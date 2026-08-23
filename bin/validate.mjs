@@ -110,10 +110,17 @@ export function validate(deck) {
     }
     // ── connector SHAPE rules. Warnings, never errors: a deck may have a deliberate exception — declare it with waive:1.
     // Ruled on two connector probes (decks/connector-probe*/RULES.md); see SKILL.md CONNECTORS for the full list.
+    //
+    // A CONNECTOR IS A STROKE WITH A HEAD. Every rule below is about a line that POINTS AT something: where it may run, how
+    // it may bend, how much air it leaves at the thing it points to. A headless stroke is a rule, an underline, an
+    // annotation leader, a chart series or decoration — it has no target, so none of this applies to it. Kyle's own ruling
+    // draws the line in exactly this place (G1's 1.5px WITH a head rejected, H5's 1px hairline leader accepted), and the
+    // cost of getting it wrong is a validator that flags a chart for being diagonal, which teaches agents to stop reading
+    // warnings at all. Length is the second guard: under 40px a headed stroke is an icon, not a run between boxes.
     // …only for rows long enough to BE connectors: a 9px stroke is a tick or a cross drawn as a line, not a run between boxes
-    if ((r.line || r.curve) && !r.waive && connLen(r) >= 40) {
+    if ((r.line || r.curve) && r.arrow && !r.waive && connLen(r) >= 40) {
       const sw = r.h ?? 3, x0 = r.x ?? 0, y0 = r.y ?? 0;
-      if (r.arrow && sw < 2.5) Wn(`${where}: a headed connector at h=${sw} is too light — use 2.5 or more (a headless leader may be a hairline)`);
+      if (sw < 2.5) Wn(`${where}: a headed connector at h=${sw} is too light — use 2.5 or more (a headless leader may be a hairline)`);
       if (Array.isArray(r.line) && r.line.every(isNum)) {
         const dx = Math.abs(r.line[0] - x0), dy = Math.abs(r.line[1] - y0);
         if (dx > 2 && dy > 2) Wn(`${where}: diagonal straight run — draw an elbow of two orthogonal segments instead`);
@@ -122,7 +129,7 @@ export function validate(deck) {
         const [c1x, c1y, c2x, c2y, ex, ey] = r.curve;
         const horiz = Math.abs(ex - x0) >= Math.abs(ey - y0), run = horiz ? Math.abs(ex - x0) : Math.abs(ey - y0);
         const A = horiz ? [x0, c1x, c2x, ex] : [y0, c1y, c2y, ey], B = horiz ? [y0, c1y, c2y, ey] : [x0, c1x, c2x, ex];
-        if (run < 96) Wn(`${where}: S-curve in a ${Math.round(run)}px channel — 96px or more, or re-cut the layout so it fits`);
+        if (run < 88) Wn(`${where}: S-curve spanning ${Math.round(run)}px — an S-curve needs about 96px of channel, or re-cut the layout so it fits`);
         const lo = Math.min(A[0], A[3]), hi = Math.max(A[0], A[3]);
         for (const k of [1, 2]) if (A[k] < lo - 2 || A[k] > hi + 2) Wn(`${where}: control point ${k} sits past the endpoints — the curve overshoots and doubles back`);
         // a control point taken out ALONG the run should reach 50%..90% of it; one taken out PERPENDICULAR (C5) is fine
@@ -162,7 +169,8 @@ export function validate(deck) {
     s.els.forEach((r, ei) => { row(r, `slides[${si}].els[${ei}]`, s); if (r && r.slot) { if (used.has(r.slot)) Wn(`slides[${si}]: slot "${r.slot}" bound twice`); used.add(r.slot); } });
     // ── connector AIR, across the slide: a connector leaves the same visible gap at both ends and never touches a
     // container. `to:`/`from:` hand that to the engine, so ends it terminates are not second-guessed here.
-    const conn = s.els.map((r, ei) => ({r, ei})).filter(o => o.r && (o.r.line || o.r.curve) && !o.r.waive && connLen(o.r) >= 40);
+    // Headed strokes only — see the note above: a chart series or a decorative path has nothing to leave air FROM.
+    const conn = s.els.map((r, ei) => ({r, ei})).filter(o => o.r && (o.r.line || o.r.curve) && o.r.arrow && !o.r.waive && connLen(o.r) >= 40);
     // containers only — the same shape the collision gate calls chrome. A tint band with no border is a backdrop a chart
     // line may legitimately run inside; the rule is about terminating on or inside a BORDER.
     const rects = s.els.filter(e => e && !isText(e) && (e.bd || e.bt || e.br || e.bb || e.bl || e.box || e.tile)
@@ -174,18 +182,22 @@ export function validate(deck) {
         const dx = Math.max(b.x - pt[0], pt[0] - (b.x + b.w), 0), dy = Math.max(b.y - pt[1], pt[1] - (b.y + b.h), 0);
         best = Math.min(best, (dx || dy) ? Math.hypot(dx, dy) : -1); }
       return best; };
+    const endOf = r => r.line ? [r.line[0], r.line[1]] : [r.curve[4], r.curve[5]];
+    // a stub is a segment that ENDS where two connectors begin — and the stub itself is normally headless (only the
+    // branches carry heads), so look for it among ALL strokes even though only headed rows are warned about
+    const fedBy = s.els.filter(e => e && (e.line || e.curve) && connLen(e) >= 40).map(endOf);
     const seen = [];
     for (const {r, ei} of conn) {
       const w = `slides[${si}].els[${ei}]`, a0 = [r.x ?? 0, r.y ?? 0];
       const z0 = r.line ? [r.line[0], r.line[1]] : [r.curve[4], r.curve[5]];
       const ends = [[a0, r.from, z0], [z0, r.to, a0]].map(([pt, term, other]) => term != null ? null : clear(pt, other));
-      for (const g of ends) if (g !== null && g <= 2) Wn(`${w}: leaves no air — a connector stops clear of the box (10px is the default; to:/from: does it for you)`);
+      for (const g of ends) if (g !== null && g <= 1) Wn(`${w}: touches the box — a connector stops clear of it (10px is the default; to:/from: does it for you)`);
       const [g1, g2] = ends;
       if (g1 !== null && g2 !== null && g1 > 2 && g2 > 2 && g1 < 60 && g2 < 60 && Math.abs(g1 - g2) > 4)
         Wn(`${w}: uneven air — ${Math.round(g1)}px at one end, ${Math.round(g2)}px at the other; use the same gap at both`);
-      // only headed connectors: a chart polyline shares vertices by nature, and that is not a stub
-      if (r.arrow) { for (const q of seen) if (Math.hypot(q[0] - a0[0], q[1] - a0[1]) < 4) Wn(`${w}: shared stub — two connectors leaving the same point read badly; fan out from the edge instead`);
-        seen.push(a0); }
+      if (fedBy.some(e => Math.hypot(e[0] - a0[0], e[1] - a0[1]) < 4))
+        for (const q of seen) if (Math.hypot(q[0] - a0[0], q[1] - a0[1]) < 4) Wn(`${w}: shared stub — a segment feeds a point that two connectors leave from; fan out from the edge instead`);
+      seen.push(a0);
     }
   });
   return {ok: !errors.length, errors, warnings};

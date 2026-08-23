@@ -321,37 +321,40 @@ test('validator: to/from terminate a connector against a row that exists', () =>
 test('validator: connector shape rules are loud warnings, and waive:1 is the declared exception', () => {
   const boxes = [{x: 0, y: 0, w: 132, h: 62, bg: '#111', bd: '2px solid #333'}, {x: 252, y: 0, w: 132, h: 62, bg: '#111', bd: '2px solid #333'}];
   const v = validate(withRoles({w: 960, h: 540, slides: [{els: [...boxes,
-    {x: 20, y: 90, line: [300, 260], bg: '#fff', h: 3},                                        // diagonal straight run
-    {x: 20, y: 300, curve: [50, 300, 70, 360, 80, 360], bg: '#fff', h: 3},                     // 60px channel
-    {x: 400, y: 300, curve: [560, 300, 720, 400, 600, 400], bg: '#fff', h: 3},                 // c2 past the endpoints
-    {x: 400, y: 460, curve: [440, 460, 560, 500, 600, 500], bg: '#fff', h: 3},                 // c1 at 20% of the run
+    {x: 20, y: 90, line: [300, 260], bg: '#fff', h: 3, arrow: 'end'},                          // diagonal straight run
+    {x: 20, y: 300, curve: [50, 300, 70, 360, 80, 360], bg: '#fff', h: 3, arrow: 'end'},       // 60px channel
+    {x: 400, y: 300, curve: [560, 300, 720, 400, 600, 400], bg: '#fff', h: 3, arrow: 'end'},   // c2 past the endpoints
+    {x: 400, y: 460, curve: [440, 460, 560, 500, 600, 500], bg: '#fff', h: 3, arrow: 'end'},   // c1 at 20% of the run
     {x: 142, y: 31, line: [242, 31], bg: '#fff', h: 1.5, arrow: 'end'},                        // headed hairline
     {x: 400, y: 100, line: [500, 100], bg: '#fff', h: 1},                                      // headless hairline: fine
   ]}]}));
-  for (const re of [/diagonal straight run/, /60px channel/, /past the endpoints/, /20% of the run/, /too light/]) assert.ok(v.warnings.some(w => re.test(w)), String(re));
+  for (const re of [/diagonal straight run/, /spanning 60px/, /past the endpoints/, /20% of the run/, /too light/]) assert.ok(v.warnings.some(w => re.test(w)), String(re));
   assert.equal(v.errors.length, 0, JSON.stringify(v.errors));
   assert.ok(!v.warnings.some(w => /h=1 /.test(w)), 'a headless leader may be a hairline (H5)');
   // every one of them goes quiet when the row declares the exception
   const waived = validate(withRoles({w: 960, h: 540, slides: [{els: [
-    {x: 20, y: 90, line: [300, 260], bg: '#fff', h: 3, waive: 1},
-    {x: 20, y: 300, curve: [50, 300, 70, 360, 80, 360], bg: '#fff', h: 3, waive: 1},
+    {x: 20, y: 90, line: [300, 260], bg: '#fff', h: 3, arrow: 'end', waive: 1},
+    {x: 20, y: 300, curve: [50, 300, 70, 360, 80, 360], bg: '#fff', h: 3, arrow: 'end', waive: 1},
   ]}]}));
   assert.deepEqual(waived.warnings, [], JSON.stringify(waived.warnings));
 });
 test('validator: a connector leaves air, and the same amount at both ends', () => {
   const boxes = [{x: 0, y: 0, w: 132, h: 62, bg: '#111', bd: '2px solid #333'}, {x: 252, y: 0, w: 132, h: 62, bg: '#111', bd: '2px solid #333'}];
   const one = els => validate(withRoles({w: 960, h: 540, slides: [{els: [...boxes, ...els]}]})).warnings;
-  assert.ok(one([{x: 132, y: 31, line: [252, 31], bg: '#fff', h: 3}]).some(w => /leaves no air/.test(w)), 'flush against both borders (K1/D1)');
-  assert.ok(one([{x: 136, y: 31, line: [236, 31], bg: '#fff', h: 3}]).some(w => /uneven air/.test(w)), '4px vs 16px (K5)');
-  assert.deepEqual(one([{x: 142, y: 31, line: [242, 31], bg: '#fff', h: 3}]), [], '10px both ends (K3) is clean');
+  assert.ok(one([{x: 132, y: 31, line: [252, 31], bg: '#fff', h: 3, arrow: 'end'}]).some(w => /touches the box/.test(w)), 'flush against both borders (K1/D1)');
+  assert.ok(one([{x: 136, y: 31, line: [236, 31], bg: '#fff', h: 3, arrow: 'end'}]).some(w => /uneven air/.test(w)), '4px vs 16px (K5)');
+  assert.deepEqual(one([{x: 142, y: 31, line: [242, 31], bg: '#fff', h: 3, arrow: 'end'}]), [], '10px both ends (K3) is clean');
+  assert.deepEqual(one([{x: 134, y: 31, line: [250, 31], bg: '#fff', h: 3, arrow: 'end'}]), [], 'the rule is about touching a border, not about being tight');
   // to:/from: hand the gap to the engine, so the authored geometry is not second-guessed
-  assert.deepEqual(one([{x: 132, y: 31, line: [252, 31], bg: '#fff', h: 3, to: 1, from: 0}]), [], 'terminated connectors are the engine\'s business');
+  assert.deepEqual(one([{x: 132, y: 31, line: [252, 31], bg: '#fff', h: 3, arrow: 'end', to: 1, from: 0}]), [], 'terminated connectors are the engine\'s business');
 });
 test('validator: no shared stubs, and head/arrow compose', () => {
-  const v = validate(withRoles({w: 960, h: 540, slides: [{els: [
-    {x: 100, y: 100, curve: [180, 100, 180, 60, 260, 60], bg: '#fff', h: 3, arrow: 'end'},
-    {x: 100, y: 100, curve: [180, 100, 180, 140, 260, 140], bg: '#fff', h: 3, arrow: 'end'},
-  ]}]}));
+  const fan = [{x: 100, y: 100, curve: [180, 100, 180, 60, 260, 60], bg: '#fff', h: 3, arrow: 'end'},
+               {x: 100, y: 100, curve: [180, 100, 180, 140, 260, 140], bg: '#fff', h: 3, arrow: 'end'}];
+  // F4: two curves straight off one point, no stub feeding it — accepted
+  assert.deepEqual(validate(withRoles({w: 960, h: 540, slides: [{els: fan}]})).warnings, [], 'a stubless fan-out is not a stub');
+  // F3/E4: a segment ENDS at that point and the two curves leave from it — that junction is what reads badly
+  const v = validate(withRoles({w: 960, h: 540, slides: [{els: [{x: 40, y: 100, line: [100, 100], bg: '#fff', h: 3, arrow: 'end'}, ...fan]}]}));
   assert.ok(v.warnings.some(w => /shared stub/.test(w)), JSON.stringify(v.warnings));
   const h = validate(withRoles({w: 960, h: 540, slides: [{els: [
     {x: 100, y: 100, line: [300, 100], bg: '#fff', h: 3, arrow: 'end', head: 'dot'},
@@ -370,6 +373,26 @@ test('validator: dash is 1 or [on,off]', () => {
   ]}]}));
   for (const re of [/dash must be 1 or \[on,off\]/, /dash needs a line or a curve/]) assert.ok(v.errors.some(e => re.test(e)), String(re));
   assert.equal(v.errors.length, 2, JSON.stringify(v.errors));
+});
+test('validator: a connector is a stroke with a HEAD — headless rules, leaders, chart series and decoration are exempt', () => {
+  // every row here would trip a connector rule if it were judged as one: a diagonal, a tight channel, a control point past
+  // the end, one at 20% of the run, a flush end, and uneven ends. None carries an arrow, so none of them is a connector.
+  const boxes = [{x: 0, y: 0, w: 132, h: 62, bg: '#111', bd: '2px solid #333'}, {x: 252, y: 0, w: 132, h: 62, bg: '#111', bd: '2px solid #333'}];
+  const shapes = [
+    {x: 20, y: 90, line: [300, 260], bg: '#fff', h: 3},                          // a chart series segment is diagonal by definition
+    {x: 20, y: 90, line: [300, 20], bg: '#fff', h: 3},                           // …and shares a vertex with the one above (a polyline, not a stub)
+    {x: 20, y: 300, curve: [50, 300, 70, 360, 80, 360], bg: '#fff', h: 3},       // a decorative swoosh in a 60px space
+    {x: 400, y: 300, curve: [560, 300, 720, 400, 600, 400], bg: '#fff', h: 3},
+    {x: 400, y: 460, curve: [440, 460, 560, 500, 600, 500], bg: '#fff', h: 3},
+    {x: 132, y: 31, line: [252, 31], bg: '#fff', h: 3},                          // a rule touching both boxes: it is a rule
+    {x: 136, y: 45, line: [236, 45], bg: '#fff', h: 1},                          // 4px/16px — a hairline leader, not a connector
+  ];
+  assert.deepEqual(validate(withRoles({w: 960, h: 540, slides: [{els: [...boxes, ...shapes]}]})).warnings, [],
+    'headless strokes must not be judged as connectors — a validator that flags a chart for being diagonal teaches agents to ignore it');
+  // the identical geometry WITH a head is a connector, and every rule applies
+  const headed = validate(withRoles({w: 960, h: 540, slides: [{els: [...boxes, ...shapes.map(r => ({...r, arrow: 'end'}))]}]})).warnings;
+  for (const re of [/diagonal straight run/, /spanning 60px/, /past the endpoints/, /% of the run/, /touches the box/, /uneven air/, /too light/])
+    assert.ok(headed.some(w => re.test(w)), String(re) + ' — ' + JSON.stringify(headed));
 });
 test('validator: structural errors', () => {
   assert.ok(validate(null).errors.length); assert.ok(validate({w: 1, h: 1, styles: {roles: {}}, slides: []}).errors.some(e => /slides must be/.test(e)));
