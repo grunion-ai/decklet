@@ -87,6 +87,15 @@ export function validate(deck) {
     if (r.curve && !(Array.isArray(r.curve) && r.curve.length === 6 && r.curve.every(isNum))) E(`${where}: curve must be [c1x,c1y,c2x,c2y,x2,y2]`);
     if (r.arrow && !ARROWS.includes(r.arrow)) E(`${where}: arrow "${r.arrow}" not one of ${ARROWS.join('|')}`);
     else if (r.arrow && !r.line && !r.curve) E(`${where}: arrow needs a line or a curve to sit on`);
+    // to/from: terminate a connector against another row, so the engine — not the author — computes where the head stops
+    for (const p of ['to', 'from']) {
+      if (r[p] == null) continue;
+      if (!r.line && !r.curve) { E(`${where}: ${p} needs a line or a curve to terminate`); continue; }
+      const tgt = typeof r[p] === 'number' ? (s && s.els || [])[r[p]] : ((s && s.els || []).find(x => x.id === r[p]) || master.find(m => m.id === r[p]));
+      if (!tgt) { E(`${where}: ${p} "${r[p]}" is not a row id on this slide, a master id, or a row index`); continue; }
+      const sl = (tgt.slot && ((deck.slots || {})[tgt.slot] || (s && layouts[s.layout] && layouts[s.layout][tgt.slot]))) || {};
+      if (!['x', 'y', 'w', 'h'].every(k => isNum(tgt[k] ?? sl[k]))) Wn(`${where}: ${p} "${r[p]}" has no resolvable x/y/w/h — the connector cannot be clipped to it`);
+    }
     if (r.href != null && !HREF.test(String(r.href).trim())) E(`${where}: href "${String(r.href).slice(0, 40)}" must be http, https or mailto`);
     if (r.html) for (const m of r.html.matchAll(/<a\b[^>]*\bhref\s*=\s*["']([^"']*)["']/gi)) if (!HREF.test(m[1].trim())) E(`${where}: link run href "${m[1].slice(0, 40)}" must be http, https or mailto`);
     if (r.anim && !ANIMS.includes(r.anim)) E(`${where}: anim "${r.anim}" not one of ${ANIMS.join('|')}`);

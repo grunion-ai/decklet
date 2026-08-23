@@ -152,6 +152,21 @@ test('blocked storage: probed at load, says what to do, and reveals ⌘S save-a-
   assert.equal((tpl.match(/localStorage\./g) || []).length, 5, 'storage API only inside the shim and the probe');
 });
 
+// ── 2c. the HUD is a contract: what ships and what SKILL.md promises are checked against each other ──
+test('HUD contract does not drift: SKILL.md names exactly the controls the template ships', () => {
+  // the controls themselves, not the items inside the + and ⓘ pop-ups
+  const hud = tpl.match(/<div id="hud">[\s\S]*?\n<\/div>/)[0].replace(/<div id="(?:addmenu|helpmenu)"[\s\S]*?<\/div>/g, '');
+  const shipped = [...hud.matchAll(/<(?:button|span) id="([^"]+)"/g)].map(m => m[1]);
+  const doc = read('SKILL.md').match(/<!-- HUD: ([^>]*) -->/);
+  assert.ok(doc, 'SKILL.md carries a machine-checked HUD manifest');
+  assert.deepEqual(doc[1].trim().split(/\s+/), shipped, 'the documented HUD and the shipped HUD are the same set, in the same order');
+});
+test('present mode: the peek HUD is a centred pill, so it cannot sit on the page counter', () => {
+  assert.match(tpl, /body\.present\.peek #hud\{[^}]*left:50%[^}]*transform:translateX\(-50%\)/, 'centred, not full-width');
+  assert.match(tpl, /body\.present\.peek #hud\{[^}]*bottom:12px/, 'lifted off the bottom edge');
+  assert.match(tpl, /body\.present\.peek #hud \.spacer\{display:none\}/, 'the spacer must not stretch the pill back across the slide');
+});
+
 // ── 2b. motion: a four-word vocabulary, replayed on slide ENTRY only, absent from print/parity/reduced motion ──
 test('motion: rise · fade · pop · wipe are the whole vocabulary; unknown anims paint nothing', () => {
   assert.match(tpl, /const ANIM=\['rise','fade','pop','wipe'\]/, 'renderer whitelists the vocabulary');
@@ -263,6 +278,19 @@ test('validator: curve is six numbers, arrow is one of three and only on a line 
     {x: 0, y: 0, w: 100, role: 'Body', text: 'plain', arrow: 'end'},
   ]}]}));
   for (const re of [/curve must be \[c1x,c1y,c2x,c2y,x2,y2\]/, /arrow "barb"/, /arrow needs a line or a curve/]) assert.ok(v.errors.some(e => re.test(e)), String(re));
+  assert.equal(v.errors.length, 3, JSON.stringify(v.errors));
+});
+test('validator: to/from terminate a connector against a row that exists', () => {
+  const v = validate(withRoles({w: 960, h: 540, master: [{id: 'chip', x: 0, y: 0, w: 40, h: 40, bg: '#000'}], slides: [{els: [
+    {x: 0, y: 0, w: 100, h: 60, bg: '#111'},
+    {x: 200, y: 30, line: [400, 30], bg: '#fff', arrow: 'end', to: 0, from: 'chip'},
+    {id: 'card', x: 600, y: 0, w: 80, h: 80, bg: '#222'},
+    {x: 200, y: 30, curve: [250, 30, 300, 90, 400, 90], bg: '#fff', arrow: 'end', to: 'card'},
+    {x: 200, y: 30, curve: [250, 30, 300, 90, 400, 90], bg: '#fff', arrow: 'end', to: 9},
+    {x: 200, y: 30, line: [400, 30], bg: '#fff', to: 'ghost'},
+    {x: 0, y: 0, w: 100, role: 'Body', text: 'plain', to: 0},
+  ]}]}));
+  for (const re of [/to "9" is not a row id on this slide, a master id, or a row index/, /to "ghost" is not a row/, /to needs a line or a curve/]) assert.ok(v.errors.some(e => re.test(e)), String(re));
   assert.equal(v.errors.length, 3, JSON.stringify(v.errors));
 });
 test('validator: structural errors', () => {
@@ -577,6 +605,64 @@ live('live: a curve is a bezier row, and arrow heads come from the engine', asyn
   assert.equal(got.heads, 2, 'arrow:"both" puts a head on each end of a straight line');
   assert.deepEqual(errs, []);
 });
+live('live: to/from terminate a connector on the target\'s border — the arrow head never floats on its fill', async () => {
+  const box = {x: 500, y: 180, w: 200, h: 100, bg: '#1A1D21', bd: '1.5px solid #5B9CF6', radius: 10};
+  const model = {w: 960, h: 540, styles: {roles: modelOf(tpl).styles.roles}, slides: [{els: [
+    box,
+    {x: 200, y: 230, line: [600, 230], bg: '#5B9CF6', h: 3, arrow: 'end', to: 0},                          // aimed at the box CENTRE
+    {x: 200, y: 400, curve: [340, 400, 420, 230, 600, 230], bg: '#6B9E8C', h: 3, arrow: 'end', to: 0},     // same, on a bezier
+    {x: 200, y: 460, line: [600, 460], bg: '#C97A54', h: 3, arrow: 'end'},                                 // no `to`: ends exactly where told
+  ]}]};
+  const f = path.join(tmp, 'terminate.html'); fs.writeFileSync(f, create(model).html);
+  const b = await pw.chromium.launch(); const p = await b.newPage({viewport: {width: 1280, height: 800}});
+  const errs = []; p.on('pageerror', e => errs.push(String(e)));
+  await p.goto(pathToFileURL(f).href); await p.waitForSelector('#canvas .el');
+  const got = await p.evaluate(() => {
+    const end = k => { const d = canvas.querySelector(`[data-n="${k}"]`);
+      if (d.dataset.seg) { const [, , x2, y2] = d.dataset.seg.split(',').map(Number); return [x2, y2]; }
+      const c = d.dataset.cur.split(',').map(Number); return [c[6], c[7]]; };
+    return {clipped: end(1), curved: end(2), plain: end(3), heads: [1, 2, 3].map(k => canvas.querySelector(`[data-n="${k}"]`).dataset.head)};
+  });
+  await b.close();
+  assert.equal(Math.round(got.clipped[0]), 500, 'the straight connector stops on the box\'s left border (x=500), not at the 600 it was given');
+  assert.equal(Math.round(got.clipped[1]), 230);
+  assert.ok(Math.abs(got.curved[0] - 500) < 6 || Math.abs(got.curved[1] - 280) < 6, `the bezier stops on a border too: ${got.curved}`);
+  assert.deepEqual(got.plain, [600, 460], 'without `to` the endpoint is exactly what the author wrote');
+  assert.deepEqual(got.heads, ['end', 'end', 'end'], 'the head end is declared for the collision gate');
+  assert.deepEqual(errs, []);
+});
+live('live: the page counter reads "1 / 3" when the footer row is empty, "text · 1 / 3" when it is not', async () => {
+  const mk = text => ({w: 960, h: 540, styles: {roles: modelOf(tpl).styles.roles},
+    master: [{id: 'foot', footer: 1, x: 60, y: 500, w: 300, role: 'Label', ...(text ? {text} : {text: ''})}],
+    slides: [{els: []}, {els: []}, {els: []}]});
+  const out = [];
+  const b = await pw.chromium.launch(); const p = await b.newPage({viewport: {width: 1280, height: 800}});
+  for (const t of ['', 'undersight']) {
+    const f = path.join(tmp, 'foot-' + (t || 'empty') + '.html'); fs.writeFileSync(f, create(mk(t)).html);
+    await p.goto(pathToFileURL(f).href); await p.evaluate(() => { localStorage.clear(); }); await p.reload(); await p.waitForSelector('#canvas [data-footer]');
+    out.push(await p.evaluate(() => canvas.querySelector('[data-footer]').textContent));
+  }
+  await b.close();
+  assert.deepEqual(out, ['1 / 3', 'undersight · 1 / 3'], 'the separator only means something after preceding text');
+});
+live('live: present-mode peek HUD clears the page counter', async () => {
+  // a 4:5 carousel with a right-anchored footer on the margin — a tall deck is HEIGHT-constrained, so the canvas fills the
+  // screen top to bottom and its bottom-right counter lands exactly where the HUD peeks (what Kyle saw)
+  const model = {w: 1080, h: 1350, format: 'carousel-4x5', styles: {roles: modelOf(tpl).styles.roles, margin: 72},
+    master: [{id: 'foot', footer: 1, x: 700, y: 1290, w: 300, role: 'Label', text: 'undersight'}], slides: [{els: []}, {els: []}]};
+  const f = path.join(tmp, 'peek.html'); fs.writeFileSync(f, create(model).html);
+  const b = await pw.chromium.launch(); const p = await b.newPage({viewport: {width: 1280, height: 800}});
+  await p.goto(pathToFileURL(f).href); await p.waitForSelector('#canvas [data-footer]');
+  // fullscreen geometry: the canvas fills the screen, so its bottom-right counter is where the HUD peeks. Windowed mode
+  // reserves 52px below the canvas and hides the clash — which is why this has to be measured at the fullscreen scale.
+  const hit = await p.evaluate(() => { document.body.classList.add('present', 'peek');
+    canvas.style.transform = `scale(${Math.min(innerWidth / deck.w, innerHeight / deck.h)})`;
+    const a = document.getElementById('hud').getBoundingClientRect(), c = canvas.querySelector('[data-footer]').getBoundingClientRect();
+    return {overlap: !(a.right < c.left || a.left > c.right || a.bottom < c.top || a.top > c.bottom), hud: [a.left, a.top, a.width], counter: [c.left, c.top, c.width]};
+  });
+  await b.close();
+  assert.equal(hit.overlap, false, `the peek HUD sits on the page counter: ${JSON.stringify(hit)}`);
+});
 live('live: parity catches a painted row drawn THROUGH a text row (the class of defect a human sees instantly)', async () => {
   const roles = modelOf(tpl).styles.roles;
   const label = {x: 300, y: 260, w: 220, role: 'Body', nowrap: 1, text: 'grade held at B'};
@@ -598,6 +684,41 @@ live('live: parity catches a painted row drawn THROUGH a text row (the class of 
   assert.equal(res.over.parity[0].pass, true, 'over:1 is how a deliberate overlay is expressed');
   assert.equal(res.tile.parity[0].pass, true, 'a text row sitting inside a tile is containment, not collision');
   assert.equal(res.miss.parity[0].pass, true);
+});
+live('live: parity catches text straddling a container edge, and an arrow head landing inside a fill', async () => {
+  const roles = modelOf(tpl).styles.roles;
+  const tile = {x: 300, y: 200, w: 300, h: 140, tile: 1, bg: '#1A1D21', bd: '1.5px solid #2C3138', radius: 12};
+  const ring = {x: 300, y: 200, w: 300, h: 300, bd: '1.5px solid #2C3138', radius: 150};   // a decoration, not a container
+  const band = {x: 100, y: 200, w: 760, h: 90, bg: '#20262E'};                             // a tint, no border — a backdrop
+  const mk = els => ({w: 960, h: 540, styles: {roles}, slides: [{els}]});
+  const cases = {
+    inside:   mk([tile, {x: 320, y: 250, w: 260, role: 'Body', align: 'center', nowrap: 1, text: 'well inside'}]),
+    straddle: mk([tile, {x: 480, y: 250, w: 260, role: 'Body', nowrap: 1, text: 'half out of the tile'}]),
+    over:     mk([tile, {x: 480, y: 250, w: 260, role: 'Body', nowrap: 1, text: 'half out of the tile', over: 1}]),
+    ring:     mk([ring, {x: 200, y: 320, w: 500, role: 'Body', nowrap: 1, text: 'a headline across a decorative ring'}]),
+    band:     mk([band, {x: 120, y: 275, w: 500, role: 'Body', nowrap: 1, text: 'a caption on the edge of a tint band'}]),
+    outside:  mk([tile, {x: 60, y: 420, w: 200, role: 'Body', nowrap: 1, text: 'nowhere near'}]),
+    headIn:   mk([tile, {x: 100, y: 270, line: [450, 270], bg: '#5B9CF6', h: 3, arrow: 'end'}]),   // tips 150px inside the fill
+    headOn:   mk([tile, {x: 100, y: 270, line: [450, 270], bg: '#5B9CF6', h: 3, arrow: 'end', to: 0}]),
+    through:  mk([tile, {x: 100, y: 270, line: [860, 270], bg: '#5B9CF6', h: 3}]),                 // crosses, no head: routing, not a landing
+  };
+  const res = {};
+  for (const [k, m] of Object.entries(cases)) {
+    const f = path.join(tmp, 'g4-' + k + '.html'); fs.writeFileSync(f, create(m).html);
+    res[k] = await verify(f, {out: path.join(tmp, 'v-g4-' + k), log: () => {}});
+  }
+  const pass = k => res[k].parity[0].pass, why = k => JSON.stringify(res[k].parity[0].rows);
+  assert.equal(pass('inside'), true, 'text on a tile is containment: ' + why('inside'));
+  assert.equal(pass('straddle'), false, 'a label hanging out of its tile must fail');
+  assert.match(why('straddle'), /straddles/);
+  assert.equal(pass('over'), true, 'over:1 is still the opt-out');
+  assert.equal(pass('ring'), true, 'a circle outline is decoration — its bounding square is not a container edge: ' + why('ring'));
+  assert.equal(pass('band'), true, 'a tint with no border is a backdrop, not a container: ' + why('band'));
+  assert.equal(pass('outside'), true, why('outside'));
+  assert.equal(pass('headIn'), false, 'an arrow head floating on a box fill must fail');
+  assert.match(why('headIn'), /arrow lands inside/);
+  assert.equal(pass('headOn'), true, '`to` puts the head on the border: ' + why('headOn'));
+  assert.equal(pass('through'), true, 'a headless line crossing a card is routing, not a landing: ' + why('through'));
 });
 live('live: the tab title is the model title — the ⤓ PDF and the ⌘S copy inherit it clean', async () => {
   const f = path.join(tmp, 'titled.html');

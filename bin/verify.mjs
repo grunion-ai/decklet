@@ -64,7 +64,21 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
         const b = d.getBoundingClientRect();   // a thin rule or dot: axis-aligned, sample its own footprint
         for (let k = 0; k <= 40; k++) { const u = k / 40; pts.push({x: b.left + b.width * u, y: b.top + b.height * u}, {x: b.left + b.width * u, y: b.bottom - b.height * u}); }
         return {key, pts, t: Math.min(b.width, b.height) / 2 + 1};
+      }).map(q => { const d = [...document.querySelectorAll('#canvas .el[data-seg],#canvas .el[data-cur],#canvas .el[data-ink]')].find(x => (x.dataset.n ?? ('m:' + x.dataset.m)) === q.key);
+        return {...q, head: d && d.dataset.head};   // which end carries an arrow, so the gate can ask where the head landed
       });
+      // container edges the engine declared. `over:1` opts a row out of both new checks, as it does for stroke-over-text.
+      const chrome = [...document.querySelectorAll('#canvas .el[data-chrome]')].filter(d => d.dataset.over == null)
+        .map(d => ({key: d.dataset.n ?? ('m:' + d.dataset.m), b: d.getBoundingClientRect()}));
+      // an arrow HEAD terminating inside a fill is a defect (the connector was aimed at a centre, not stopped on the edge);
+      // a headless stroke crossing the same box is routing. A LANDING means the connector crossed INTO the box — it starts
+      // outside and ends inside. A box that holds both ends is the container the diagram lives in, not the thing pointed at.
+      // Depth tolerance covers the border and its antialiasing.
+      const headHits = [], within = (p, b) => p.x > b.left && p.x < b.right && p.y > b.top && p.y < b.bottom;
+      for (const q of ink) { if (!q.head) continue;
+        for (const [on, p, o] of [[q.head !== 'start', q.pts.at(-1), q.pts[0]], [q.head !== 'end', q.pts[0], q.pts.at(-1)]]) { if (!on) continue;
+          for (const c of chrome) if (!within(o, c.b) && p.x > c.b.left + 4 && p.x < c.b.right - 4 && p.y > c.b.top + 4 && p.y < c.b.bottom - 4) headHits.push({key: q.key, on: c.key});
+        } }
       return [...document.querySelectorAll('#canvas .el')].map(d => {
         const r = d.getBoundingClientRect(), cv = document.getElementById('canvas').getBoundingClientRect();
         const o = {text: (d.textContent || '').trim().slice(0, 40), n: d.dataset.n ?? ('m:' + d.dataset.m), problems: [], ...(d.dataset.snapped ? {snapped: 1} : {})};
@@ -77,14 +91,24 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
           if (d.style.whiteSpace === 'nowrap' && lines > 1) o.problems.push(`nowrap row renders ${lines} lines`);
           if (d.dataset.lines && +d.dataset.lines !== lines) o.problems.push(`source had ${d.dataset.lines} line(s), renders ${lines}`);
           o.lines = lines;
-          if (d.dataset.over == null && ink.length) {
+          if (d.dataset.over == null && (ink.length || chrome.length)) {
             // glyph rects carry the line box's leading; inset it so a rule sitting just under a heading is not a "collision".
             // TWO samples inside = the stroke passes THROUGH the glyphs; one = it merely touches an edge (a leader pointing at a label).
             const gl = [...rg.getClientRects()].filter(x => x.width > 1 && x.height > 1).map(x => ({l: x.left, r: x.right, t: x.top + x.height * .15, b: x.bottom - x.height * .15}));
             const hit = ink.filter(q => q.pts.filter(z => gl.some(g => z.x > g.l - q.t && z.x < g.r + q.t && z.y > g.t - q.t && z.y < g.b + q.t)).length >= 2);
             if (hit.length) o.problems.push('overlapped by ' + hit.map(q => q.key).join(','));
+            // …and text must be wholly inside a container or wholly outside it. Straddling an edge is the other shape a human
+            // sees instantly: a label crossing a tile's border, or hanging half out of the box that is supposed to hold it.
+            const TOL = 2, cross = chrome.filter(c => gl.some(g => {
+              const inside = g.l >= c.b.left - TOL && g.r <= c.b.right + TOL && g.t >= c.b.top - TOL && g.b <= c.b.bottom + TOL;
+              const outside = g.r <= c.b.left + TOL || g.l >= c.b.right - TOL || g.b <= c.b.top + TOL || g.t >= c.b.bottom - TOL;
+              return !inside && !outside;
+            }));
+            if (cross.length) o.problems.push('straddles ' + cross.map(c => c.key).join(','));
           }
         }
+        const hh = headHits.filter(x => x.key === o.n);
+        if (hh.length) o.problems.push('arrow lands inside ' + [...new Set(hh.map(x => x.on))].join(',') + ' — terminate it with to:/from:');
         if (r.right > cv.left + W + 1 || r.bottom > cv.top + H + 1 || r.left < cv.left - 1 || r.top < cv.top - 1) o.problems.push('outside the canvas');
         return o;
       }).filter(o => o.problems.length); }, [W, H]);

@@ -96,7 +96,10 @@ body.dragging{-webkit-user-select:none;user-select:none}
 body.present #hud,body.present .h{display:none!important}
 body.present #canvas{border:0;border-radius:0}
 /* …but the HUD peeks back in while the pointer hovers the bottom twelfth (video-player controls pattern) */
-body.present.peek #hud{display:flex!important;position:fixed;left:0;right:0;bottom:0;z-index:10;background:var(--card);border-top:1px solid var(--line)}
+/* peek HUD: a centred pill, lifted off the bottom edge. Full-width + bottom:0 put the right-hand controls exactly on the
+   deck's own page counter (bottom-right, on styles.margin) whenever the canvas fills the screen — a tall 4:5 deck always. */
+body.present.peek #hud{display:flex!important;position:fixed;left:50%;right:auto;transform:translateX(-50%);bottom:12px;width:auto;max-width:calc(100vw - 24px);flex-wrap:nowrap;z-index:10;background:var(--card);border:1px solid var(--line);border-top:1px solid var(--line);border-radius:10px}
+body.present.peek #hud .spacer{display:none}
 /* print: Safari forces US Letter PORTRAIT — it ignores px @page sizes AND the landscape keyword (margin:0 is honored).
    Layout is page-size-independent: each page is the model space at true size (absolute px, no clamps),
    `zoom`ed to the printable page width (816/W for Letter, 794/W for A4 — see deck.page). Each page paints ITS slide's bg; the dark body paints the letterbox. */
@@ -237,6 +240,37 @@ const paints=r=>!!(r.text||r.html||r.svg||r.img||r.bg||r.bd||r.bt||r.br||r.bb||r
 const href=u=>{u=String(u==null?'':u).trim();return /^(https?:|mailto:)/i.test(u)?u:''};
 // arrow heads: which ends of a line or a curve carry one
 const AR=r=>({start:[1,0],end:[0,1],both:[1,1]}[r.arrow]||[0,0]);
+// `to` / `from`: terminate a connector AGAINST another row instead of at a hand-computed standoff. A connector points AT a
+// thing, so an author naturally gives the target's coordinate — and the head then floats inside its fill. The engine finds
+// where the stroke crosses the target's box and stops there, so the head tips ON the border. Target = a row `id` (on this
+// slide or in the master), or a slide row index; it must have resolvable numeric x/y/w/h (validate enforces both). Prefer
+// an id: array indices shift the moment a row is inserted, and a deck built programmatically does not know them.
+const boxOf=(k,s)=>{const e=typeof k==='number'?((s.els||[])[k]):((s.els||[]).find(x=>x.id===k)||(deck.master||[]).find(m=>m.id===k));if(!e)return null;
+  const sl=e.slot&&LAY(s)[e.slot]||{},x=e.x??sl.x,y=e.y??sl.y,w=e.w??sl.w,h=e.h??sl.h;
+  return [x,y,w,h].every(v=>typeof v==='number')?{x,y,w,h}:null};
+const inBox=(p,b)=>p.x>=b.x&&p.x<=b.x+b.w&&p.y>=b.y&&p.y<=b.y+b.h;
+// bisect for the boundary, walking IN from the given end; null when that end is not inside (nothing to clip) or the whole
+// stroke is swallowed (the author aimed a connector that starts and ends inside the same box)
+const edgeT=(P,b,end)=>{const a=end?1:0,z=end?0:1;if(!inBox(P(a),b)||inBox(P(z),b))return null;
+  let lo=a,hi=z;for(let k=0;k<40;k++){const m=(lo+hi)/2;inBox(P(m),b)?lo=m:hi=m}return hi};
+const lerp=(a,b,t)=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});
+// de Casteljau: the sub-curve between t0 and t1, so a clipped bezier is still one exact cubic
+const bezPart=(p,t0,t1)=>{const cut=(q,t)=>{const a=lerp(q[0],q[1],t),b=lerp(q[1],q[2],t),c=lerp(q[2],q[3],t),d=lerp(a,b,t),e=lerp(b,c,t),f=lerp(d,e,t);return [[q[0],a,d,f],[f,e,c,q[3]]]};
+  let q=p;if(t1<1)q=cut(q,t1)[0];if(t0>0)q=cut(q,(t1<1&&t1>0)?t0/t1:t0)[1];return q};
+// clip a connector row in place against whatever `from`/`to` name
+function terminate(r,s){
+  if(!(r.line||r.curve)||(r.to==null&&r.from==null))return;
+  const s0={x:r.x||0,y:r.y||0};
+  if(r.line){let a=s0,z={x:r.line[0],y:r.line[1]};const P=t=>lerp(a,z,t);
+    for(const [k,end] of [[r.to,1],[r.from,0]]){if(k==null)continue;const b=boxOf(k,s);if(!b)continue;
+      const t=edgeT(P,b,end);if(t==null)continue;const q=lerp(a,z,t);end?z=q:a=q}
+    r.x=a.x;r.y=a.y;r.line=[z.x,z.y];return}
+  let q=[s0,{x:r.curve[0],y:r.curve[1]},{x:r.curve[2],y:r.curve[3]},{x:r.curve[4],y:r.curve[5]}];
+  const at=(p,t)=>{const u=1-t,f=(a,b,c,d)=>u*u*u*a+3*u*u*t*b+3*u*t*t*c+t*t*t*d;return {x:f(p[0].x,p[1].x,p[2].x,p[3].x),y:f(p[0].y,p[1].y,p[2].y,p[3].y)}};
+  for(const [k,end] of [[r.to,1],[r.from,0]]){if(k==null)continue;const b=boxOf(k,s);if(!b)continue;
+    const t=edgeT(u=>at(q,u),b,end);if(t==null)continue;q=bezPart(q,end?0:t,end?t:1)}
+  r.x=q[0].x;r.y=q[0].y;r.curve=[q[1].x,q[1].y,q[2].x,q[2].y,q[3].x,q[3].y];
+}
 let uid=0; // marker ids must be unique per document — the contact sheet renders every slide at once
 // shared element painter — render(), the contact sheet and the print pipeline all use it
 function drawEls(s,root,animate){
@@ -247,6 +281,7 @@ function drawEls(s,root,animate){
   (s.els||[]).forEach((el,n)=>items.push({el,n}));
   items.forEach(({el,n,m})=>{
     const r=res(el,s),d=document.createElement('div');
+    terminate(r,s); // `to`/`from` clip the stroke before anything reads r.x/r.y/r.line/r.curve
     const an=animate&&ANIM.includes(r.anim)?r.anim:'';
     d.className='el'+(r.box?' box':'')+(r.tile?' tile':'')+(an?' '+an:'');
     if(r.svg)d.innerHTML=r.svg;
@@ -288,12 +323,19 @@ function drawEls(s,root,animate){
     if(an)d.style.animationDelay=(a++*120)+'ms';
     if(el._lines)d.dataset.lines=el._lines; // extractor metadata: source line count (layout-parity proof)
     if(el.over)d.dataset.over=1; // declared overlay: verify's collision check leaves this row alone
+    if((r.line||r.curve)&&r.arrow)d.dataset.head=r.arrow; // which end carries a head — the gate checks where it lands
+
     // ink = what can be drawn THROUGH text: leader lines, curves, rules, hairlines, small dots. A card, tile, bar, donut or
     // backdrop is something text is meant to sit ON — a stacking decision, not a collision. The engine declares it; verify reads it.
     if(!(r.text||r.html)){const thin=Math.min(r.w==='auto'?1e4:(+r.w||1e4),+r.h||1e4)<=24;
       if(r.line)d.dataset.seg=[r.x||0,r.y||0,r.line[0],r.line[1],r.h||3].join(',');
       else if(r.curve)d.dataset.cur=[r.x||0,r.y||0,...r.curve,r.h||3].join(',');
-      else if((r.bg||r.bd)&&thin&&!r.bar&&r.donut==null)d.dataset.ink=1}
+      else if((r.bg||r.bd)&&thin&&!r.bar&&r.donut==null)d.dataset.ink=1;
+      // chrome = a CONTAINER edge: a box/tile or any bordered rect big enough to hold something. Text must be wholly inside
+      // it or wholly outside; an arrow head must stop on it, never inside its fill. A tint with no border is a backdrop, and
+      // a circle/pill outline is decoration whose bounding square is not an edge — neither is chrome.
+      const rad=typeof r.radius==='number'?r.radius:0;
+      if(!thin&&rad<Math.min(+r.w||1e4,+r.h||1e4)*.25&&(r.box||r.tile||r.bd||r.bt||r.br||r.bb||r.bl))d.dataset.chrome=1}
     if(el._src)d.dataset.snapped=1; // extractor metadata: the type scale changed this row (its line-count drift is scale crowding, not a parity failure)
     if(n!=null)d.dataset.n=n;else d.dataset.m=m;
     root.appendChild(d);
@@ -319,7 +361,7 @@ function render(){
   placeTb();
 }
 // counter: inside the footer master row when one exists (inherits its font/baseline/padding); else the generic pin
-const num=(root,n)=>{const f=root.querySelector('[data-footer]');const c=document.createElement(f?'span':'div');c.className=f?'num':'num pin';c.textContent=(f?' · ':'')+n+' / '+deck.slides.length;if(!f)c.style.right=MG()+'px';(f||root).appendChild(c)};
+const num=(root,n)=>{const f=root.querySelector('[data-footer]');const c=document.createElement(f?'span':'div');c.className=f?'num':'num pin';c.textContent=(f&&f.textContent.trim()?' · ':'')+n+' / '+deck.slides.length;if(!f)c.style.right=MG()+'px';(f||root).appendChild(c)};
 // print: every slide becomes one page painted with its own bg — same drawEls, no handlers needed
 addEventListener('beforeprint',()=>{commitEdit();const p=$('print');p.innerHTML='';deck.slides.forEach((s,n)=>{const pg=document.createElement('div');pg.className='pg';pg.style.background=s.bg||'var(--card)';const cv=document.createElement('div');cv.className='cv';drawEls(s,cv,false);num(cv,n+1);pg.appendChild(cv);p.appendChild(pg)})});
 addEventListener('afterprint',()=>{$('print').innerHTML=''});

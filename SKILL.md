@@ -84,7 +84,11 @@ node bin/verify.mjs deck.html [--refs shots/] [--out verify-out/] [--threshold 0
 ```
 - **Contract** — always.
 - **Layout parity** — always (needs Playwright): no text row overflows its box, every `nowrap` row renders one line, imported rows render their source line count, every element is inside the canvas, **no painted row is drawn through a text row**, zero page errors.
-  Collision is measured on glyph rects, not boxes. Containment is not collision — text on a tile, a label inside a box, a slide backdrop all pass. A leader line crossing a label fails; if the overlay is deliberate, say so with `over:1`.
+  Three shapes, all measured on real geometry (glyph rects and sampled strokes, never bounding boxes):
+  1. **ink through text** — a line, curve or rule crossing a label's glyphs;
+  2. **text straddling a container** — a label crossing a box/tile border, or hanging half out of the box meant to hold it;
+  3. **an arrow head inside a fill** — a connector aimed at a target's centre instead of stopped on its edge (fix with `to:`).
+  Containment is not collision: text on a tile, a label inside a box, a slide backdrop all pass. A tint with no border is a backdrop and a circle/pill outline is decoration — neither is a container edge. A headless stroke crossing a card is routing, not a landing. `over:1` opts a row out of all three.
 - **AE pixel diff** — when `--refs` exists (needs ImageMagick): `< 0.5%` of pixels differ at 2% fuzz. AE alone passes wrapped labels; parity is what catches them — that is why parity is not optional.
 
 Fix the model, not the output. Re-run until `VERIFY PASS`. Attach `verify-out/results.json` to your report.
@@ -92,7 +96,9 @@ Fix the model, not the output. Re-run until `VERIFY PASS`. Attach `verify-out/re
 ### Step 6 — hand-off notes for the human editor
 Say, in this order:
 1. Where the file is and that it opens from disk in any browser, no install, no network.
-2. **Toolbar:** `‹ prev` / `next ›` · `+` (Text / Box / Slide) · `⊞` contact sheet (G or Esc) · `⤓` PDF · `⛶` fullscreen (F). Drag to move, ⌘-click to multi-select, double-click to retype, corner nib to resize, ⌘Z to undo (persists across reloads). Selecting text shows a floating toolbar: role segment, **B / I / U / S̶ / 🔗 link** (marks never change size; the link takes http, https or mailto — an empty field unlinks), the deck's own colours as swatches, "Apply to layout", "Apply to all slides".
+2. **HUD (the full set, left to right):** `‹ prev` / `next ›` · autosave dot · `+` (Text / Box / Slide) · `⊞` contact sheet (G or Esc) · `⤒` save a copy (⌘S — only shown when the browser blocks storage) · `⤓` PDF · `⛶` fullscreen (F) · `ⓘ` shortcuts.
+   <!-- HUD: prev next autosave addbtn grid-btn savecopy pdf fs help -->
+   This manifest is a contract: the gate compares it against the template, so the HUD cannot gain or lose a control without this line changing. While presenting, the HUD peeks back as a centred pill above the bottom edge — never over the page counter in the corner. Drag to move, ⌘-click to multi-select, double-click to retype, corner nib to resize, ⌘Z to undo (persists across reloads). Selecting text shows a floating toolbar: role segment, **B / I / U / S̶ / 🔗 link** (marks never change size; the link takes http, https or mailto — an empty field unlinks), the deck's own colours as swatches, "Apply to layout", "Apply to all slides".
 3. **Contact sheet:** live thumbnails 3-across; click / ⌘ / shift select, double-click opens, grab-and-drag reorders (mouse or touch — the other cells slide aside), ⌫ deletes (never the last), ⌘C ⌘V ⌘D ⌘Z. It also opens in present mode.
 4. **PDF:** links become real `/Link` annotations, so a LinkedIn document post is clickable. `⤓` downloads a **true slide-sized PDF written inside the file** — no library, no server. Each slide is rasterised from its live DOM (SVG `foreignObject` → canvas at 2× → JPEG) onto a W×H pt page, so a 16:9 deck is a 16:9 PDF with no letterboxing; fonts must be local (they are — the deck loads none). Verified in Chromium; **Safari's `foreignObject` path is unconfirmed** — if rasterising throws or the canvas is tainted, `⤓` falls back to `print()`. **⌘P is the paper path:** one page per slide, each with its own background, on a **named** page size — Letter (A4 for `document-a4`) — because Safari ignores pixel `@page` sizes; the slide is zoomed to the printable width. Choose "Save as PDF" there for a paper-shaped file.
 5. **Presenting:** F or `⛶`; chrome hides, backdrop = current slide's background, HUD peeks back when the pointer rests at the bottom edge and stays pinned while the + menu, the text toolbar or the contact sheet is open. Arrow keys / space advance; Esc opens the contact sheet to jump.
@@ -152,6 +158,7 @@ Row — every prop optional; a row is whatever its props make it:
 | `line` | `[x2,y2]` | — | straight line from (x,y) to (x2,y2); `h` = thickness (3), `bg` = colour |
 | `curve` | `[c1x,c1y,c2x,c2y,x2,y2]` | — | cubic bezier connector from (x,y); absolute coords like `line`; `h` = thickness, `bg` = colour |
 | `arrow` | `start`\|`end`\|`both` | — | arrow head on a `line` or a `curve` — never hand-build one out of three lines |
+| `to`, `from` | row index \| masterId | — | terminate a connector **against another row**: the engine clips the stroke where it crosses that row's box, so the head tips on the border. Aim at the target, not at a hand-computed standoff |
 | `href` | url | — | http/https/mailto only. One inset anchor over the whole row (a painted CTA box + its label each carry it); live in present mode, a real `/Link` annotation in the `⤓` PDF |
 | `over` | 1 | — | declares a deliberate overlay: `verify`'s collision check leaves this row (and what it crosses) alone |
 | `donut` | 0–100 | — | ring, `w` = diameter, `color` = fill |
@@ -220,7 +227,7 @@ Four words, and no fifth: `rise` (text — the default), `fade` (quiet chrome), 
 | single line | `verify` parity | `nowrap` rows and imported single-line rows render 1 line |
 | line count | `verify` parity | imported rows: rendered lines == source `_lines` |
 | bounds | `verify` parity | every element inside the canvas |
-| collision | `verify` parity | no painted row crosses a text row's glyphs (containment is fine; `over:1` opts out) |
+| collision | `verify` parity | no ink through glyphs, no text straddling a container edge, no arrow head inside a fill (`over:1` opts out) |
 | page errors | `verify` | none |
 | AE | `verify --refs` | `< 0.5%` pixels at `-fuzz 2%` (set `--threshold`) |
 
@@ -230,6 +237,7 @@ Four words, and no fifth: `rise` (text — the default), `fade` (quiet chrome), 
 - **Size overrides.** `size:18` on a Body row "because it needs to be bigger". Change the role, or use the right role (`Title` for a display headline, `H1` for a slide title). Same for `font`, `lh`, `ls`, `mono`.
 - **Wrapping labels.** Chips, axis labels, step numbers, supertitles that wrap to two lines. `nowrap:1` + width, or `w:'auto'`. Parity fails these on purpose.
 - **Hand-built arrow heads.** Three `line` rows and a trig helper to draw one arrow. `arrow:'end'` on a `line` or a `curve`. Stiff diagonals where the source had a spline: that is what `curve` is for.
+- **Connectors aimed at a centre.** Giving a connector the target's coordinate puts the head inside its fill, floating. Give the target itself — `to: 4` — and the engine stops the stroke on the border. Hand-computed standoffs ("end it 10px short") are the thing `to` exists to delete.
 - **A dead CTA.** A painted button with no `href` looks like a link and is not one — no click in the deck, no annotation in the PDF, and a LinkedIn document post has nothing to follow. Put the `href` on the box **and** on its label row.
 - **Leader lines through labels.** Route the line, or declare the overlay with `over:1`. `verify` fails it either way until you decide.
 - **Hardcoded counters.** `"3 / 9"` typed into a row. The footer master renders the counter.
