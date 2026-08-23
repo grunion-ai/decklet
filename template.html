@@ -193,6 +193,7 @@ function drawEls(s,root,animate){
     if(r.donut!=null)d.style.cssText+=`width:${r.w}px;height:${r.w}px;padding:0;border-radius:50%;background:conic-gradient(${r.color||'var(--accent)'} ${r.donut}%,var(--line) 0);-webkit-mask:radial-gradient(#0000 55%,#000 56%);mask:radial-gradient(#0000 55%,#000 56%);`;
     if(r.anim&&animate)d.style.animationDelay=(a++*120)+'ms';
     if(el._lines)d.dataset.lines=el._lines; // extractor metadata: source line count (layout-parity proof)
+    if(el._src)d.dataset.snapped=1; // extractor metadata: the type scale changed this row (its line-count drift is scale crowding, not a parity failure)
     if(n!=null)d.dataset.n=n;else d.dataset.m=m;
     root.appendChild(d);
   });
@@ -418,20 +419,43 @@ document.addEventListener('fullscreenchange',()=>{document.body.classList.toggle
 const pinned=()=>addmenu.classList.contains('open')||!tb.hidden||!sheet.hidden;
 addEventListener('mousemove',e=>{if(present())document.body.classList.toggle('peek',e.clientY>innerHeight*11/12||pinned())});
 $('fs').onclick=fs;
-// ⤓ PDF: a TRUE slide-sized PDF written in-file, zero dependencies. Each slide is rasterised from its live DOM — the deck's
-// <style> + the slide's XHTML inside an SVG foreignObject → <img> → canvas at 2× → JPEG → one DCTDecode XObject drawn
-// full-page on a W×H pt page (1 model px = 1 pt, so 1600×900 / 960×540 — real 16:9, no letterboxing). Fonts must be local
-// (the deck makes no requests anyway). Falls back to print() — the paper path, ⌘P — if rasterisation throws or the canvas
-// is tainted (Safari's foreignObject path taints; unconfirmed here). The xref table is byte-exact.
+// ⤓ PDF: a TRUE slide-sized PDF written in-file, zero dependencies. Each slide is rasterised from its live DOM in LAYERS:
+// (a) the deck's <style> + the slide's XHTML inside an SVG foreignObject → <img> → canvas at 2×, with every img/svg row
+// kept as an invisible placeholder (layout intact, pixels deferred); (b) every img row drawn straight onto the canvas from a
+// decoded Image (await decode()), every inline svg row serialised ALONE into its own Image and drawn at the row's rect — in
+// model z-order. Why: WebKit fires the foreignObject image's onload before the nested <img> it contains have decoded (data:
+// PNGs above ~20KB came out blank in Safari's export — the headshot, the larger glyphs), so nothing nested is trusted to paint.
+// Then JPEG → one DCTDecode XObject drawn full-page on a W×H pt page (1 model px = 1 pt: 1600×900 / 960×540 — real 16:9, no
+// letterboxing). Fonts: awaits document.fonts.ready (the deck makes no requests anyway). Falls back to print() — the paper
+// path, ⌘P — if rasterisation throws or the canvas is tainted. The xref table is byte-exact.
 async function exportPdf(){
-  commitEdit();const css=document.querySelector('style').textContent,S=2,jpg=[];
+  commitEdit();await document.fonts.ready;const css=document.querySelector('style').textContent,S=2,jpg=[];
+  const load=src=>new Promise((ok,no)=>{const im=new Image();im.onload=()=>ok(im);im.onerror=no;im.src=src});
   for(const [n,s] of deck.slides.entries()){
-    const cv=document.createElement('div');cv.style.cssText=`position:relative;width:${W}px;height:${H}px;overflow:hidden;font:16px/1.45 -apple-system,BlinkMacSystemFont,sans-serif;color:${getComputedStyle(canvas).color}`;drawEls(s,cv,false);num(cv,n+1);
+    const cv=document.createElement('div');cv.style.cssText=`position:absolute;left:-99999px;top:0;width:${W}px;height:${H}px;overflow:hidden;font:16px/1.45 -apple-system,BlinkMacSystemFont,sans-serif;color:${getComputedStyle(canvas).color}`;drawEls(s,cv,false);num(cv,n+1);
+    document.body.appendChild(cv); // in-document so the media rows have geometry (slots resolve to real rects here)
+    const cb=cv.getBoundingClientRect(),media=[...cv.querySelectorAll('.el')].filter(d=>d.querySelector('img,svg')).map(d=>{
+      const e=d.querySelector('img,svg'),b=e.getBoundingClientRect(),cs=getComputedStyle(d);
+      return{el:d,x:b.left-cb.left,y:b.top-cb.top,w:b.width,h:b.height,op:+cs.opacity,radius:parseFloat(cs.borderRadius)||0,color:cs.color,src:e.tagName==='IMG'?e.getAttribute('src'):null,svg:e.tagName==='IMG'?null:e,fit:e.tagName==='IMG'?e.style.objectFit:null,pos:e.tagName==='IMG'?e.style.objectPosition:null};
+    });
+    media.forEach(m=>m.el.style.visibility='hidden');cv.style.position='relative';cv.style.left='0'; // placeholders: layout stays, pixels come from layer (b); back on-canvas for the serialisation
     const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><style>${css}</style><foreignObject width="${W}" height="${H}"><div xmlns="http://www.w3.org/1999/xhtml" style="--W:${W}px;--H:${H}px">${new XMLSerializer().serializeToString(cv)}</div></foreignObject></svg>`;
-    const im=new Image(); // data: URL, not blob: — a blob minted by a file:// page is cross-origin to itself and taints the canvas
-    await new Promise((ok,no)=>{im.onload=ok;im.onerror=no;im.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg)});
+    cv.remove();
+    const im=await load('data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg)); // data: URL, not blob: — a blob minted by a file:// page is cross-origin to itself and taints the canvas
     const c=document.createElement('canvas');c.width=W*S;c.height=H*S;const g=c.getContext('2d');
     canvas.style.background=s.bg||'';g.fillStyle=getComputedStyle(canvas).backgroundColor;canvas.style.background='';g.fillRect(0,0,c.width,c.height);g.drawImage(im,0,0,c.width,c.height);
+    for(const m of media){ // layer (b): media rows, DOM order == model z-order
+      let pic;
+      if(m.src){pic=new Image();pic.src=m.src;await pic.decode()}
+      else{const x=m.svg.cloneNode(true);x.setAttribute('xmlns','http://www.w3.org/2000/svg');x.setAttribute('width',m.w);x.setAttribute('height',m.h);x.style.color=m.color;if(!x.getAttribute('viewBox')&&x.getAttribute('width'))x.setAttribute('preserveAspectRatio','none');
+        pic=await load('data:image/svg+xml;charset=utf-8,'+encodeURIComponent(new XMLSerializer().serializeToString(x)))}
+      g.save();g.globalAlpha=m.op;g.beginPath();if(m.radius&&g.roundRect)g.roundRect(m.x*S,m.y*S,m.w*S,m.h*S,m.radius*S);else g.rect(m.x*S,m.y*S,m.w*S,m.h*S);g.clip();
+      // object-fit: fill (default) stretches; cover/contain scale by the ratio and place by object-position (defaults 50% 50%)
+      let dx=m.x,dy=m.y,dw=m.w,dh=m.h;
+      if(m.src&&(m.fit==='cover'||m.fit==='contain')){const k=m.fit==='cover'?Math.max(m.w/pic.naturalWidth,m.h/pic.naturalHeight):Math.min(m.w/pic.naturalWidth,m.h/pic.naturalHeight);dw=pic.naturalWidth*k;dh=pic.naturalHeight*k;
+        const p=(m.pos||'50% 50%').split(/\s+/).map(v=>parseFloat(v)/100);dx=m.x+(m.w-dw)*(isNaN(p[0])?.5:p[0]);dy=m.y+(m.h-dh)*(isNaN(p[1])?.5:p[1])}
+      g.drawImage(pic,dx*S,dy*S,dw*S,dh*S);g.restore();
+    }
     jpg.push(atob(c.toDataURL('image/jpeg',.92).split(',')[1])); // SecurityError here = tainted canvas → caller falls back to print()
   }
   // minimal PDF: 1 catalog · 2 pages · per slide {page, image XObject, content}; offsets tracked as bytes (latin-1 strings)

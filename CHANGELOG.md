@@ -1,4 +1,6 @@
 # Changelog
+## 0.3.1
+- PDF export: layered rasterization fixes missing images in WebKit. Safari fired the foreignObject image's onload before the nested `<img>` it contained had decoded (data: PNGs above ~20 KB came out blank). `⤓` now awaits `document.fonts.ready`, rasterises the foreignObject pass with `img`/`svg` rows as hidden placeholders, then draws each `img` from a decoded `Image` and each inline `svg` from its own serialised `Image` at the row's rect, in model z-order (object-fit cover/contain + object-position, border-radius clip, opacity honoured). Chromium output is unchanged on slides without media. `print()` remains the fallback.
 
 ## 0.3.0 — initial public release
 

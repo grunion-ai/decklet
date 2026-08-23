@@ -1,6 +1,6 @@
 {
   "name": "@grunion/decklet",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Agent-generated, brand-true, real-time editable presentations and assets — one portable HTML file, no office suite.",
   "license": "MIT",
   "type": "module",
