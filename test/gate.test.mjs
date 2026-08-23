@@ -158,6 +158,25 @@ test('blocked storage: probed at load, says what to do, and reveals ⌘S save-a-
   assert.equal((tpl.match(/localStorage\./g) || []).length, 5, 'storage API only inside the shim and the probe');
 });
 
+test('toolbar: the link mark is drawn like B I U S, not an emoji', () => {
+  const seg = tpl.match(/<span class="seg" id="tb-inline">[\s\S]*?<\/span>/)[0];
+  assert.doesNotMatch(seg, /\uD83D[\uDD17]|🔗/u, 'no emoji in the mark segment — it is a colour raster beside four monochrome glyphs');
+  assert.match(seg, /<button data-link="1"[^>]*><svg[^>]*viewBox="0 0 16 16"[^>]*>/, 'an inline SVG at the same optical size as the letters');
+  assert.match(seg, /stroke="currentColor"/, 'it inherits the toolbar colour and active state like the other marks');
+  assert.match(seg, /aria-label="Link"/);
+});
+test('shortcuts popover cannot drift from the keybindings', () => {
+  const pop = tpl.match(/<div id="helpmenu"[\s\S]*?\n\s*<\/div>/)[0];
+  // every modifier chord the template actually handles must appear in the popover
+  const chords = [...new Set([...tpl.matchAll(/mod&&k==='([a-z])'/g)].map(m => m[1])
+    .concat([...tpl.matchAll(/\(e\.metaKey\|\|e\.ctrlKey\)&&e\.key\.toLowerCase\(\)==='([a-z])'/g)].map(m => m[1])))].sort();
+  assert.ok(chords.length >= 5, 'found the chord handlers: ' + chords);
+  for (const c of chords) assert.match(pop, new RegExp('⌘' + c.toUpperCase()), `⌘${c.toUpperCase()} is handled but not in the shortcuts popover`);
+  // …and every plain key the template handles
+  for (const [re, shown] of [[/e\.key==='ArrowRight'/, /← → \/ ↑ ↓/], [/e\.key\.toLowerCase\(\)==='f'/, /<kbd>F<\/kbd>/], [/e\.key\.toLowerCase\(\)==='g'/, /Esc · G/], [/e\.key==='Backspace'/, /<kbd>⌫<\/kbd>/]])
+    if (re.test(tpl)) assert.match(pop, shown, `handled key missing from the popover: ${re}`);
+});
+
 // ── 2c. the HUD is a contract: what ships and what SKILL.md promises are checked against each other ──
 test('HUD contract does not drift: SKILL.md names exactly the controls the template ships', () => {
   // the controls themselves, not the items inside the + and ⓘ pop-ups
@@ -298,6 +317,59 @@ test('validator: to/from terminate a connector against a row that exists', () =>
   ]}]}));
   for (const re of [/to "9" is not a row id on this slide, a master id, or a row index/, /to "ghost" is not a row/, /to needs a line or a curve/]) assert.ok(v.errors.some(e => re.test(e)), String(re));
   assert.equal(v.errors.length, 3, JSON.stringify(v.errors));
+});
+test('validator: connector shape rules are loud warnings, and waive:1 is the declared exception', () => {
+  const boxes = [{x: 0, y: 0, w: 132, h: 62, bg: '#111', bd: '2px solid #333'}, {x: 252, y: 0, w: 132, h: 62, bg: '#111', bd: '2px solid #333'}];
+  const v = validate(withRoles({w: 960, h: 540, slides: [{els: [...boxes,
+    {x: 20, y: 90, line: [300, 260], bg: '#fff', h: 3},                                        // diagonal straight run
+    {x: 20, y: 300, curve: [50, 300, 70, 360, 80, 360], bg: '#fff', h: 3},                     // 60px channel
+    {x: 400, y: 300, curve: [560, 300, 720, 400, 600, 400], bg: '#fff', h: 3},                 // c2 past the endpoints
+    {x: 400, y: 460, curve: [440, 460, 560, 500, 600, 500], bg: '#fff', h: 3},                 // c1 at 20% of the run
+    {x: 142, y: 31, line: [242, 31], bg: '#fff', h: 1.5, arrow: 'end'},                        // headed hairline
+    {x: 400, y: 100, line: [500, 100], bg: '#fff', h: 1},                                      // headless hairline: fine
+  ]}]}));
+  for (const re of [/diagonal straight run/, /60px channel/, /past the endpoints/, /20% of the run/, /too light/]) assert.ok(v.warnings.some(w => re.test(w)), String(re));
+  assert.equal(v.errors.length, 0, JSON.stringify(v.errors));
+  assert.ok(!v.warnings.some(w => /h=1 /.test(w)), 'a headless leader may be a hairline (H5)');
+  // every one of them goes quiet when the row declares the exception
+  const waived = validate(withRoles({w: 960, h: 540, slides: [{els: [
+    {x: 20, y: 90, line: [300, 260], bg: '#fff', h: 3, waive: 1},
+    {x: 20, y: 300, curve: [50, 300, 70, 360, 80, 360], bg: '#fff', h: 3, waive: 1},
+  ]}]}));
+  assert.deepEqual(waived.warnings, [], JSON.stringify(waived.warnings));
+});
+test('validator: a connector leaves air, and the same amount at both ends', () => {
+  const boxes = [{x: 0, y: 0, w: 132, h: 62, bg: '#111', bd: '2px solid #333'}, {x: 252, y: 0, w: 132, h: 62, bg: '#111', bd: '2px solid #333'}];
+  const one = els => validate(withRoles({w: 960, h: 540, slides: [{els: [...boxes, ...els]}]})).warnings;
+  assert.ok(one([{x: 132, y: 31, line: [252, 31], bg: '#fff', h: 3}]).some(w => /leaves no air/.test(w)), 'flush against both borders (K1/D1)');
+  assert.ok(one([{x: 136, y: 31, line: [236, 31], bg: '#fff', h: 3}]).some(w => /uneven air/.test(w)), '4px vs 16px (K5)');
+  assert.deepEqual(one([{x: 142, y: 31, line: [242, 31], bg: '#fff', h: 3}]), [], '10px both ends (K3) is clean');
+  // to:/from: hand the gap to the engine, so the authored geometry is not second-guessed
+  assert.deepEqual(one([{x: 132, y: 31, line: [252, 31], bg: '#fff', h: 3, to: 1, from: 0}]), [], 'terminated connectors are the engine\'s business');
+});
+test('validator: no shared stubs, and head/arrow compose', () => {
+  const v = validate(withRoles({w: 960, h: 540, slides: [{els: [
+    {x: 100, y: 100, curve: [180, 100, 180, 60, 260, 60], bg: '#fff', h: 3, arrow: 'end'},
+    {x: 100, y: 100, curve: [180, 100, 180, 140, 260, 140], bg: '#fff', h: 3, arrow: 'end'},
+  ]}]}));
+  assert.ok(v.warnings.some(w => /shared stub/.test(w)), JSON.stringify(v.warnings));
+  const h = validate(withRoles({w: 960, h: 540, slides: [{els: [
+    {x: 100, y: 100, line: [300, 100], bg: '#fff', h: 3, arrow: 'end', head: 'dot'},
+    {x: 100, y: 200, line: [300, 200], bg: '#fff', h: 3, head: 'bar'},
+    {x: 100, y: 300, line: [300, 300], bg: '#fff', h: 3, arrow: 'end', head: 'spike'},
+  ]}]}));
+  for (const re of [/head needs arrow/, /head "spike"/]) assert.ok(h.errors.some(e => re.test(e)), String(re));
+  assert.equal(h.errors.length, 2, JSON.stringify(h.errors));
+});
+test('validator: dash is 1 or [on,off]', () => {
+  const v = validate(withRoles({w: 960, h: 540, slides: [{els: [
+    {x: 100, y: 100, line: [300, 100], bg: '#fff', h: 3, dash: 1},
+    {x: 100, y: 160, line: [300, 160], bg: '#fff', h: 3, dash: [10, 8]},
+    {x: 100, y: 220, line: [300, 220], bg: '#fff', h: 3, dash: 'yes'},
+    {x: 100, y: 280, w: 90, role: 'Body', text: 'not a connector', dash: 1},
+  ]}]}));
+  for (const re of [/dash must be 1 or \[on,off\]/, /dash needs a line or a curve/]) assert.ok(v.errors.some(e => re.test(e)), String(re));
+  assert.equal(v.errors.length, 2, JSON.stringify(v.errors));
 });
 test('validator: structural errors', () => {
   assert.ok(validate(null).errors.length); assert.ok(validate({w: 1, h: 1, styles: {roles: {}}, slides: []}).errors.some(e => /slides must be/.test(e)));
@@ -605,7 +677,7 @@ live('live: an arrow head ENDS on the row\'s stated end point — the connector 
   const got = await p.evaluate(() => {
     canvas.style.transform = 'none'; canvas.style.border = '0';   // measure in model space (the 1px canvas border shifts children)
     const cb = canvas.getBoundingClientRect(), L = e => { const r = e.getBoundingClientRect(); return {l: r.left - cb.left, r: r.right - cb.left, t: r.top - cb.top, b: r.bottom - cb.top}; };
-    const row = k => { const d = canvas.querySelector(`[data-n="${k}"]`); return {shaft: L(d), heads: [...d.querySelectorAll('i.ar')].map(L)}; };
+    const row = k => { const d = canvas.querySelector(`[data-n="${k}"]`); return {shaft: L(d), heads: [...d.querySelectorAll('.ar')].map(L)}; };
     const cv = canvas.querySelector('[data-n="3"]'), pa = cv.querySelector('svg > path');
     const sv = cv.querySelector('svg').getBoundingClientRect(), end = pa.getPointAtLength(pa.getTotalLength());
     return {end: row(0), both: row(1), none: row(2),
@@ -642,7 +714,7 @@ live('live: A1 from the connector probe — a symmetric 8px gap renders symmetri
   await p.goto(pathToFileURL(f).href); await p.waitForSelector('#canvas .el');
   const g = await p.evaluate(() => { canvas.style.transform = 'none'; canvas.style.border = '0';
     const cb = canvas.getBoundingClientRect(), X = (s, k) => { const r = canvas.querySelector(s).getBoundingClientRect(); return r[k] - cb.left; };
-    const head = canvas.querySelector('[data-n="2"] i.ar').getBoundingClientRect();
+    const head = canvas.querySelector('[data-n="2"] .ar').getBoundingClientRect();
     return {fromRight: X('[data-n="0"]', 'right'), toLeft: X('[data-n="1"]', 'left'), shaftLeft: X('[data-n="2"]', 'left'), tip: head.right - cb.left};
   });
   await b.close();
@@ -672,7 +744,7 @@ live('live: a curve is a bezier row, and arrow heads come from the engine', asyn
     return {d: pa.getAttribute('d'), stroke: pa.getAttribute('stroke-width'), markerEnd: !!pa.getAttribute('marker-end'), markerStart: !!pa.getAttribute('marker-start'),
       // offsets, not client rects: #canvas is scaled to fit the window and the hull is asserted in model space
       covers: [c.offsetLeft <= 100, c.offsetLeft + c.offsetWidth >= 240, c.offsetTop <= 100, c.offsetTop + c.offsetHeight >= 200],
-      heads: canvas.querySelectorAll('[data-n="1"] i.ar').length};
+      heads: canvas.querySelectorAll('[data-n="1"] .ar').length};
   });
   await b.close();
   assert.match(got.d, /^M[\d.\- ]+C[\d.\- ]+ [\d.\- ]+ [\d.\- ]+$/, 'one cubic segment: ' + got.d);
@@ -700,9 +772,9 @@ live('live: to/from terminate a connector on the target\'s border — the arrow 
     return {clipped: end(1), curved: end(2), plain: end(3), heads: [1, 2, 3].map(k => canvas.querySelector(`[data-n="${k}"]`).dataset.head)};
   });
   await b.close();
-  assert.equal(Math.round(got.clipped[0]), 500, 'the straight connector stops on the box\'s left border (x=500), not at the 600 it was given');
+  assert.equal(Math.round(got.clipped[0]), 490, 'the straight connector stops 10px clear of the box border at x=500, not at the 600 it was given');
   assert.equal(Math.round(got.clipped[1]), 230);
-  assert.ok(Math.abs(got.curved[0] - 500) < 6 || Math.abs(got.curved[1] - 280) < 6, `the bezier stops on a border too: ${got.curved}`);
+  assert.ok(Math.hypot(got.curved[0] - 500, got.curved[1] - 230) > 6, `the bezier leaves air too: ${got.curved}`);
   assert.deepEqual(got.plain, [600, 460], 'without `to` the endpoint is exactly what the author wrote');
   assert.deepEqual(got.heads, ['end', 'end', 'end'], 'the head end is declared for the collision gate');
   assert.deepEqual(errs, []);
@@ -795,6 +867,99 @@ live('live: parity catches text straddling a container edge, and an arrow head l
   assert.match(why('headIn'), /arrow lands inside/);
   assert.equal(pass('headOn'), true, '`to` puts the head on the border: ' + why('headOn'));
   assert.equal(pass('through'), true, 'a headless line crossing a card is routing, not a landing: ' + why('through'));
+});
+live('live: dash quantises to the run so a stroke starts and ends on a WHOLE dash, and keeps its head', async () => {
+  const model = {w: 960, h: 540, styles: {roles: modelOf(tpl).styles.roles}, slides: [{els: [
+    {x: 100, y: 100, line: [403, 100], bg: '#5B9CF6', h: 2.5, arrow: 'end', dash: 1},
+    {x: 100, y: 200, line: [377, 200], bg: '#5B9CF6', h: 2.5, dash: [10, 8]},
+    {x: 100, y: 300, curve: [220, 300, 300, 420, 420, 420], bg: '#6B9E8C', h: 2.5, arrow: 'end', dash: 1},
+  ]}]};
+  const f = path.join(tmp, 'dash.html'); fs.writeFileSync(f, create(model).html);
+  const b = await pw.chromium.launch(); const p = await b.newPage({viewport: {width: 1280, height: 800}});
+  const errs = []; p.on('pageerror', e => errs.push(String(e)));
+  await p.goto(pathToFileURL(f).href); await p.waitForSelector('#canvas .el');
+  const got = await p.evaluate(() => {
+    canvas.style.transform = 'none'; canvas.style.border = '0';
+    const num = t => [...t.matchAll(/([\d.]+)px/g)].map(m => +m[1]);
+    const lineRow = k => { const d = canvas.querySelector(`[data-n="${k}"]`);
+      return {len: parseFloat(d.style.width), stops: num(getComputedStyle(d).backgroundImage), heads: d.querySelectorAll('.ar').length}; };
+    const cv = canvas.querySelector('[data-n="2"]'), pa = cv.querySelector('svg > path');
+    return {a: lineRow(0), b: lineRow(1), c: {len: pa.getTotalLength(), da: (pa.getAttribute('stroke-dasharray') || '').split(/[ ,]+/).map(Number), heads: cv.querySelectorAll('marker').length}};
+  });
+  await b.close();
+  assert.deepEqual(errs, []);
+  // stops read [0, on, on, on+off]; a whole number of periods plus one closing dash must fill the run exactly
+  const whole = (len, on, off) => { const n = (len - on) / (on + off); return Math.abs(n - Math.round(n)) < 0.02 && n >= 1; };
+  for (const [id, r] of [['dash:1', got.a], ['dash:[10,8]', got.b]]) {
+    const on = r.stops[1], off = r.stops[3] - r.stops[1];
+    assert.ok(whole(r.len, on, off), `${id}: run ${r.len} does not hold a whole number of ${on}/${off} dashes`);
+  }
+  assert.equal(got.a.heads, 1, 'a dashed line keeps its arrow head (the gradient used to eat it)');
+  assert.ok(whole(got.c.len, got.c.da[0], got.c.da[1]), `curve: arc ${got.c.len} vs dasharray ${got.c.da}`);
+  assert.equal(got.c.heads, 1, 'a dashed curve keeps its marker');
+});
+live('live: terminator shapes are drawn by the engine, centred on the stroke axis by construction', async () => {
+  const shapes = ['triangle', 'chevron', 'dot', 'bar'];
+  const model = {w: 960, h: 540, styles: {roles: modelOf(tpl).styles.roles}, slides: [{els: shapes.map((h, k) => (
+    {x: 100, y: 80 + k * 90, line: [400, 80 + k * 90], bg: '#5B9CF6', h: 3, arrow: 'end', head: h}))}]};
+  const f = path.join(tmp, 'heads.html'); fs.writeFileSync(f, create(model).html);
+  const b = await pw.chromium.launch(); const p = await b.newPage({viewport: {width: 1280, height: 800}});
+  const errs = []; p.on('pageerror', e => errs.push(String(e)));
+  await p.goto(pathToFileURL(f).href); await p.waitForSelector('#canvas .el');
+  const got = await p.evaluate(n => { canvas.style.transform = 'none'; canvas.style.border = '0';
+    const cb = canvas.getBoundingClientRect();
+    return [...Array(n).keys()].map(k => { const d = canvas.querySelector(`[data-n="${k}"]`), hd = d.querySelector('.ar');
+      const s = d.getBoundingClientRect(), a = hd.getBoundingClientRect();
+      const g = hd.querySelector('path');
+      return {tip: +(a.right - cb.left).toFixed(1), axis: +((s.top + s.bottom) / 2 - cb.top).toFixed(1), mid: +((a.top + a.bottom) / 2 - cb.top).toFixed(1), shaftEnd: +(s.right - cb.left).toFixed(1),
+        d: g.getAttribute('d'), filled: g.getAttribute('fill') !== 'none'};
+    }); }, shapes.length);
+  await b.close();
+  assert.deepEqual(errs, []);
+  got.forEach((g, k) => {
+    assert.ok(Math.abs(g.tip - 400) < 1, `${shapes[k]}: leading edge at ${g.tip}, stated end 400`);
+    assert.ok(Math.abs(g.mid - g.axis) < 0.6, `${shapes[k]}: head centre ${g.mid} off the stroke axis ${g.axis}`);
+    assert.ok(g.shaftEnd <= g.tip + 0.5, `${shapes[k]}: shaft runs past the head`);
+  });
+  assert.equal(new Set(got.map(g => g.d)).size, 4, 'four distinct head shapes, not four triangles: ' + JSON.stringify(got.map(g => g.d)));
+  assert.deepEqual(got.map(g => g.filled), [true, false, true, true], 'the chevron is an OPEN head (J3), the rest are filled');
+});
+live('live: to:/from: leave 10px of air by default — a connector never lands on the border', async () => {
+  const box = {x: 500, y: 180, w: 200, h: 100, bg: '#1A1D21', bd: '1.5px solid #5B9CF6', radius: 10};
+  const model = {w: 960, h: 540, styles: {roles: modelOf(tpl).styles.roles}, slides: [{els: [box,
+    {x: 200, y: 230, line: [600, 230], bg: '#5B9CF6', h: 3, arrow: 'end', to: 0},
+    {x: 200, y: 260, line: [600, 260], bg: '#5B9CF6', h: 3, arrow: 'end', to: 0, gap: 0},
+    {x: 200, y: 400, curve: [340, 400, 420, 230, 600, 235], bg: '#6B9E8C', h: 3, arrow: 'end', to: 0},
+  ]}]};
+  const f = path.join(tmp, 'air.html'); fs.writeFileSync(f, create(model).html);
+  const b = await pw.chromium.launch(); const p = await b.newPage({viewport: {width: 1280, height: 800}});
+  await p.goto(pathToFileURL(f).href); await p.waitForSelector('#canvas .el');
+  const got = await p.evaluate(() => [1, 2, 3].map(k => { const d = canvas.querySelector(`[data-n="${k}"]`);
+    if (d.dataset.seg) { const v = d.dataset.seg.split(',').map(Number); return [+v[2].toFixed(1), +v[3].toFixed(1)]; }
+    const c = d.dataset.cur.split(',').map(Number); return [+c[6].toFixed(1), +c[7].toFixed(1)]; }));
+  await b.close();
+  assert.equal(got[0][0], 490, 'default: the tip stops 10px clear of the border at x=500');
+  assert.equal(got[1][0], 500, 'gap:0 puts it back on the border');
+  assert.ok(Math.hypot(got[2][0] - 500, got[2][1] - 230) > 8, `curve leaves air too: ${got[2]}`);
+});
+live('live: parity catches text over text', async () => {
+  const roles = modelOf(tpl).styles.roles;
+  const mk = els => ({w: 960, h: 540, styles: {roles}, slides: [{els}]});
+  const title = {x: 60, y: 200, w: 700, role: 'H1', text: 'A title that runs long'};
+  const cases = {
+    clash: mk([title, {x: 60, y: 214, w: 400, role: 'Body', text: 'a caption underneath'}]),
+    over:  mk([title, {x: 60, y: 214, w: 400, role: 'Body', text: 'a caption underneath', over: 1}]),
+    clear: mk([title, {x: 60, y: 280, w: 400, role: 'Body', text: 'a caption underneath'}]),
+  };
+  const res = {};
+  for (const [k, m] of Object.entries(cases)) {
+    const f = path.join(tmp, 'tt-' + k + '.html'); fs.writeFileSync(f, create(m).html);
+    res[k] = await verify(f, {out: path.join(tmp, 'v-tt-' + k), log: () => {}});
+  }
+  assert.equal(res.clash.parity[0].pass, false, 'two text rows on top of each other must fail');
+  assert.match(JSON.stringify(res.clash.parity[0].rows), /overlaps text/);
+  assert.equal(res.over.parity[0].pass, true, 'over:1 opts out');
+  assert.equal(res.clear.parity[0].pass, true, JSON.stringify(res.clear.parity[0].rows));
 });
 live('live: the tab title is the model title — the ⤓ PDF and the ⌘S copy inherit it clean', async () => {
   const f = path.join(tmp, 'titled.html');

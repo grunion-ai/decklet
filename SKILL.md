@@ -87,7 +87,8 @@ node bin/verify.mjs deck.html [--refs shots/] [--out verify-out/] [--threshold 0
   Three shapes, all measured on real geometry (glyph rects and sampled strokes, never bounding boxes):
   1. **ink through text** — a line, curve or rule crossing a label's glyphs;
   2. **text straddling a container** — a label crossing a box/tile border, or hanging half out of the box meant to hold it;
-  3. **an arrow head inside a fill** — a connector aimed at a target's centre instead of stopped on its edge (fix with `to:`).
+  3. **an arrow head inside a fill** — a connector aimed at a target's centre instead of stopped on its edge (fix with `to:`);
+  4. **text over text** — a title landing on a caption.
   Containment is not collision: text on a tile, a label inside a box, a slide backdrop all pass. A tint with no border is a backdrop and a circle/pill outline is decoration — neither is a container edge. A headless stroke crossing a card is routing, not a landing. `over:1` opts a row out of all three.
 - **AE pixel diff** — when `--refs` exists (needs ImageMagick): `< 0.5%` of pixels differ at 2% fuzz. AE alone passes wrapped labels; parity is what catches them — that is why parity is not optional.
 
@@ -98,7 +99,7 @@ Say, in this order:
 1. Where the file is and that it opens from disk in any browser, no install, no network.
 2. **HUD (the full set, left to right):** `‹ prev` / `next ›` · autosave dot · `+` (Text / Box / Slide) · `⊞` contact sheet (G or Esc) · `⤒` save a copy (⌘S — only shown when the browser blocks storage) · `⤓` PDF · `⛶` fullscreen (F) · `ⓘ` shortcuts.
    <!-- HUD: prev next autosave addbtn grid-btn savecopy pdf fs help -->
-   This manifest is a contract: the gate compares it against the template, so the HUD cannot gain or lose a control without this line changing. While presenting, the HUD peeks back as a centred pill above the bottom edge — never over the page counter in the corner. Drag to move, ⌘-click to multi-select, double-click to retype, corner nib to resize, ⌘Z to undo (persists across reloads). Selecting text shows a floating toolbar: role segment, **B / I / U / S̶ / 🔗 link** (marks never change size; the link takes http, https or mailto — an empty field unlinks), the deck's own colours as swatches, "Apply to layout", "Apply to all slides".
+   This manifest is a contract: the gate compares it against the template, so the HUD cannot gain or lose a control without this line changing. While presenting, the HUD peeks back as a centred pill above the bottom edge — never over the page counter in the corner. Drag to move, ⌘-click to multi-select, double-click to retype, corner nib to resize, ⌘Z to undo (persists across reloads). Selecting text shows a floating toolbar: role segment, **B / I / U / S̶ / link** (marks never change size; the link takes http, https or mailto — an empty field unlinks), the deck's own colours as swatches, "Apply to layout", "Apply to all slides".
 3. **Contact sheet:** live thumbnails 3-across; click / ⌘ / shift select, double-click opens, grab-and-drag reorders (mouse or touch — the other cells slide aside), ⌫ deletes (never the last), ⌘C ⌘V ⌘D ⌘Z. It also opens in present mode.
 4. **PDF:** links become real `/Link` annotations, so a LinkedIn document post is clickable. `⤓` downloads a **true slide-sized PDF written inside the file** — no library, no server. Each slide is rasterised from its live DOM (SVG `foreignObject` → canvas at 2× → JPEG) onto a W×H pt page, so a 16:9 deck is a 16:9 PDF with no letterboxing; fonts must be local (they are — the deck loads none). Verified in Chromium; **Safari's `foreignObject` path is unconfirmed** — if rasterising throws or the canvas is tainted, `⤓` falls back to `print()`. **⌘P is the paper path:** one page per slide, each with its own background, on a **named** page size — Letter (A4 for `document-a4`) — because Safari ignores pixel `@page` sizes; the slide is zoomed to the printable width. Choose "Save as PDF" there for a paper-shaped file.
 5. **Presenting:** F or `⛶`; chrome hides, backdrop = current slide's background, HUD peeks back when the pointer rests at the bottom edge and stays pinned while the + menu, the text toolbar or the contact sheet is open. Arrow keys / space advance; Esc opens the contact sheet to jump.
@@ -158,7 +159,11 @@ Row — every prop optional; a row is whatever its props make it:
 | `line` | `[x2,y2]` | — | straight line from (x,y) to (x2,y2); `h` = thickness (3), `bg` = colour |
 | `curve` | `[c1x,c1y,c2x,c2y,x2,y2]` | — | cubic bezier connector from (x,y); absolute coords like `line`; `h` = thickness, `bg` = colour |
 | `arrow` | `start`\|`end`\|`both` | — | arrow head on a `line` or a `curve` — never hand-build one out of three lines. **The head IS the terminus:** its tip lands on the stated end point and the stroke is shortened to make room, so a connector draws exactly as long as it was authored |
-| `to`, `from` | row id \| row index | — | terminate a connector **against another row**: the engine clips where the stroke crosses that row's box, so the arrow **tip** lands on the border. Aim at the target, not at a hand-computed standoff. Prefer an id — indices shift when a row is inserted |
+| `to`, `from` | row id \| row index | — | terminate a connector **against another row**: the engine clips where the stroke crosses that row's box and backs off `gap`, so the tip stops clear of the border. Aim at the target, not at a hand-computed standoff. Prefer an id — indices shift when a row is inserted |
+| `gap` | number | `10` | the air `to:`/`from:` leaves between the tip and the target's border. `0` is flush (situational — K1) |
+| `head` | `triangle`\|`chevron`\|`dot`\|`bar` | `triangle` | what is drawn at the arrow ends. `arrow` says *which* ends, `head` says *what* — centred on the stroke axis by construction |
+| `dash` | `1` \| `[on,off]` | — | dashed stroke, **quantised to the run** so it always begins and ends on a whole dash (measured along arc length on a curve). Keeps its head |
+| `waive` | 1 | — | this connector breaks a shape rule on purpose — `validate` stays quiet about it (the `over:1` of connector geometry) |
 | `href` | url | — | http/https/mailto only. One inset anchor over the whole row (a painted CTA box + its label each carry it); live in present mode, a real `/Link` annotation in the `⤓` PDF |
 | `over` | 1 | — | declares a deliberate overlay: `verify`'s collision check leaves this row (and what it crosses) alone |
 | `donut` | 0–100 | — | ring, `w` = diameter, `color` = fill |
@@ -227,9 +232,29 @@ Four words, and no fifth: `rise` (text — the default), `fade` (quiet chrome), 
 | single line | `verify` parity | `nowrap` rows and imported single-line rows render 1 line |
 | line count | `verify` parity | imported rows: rendered lines == source `_lines` |
 | bounds | `verify` parity | every element inside the canvas |
-| collision | `verify` parity | no ink through glyphs, no text straddling a container edge, no arrow head inside a fill (`over:1` opts out) |
+| collision | `verify` parity | no ink through glyphs, no text straddling a container edge, no arrow head inside a fill, no text over text (`over:1` opts out) |
 | page errors | `verify` | none |
 | AE | `verify --refs` | `< 0.5%` pixels at `-fuzz 2%` (set `--threshold`) |
+
+## CONNECTORS — the shapes a deck may draw
+
+Ruled on two connector probes. `validate` warns on the ones it can measure; the rest are here. A deliberate exception is
+declared with `waive:1` on the row — never by ignoring the warning.
+
+| rule | do | not |
+|---|---|---|
+| **Straight runs are orthogonal** | horizontal, vertical, right-to-left | a diagonal — draw an elbow of two orthogonal segments *(warned)* |
+| **S-curves need room** | a channel of **96px or more** | squeezing a curve into a tighter channel — re-cut the layout. A harder bend does not rescue it *(warned)* |
+| **Control points** | 50% or 90% of the run, or straight out perpendicular (vertical-out / horizontal-in) | 25% of the run, past the endpoint, or a quarter turn *(first two warned)* |
+| **Termination** | leave air — `gap` 10 is the default; `to:`/`from:` applies it | landing on a border or inside a fill *(warned + a `verify` failure)* |
+| **Even air** | the same gap at both ends | 4px at one end and 16px at the other *(warned)* |
+| **Weight** | **2.5px or heavier** for a headed connector | 1.5px with a head. A *headless* annotation leader may be a 1px hairline *(warned)* |
+| **Fan-out** | two S-curves from one edge, or straight diagonals / elbows when the geometry is orthogonal | a shared stub — two connectors leaving the same point, even with matched tangents *(warned)* |
+| **Entry** | enter the target on the face the connector comes from | top-edge entry, or a back-edge return to the side it left |
+
+`dash` and `head` are engine features, not hand-work: never fake a dash with a `repeating-linear-gradient` on `bg` (it
+cannot know the run length, so the last dash is sliced, and it silently eats the head), and never mock a dot or bar
+terminator out of extra rows (they land off centre).
 
 ## ANTI-PATTERNS (each is a review failure)
 - **Implicit padding / chrome on plain text.** A text row is text. Padding, radius, pre-wrap belong to `box`/`tile` or explicit `p`. Never fake a card with a padded text row.

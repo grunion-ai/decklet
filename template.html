@@ -72,6 +72,7 @@ body.present .el a.lk{pointer-events:auto}
 #tb .seg:last-of-type{border:0}
 #tb .seg[hidden]{display:none}
 #tb button.on{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+#tb .seg button svg{display:block} /* the link mark is a currentColor glyph beside B I U S̶ — it inverts with .on like they do */
 #tb button:disabled{opacity:.35;cursor:default}
 #tb .sw{width:16px;height:16px;padding:0;margin:0;vertical-align:middle;border-radius:50%;border:2px solid var(--line)}
 #tb .sw.on{border-color:var(--fg);box-shadow:0 0 0 1px var(--fg)}
@@ -123,11 +124,11 @@ body.present.peek #hud .spacer{display:none}
     <button data-cmd="italic" title="Italic" aria-label="Italic"><i>I</i></button>
     <button data-cmd="underline" title="Underline" aria-label="Underline"><u>U</u></button>
     <button data-cmd="strikeThrough" title="Strikethrough" aria-label="Strikethrough"><s>S</s></button>
-    <button data-link="1" title="Link (http, https or mailto)" aria-label="Link">🔗</button>
+    <button data-link="1" title="Link (http, https or mailto)" aria-label="Link"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M6.6 9.4a2.6 2.6 0 0 0 3.7 0l2.4-2.4a2.6 2.6 0 0 0-3.7-3.7l-1 1"/><path d="M9.4 6.6a2.6 2.6 0 0 0-3.7 0L3.3 9a2.6 2.6 0 0 0 3.7 3.7l1-1"/></svg></button>
   </span>
   <span class="seg" id="tb-colors"></span>
-  <button id="tb-layout" hidden title="Promote this geometry to the layout slot">Apply to layout</button>
-  <button id="tb-master" hidden title="Promote this slide-local override back to every slide">Apply to all slides</button>
+  <button id="tb-layout" hidden title="Promote this geometry to the layout slot" aria-label="Promote this geometry to the layout slot">Apply to layout</button>
+  <button id="tb-master" hidden title="Promote this slide-local override back to every slide" aria-label="Promote this slide-local override back to every slide">Apply to all slides</button>
 </div>
 <div id="hud">
   <button id="prev" title="Previous slide (←)" aria-label="Previous slide (←)">‹</button>
@@ -135,16 +136,16 @@ body.present.peek #hud .spacer{display:none}
   <div class="spacer"></div>
   <span id="autosave" role="status" data-state="ok" title="Autosaved" aria-label="Autosaved" data-tip="Autosaved"></span>
   <div id="addwrap">
-    <button id="addbtn" aria-haspopup="true" aria-expanded="false" title="Add" aria-label="Add">+</button>
+    <button id="addbtn" aria-haspopup="true" aria-expanded="false" title="Add text, box or slide" aria-label="Add text, box or slide">+</button>
     <div id="addmenu" role="menu">
       <button id="add-text">+ Text</button>
       <button id="add-box">+ Box</button>
       <button id="sadd">+ Slide</button>
     </div>
   </div>
-  <button id="grid-btn" title="Slides (G / Esc)" aria-label="Slides">⊞</button>
-  <button id="savecopy" title="Save a copy (⌘S)" aria-label="Save a copy">⤒</button>
-  <button id="pdf" title="Download PDF (⌘P prints)" aria-label="PDF">⤓</button>
+  <button id="grid-btn" title="Contact sheet (G / Esc)" aria-label="Contact sheet (G / Esc)">⊞</button>
+  <button id="savecopy" title="Save a copy (⌘S) — this browser blocks storage, so edits only survive in a copy" aria-label="Save a copy (⌘S)">⤒</button>
+  <button id="pdf" title="Download PDF (⌘P prints)" aria-label="Download PDF (⌘P prints)">⤓</button>
   <div class="sep"></div>
   <button id="fs" title="Full screen (F)" aria-label="Full screen (F)">⛶</button>
   <div id="helpwrap">
@@ -160,7 +161,7 @@ body.present.peek #hud .spacer{display:none}
       <div><kbd>⌫</kbd> delete</div>
       <div><kbd>⌘Z</kbd> undo</div>
       <div><kbd>⌘C · ⌘V · ⌘D</kbd> copy · paste · duplicate slides (in the sheet)</div>
-      <div><kbd>⌘S</kbd> save a copy (.html)</div>
+      <div><kbd>⌘S</kbd> save a copy (.html) · the <b>⤒</b> button when storage is blocked</div>
       <div><kbd>⤓ · ⌘P</kbd> PDF · paper print</div>
     </div>
   </div>
@@ -244,6 +245,22 @@ const AR=r=>({start:[1,0],end:[0,1],both:[1,1]}[r.arrow]||[0,0]);
 // is never APPENDED beyond the end. (It used to be: every connector drew ~3.2x its stroke width longer than it was authored,
 // so a symmetric 8px gap rendered 8px at the tail and -7px at the nose, and authors hand-inset every target to pay it back.)
 const HEAD=sw=>({len:sw*3.2,half:sw*1.6});
+// Head SHAPE and head POSITION are separate choices: `arrow` says which ends, `head` says what is drawn there. ONE path per
+// shape, in a 0..10 box whose leading edge is x=10 and whose axis is y=5 — so every terminator is centred on the stroke by
+// construction. The same path feeds the line's inline SVG and the curve's marker; they cannot drift.
+const HEADS={
+  triangle:{d:'M0 0L10 5L0 10Z',fill:1},
+  chevron:{d:'M1.5 0.5L9 5L1.5 9.5',fill:0},
+  dot:{d:'M0 5A5 5 0 1 0 10 5A5 5 0 1 0 0 5Z',fill:1},
+  bar:{d:'M7 0L10 0L10 10L7 10Z',fill:1},
+};
+const headSvg=(r,c)=>{const k=HEADS[r.head]||HEADS.triangle;return `<path d="${k.d}" ${k.fill?`fill="${c}"`:`fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"`}/>`};
+// dashes: quantise the nominal pattern to the run so the stroke ALWAYS begins and ends on a whole dash. A repeating
+// gradient cannot do this — it does not know the run length — which is why the last dash used to be sliced mid-stroke.
+const DASH=(r,sw,len)=>{const [on,off]=Array.isArray(r.dash)?r.dash:[sw*4,sw*3];
+  if(!(len>0)||!(on>0)||!(off>0))return null;
+  const n=Math.max(1,Math.round((len-on)/(on+off))),k=len/(n*(on+off)+on);
+  return {on:on*k,off:off*k}};
 // `to` / `from`: terminate a connector AGAINST another row instead of at a hand-computed standoff. A connector points AT a
 // thing, so an author naturally gives the target's coordinate — and the head then floats inside its fill. The engine finds
 // where the stroke crosses the target's box and stops there, so the head tips ON the border. Target = a row `id` (on this
@@ -261,23 +278,29 @@ const lerp=(a,b,t)=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});
 // de Casteljau: the sub-curve between t0 and t1, so a clipped bezier is still one exact cubic
 // the t at which `L` of arc length remains from one end — how far back to trim so the head has room
 const bezPt=(q,t)=>{const u=1-t,f=(a,b,c,d)=>u*u*u*a+3*u*u*t*b+3*u*t*t*c+t*t*t*d;return {x:f(q[0].x,q[1].x,q[2].x,q[3].x),y:f(q[0].y,q[1].y,q[2].y,q[3].y)}};
+const bezLen=q=>{let prev=bezPt(q,0),acc=0;for(let k=1;k<=240;k++){const p=bezPt(q,k/240);acc+=Math.hypot(p.x-prev.x,p.y-prev.y);prev=p}return acc};
 const tAtLen=(q,L,fromEnd)=>{const N=240;let prev=bezPt(q,fromEnd?1:0),acc=0;
   for(let k=1;k<=N;k++){const t=fromEnd?1-k/N:k/N,p=bezPt(q,t);acc+=Math.hypot(p.x-prev.x,p.y-prev.y);prev=p;if(acc>=L)return t}
   return fromEnd?0:1};
 const bezPart=(p,t0,t1)=>{const cut=(q,t)=>{const a=lerp(q[0],q[1],t),b=lerp(q[1],q[2],t),c=lerp(q[2],q[3],t),d=lerp(a,b,t),e=lerp(b,c,t),f=lerp(d,e,t);return [[q[0],a,d,f],[f,e,c,q[3]]]};
   let q=p;if(t1<1)q=cut(q,t1)[0];if(t0>0)q=cut(q,(t1<1&&t1>0)?t0/t1:t0)[1];return q};
 // clip a connector row in place against whatever `from`/`to` name
+// A connector LEAVES AIR: after clipping to the target's box it backs off `gap` (10 by default — Kyle's ruling; `gap:0`
+// puts it flush). Landing on the border reads as touching, which is why D1/K1 were rejected alongside the ones inside.
+const GAP=r=>r.gap==null?10:r.gap;
 function terminate(r,s){
   if(!(r.line||r.curve)||(r.to==null&&r.from==null))return;
-  const s0={x:r.x||0,y:r.y||0};
-  if(r.line){let a=s0,z={x:r.line[0],y:r.line[1]};const P=t=>lerp(a,z,t);
+  const g=GAP(r),s0={x:r.x||0,y:r.y||0};
+  if(r.line){let a=s0,z={x:r.line[0],y:r.line[1]};
     for(const [k,end] of [[r.to,1],[r.from,0]]){if(k==null)continue;const b=boxOf(k,s);if(!b)continue;
-      const t=edgeT(P,b,end);if(t==null)continue;const q=lerp(a,z,t);end?z=q:a=q}
+      const P=t=>lerp(a,z,t),t=edgeT(P,b,end);if(t==null)continue;
+      const q=lerp(a,z,t),L=Math.hypot(z.x-a.x,z.y-a.y)||1,ux=(z.x-a.x)/L,uy=(z.y-a.y)/L,d=end?-g:g;
+      const w={x:q.x+ux*d,y:q.y+uy*d};end?z=w:a=w}
     r.x=a.x;r.y=a.y;r.line=[z.x,z.y];return}
   let q=[s0,{x:r.curve[0],y:r.curve[1]},{x:r.curve[2],y:r.curve[3]},{x:r.curve[4],y:r.curve[5]}];
-  const at=(p,t)=>{const u=1-t,f=(a,b,c,d)=>u*u*u*a+3*u*u*t*b+3*u*t*t*c+t*t*t*d;return {x:f(p[0].x,p[1].x,p[2].x,p[3].x),y:f(p[0].y,p[1].y,p[2].y,p[3].y)}};
   for(const [k,end] of [[r.to,1],[r.from,0]]){if(k==null)continue;const b=boxOf(k,s);if(!b)continue;
-    const t=edgeT(u=>at(q,u),b,end);if(t==null)continue;q=bezPart(q,end?0:t,end?t:1)}
+    const t=edgeT(u=>bezPt(q,u),b,end);if(t==null)continue;q=bezPart(q,end?0:t,end?t:1);
+    if(g>0){const t2=tAtLen(q,g,!!end);q=bezPart(q,end?0:t2,end?t2:1)}}
   r.x=q[0].x;r.y=q[0].y;r.curve=[q[1].x,q[1].y,q[2].x,q[2].y,q[3].x,q[3].y];
 }
 let uid=0; // marker ids must be unique per document — the contact sheet renders every slide at once
@@ -316,10 +339,13 @@ function drawEls(s,root,animate){
       const sw=r.h||3,c=r.bg||'var(--accent)',[as,ae]=AR(r),hd=HEAD(sw);
       // the shaft gives up hd.len at every headed end; the row's own origin moves forward when the TAIL carries a head
       const back=as?Math.min(hd.len,len/2):0,fwd=ae?Math.min(hd.len,len/2):0,shaft=Math.max(0,len-back-fwd);
-      d.style.cssText+=`left:${(x0+Math.cos(a)*back).toFixed(2)}px;top:${(y0+Math.sin(a)*back).toFixed(2)}px;width:${shaft.toFixed(1)}px;height:${sw}px;padding:0;background:${c};transform:rotate(${a}rad);transform-origin:0 50%;border-radius:2px;`;
-      // one CSS triangle per head, sized only by the borders that show, so its box edge IS its tip
-      for(const [on,fw] of [[ae,1],[as,0]]) if(on){const t=document.createElement('i');t.className='ar';
-        t.style.cssText=`position:absolute;top:50%;left:${fw?shaft:-hd.len}px;width:0;height:0;border-top:${hd.half}px solid transparent;border-bottom:${hd.half}px solid transparent;border-${fw?'left':'right'}:${hd.len}px solid ${c};transform:translateY(-50%)`;d.appendChild(t)}}
+      const dp=r.dash?DASH(r,sw,shaft):null;
+      const paint=dp?`repeating-linear-gradient(90deg,${c} 0 ${dp.on.toFixed(2)}px,transparent ${dp.on.toFixed(2)}px ${(dp.on+dp.off).toFixed(2)}px)`:c;
+      d.style.cssText+=`left:${(x0+Math.cos(a)*back).toFixed(2)}px;top:${(y0+Math.sin(a)*back).toFixed(2)}px;width:${shaft.toFixed(1)}px;height:${sw}px;padding:0;background:${paint};transform:rotate(${a}rad);transform-origin:0 50%;border-radius:${dp?0:2}px;`;
+      // the head is an inline SVG of the SAME path the curve's marker uses, sized hd.len square, its leading edge on the stated end
+      for(const [on,fw] of [[ae,1],[as,0]]) if(on){const t=document.createElementNS('http://www.w3.org/2000/svg','svg');
+        t.setAttribute('class','ar');t.setAttribute('viewBox','0 0 10 10');t.innerHTML=headSvg(r,c);
+        t.style.cssText=`position:absolute;top:50%;left:${fw?shaft:-hd.len}px;width:${hd.len}px;height:${hd.len}px;overflow:visible;transform:translateY(-50%)${fw?'':' scaleX(-1)'}`;d.appendChild(t)}}
     // curve = one cubic bezier drawn as an SVG path; the row box wraps the whole control hull so parity/collision can measure it
     if(r.curve){const [c1x,c1y,c2x,c2y,ex,ey]=r.curve,sx=r.x||0,sy=r.y||0,sw=r.h||3,c=r.bg||'var(--accent)',[as,ae]=AR(r),hd=HEAD(sw);
       const pad=sw*4+2,xs=[sx,c1x,c2x,ex],ys=[sy,c1y,c2y,ey],bx=Math.min(...xs)-pad,by=Math.min(...ys)-pad;
@@ -329,10 +355,11 @@ function drawEls(s,root,animate){
       let q=[{x:sx,y:sy},{x:c1x,y:c1y},{x:c2x,y:c2y},{x:ex,y:ey}];
       const t0=as?tAtLen(q,hd.len,false):0,t1=ae?tAtLen(q,hd.len,true):1;
       if(t1-t0>.02)q=bezPart(q,t0,t1);
-      const mk=`<marker id="${id}" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="${(hd.len/sw).toFixed(3)}" markerHeight="${(hd.half*2/sw).toFixed(3)}" orient="auto-start-reverse" markerUnits="strokeWidth"><path d="M0 0L10 5L0 10z" fill="${c}"/></marker>`;
+      const mk=`<marker id="${id}" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="${(hd.len/sw).toFixed(3)}" markerHeight="${(hd.half*2/sw).toFixed(3)}" orient="auto-start-reverse" markerUnits="strokeWidth">${headSvg(r,c)}</marker>`;
+      const dp=r.dash?DASH(r,sw,bezLen(q)):null;   // measured along ARC length, so a curve ends on a whole dash too
       d.innerHTML=`<svg width="${bw}" height="${bh}" viewBox="0 0 ${bw} ${bh}" fill="none" xmlns="http://www.w3.org/2000/svg">`+
         (as||ae?`<defs>${mk}</defs>`:'')+
-        `<path d="M${P(q[0])}C${P(q[1])} ${P(q[2])} ${P(q[3])}" stroke="${c}" stroke-width="${sw}" stroke-linecap="butt"${ae?` marker-end="url(#${id})"`:''}${as?` marker-start="url(#${id})"`:''}/></svg>`;
+        `<path d="M${P(q[0])}C${P(q[1])} ${P(q[2])} ${P(q[3])}" stroke="${c}" stroke-width="${sw}" stroke-linecap="butt"${dp?` stroke-dasharray="${dp.on.toFixed(2)} ${dp.off.toFixed(2)}"`:''}${ae?` marker-end="url(#${id})"`:''}${as?` marker-start="url(#${id})"`:''}/></svg>`;
       d.style.cssText+=`left:${bx}px;top:${by}px;width:${bw}px;height:${bh}px;padding:0;background:none;border:0;`}
     if(r.donut!=null)d.style.cssText+=`width:${r.w}px;height:${r.w}px;padding:0;border-radius:50%;background:conic-gradient(${r.color||'var(--accent)'} ${r.donut}%,var(--line) 0);-webkit-mask:radial-gradient(#0000 55%,#000 56%);mask:radial-gradient(#0000 55%,#000 56%);`;
     // a row's own href: ONE inset anchor over the whole row, so a painted CTA box is clickable even though its label is a separate row

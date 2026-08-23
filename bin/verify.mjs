@@ -79,6 +79,13 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
         for (const [on, p, o] of [[q.head !== 'start', q.pts.at(-1), q.pts[0]], [q.head !== 'end', q.pts[0], q.pts.at(-1)]]) { if (!on) continue;
           for (const c of chrome) if (!within(o, c.b) && p.x > c.b.left + 4 && p.x < c.b.right - 4 && p.y > c.b.top + 4 && p.y < c.b.bottom - 4) headHits.push({key: q.key, on: c.key});
         } }
+      // text-over-text: the third shape. A title landing on a caption is the first thing a human sees and no other gate
+      // catches it. Glyph rects again, never boxes — two rows may share a box and still not touch a letter.
+      const inset = x => ({l: x.left, r: x.right, t: x.top + x.height * .15, b: x.bottom - x.height * .15});
+      const words = d => { const g = document.createRange(); g.selectNodeContents(d); return [...g.getClientRects()].filter(x => x.width > 1 && x.height > 1).map(inset); };
+      const texts = [...document.querySelectorAll('#canvas .el')]
+        .filter(d => (d.textContent || '').trim() && !d.querySelector('svg,img') && d.dataset.over == null)
+        .map(d => ({key: d.dataset.n ?? ('m:' + d.dataset.m), el: d, gl: words(d)}));
       return [...document.querySelectorAll('#canvas .el')].map(d => {
         const r = d.getBoundingClientRect(), cv = document.getElementById('canvas').getBoundingClientRect();
         const o = {text: (d.textContent || '').trim().slice(0, 40), n: d.dataset.n ?? ('m:' + d.dataset.m), problems: [], ...(d.dataset.snapped ? {snapped: 1} : {})};
@@ -91,7 +98,7 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
           if (d.style.whiteSpace === 'nowrap' && lines > 1) o.problems.push(`nowrap row renders ${lines} lines`);
           if (d.dataset.lines && +d.dataset.lines !== lines) o.problems.push(`source had ${d.dataset.lines} line(s), renders ${lines}`);
           o.lines = lines;
-          if (d.dataset.over == null && (ink.length || chrome.length)) {
+          if (d.dataset.over == null && (ink.length || chrome.length || texts.length > 1)) {
             // glyph rects carry the line box's leading; inset it so a rule sitting just under a heading is not a "collision".
             // TWO samples inside = the stroke passes THROUGH the glyphs; one = it merely touches an edge (a leader pointing at a label).
             const gl = [...rg.getClientRects()].filter(x => x.width > 1 && x.height > 1).map(x => ({l: x.left, r: x.right, t: x.top + x.height * .15, b: x.bottom - x.height * .15}));
@@ -105,6 +112,8 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
               return !inside && !outside;
             }));
             if (cross.length) o.problems.push('straddles ' + cross.map(c => c.key).join(','));
+            const onText = texts.filter(t => t.el !== d && t.gl.some(h => gl.some(g => Math.min(g.r, h.r) - Math.max(g.l, h.l) > 2 && Math.min(g.b, h.b) - Math.max(g.t, h.t) > 2)));
+            if (onText.length) o.problems.push('overlaps text ' + onText.map(t => t.key).join(','));
           }
         }
         const hh = headHits.filter(x => x.key === o.n);

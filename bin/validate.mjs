@@ -9,13 +9,17 @@ import {pathToFileURL} from 'node:url';
 export const ROLES = ['Title', 'Supertitle', 'H1', 'H2', 'Body', 'Caption', 'Label', 'Stat'];
 export const ANIMS = ['rise', 'fade', 'pop', 'wipe'];   // entrance motion on slide entry — the engine ignores anything else
 export const FORMATS = ['slides', 'carousel', 'carousel-4x5', 'document-letter', 'document-a4'];
-export const ARROWS = ['start', 'end', 'both'];          // arrow heads, on a line or a curve row
+export const ARROWS = ['start', 'end', 'both'];          // WHICH ends carry a head
+export const HEADS = ['triangle', 'chevron', 'dot', 'bar'];   // WHAT is drawn there row
 export const HREF = /^(https?:|mailto:)/i;               // href is model content: navigable schemes only, never javascript:/data:
 const LOCKED = ['font', 'size', 'lh', 'ls', 'mono'];          // only a role may set these
 const ROLE_REQ = ['font', 'size', 'weight', 'color'];   // lh is strongly recommended; null = browser-normal leading (what import-html emits for line-height:normal)
 const isNum = v => typeof v === 'number' && Number.isFinite(v);
 const plain = r => (r.text ?? r.html ?? '').replace(/<[^>]+>/g, '');
 const isText = r => r.text != null || r.html != null;
+// end-to-end span of a connector row; below ~40px a line is an icon stroke (a tick, a cross), not a run between boxes
+const connLen = r => { const x0 = r.x ?? 0, y0 = r.y ?? 0, e = r.line ? r.line : r.curve ? [r.curve[4], r.curve[5]] : null;
+  return e && isNum(e[0]) && isNum(e[1]) ? Math.hypot(e[0] - x0, e[1] - y0) : 0; };
 
 // style.json → deck: {tokens:{…}, roles:{…}, pad:{…}} — the model's own styles win per key. The ONE merge: create() builds with
 // it and validate --style measures text fit against it, so the two scales can never drift apart. Mutates and returns the deck.
@@ -96,6 +100,38 @@ export function validate(deck) {
       const sl = (tgt.slot && ((deck.slots || {})[tgt.slot] || (s && layouts[s.layout] && layouts[s.layout][tgt.slot]))) || {};
       if (!['x', 'y', 'w', 'h'].every(k => isNum(tgt[k] ?? sl[k]))) Wn(`${where}: ${p} "${r[p]}" has no resolvable x/y/w/h — the connector cannot be clipped to it`);
     }
+    if (r.head != null) {
+      if (!HEADS.includes(r.head)) E(`${where}: head "${r.head}" not one of ${HEADS.join('|')}`);
+      else if (!r.arrow) E(`${where}: head needs arrow to say which end carries it`);
+    }
+    if (r.dash != null) {
+      if (!(r.dash === 1 || r.dash === true || (Array.isArray(r.dash) && r.dash.length === 2 && r.dash.every(v => isNum(v) && v > 0)))) E(`${where}: dash must be 1 or [on,off]`);
+      else if (!r.line && !r.curve) E(`${where}: dash needs a line or a curve`);
+    }
+    // ── connector SHAPE rules. Warnings, never errors: a deck may have a deliberate exception — declare it with waive:1.
+    // Ruled on two connector probes (decks/connector-probe*/RULES.md); see SKILL.md CONNECTORS for the full list.
+    // …only for rows long enough to BE connectors: a 9px stroke is a tick or a cross drawn as a line, not a run between boxes
+    if ((r.line || r.curve) && !r.waive && connLen(r) >= 40) {
+      const sw = r.h ?? 3, x0 = r.x ?? 0, y0 = r.y ?? 0;
+      if (r.arrow && sw < 2.5) Wn(`${where}: a headed connector at h=${sw} is too light — use 2.5 or more (a headless leader may be a hairline)`);
+      if (Array.isArray(r.line) && r.line.every(isNum)) {
+        const dx = Math.abs(r.line[0] - x0), dy = Math.abs(r.line[1] - y0);
+        if (dx > 2 && dy > 2) Wn(`${where}: diagonal straight run — draw an elbow of two orthogonal segments instead`);
+      }
+      if (Array.isArray(r.curve) && r.curve.length === 6 && r.curve.every(isNum)) {
+        const [c1x, c1y, c2x, c2y, ex, ey] = r.curve;
+        const horiz = Math.abs(ex - x0) >= Math.abs(ey - y0), run = horiz ? Math.abs(ex - x0) : Math.abs(ey - y0);
+        const A = horiz ? [x0, c1x, c2x, ex] : [y0, c1y, c2y, ey], B = horiz ? [y0, c1y, c2y, ey] : [x0, c1x, c2x, ex];
+        if (run < 96) Wn(`${where}: S-curve in a ${Math.round(run)}px channel — 96px or more, or re-cut the layout so it fits`);
+        const lo = Math.min(A[0], A[3]), hi = Math.max(A[0], A[3]);
+        for (const k of [1, 2]) if (A[k] < lo - 2 || A[k] > hi + 2) Wn(`${where}: control point ${k} sits past the endpoints — the curve overshoots and doubles back`);
+        // a control point taken out ALONG the run should reach 50%..90% of it; one taken out PERPENDICULAR (C5) is fine
+        for (const [k, base, far] of [[1, 0, 3], [2, 3, 0]]) {
+          const along = Math.abs(A[k] - A[base]), across = Math.abs(B[k] - B[base]);
+          if (run > 0 && along > across && along / run < 0.4) Wn(`${where}: control point ${k} at ${Math.round(along / run * 100)}% of the run — take it to 50% or 90%, or out perpendicular`);
+        }
+      }
+    }
     if (r.href != null && !HREF.test(String(r.href).trim())) E(`${where}: href "${String(r.href).slice(0, 40)}" must be http, https or mailto`);
     if (r.html) for (const m of r.html.matchAll(/<a\b[^>]*\bhref\s*=\s*["']([^"']*)["']/gi)) if (!HREF.test(m[1].trim())) E(`${where}: link run href "${m[1].slice(0, 40)}" must be http, https or mailto`);
     if (r.anim && !ANIMS.includes(r.anim)) E(`${where}: anim "${r.anim}" not one of ${ANIMS.join('|')}`);
@@ -124,6 +160,33 @@ export function validate(deck) {
     for (const id of s.hide || []) if (!mids.has(id)) E(`slides[${si}]: hide "${id}" is not a master id`);
     const used = new Set();
     s.els.forEach((r, ei) => { row(r, `slides[${si}].els[${ei}]`, s); if (r && r.slot) { if (used.has(r.slot)) Wn(`slides[${si}]: slot "${r.slot}" bound twice`); used.add(r.slot); } });
+    // ── connector AIR, across the slide: a connector leaves the same visible gap at both ends and never touches a
+    // container. `to:`/`from:` hand that to the engine, so ends it terminates are not second-guessed here.
+    const conn = s.els.map((r, ei) => ({r, ei})).filter(o => o.r && (o.r.line || o.r.curve) && !o.r.waive && connLen(o.r) >= 40);
+    // containers only — the same shape the collision gate calls chrome. A tint band with no border is a backdrop a chart
+    // line may legitimately run inside; the rule is about terminating on or inside a BORDER.
+    const rects = s.els.filter(e => e && !isText(e) && (e.bd || e.bt || e.br || e.bb || e.bl || e.box || e.tile)
+      && ['x', 'y', 'w', 'h'].every(k => isNum(e[k])) && Math.min(e.w, e.h) > 24);
+    const holds = (b, p) => p[0] >= b.x && p[0] <= b.x + b.w && p[1] >= b.y && p[1] <= b.y + b.h;
+    // a box holding BOTH ends is the container the diagram lives in, not something the connector terminates against
+    const clear = (pt, other) => { let best = Infinity;
+      for (const b of rects) { if (holds(b, pt) && holds(b, other)) continue;
+        const dx = Math.max(b.x - pt[0], pt[0] - (b.x + b.w), 0), dy = Math.max(b.y - pt[1], pt[1] - (b.y + b.h), 0);
+        best = Math.min(best, (dx || dy) ? Math.hypot(dx, dy) : -1); }
+      return best; };
+    const seen = [];
+    for (const {r, ei} of conn) {
+      const w = `slides[${si}].els[${ei}]`, a0 = [r.x ?? 0, r.y ?? 0];
+      const z0 = r.line ? [r.line[0], r.line[1]] : [r.curve[4], r.curve[5]];
+      const ends = [[a0, r.from, z0], [z0, r.to, a0]].map(([pt, term, other]) => term != null ? null : clear(pt, other));
+      for (const g of ends) if (g !== null && g <= 2) Wn(`${w}: leaves no air — a connector stops clear of the box (10px is the default; to:/from: does it for you)`);
+      const [g1, g2] = ends;
+      if (g1 !== null && g2 !== null && g1 > 2 && g2 > 2 && g1 < 60 && g2 < 60 && Math.abs(g1 - g2) > 4)
+        Wn(`${w}: uneven air — ${Math.round(g1)}px at one end, ${Math.round(g2)}px at the other; use the same gap at both`);
+      // only headed connectors: a chart polyline shares vertices by nature, and that is not a stub
+      if (r.arrow) { for (const q of seen) if (Math.hypot(q[0] - a0[0], q[1] - a0[1]) < 4) Wn(`${w}: shared stub — two connectors leaving the same point read badly; fan out from the edge instead`);
+        seen.push(a0); }
+    }
   });
   return {ok: !errors.length, errors, warnings};
 }
