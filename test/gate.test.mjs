@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import {execFileSync} from 'node:child_process';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {validate, ROLES} from '../bin/validate.mjs';
 import {create, FORMAT} from '../bin/create.mjs';
@@ -227,6 +228,27 @@ live('live: explainer + three examples pass verify (layout parity, no page error
     assert.equal(r.parity.length, model.slides.length);
   }
 });
+live('live: parity — a row the type scale changed (_src) may drift in line count: reported as scale crowding, never a failure', async () => {
+  const row = {x: 60, y: 200, w: 120, role: 'Body', text: 'a sentence that certainly wraps inside one hundred and twenty pixels', _lines: 1};
+  const mk = extra => ({w: 960, h: 540, slides: [{els: [{...row, ...extra}]}]});
+  const hard = path.join(tmp, 'parity-hard.html'), soft = path.join(tmp, 'parity-soft.html');
+  fs.writeFileSync(hard, create(mk({})).html); fs.writeFileSync(soft, create(mk({_src: {size: 11, lh: null, ls: null}})).html);
+  const rh = await verify(hard, {out: path.join(tmp, 'v-hard'), log: () => {}}), rs = await verify(soft, {out: path.join(tmp, 'v-soft'), log: () => {}});
+  assert.equal(rh.parity[0].pass, false, 'unchanged row: line-count drift is a parity failure');
+  assert.equal(rs.parity[0].pass, true, 'snapped row: line-count drift is not a failure');
+  assert.equal(rs.parity[0].crowding.length, 1, '…but it is reported as scale crowding');
+  assert.ok(!rs.errors.some(e => /parity/.test(e)));
+});
+live('live: AE — a deck that differs from its reference reports the real pixel count (compare exits 1 and prints to stderr; never a silent 0)', async () => {
+  let magick = true; try { execFileSync('magick', ['-version'], {stdio: 'pipe'}); } catch { magick = false; }
+  if (!magick) return;
+  const model = {w: 960, h: 540, slides: [{name: 'one', els: [{x: 60, y: 60, w: 400, h: 200, bg: '#ff0000'}]}]};
+  const f = path.join(tmp, 'ae.html'); fs.writeFileSync(f, create(model).html);
+  const refs = path.join(tmp, 'ae-refs'); fs.mkdirSync(refs, {recursive: true});
+  execFileSync('magick', ['-size', '960x540', 'xc:#15161a', path.join(refs, 'one.png')]); // the reference has no red box
+  const r = await verify(f, {refs, out: path.join(tmp, 'v-ae'), log: () => {}});
+  assert.ok(r.ae[0].px > 70000 && r.ae[0].pass === false, `AE must see the 400×200 box: ${JSON.stringify(r.ae[0])}`);
+});
 live('live: editor rules — nib, present backdrop, master fork + inline counter, edit commit, undo, slots, A4 page rule', async () => {
   const b = await pw.chromium.launch(); const p = await b.newPage({viewport: {width: 1280, height: 800}});
   const errs = []; p.on('pageerror', e => errs.push(String(e)));
@@ -281,10 +303,15 @@ live('live: editor rules — nib, present backdrop, master fork + inline counter
 });
 live('live: import-html in-page intent capture (line count, nowrap, hugging chip)', async () => {
   const b = await pw.chromium.launch(); const p = await b.newPage({viewport: {width: 800, height: 450}});
-  await p.setContent('<body style="margin:0;width:800px;height:450px;font:16px/1.5 sans-serif"><div style="padding:20px"><p style="width:200px">one two three four five six seven eight nine ten eleven twelve</p><div style="display:flex;gap:8px"><span style="background:#eee;padding:4px 10px;border-radius:999px;border:1px solid #999">chip</span><span>label</span></div><div style="width:300px;height:10px"></div></div></body>');
+  await p.setContent('<body style="margin:0;width:800px;height:450px;font:16px/1.5 sans-serif"><div style="padding:20px"><p style="width:200px">one two three four five six seven eight nine ten eleven twelve</p><div style="display:flex;gap:8px"><span style="background:#eee;padding:4px 10px;border-radius:999px;border:1px solid #999">chip</span><span>label</span></div><div style="width:300px;height:10px"></div><table style="border-collapse:separate;border-spacing:4px;margin-top:8px"><tr><td style="width:58px;height:40px;padding:0;background:#c97a54;border-radius:8px;color:#fff;text-align:center">2</td></tr></table></div></body>');
   const rows = (await p.evaluate(extractInPage, 800)).els; await b.close();
   const para = rows.find(r => /^one two/.test(r.text || '')), chip = rows.find(r => r.text === 'chip'), label = rows.find(r => r.text === 'label');
   assert.ok(para._lines > 1 && !para.nowrap); assert.deepEqual([label._lines, label.nowrap], [1, 1]);
   assert.deepEqual([chip.w, chip.p, chip.bg, chip.bd, chip.radius], ['auto', '4px 10px 4px 10px', '#EEEEEE', '1px solid #999999', 999]);
   assert.ok(!rows.some(r => r.x === 20 && r.w === 300 && !r.text));
+  // fixed-width table cell: the column pins the width (style.width=max-content is a no-op on a td) → a 58×40 box row + a centred text
+  // row whose y comes from the glyph line, never a w:'auto' chip (AFB grading heatmap, 2026-08-23)
+  const cell = rows.find(r => r.text === '2'), cellBox = rows.find(r => r.bg === '#C97A54');
+  assert.deepEqual([cell.w, cell.align, [cellBox.x, cellBox.w, cellBox.h]], [58, 'center', [cell.x, 58, 40]]);
+  assert.ok(cell.y > cellBox.y + 4 && cell.y < cellBox.y + 24, `centred cell text y ${cell.y} vs box ${cellBox.y}`);
 });

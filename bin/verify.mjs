@@ -5,7 +5,9 @@
 //        every text row: no overflow (scrollWidth ≤ clientWidth), nowrap rows render ONE line, rows imported from HTML render the
 //        source line count (data-lines), every element stays inside the canvas, zero page errors
 //   3. AE pixel diff vs reference PNGs (ImageMagick `magick`/`compare`)  only when --refs is given
-// usage: node bin/verify.mjs deck.html [--refs dir] [--out dir] [--threshold 0.5] [--fuzz 2%] [--strict]
+// usage: node bin/verify.mjs deck.html [--refs dir] [--out dir] [--threshold 0.5] [--fuzz 2%] [--report model.report.json] [--fonts <css url>] [--strict]
+//   --report: the importer's drift report (default: model.report.json beside the deck) — masks where the mockup drew its chrome
+//   --fonts: a webfont stylesheet injected at TEST time only (the deck stays self-contained) so the AE shot uses the reference's font build
 //   refs: <slide.name>.png, <n>.png (1-based) or slide-<n>.png
 // exit 0 = PASS. Writes <out>/results.json (+ per-slide PNGs).
 import fs from 'node:fs';
@@ -16,7 +18,7 @@ import {validate} from './validate.mjs';
 
 export const modelOf = html => JSON.parse(html.match(/\/\*DECK\*\/([\s\S]*?)\/\*\/DECK\*\//)[1].replace(/<\\\/script/g, '</script'));
 
-export async function verify(file, {refs = null, out = null, threshold = 0.5, fuzz = '2%', strict = false, log = console.log} = {}) {
+export async function verify(file, {refs = null, out = null, threshold = 0.5, fuzz = '2%', strict = false, report = null, fonts = null, log = console.log} = {}) {
   const html = fs.readFileSync(file, 'utf8');
   const res = {file, contract: null, parity: [], ae: [], errors: [], skipped: []};
   // self-containment — the guarantee the whole engine rests on
@@ -35,6 +37,10 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
     await p.evaluate(() => { localStorage.clear(); }); await p.reload(); await p.waitForTimeout(300); // verify the SHIPPED model, not a stale local edit
     await p.addStyleTag({content: '#canvas{transform:none!important;border:0!important;border-radius:0!important;position:absolute!important;left:0;top:0} .el{animation:none!important}'});
     const N = deck.slides.length;
+    const repFile = report || path.join(path.dirname(path.resolve(file)), 'model.report.json');
+    const rep = fs.existsSync(repFile) ? JSON.parse(fs.readFileSync(repFile, 'utf8')) : null; // importer's drift report: where the mockup drew its chrome
+    if (fonts) { await p.addStyleTag({url: fonts}); await p.evaluate(() => document.fonts.ready); await p.waitForTimeout(1200); } // TEST-TIME only: pin the AE shot to the reference's webfont build
+    await p.addStyleTag({content: '#canvas .num{visibility:hidden}'}); // the counter is engine chrome the mockups never had; parity still measures it
     const hasMagick = !!refs && (() => { try { execFileSync('magick', ['-version'], {stdio: 'pipe'}); return true; } catch { return false; } })();
     if (refs && !hasMagick) res.skipped.push('AE: ImageMagick `magick` not on PATH');
     for (let n = 0; n < N; n++) {
@@ -42,7 +48,7 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
       const name = deck.slides[n].name || `slide-${n + 1}`;
       const bad = await p.evaluate(([W, H]) => [...document.querySelectorAll('#canvas .el')].map(d => {
         const r = d.getBoundingClientRect(), cv = document.getElementById('canvas').getBoundingClientRect();
-        const o = {text: (d.textContent || '').trim().slice(0, 40), n: d.dataset.n ?? ('m:' + d.dataset.m), problems: []};
+        const o = {text: (d.textContent || '').trim().slice(0, 40), n: d.dataset.n ?? ('m:' + d.dataset.m), problems: [], ...(d.dataset.snapped ? {snapped: 1} : {})};
         const textual = !!(d.textContent || '').trim() && !d.querySelector('svg,img');
         if (textual) {
           const rg = document.createRange(); rg.selectNodeContents(d); const tops = [];
@@ -56,15 +62,39 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
         if (r.right > cv.left + W + 1 || r.bottom > cv.top + H + 1 || r.left < cv.left - 1 || r.top < cv.top - 1) o.problems.push('outside the canvas');
         return o;
       }).filter(o => o.problems.length), [W, H]);
-      res.parity.push({slide: n + 1, name, pass: !bad.length, rows: bad});
+      // a row the type scale changed (imported with _src) may wrap or crowd differently from its source: that is a consequence of the
+      // scale, not a layout fault — reported as scale crowding for a human decision, never a failure. Everything else stays hard.
+      const soft = o => o.snapped && o.problems.every(x => /^source had|^overflows/.test(x));
+      res.parity.push({slide: n + 1, name, pass: !bad.some(o => !soft(o)), rows: bad.filter(o => !soft(o)), crowding: bad.filter(soft)});
       const act = path.join(out, `${String(n + 1).padStart(2, '0')}-${name}.png`);
       await p.locator('#canvas').screenshot({path: act});
       if (hasMagick) {
         const ref = [`${name}.png`, `${n + 1}.png`, `slide-${n + 1}.png`].map(f => path.join(refs, f)).find(f => fs.existsSync(f));
         if (!ref) { res.ae.push({slide: n + 1, name, skipped: 'no reference'}); continue; }
-        const ae = (args) => { try { return +execFileSync('magick', ['compare', '-metric', 'AE', ...args, ref, act, path.join(out, `${String(n + 1).padStart(2, '0')}-${name}.diff.png`)], {stdio: 'pipe'}).toString(); } catch (e) { return +e.stderr.toString().trim() || 0; } };
-        const px = ae(['-fuzz', fuzz]), pct = px / (W * H) * 100;
-        res.ae.push({slide: n + 1, name, px, pct: +pct.toFixed(3), pass: pct < threshold});
+        // `compare` exits 1 whenever the images differ and prints "AE (normalised)" on stderr — parse the leading number; never fall back to 0
+        const ae = (a, b, args, diff) => { const num = t => { const m = /^\s*(\d+(?:\.\d+)?)/.exec(t); return m ? +m[1] : NaN; }; const argv = ['compare', '-metric', 'AE', ...args, a, b, diff || path.join(out, `${String(n + 1).padStart(2, '0')}-${name}.diff.png`)]; try { return num(execFileSync('magick', argv, {stdio: 'pipe'}).toString()) || 0; } catch (e) { const v = num(e.stderr.toString()); if (Number.isNaN(v)) throw new Error('magick compare: ' + e.stderr.toString().trim()); return v; } };
+        const PAD = 6, mask = (src, dst, rects) => execFileSync('magick', [src, '-fill', 'black', ...rects.flatMap(r => ['-draw', `rectangle ${Math.floor(r[0] - PAD)},${Math.floor(r[1] - PAD)} ${Math.ceil(r[0] + r[2] + PAD)},${Math.ceil(r[1] + r[3] + PAD)}`]), dst]);
+        const pct = v => +(v / (W * H) * 100).toFixed(3), raw = ae(ref, act, ['-fuzz', fuzz]);
+        // imported decks deviate from their mockups ON PURPOSE: chrome is deck-wide (mockup drift normalised away) and rows the type
+        // scale changed were snapped. Mask both — where the engine drew them and where the mockup drew them — and pass on what is left:
+        // everything the engine was asked to reproduce verbatim. Hand-authored decks have no master drift / _src, so all three columns agree.
+        const geo = await p.evaluate(() => {
+          const c = canvas.getBoundingClientRect(), R = d => { const r = d.getBoundingClientRect(); return [r.left - c.left, r.top - c.top, r.width, r.height]; };
+          const chrome = [...canvas.querySelectorAll('.el[data-m]')].map(R), conflicts = [], s = deck.slides[i];
+          s.els.forEach((e, k) => { const d = canvas.querySelector(`[data-n="${k}"]`); if (!d) return; const a = R(d), bx = e._box || a;
+            const u = [Math.min(a[0], bx[0]), Math.min(a[1], bx[1])]; u.push(Math.max(a[0] + a[2], bx[0] + (bx[2] || 0)) - u[0], Math.max(a[1] + a[3], bx[1] + (bx[3] || a[3])) - u[1]);
+            if (e.slot === 'supertitle') chrome.push(u); else if (e._src) conflicts.push(u); });
+          return {chrome, conflicts};
+        });
+        for (const x of (rep?.normalised || [])) if (x.slide === name && x.what === 'rect') geo.chrome.push([x.from[0], x.from[1], x.from[2] === 'auto' ? 400 : x.from[2], x.from[3] || 24]);
+        const masked = geo.chrome.length || geo.conflicts.length, stem = path.join(out, `${String(n + 1).padStart(2, '0')}-${name}`);
+        let noChrome = raw, noBoth = raw;
+        if (masked) {
+          const mr = stem + '.ref-masked.png', ma = stem + '.actual-masked.png';
+          mask(ref, mr, geo.chrome); mask(act, ma, geo.chrome); noChrome = ae(mr, ma, ['-fuzz', fuzz], stem + '.chrome.diff.png');
+          mask(mr, mr, geo.conflicts); mask(ma, ma, geo.conflicts); noBoth = ae(mr, ma, ['-fuzz', fuzz]);
+        }
+        res.ae.push({slide: n + 1, name, px: raw, pct: pct(raw), pctNoChrome: pct(noChrome), pctNoChromeNoConflict: pct(noBoth), conflictRows: geo.conflicts.length, pass: pct(noBoth) < threshold});
       }
     }
     await b.close();
@@ -80,12 +110,13 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const a = process.argv.slice(2), o = {}; let file = null;
   for (let k = 0; k < a.length; k++) if (a[k].startsWith('--')) o[a[k].slice(2)] = a[k + 1] && !a[k + 1].startsWith('--') ? a[++k] : true; else file = a[k];
-  if (!file) { console.error('usage: node bin/verify.mjs deck.html [--refs dir] [--out dir] [--threshold 0.5] [--fuzz 2%] [--strict]'); process.exit(2); }
-  const r = await verify(file, {refs: o.refs, out: o.out, threshold: o.threshold ? +o.threshold : 0.5, fuzz: o.fuzz || '2%', strict: !!o.strict});
+  if (!file) { console.error('usage: node bin/verify.mjs deck.html [--refs dir] [--out dir] [--threshold 0.5] [--fuzz 2%] [--report model.report.json] [--fonts <css url, test-time only>] [--strict]'); process.exit(2); }
+  const r = await verify(file, {refs: o.refs, out: o.out, threshold: o.threshold ? +o.threshold : 0.5, fuzz: o.fuzz || '2%', strict: !!o.strict, report: o.report || null, fonts: o.fonts || null});
   for (const m of r.contract.errors) console.error('ERROR   contract: ' + m);
   for (const m of r.contract.warnings) console.error('warning contract: ' + m);
   for (const s of r.parity) console.log(`parity  slide ${s.slide} ${s.name}: ${s.pass ? 'PASS' : 'FAIL ' + JSON.stringify(s.rows)}`);
-  for (const s of r.ae) console.log(`ae      slide ${s.slide} ${s.name}: ${s.skipped ? 'skipped (' + s.skipped + ')' : (s.pass ? 'PASS' : 'FAIL') + ' ' + s.pct + '%'}`);
+  for (const s of r.parity) if (s.crowding?.length) console.log(`crowding slide ${s.slide} ${s.name}: ${s.crowding.length} row(s) the scale changed now wrap/crowd differently — ${s.crowding.map(c => JSON.stringify(c.text)).join(', ')}`);
+  for (const s of r.ae) console.log(`ae      slide ${s.slide} ${s.name}: ${s.skipped ? 'skipped (' + s.skipped + ')' : (s.pass ? 'PASS' : 'FAIL') + ` raw ${s.pct}% · chrome masked ${s.pctNoChrome}% · + ${s.conflictRows} snapped rows masked ${s.pctNoChromeNoConflict}% (pass column)`}`);
   for (const m of r.skipped) console.log('skipped ' + m);
   for (const m of r.errors) console.error('FAIL    ' + m);
   console.log(r.ok ? 'VERIFY PASS' : 'VERIFY FAIL');

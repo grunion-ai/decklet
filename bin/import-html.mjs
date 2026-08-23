@@ -36,7 +36,8 @@ export function extractInPage(VW) {
   // source line count: cluster the content range's client rects by top
   const lines = e => { const rg = document.createRange(); rg.selectNodeContents(e); const tops = []; for (const r of rg.getClientRects()) { if (!r.width && !r.height) continue; if (!tops.some(t => Math.abs(t - r.top) < 2)) tops.push(r.top); } return tops.length || 1; };
   // shrink-to-fit: width unchanged under max-content ⇒ the source box hugs its content (inline-block / auto-width flex item / abs)
-  const hugs = e => { const w0 = e.getBoundingClientRect().width, prev = e.style.width; e.style.width = 'max-content'; const w1 = e.getBoundingClientRect().width; e.style.width = prev; return Math.abs(w0 - w1) < 0.5; };
+  // (measured as content width == inner width — the max-content probe is a no-op on table cells, so a 58px td read as a hugging chip)
+  const hugs = e => { const cs = getComputedStyle(e), rg = document.createRange(); rg.selectNodeContents(e); const inner = e.getBoundingClientRect().width - ['Left', 'Right'].reduce((a, s) => a + parseFloat(cs['padding' + s]) + parseFloat(cs['border' + s + 'Width']), 0); return Math.abs(inner - rg.getBoundingClientRect().width) < 1.5; };
   function boxRow(e, cs) {
     const bg = hex(cs.backgroundColor); const sides = ['top', 'right', 'bottom', 'left'].map(s => side(cs, s));
     if (!bg && !sides.some(Boolean) && cs.boxShadow === 'none') return null;
@@ -59,8 +60,10 @@ export function extractInPage(VW) {
     // hugging single-line source (chip / pill / label): ONE row carrying its own padding + border + bg, w:'auto' — not a box row + an inner text row
     const row = hug ? { x: r2(r.left), y: r2(r.top), w: 'auto', ...(bx ? Object.fromEntries(Object.entries(bx).filter(([k]) => !'xywh'.includes(k))) : {}), p: [cs.paddingTop, cs.paddingRight, cs.paddingBottom, cs.paddingLeft].map(v => parseFloat(v)).join('px ') + 'px' }
                     : { x: r2(r.left + pl), y: r2(r.top + pt), w: r2(r.width - pl - pr) };
+    // vertically centred single line (table cell / flex align-items:center): the line box sits below the padding edge — take y from the glyph rect
+    if (n === 1 && !hug) { const rg = document.createRange(); rg.selectNodeContents(e); const g = rg.getBoundingClientRect(); const lh = cs.lineHeight === 'normal' ? g.height : parseFloat(cs.lineHeight); const y = r2(g.top - (lh - g.height) / 2); if (y > row.y + 0.5) row.y = y; }
     if (row.p === '0px 0px 0px 0px') delete row.p;
-    if (hug) row._w = r2(r.width); // proof metadata: the hugging row's source width
+    row._w = r2(r.width); row._h = r2(r.height); // proof metadata: the source box (the AE proof masks it where the scale changed the row)
     row.font = cs.fontFamily; row.size = parseFloat(cs.fontSize); row.weight = +cs.fontWeight; row.color = hex(cs.color);
     if (cs.letterSpacing !== 'normal') row.ls = parseFloat(cs.letterSpacing);
     if (cs.lineHeight !== 'normal') row.lh = r2(parseFloat(cs.lineHeight));
@@ -79,7 +82,9 @@ export function extractInPage(VW) {
       const keys = ['color', 'font-weight', 'font-family', 'font-size', 'letter-spacing', 'text-transform', 'padding-left', 'padding-right', 'font-style', 'opacity', 'position', 'top', 'line-height', 'display', 'margin-top', 'margin-bottom', 'margin-left', 'margin-right', 'padding-top', 'padding-bottom', 'white-space', 'vertical-align'];
       const pin = inl.map(d => { const dc = getComputedStyle(d); const o = {}; for (const k of keys) { const v = dc.getPropertyValue(k), pv = cs.getPropertyValue(k); const always = k === 'display' ? (v !== 'inline' && !(leafFlex && v === 'block')) : /^(margin|padding)-/.test(k) ? v !== '0px' : false; if (always || v !== pv) o[k] = k === 'color' ? hex(v) : v; } return o; });
       inl.forEach((d, i) => { for (const k in pin[i]) d.style.setProperty(k, pin[i][k]); d.removeAttribute('class'); if (d.dataset.pseudo) { delete d.dataset.pseudo; } });
-      row.html = e.innerHTML.replace(/\s+/g, ' ').trim();
+      // the SERIALISED runs lose the locked type keys — runs change weight/style/position/colour, never size (the role owns family/size/lh/tracking)
+      const raw = e.innerHTML.replace(/\s+/g, ' ').trim(), LK = /\s*(font-size|font-family|line-height|letter-spacing):\s*(?:&quot;[^&]*&quot;|[^;])*;?/g;
+      row.html = raw.replace(LK, ''); if (raw !== row.html) row._runs = 1; // a run changed family/size in the mockup → brand-scale conflict, recorded
     } else row.text = e.textContent;
     return { row, hug };
   }
@@ -236,7 +241,9 @@ export function detectRoles(slides, master) {
   }
   all.forEach(e => {
     const t = roles[e.role];
-    if (e.size !== t.size) e._src = { size: e.size, lh: e.lh ?? null };           // proof metadata: this row changed size
+    // proof metadata: ANY locked key off the role (row or run) = the scale changed this row — verify reports its line-count drift as scale crowding, not a parity failure
+    if (!!e._runs || e.size !== t.size || (e.lh ?? null) !== (t.lh ?? null) || Math.abs((e.ls ?? 0) - (t.ls ?? 0)) > 0.05) e._src = { size: e.size, lh: e.lh ?? null, ls: e.ls ?? null, ...(e._runs ? { runs: 1 } : {}) };
+    delete e._runs;
     for (const p of LOCKED) delete e[p];
     for (const p of ['weight', 'color', 'tt']) { if ((e[p] ?? null) === (t[p] ?? null)) delete e[p]; else if (e[p] == null) e[p] = null; }
     if (e.html) e.html = e.html.replace(/\s*(font-size|font-family|line-height|letter-spacing):[^;"]+;?/g, '');   // runs never carry size
