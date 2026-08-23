@@ -1,4 +1,10 @@
 # Changelog
+## 0.3.3 — the scale never crowds
+- import-html **fit cap**: a role is its modal signature **capped by the tightest row wearing it**. The walker measures every boxed text row's `_fit` — the largest font-size at which it keeps its source line count inside its box — and `detectRoles` lowers the role to the smallest `_fit` below the modal (leading re-read from a real mockup signature at or below the cap). The scale may shrink a row, never crowd it; the cap is reported in `model.report.json` (`conflicts.<Role>.cap`). On a dense data deck this took Caption/Label 14 → 12 and removed every overflow and chip misalignment.
+- verify parity is **hard again** for overflow and extra lines; a snapped row is tolerated only when it renders *fewer* lines than its source (collapsed inline runs), reported as crowding.
+- import-html footer: a right-anchored hugging row matches the master by **either edge** (a footer whose text changes grows leftward; the left edge drifted 55px and the row was being hidden on one slide, leaving the generic pinned counter to collide with it). Typed page counts (`· 2/5`, `3 / 6`, `Page 2 of 5`) are stripped from the footer text before the vote — the engine renders the counter.
+- import-html: a row whose first font family differs from its role's is a snapped row (`_src`), so the AE mask covers it.
+- verify: the AE failure message names the pass column (after masks), not the raw diff.
 ## Unreleased
 - HUD: `‹` / `›` nav buttons are icon-only (aria-label/title "Previous slide (←)" / "Next slide (→)"), matching `⤓ ⊞ ⛶`.
 - Contact sheet: a pointer drag never runs native text selection alongside it — `user-select:none` on the sheet, cells and `body.dragging`; press and drag start `preventDefault()` and clear any selection.

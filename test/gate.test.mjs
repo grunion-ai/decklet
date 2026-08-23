@@ -224,6 +224,25 @@ test('import-html assemble: master from recurring chrome, footer, layout slots, 
   assert.equal(detectTitle([{layout: 'title', els: [{slot: 'title', size: 44, text: 'Same size'}]}, sl[1]], structuredClone(lay)).length, 0, 'no Title when the cover headline is not larger than content H1');
 });
 
+test('import-html assemble: the footer is ONE master row across slides — right-anchored hugging text matches by its right edge, typed page counts are stripped, the scale never crowds (fit cap)', () => {
+  const logo = '<svg viewBox="0 0 10 10"><rect width="10" height="10"/></svg>';
+  const mk = (name, foot, extra = []) => ({name, bg: '#fff', els: [
+    {x: 10, y: 10, w: 100, h: 20, svg: logo},
+    {x: 20, y: 30, w: 600, font: 'Inter', size: 14, weight: 600, color: '#C97A54', tt: 'uppercase', ls: 1, text: 'KICKER ' + name, _lines: 1, nowrap: 1},
+    {x: 20, y: 60, w: 600, font: 'Inter', size: 44, weight: 700, color: '#23262C', text: name + ' title', _lines: 1, nowrap: 1},
+    {x: 800 - 20 - foot.length * 6, y: 420, w: 'auto', _w: foot.length * 6, font: 'Inter', size: 12, weight: 400, color: '#3A3F47', text: foot, _lines: 1, nowrap: 1}, // right edge on 780 for every slide
+    ...extra]});
+  // slide a typed no page count (x differs by 30px from the others); b/c/d typed "· 2/4" style counters
+  const body = n => ({x: 20, y: 200, w: 300, font: 'DM Sans', size: 16, weight: 400, color: '#3A3F47', text: 'body ' + n, _lines: 2, _fit: 19});
+  const raw = [mk('a', 'Deck · July', [body(1)]), mk('b', 'Deck · July · 2/4', [body(2)]), mk('c', 'Deck · July · 3/4', [body(3), {x: 20, y: 300, w: 120, font: 'DM Sans', size: 15, weight: 400, color: '#3A3F47', text: 'a tight body row in a narrow card', _lines: 2, _fit: 13.5}]), mk('d', 'Deck · July · 4/4', [body(4)])];
+  const d = assemble(raw, {w: 800, h: 450});
+  const foot = d.master.find(m => m.footer);
+  assert.ok(foot, 'footer master exists'); assert.equal(foot.text, 'Deck · July', 'typed page count stripped from the footer text (the engine renders the counter)');
+  assert.ok(d.slides.every(s => !(s.hide || []).includes(foot.id)), 'every slide shows the one footer row — slide a matched by its right edge');
+  assert.ok(!d.slides.some(s => s.els.some(e => /July/.test(e.text || ''))), 'no slide keeps a private footer copy');
+  // fit cap: Body modal is 16 but one Body row only fits at 13.5 → the role is 13.5 (the scale may shrink a row, never crowd it)
+  assert.equal(d.styles.roles.Body.size, 13.5); assert.ok(d._report.conflicts.Body.cap, 'the cap is reported with the row that set it');
+});
 // ── 7. live proofs (Playwright optional devDependency) ──
 live('live: explainer + three examples pass verify (layout parity, no page errors)', async () => {
   for (const n of ['explainer', 'quarterly-update', 'launch-carousel', 'one-pager']) {
@@ -234,16 +253,17 @@ live('live: explainer + three examples pass verify (layout parity, no page error
     assert.equal(r.parity.length, model.slides.length);
   }
 });
-live('live: parity — a row the type scale changed (_src) may drift in line count: reported as scale crowding, never a failure', async () => {
+live('live: parity — a snapped row (_src) may render fewer lines (crowding, reported); more lines or overflow fail', async () => {
   const row = {x: 60, y: 200, w: 120, role: 'Body', text: 'a sentence that certainly wraps inside one hundred and twenty pixels', _lines: 1};
   const mk = extra => ({w: 960, h: 540, slides: [{els: [{...row, ...extra}]}]});
   const hard = path.join(tmp, 'parity-hard.html'), soft = path.join(tmp, 'parity-soft.html');
   fs.writeFileSync(hard, create(mk({})).html); fs.writeFileSync(soft, create(mk({_src: {size: 11, lh: null, ls: null}})).html);
   const rh = await verify(hard, {out: path.join(tmp, 'v-hard'), log: () => {}}), rs = await verify(soft, {out: path.join(tmp, 'v-soft'), log: () => {}});
   assert.equal(rh.parity[0].pass, false, 'unchanged row: line-count drift is a parity failure');
-  assert.equal(rs.parity[0].pass, true, 'snapped row: line-count drift is not a failure');
-  assert.equal(rs.parity[0].crowding.length, 1, '…but it is reported as scale crowding');
-  assert.ok(!rs.errors.some(e => /parity/.test(e)));
+  assert.equal(rs.parity[0].pass, false, 'snapped row that renders MORE lines than its source: still a failure (the importer fit cap must prevent it)');
+  const fewer = path.join(tmp, 'parity-fewer.html'); fs.writeFileSync(fewer, create({w: 960, h: 540, slides: [{els: [{x: 60, y: 200, w: 600, role: 'Body', text: 'one line', _lines: 2, _src: {size: 11, lh: null, ls: null}}]}]}).html);
+  const rf = await verify(fewer, {out: path.join(tmp, 'v-fewer'), log: () => {}});
+  assert.equal(rf.parity[0].pass, true, 'snapped row that renders FEWER lines (collapsed runs): not a failure'); assert.equal(rf.parity[0].crowding.length, 1, '…reported as scale crowding');
 });
 live('live: AE — a deck that differs from its reference reports the real pixel count (compare exits 1 and prints to stderr; never a silent 0)', async () => {
   let magick = true; try { execFileSync('magick', ['-version'], {stdio: 'pipe'}); } catch { magick = false; }
@@ -329,4 +349,6 @@ live('live: import-html in-page intent capture (line count, nowrap, hugging chip
   const cell = rows.find(r => r.text === '2'), cellBox = rows.find(r => r.bg === '#C97A54');
   assert.deepEqual([cell.w, cell.align, [cellBox.x, cellBox.w, cellBox.h]], [58, 'center', [cell.x, 58, 40]]);
   assert.ok(cell.y > cellBox.y + 4 && cell.y < cellBox.y + 24, `centred cell text y ${cell.y} vs box ${cellBox.y}`);
+  assert.ok(para._fit >= 16 && para._fit < 24, `wrapped paragraph records the largest font-size that keeps its line count (${para._fit})`);
+  assert.ok(chip._fit === undefined, 'hugging chip has no width to fit into → no _fit');
 });

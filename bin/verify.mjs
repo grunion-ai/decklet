@@ -64,7 +64,8 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
       }).filter(o => o.problems.length), [W, H]);
       // a row the type scale changed (imported with _src) may wrap or crowd differently from its source: that is a consequence of the
       // scale, not a layout fault — reported as scale crowding for a human decision, never a failure. Everything else stays hard.
-      const soft = o => o.snapped && o.problems.every(x => /^source had|^overflows/.test(x));
+      // …only when it renders FEWER lines (collapsed runs); more lines or overflow means the importer's fit cap failed — hard
+      const soft = o => o.snapped && o.problems.every(x => { const m = /^source had (\d+) line\(s\), renders (\d+)/.exec(x); return m && +m[2] < +m[1]; });
       res.parity.push({slide: n + 1, name, pass: !bad.some(o => !soft(o)), rows: bad.filter(o => !soft(o)), crowding: bad.filter(soft)});
       const act = path.join(out, `${String(n + 1).padStart(2, '0')}-${name}.png`);
       await p.locator('#canvas').screenshot({path: act});
@@ -102,7 +103,7 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
     fs.writeFileSync(path.join(out, 'results.json'), JSON.stringify(res, null, 1));
   }
   if (res.parity.some(r => !r.pass)) res.errors.push('layout parity failed on ' + res.parity.filter(r => !r.pass).map(r => r.slide).join(','));
-  if (res.ae.some(r => r.pass === false)) res.errors.push('AE over threshold on ' + res.ae.filter(r => r.pass === false).map(r => `${r.slide} (${r.pct}%)`).join(','));
+  if (res.ae.some(r => r.pass === false)) res.errors.push('AE over threshold on ' + res.ae.filter(r => r.pass === false).map(r => `${r.slide} (${r.pctNoChromeNoConflict ?? r.pct}% after masks)`).join(','));
   res.ok = !res.errors.length;
   return res;
 }

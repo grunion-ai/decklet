@@ -64,6 +64,10 @@ export function extractInPage(VW) {
     if (n === 1 && !hug) { const rg = document.createRange(); rg.selectNodeContents(e); const g = rg.getBoundingClientRect(); const lh = cs.lineHeight === 'normal' ? g.height : parseFloat(cs.lineHeight); const y = r2(g.top - (lh - g.height) / 2); if (y > row.y + 0.5) row.y = y; }
     if (row.p === '0px 0px 0px 0px') delete row.p;
     row._w = r2(r.width); row._h = r2(r.height); // proof metadata: the source box (the AE proof masks it where the scale changed the row)
+    // fit: the largest font-size at which this row still keeps its source line count inside its box (hugging rows have no box to fit)
+    if (!hug) { const s0 = parseFloat(cs.fontSize), prev = e.style.fontSize, ok = sz => { e.style.fontSize = sz + 'px'; return lines(e) <= n && e.scrollWidth <= e.clientWidth + 1; };
+      if (!ok(s0)) row._fit = s0; else { let lo = s0, hi = s0 * 1.6; while (hi - lo > 0.25) { const m = (lo + hi) / 2; if (ok(m)) lo = m; else hi = m; } row._fit = Math.floor(lo * 2) / 2; }
+      e.style.fontSize = prev; }
     row.font = cs.fontFamily; row.size = parseFloat(cs.fontSize); row.weight = +cs.fontWeight; row.color = hex(cs.color);
     if (cs.letterSpacing !== 'normal') row.ls = parseFloat(cs.letterSpacing);
     if (cs.lineHeight !== 'normal') row.lh = r2(parseFloat(cs.lineHeight));
@@ -115,7 +119,9 @@ const kind = r => r.svg ? 'svg' : r.img ? 'img' : (r.text != null || r.html != n
 const plain = r => (r.text ?? r.html ?? '').replace(/<[^>]+>/g, '').trim();
 const viewBox = r => (r.svg.match(/viewBox="([^"]+)"/) || [])[1] || '';
 const wOf = r => r.w === 'auto' ? 0 : r.w;
-const near = (a, b, tol) => Math.abs(a.x - b.x) <= tol && Math.abs(a.y - b.y) <= tol && (a.w === 'auto' || b.w === 'auto' || Math.abs(a.w - b.w) <= tol) && Math.abs((a.h || 0) - (b.h || 0)) <= tol;
+const rightOf = r => r.x + (r.w === 'auto' ? (r._w ?? (r._box && r._box[2]) ?? 0) : r.w); // hugging rows: the source width rides _w (walker) / _box (assembled)
+// hugging rows (w:'auto') are the same element when EITHER edge lines up: a right-anchored footer grows leftward as its text changes
+const near = (a, b, tol) => (Math.abs(a.x - b.x) <= tol || (a.w === 'auto' && b.w === 'auto' && Math.abs(rightOf(a) - rightOf(b)) <= tol)) && Math.abs(a.y - b.y) <= tol && (a.w === 'auto' || b.w === 'auto' || Math.abs(a.w - b.w) <= tol) && Math.abs((a.h || 0) - (b.h || 0)) <= tol;
 // same KIND of thing: a recoloured logo, a rephrased footer, the same rule at a different margin
 const kin = (a, b) => { const k = kind(a); if (k !== kind(b)) return false; if (k === 'svg') return viewBox(a) === viewBox(b); if (k === 'text') return Math.abs(a.size - b.size) <= 2; if (k === 'box') return ['bg', 'bd', 'bt', 'br', 'bb', 'bl'].every(p => !!a[p] === !!b[p]); return true; };
 const mode = arr => { const c = new Map(); for (const v of arr) c.set(v, (c.get(v) || 0) + 1); return [...c.entries()].sort((a, b) => b[1] - a[1])[0][0]; };
@@ -125,6 +131,7 @@ const rkey = r => [r.x, r.y, r.w, r.h].join(',');
 //    colour, case, italic — never size: for any text type there is exactly one font/size/leading combination.
 export const ROLES = ['Title', 'Supertitle', 'H1', 'H2', 'Body', 'Caption', 'Label', 'Stat'];
 const LOCKED = ['font', 'size', 'lh', 'ls', 'mono'];
+const fam = f => String(f || '').split(',')[0].replace(/["']/g, '').trim().toLowerCase(); // first family = the face the mockup asked for
 const upper = r => r.tt === 'uppercase' || (/[A-Z]/.test(plain(r)) && plain(r) === plain(r).toUpperCase());
 const isMono = r => /mono|menlo|courier|fira code/i.test(r.font || '');
 export const classify = r => {
@@ -173,7 +180,9 @@ export function detectMaster(slides, W, H, tol = 24) {
     master.push(m); c.id = m.id; c.m = m;
   }
   const foot = master.filter(m => kind(m) === 'text' && m.y > H * 0.8).sort((a, b) => (b.y - a.y) || ((b.x + wOf(b)) - (a.x + wOf(a))))[0];
-  if (foot) foot.footer = 1;
+  // the mockups typed their page count ("· 2/5", "3 / 6", "Page 2 of 5"); the engine renders the counter — strip it from every instance before the text vote
+  const COUNTER = /\s*[·|\-–—]?\s*(?:page\s*)?\d+\s*(?:\/|of)\s*\d+\s*$/i;
+  if (foot) { foot.footer = 1; const c = clusters.find(c => c.m === foot); for (const x of c.inst) if (x.e.text != null && COUNTER.test(x.e.text)) x.e.text = x.e.text.replace(COUNTER, ''); foot.text = foot.text == null ? foot.text : mode(c.inst.map(x => x.e.text)); }
   slides.forEach((s, si) => {
     const used = new Set(), keep = [];
     for (const c of clusters) {
@@ -235,15 +244,21 @@ export function detectRoles(slides, master) {
   for (const name of ROLES) {
     const rows = all.filter(e => e.role === name); const t = { ...SEED[name] };
     if (rows.length) for (const p of RP) t[p] = mode(rows.map(r => r[p] ?? null));
+    // fit cap: the scale may shrink a row, never crowd it — a role is its modal signature capped by the tightest row wearing it
+    // (_fit = the largest font-size at which the row keeps its source line count inside its box, measured in the mockup page)
+    const tight = rows.filter(r => r._fit != null && r._fit < t.size).sort((a, b) => a._fit - b._fit)[0]; let cap = null;
+    if (tight) { cap = { from: t.size, to: tight._fit, text: plain(tight).slice(0, 40) }; const sig = rows.filter(r => r.size <= tight._fit).sort((a, b) => b.size - a.size)[0];
+      const ratio = tight._fit / t.size; t.lh = t.lh == null ? null : Math.round(t.lh * ratio * 100) / 100; t.size = tight._fit;
+      if (sig && sig.lh != null) t.lh = sig.lh; } // prefer a real mockup leading at/below the cap
     roles[name] = t;
     const off = rows.filter(r => r.size !== t.size);
-    conflicts[name] = { seed: SEED[name].size, mockup: t.size, rows: rows.length, snapped: off.map(r => ({ from: r.size, text: plain(r).slice(0, 40) })) };
+    conflicts[name] = { seed: SEED[name].size, mockup: t.size, rows: rows.length, ...(cap ? { cap } : {}), snapped: off.map(r => ({ from: r.size, text: plain(r).slice(0, 40) })) };
   }
   all.forEach(e => {
     const t = roles[e.role];
     // proof metadata: ANY locked key off the role (row or run) = the scale changed this row — verify reports its line-count drift as scale crowding, not a parity failure
-    if (!!e._runs || e.size !== t.size || (e.lh ?? null) !== (t.lh ?? null) || Math.abs((e.ls ?? 0) - (t.ls ?? 0)) > 0.05) e._src = { size: e.size, lh: e.lh ?? null, ls: e.ls ?? null, ...(e._runs ? { runs: 1 } : {}) };
-    delete e._runs;
+    if (!!e._runs || e.size !== t.size || (e.lh ?? null) !== (t.lh ?? null) || Math.abs((e.ls ?? 0) - (t.ls ?? 0)) > 0.05 || fam(e.font) !== fam(t.font)) e._src = { size: e.size, lh: e.lh ?? null, ls: e.ls ?? null, ...(e._runs ? { runs: 1 } : {}) };
+    delete e._runs; delete e._fit;
     for (const p of LOCKED) delete e[p];
     for (const p of ['weight', 'color', 'tt']) { if ((e[p] ?? null) === (t[p] ?? null)) delete e[p]; else if (e[p] == null) e[p] = null; }
     if (e.html) e.html = e.html.replace(/\s*(font-size|font-family|line-height|letter-spacing):[^;"]+;?/g, '');   // runs never carry size
