@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {pathToFileURL, fileURLToPath} from 'node:url';
-import {validate} from './validate.mjs';
+import {validate, mergeStyle} from './validate.mjs';
 
 // page-size presets of ONE model space: canvas size + print page (named sizes only — Safari ignores px @page sizes)
 export const FORMAT = {
@@ -32,12 +32,11 @@ export function create(model, {style = null, format, space, title, template} = {
   deck.format = fmt; deck.page = FORMAT[fmt].page;
   if (space) { const [w, h] = space.split('x').map(Number); deck.w = w; deck.h = h; }
   if (deck.w == null || deck.h == null) { deck.w = FORMAT[fmt].w; deck.h = FORMAT[fmt].h; }
-  // style.json: {tokens:{bg,fg,muted,accent,card,line,sel,box}, roles:{…}, pad:{…}} — the model's own styles win per key
-  if (style) {
-    deck.styles = deck.styles || {};
-    deck.styles.roles = {...(style.roles || {}), ...(deck.styles.roles || {})};
-    deck.styles.pad = {...(style.pad || {}), ...(deck.styles.pad || {})};
-  }
+  // style.json: {tokens:{bg,fg,muted,accent,card,line,sel,box}, roles:{…}, pad:{…}} — shared with validate --style so the two never drift
+  mergeStyle(deck, style);
+  // the deck NAMES itself: --title wins, else the model's own title, else "decklet". It is model data, never markup —
+  // the runtime titles the document from it, so the tab, the ⤓ PDF filename and the ⌘S copy filename are one string.
+  deck.title = title || deck.title || 'decklet';
   let html = template || fs.readFileSync(path.join(here, '..', 'template.html'), 'utf8');
   if (!deck.styles || !deck.styles.roles || !Object.keys(deck.styles.roles).length) { // no roles anywhere → inherit the template's neutral scale
     const tpl = JSON.parse(html.match(/\/\*DECK\*\/([\s\S]*?)\/\*\/DECK\*\//)[1]);
@@ -46,7 +45,6 @@ export function create(model, {style = null, format, space, title, template} = {
   const tokens = {...(style && style.tokens || {})};
   if (Object.keys(tokens).length) html = put(html, 'TOKENS', Object.entries(tokens).map(([k, v]) => `--${k.replace(/^--/, '')}:${v}`).join(';'));
   const hash = createHash('sha256').update(JSON.stringify(deck)).digest('hex').slice(0, 10);
-  html = put(html, 'TITLE', esc(String(title || deck.title || 'decklet').replace(/[<>&]/g, c => ({'<': '&lt;', '>': '&gt;', '&': '&amp;'}[c]))));
   html = put(html, 'DECK', esc(JSON.stringify(deck)));
   html = put(html, 'KEY', `'decklet:${hash}'`);
   return {html, deck, hash};

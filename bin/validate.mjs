@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // decklet model-contract validator — pure Node, no browser. Agents run this before create/verify.
-// usage: node bin/validate.mjs model.json [--strict]     (--strict: warnings fail too)
-// library: import {validate, ROLES} from './validate.mjs'  →  {ok, errors:[…], warnings:[…]}
+// usage: node bin/validate.mjs model.json [--style style.json] [--strict]     (--strict: warnings fail too)
+//   --style: the same style.json create() will build with — text fit is only meaningful against the scale the deck will wear
+// library: import {validate, mergeStyle, ROLES} from './validate.mjs'  →  {ok, errors:[…], warnings:[…]}
 import fs from 'node:fs';
 import {pathToFileURL} from 'node:url';
 
@@ -13,6 +14,16 @@ const ROLE_REQ = ['font', 'size', 'weight', 'color'];   // lh is strongly recomm
 const isNum = v => typeof v === 'number' && Number.isFinite(v);
 const plain = r => (r.text ?? r.html ?? '').replace(/<[^>]+>/g, '');
 const isText = r => r.text != null || r.html != null;
+
+// style.json → deck: {tokens:{…}, roles:{…}, pad:{…}} — the model's own styles win per key. The ONE merge: create() builds with
+// it and validate --style measures text fit against it, so the two scales can never drift apart. Mutates and returns the deck.
+export function mergeStyle(deck, style) {
+  if (!style) return deck;
+  deck.styles = deck.styles || {};
+  deck.styles.roles = {...(style.roles || {}), ...(deck.styles.roles || {})};
+  deck.styles.pad = {...(style.pad || {}), ...(deck.styles.pad || {})};
+  return deck;
+}
 
 export function validate(deck) {
   const errors = [], warnings = [];
@@ -102,10 +113,14 @@ export function validate(deck) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const a = process.argv.slice(2), strict = a.includes('--strict'), file = a.find(x => !x.startsWith('--'));
-  if (!file) { console.error('usage: node bin/validate.mjs model.json [--strict]'); process.exit(2); }
+  const a = process.argv.slice(2), strict = a.includes('--strict'), si = a.indexOf('--style');
+  const file = (si < 0 ? a : a.filter((_, k) => k !== si && k !== si + 1)).find(x => !x.startsWith('--'));
+  if (!file) { console.error('usage: node bin/validate.mjs model.json [--style style.json] [--strict]'); process.exit(2); }
   const deck = JSON.parse(fs.readFileSync(file, 'utf8'));
-  if (!(deck.styles && deck.styles.roles)) { // no roles in the model → create.mjs inherits the template's neutral scale; validate against the same
+  // --style: the real type scale usually arrives at create time. Merge it the same way create() does, or text fit is measured
+  // against the wrong roles — validate reports 0 warnings while create --style reports the overflow verify then fails on.
+  mergeStyle(deck, si >= 0 ? JSON.parse(fs.readFileSync(a[si + 1], 'utf8')) : null);
+  if (!deck.styles || !deck.styles.roles || !Object.keys(deck.styles.roles).length) { // no roles anywhere → create.mjs inherits the template's neutral scale; validate against the same
     const tpl = new URL('../template.html', import.meta.url);
     if (fs.existsSync(tpl)) { const t = JSON.parse(fs.readFileSync(tpl, 'utf8').match(/\/\*DECK\*\/([\s\S]*?)\/\*\/DECK\*\//)[1]); deck.styles = {...t.styles, ...(deck.styles || {}), roles: t.styles.roles}; console.error('note    no styles.roles in the model — validated against the template\'s neutral roles (create.mjs does the same)'); }
   }

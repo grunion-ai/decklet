@@ -65,15 +65,18 @@ Discipline, in order of importance:
 
 ### Step 3 — validate (no browser)
 ```
-node bin/validate.mjs model.json            # 0 errors required; read every warning
-node bin/validate.mjs model.json --strict   # warnings fail too — use before hand-off
+node bin/validate.mjs model.json --style style.json            # 0 errors required; read every warning
+node bin/validate.mjs model.json --style style.json --strict   # warnings fail too — use before hand-off
 ```
+**Always pass the same `--style` you will pass to `create`.** Text fit is only meaningful against the scale the deck will actually wear: without it the model is measured against the template's neutral roles, so `validate` can report 0 warnings on a model `create --style` then floods with overflow — and `verify` fails on. Omit `--style` only when there is none.
 
 ### Step 4 — create
 ```
 node bin/create.mjs --model model.json [--style style.json] --out deck.html --format slides [--space 1600x900] [--title "…"]
 ```
 Refuses an invalid model (`--force` to override while iterating). Stamps a per-deck storage namespace from the model hash, so a rebuilt deck never loads a stale local edit.
+
+**The deck names itself.** `--title` wins, else the model's own `title`, else `decklet`; the winner is written into the model and the runtime titles the document from it. One short, human name — you are the one who writes it — becomes the browser tab, the `⤓` PDF filename and the `⌘S` save-a-copy filename.
 
 ### Step 5 — verify (mandatory)
 ```
@@ -105,7 +108,7 @@ Top level:
 | `w`, `h` | number | from format | `960`, `540` |
 | `format` | enum | `slides` | `"carousel"` |
 | `page` | `letter`\|`a4` | from format | set by create |
-| `title` | string | `decklet` | `"Q3 update"` |
+| `title` | string | `decklet` | `"Q3 update"` — tab title + `⤓`/`⌘S` filename; `--title` overwrites it |
 | `styles.roles` | `{Role: treatment}` | template neutral | see STYLE CONTRACT |
 | `styles.margin` | number | `round(w × 0.06)` | content inset chrome sits on: the footer counter's right edge = `w − margin` |
 | `styles.pad` | `{token: css}` | `{chip:'3px 8px', pill:'5px 12px'}` | `p:'chip'` on a row |
@@ -279,8 +282,8 @@ Print zoom is exactly 1 for `document-*` formats: the page IS the canvas.
 ### D — finished HTML pages → model (`bin/import-html.mjs`)
 When the source is already HTML at a fixed viewport (mockups, a static site's pages):
 ```
-node bin/import-html.mjs --w 1600 --h 900 --out model.json --shots shots/ 'pages/*.html'
+node bin/import-html.mjs --w 1600 --h 900 --out model.json --shots shots/ 'pages/*.html'   # --shots writes shots/<page>.png
 node bin/create.mjs --model model.json --out deck.html --space 1600x900
 node bin/verify.mjs deck.html --refs shots/
 ```
-The importer lifts recurring chrome into `master`, heading signatures into layout slots, style signatures into the eight roles (a cover headline larger than any content `H1` becomes `Title`), and records `_lines`/`nowrap` intent so parity can compare against the source. Read `model.report.json`: `conflicts` lists rows whose size was snapped to their role — those are the source's own inconsistencies, decide whether to keep the snap.
+The importer lifts recurring chrome into `master`, heading signatures into layout slots, style signatures into the eight roles (a cover headline larger than any content `H1` becomes `Title`), and records `_lines`/`nowrap` intent so parity can compare against the source. `--shots` screenshots each page at the model viewport (before the walker touches the DOM) to `shots/<page-basename>.png` and records the paths under `report.refs` — that is exactly the filename `verify --refs` resolves. Read `model.report.json`: `conflicts` lists rows whose size was snapped to their role — those are the source's own inconsistencies, decide whether to keep the snap.

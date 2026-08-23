@@ -5,11 +5,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import {execFileSync} from 'node:child_process';
+import {execFileSync, spawnSync} from 'node:child_process';
 import {fileURLToPath, pathToFileURL} from 'node:url';
-import {validate, ROLES, ANIMS} from '../bin/validate.mjs';
+import {validate, mergeStyle, ROLES, ANIMS} from '../bin/validate.mjs';
 import {create, FORMAT} from '../bin/create.mjs';
-import {assemble, extractInPage, classify, detectTitle} from '../bin/import-html.mjs';
+import {assemble, extract, extractInPage, classify, detectTitle} from '../bin/import-html.mjs';
 import {verify, modelOf} from '../bin/verify.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -40,7 +40,7 @@ test('no client or brand residue in the public tree', () => {
 
 // ── 2. engine static contract (the rules the editor is built on) ──
 test('template markers + per-deck storage namespace', () => {
-  assert.match(tpl, /<title>\/\*TITLE\*\/[^<]*\/\*\/TITLE\*\/<\/title>/);
+  assert.match(tpl, /<title>decklet<\/title>/, 'the tab title is plain static text — a /*MARK*/ sentinel is not a comment inside <title>');
   assert.match(tpl, /:root\{\/\*TOKENS\*\/[^}]*\/\*\/TOKENS\*\/;--W:/);
   assert.match(tpl, /const DECK=\/\*DECK\*\/\{[\s\S]*?\}\/\*\/DECK\*\/;/);
   assert.match(tpl, /const NS=\/\*KEY\*\/'decklet:template'\/\*\/KEY\*\/,KEY=NS\+':model',HKEY=NS\+':hist'/);
@@ -228,13 +228,37 @@ test('create: style.json tokens land in :root, roles merge (model wins per role)
   assert.equal(d.styles.roles.H1.size, 50); assert.equal(d.styles.roles.Body.size, 10);
   const e = create({slides: [{els: []}]}, {}).deck; assert.deepEqual(Object.keys(e.styles.roles), ROLES);
 });
-test('create: title escaped, </script> in content escaped, namespace follows the model', () => {
+test('create: --title is model data (clean tab title, clean ⤓/⌘S filename), </script> in content escaped, namespace follows the model', () => {
   const base = {styles: {roles: modelOf(tpl).styles.roles}, slides: [{els: [{x: 0, y: 0, w: 10, role: 'Body', text: 'a</script><b>'}]}]};
   const a = create(base, {title: 'x<y&z'});
-  assert.match(a.html, /<title>\/\*TITLE\*\/x&lt;y&amp;z\/\*\/TITLE\*\/<\/title>/);
+  assert.match(a.html, /<title>decklet<\/title>/, 'no sentinel and no interpolation in <title> — the runtime titles the document');
+  assert.doesNotMatch(a.html, /\/\*\/?TITLE\*\//, 'the TITLE marker is gone from the engine');
+  assert.equal(modelOf(a.html).title, 'x<y&z', '--title lands in the model, escaped by JSON not by HTML');
+  assert.match(tpl, /document\.title=deck\.title\|\|'decklet'/, 'one source for the tab title, the ⤓ PDF name and the ⌘S copy name');
+  assert.equal(create(base, {}).deck.title, 'decklet');
+  assert.equal(create({...base, title: 'from the model'}, {}).deck.title, 'from the model');
+  assert.equal(create({...base, title: 'from the model'}, {title: 'from the flag'}).deck.title, 'from the flag', '--title wins');
   assert.ok(!/a<\/script><b>/.test(a.html) && a.html.includes('a<\\/script><b>'));
   assert.deepEqual(modelOf(a.html).slides[0].els[0].text, 'a</script><b>', 'round-trips through modelOf');
   const b = create({...base, slides: [{els: []}]}, {}); assert.notEqual(a.hash, b.hash);
+  assert.equal(modelOf(create({...base, title: 'second pass'}, {template: a.html}).html).title, 'second pass', 're-create over a built deck still substitutes');
+});
+
+test('validate --style: text fit is measured against the scale create() will build with (ONE merge, no drift)', () => {
+  // a Body row that fits at the template's neutral 16px and overflows badly at the brand's 40px
+  const model = {w: 960, h: 540, slides: [{els: [{x: 0, y: 0, w: 200, role: 'Body', nowrap: 1, text: 'Two deals, one re-read'}]}]};
+  const style = {roles: {Body: {font: 'Georgia', size: 40, weight: 400, lh: 48, color: '#000'}}, pad: {chip: '2px 6px'}};
+  const mf = path.join(tmp, 'fit-model.json'), sf = path.join(tmp, 'fit-style.json');
+  fs.writeFileSync(mf, JSON.stringify(model)); fs.writeFileSync(sf, JSON.stringify(style));
+  const cli = (...args) => { const r = spawnSync(process.execPath, [path.join(root, 'bin/validate.mjs'), mf, ...args], {encoding: 'utf8'}); return {out: r.stdout + r.stderr, code: r.status}; };
+  assert.match(cli().out, /0 errors, 0 warnings/, 'without --style the neutral scale hides the overflow');
+  const s = cli('--style', sf);
+  assert.match(s.out, /likely wider than w=200/, '--style surfaces exactly what create --style reports');
+  assert.equal(cli('--style', sf, '--strict').code, 1, '--strict fails on it');
+  // the merge itself is shared with create() — the two can never disagree
+  assert.deepEqual(validate(mergeStyle(structuredClone(model), style)).warnings, validate(create(model, {style}).deck).warnings);
+  assert.equal(mergeStyle(structuredClone(model), style).styles.pad.chip, '2px 6px');
+  assert.equal(mergeStyle({styles: {roles: {Body: {size: 9}}}}, style).styles.roles.Body.size, 9, 'the model wins per role');
 });
 
 // ── 6. import-html: pure structure lifting on a fixture ──
@@ -399,6 +423,31 @@ live('live: editor rules — nib, present backdrop, master fork + inline counter
   assert.equal(await ev(() => [...document.styleSheets].some(s => { try { return [...s.cssRules].some(r => r.cssText.includes('a4')); } catch { return false; } })), true);
   assert.equal(await ev(() => document.documentElement.style.getPropertyValue('--Z')), '1.0000', 'A4 document prints at zoom 1');
   await b.close();
+});
+live('live: the tab title is the model title — the ⤓ PDF and the ⌘S copy inherit it clean', async () => {
+  const f = path.join(tmp, 'titled.html');
+  fs.writeFileSync(f, create({styles: {roles: modelOf(tpl).styles.roles}, slides: [{els: []}]}, {title: 'Two deals, one re-read'}).html);
+  const b = await pw.chromium.launch(); const p = await b.newPage();
+  await p.goto(pathToFileURL(f).href); await p.evaluate(() => { localStorage.clear(); }); await p.reload();
+  const names = await p.evaluate(() => [document.title, document.title.replace(/[\/:*?"<>|]+/g, '-') + '.pdf']);
+  await b.close();
+  assert.deepEqual(names, ['Two deals, one re-read', 'Two deals, one re-read.pdf'], 'no /*TITLE*/ sentinel in the tab or the download');
+});
+live('live: import-html --shots writes one reference PNG per page, named for the slide (verify --refs consumes it)', async () => {
+  const dir = path.join(tmp, 'shots-new'), pages = ['alpha', 'beta'].map(n => {
+    const f = path.join(tmp, n + '.html');
+    fs.writeFileSync(f, `<body style="margin:0;width:800px;height:450px;background:#fff"><h1 style="position:absolute;left:40px;top:60px;font:700 40px sans-serif">${n}</h1></body>`);
+    return f;
+  });
+  const d = await extract(pages, {w: 800, h: 450, shots: dir});   // the directory does not exist yet
+  assert.deepEqual(Object.keys(d._report.refs), ['alpha', 'beta'], 'refs keyed by slide name');
+  for (const s of d.slides) {
+    const f = path.join(dir, s.name + '.png');   // exactly the name verify --refs looks for
+    assert.equal(d._report.refs[s.name], f);
+    const png = fs.readFileSync(f);
+    assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [800, 450], s.name + ': shot is the model viewport');
+  }
+  assert.equal((await extract([pages[0]], {w: 800, h: 450}))._report.refs, undefined, 'no --shots → no refs, exactly as before');
 });
 live('live: import-html in-page intent capture (line count, nowrap, hugging chip)', async () => {
   const b = await pw.chromium.launch(); const p = await b.newPage({viewport: {width: 800, height: 450}});

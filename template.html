@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>/*TITLE*/decklet/*/TITLE*/</title>
+<title>decklet</title>
 <style>
 :root{/*TOKENS*/--bg:#111315;--fg:#F3F4F6;--muted:#9CA3AF;--accent:#5B9CF6;--card:#1A1D21;--line:#2C3138;--sel:#5B9CF6;--box:#20262E/*/TOKENS*/;--W:960px;--H:540px;--Z:0.85;--AR:1.7778}
 *{box-sizing:border-box;margin:0}
@@ -183,6 +183,7 @@ const NS=/*KEY*/'decklet:template'/*/KEY*/,KEY=NS+':model',HKEY=NS+':hist',PKEY=
 // position: the URL hash (#4 = slide 4) wins over the stored position; render() clamps to the slide count
 const hashPos=()=>parseInt(location.hash.slice(1))-1;
 let deck=JSON.parse(store.get(KEY)||'null')||structuredClone(DECK),i=hashPos()>=0?hashPos():parseInt(store.get(PKEY))||0,sel=new Set();
+document.title=deck.title||'decklet'; // the deck names itself: tab title, ⤓ PDF filename and ⌘S copy filename are all this one string
 const W=deck.w||960,H=deck.h||540;
 const PAGE=deck.page==='a4'?'a4':'letter',PW=PAGE==='a4'?794:816;
 document.documentElement.style.cssText=`--W:${W}px;--H:${H}px;--Z:${(PW/W).toFixed(4)};--AR:${(W/H).toFixed(4)}`;

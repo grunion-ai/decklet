@@ -280,18 +280,22 @@ export function assemble(raw, { w: W = 1600, h: H = 900 } = {}) {
 
 export async function extract(files, { w = 1600, h = 900, shots = null } = {}) {
   const { chromium } = await import('playwright');
-  const b = await chromium.launch(); const raw = [];
+  const b = await chromium.launch(); const raw = [], refs = {};
+  if (shots) fs.mkdirSync(shots, { recursive: true });
   for (const f of files) {
     const p = await b.newPage({ viewport: { width: w, height: h }, deviceScaleFactor: 1 });
     await p.goto('file://' + path.resolve(f)); await p.waitForTimeout(1500);
+    const name = path.basename(f, '.html');
+    // the AE reference, shot BEFORE the walker runs — it materialises pseudo content and pins inline styles into the live DOM
+    if (shots) { const s = path.resolve(shots, name + '.png'); await p.screenshot({ path: s }); refs[name] = s; }  // <slide.name>.png = what verify --refs looks for
     const rows = await p.evaluate(extractInPage, w);
     for (const e of rows.els) if (e.img && !e.img.startsWith('data:')) { const fp = path.resolve(path.dirname(f), e.img); e.img = 'data:image/png;base64,' + fs.readFileSync(fp).toString('base64'); }
-    raw.push({ name: path.basename(f, '.html'), ...rows });
+    raw.push({ name, ...rows });
     await p.close();
   }
   await b.close();
   const deck = assemble(raw, { w, h });
-  if (shots) deck._report.refs = Object.fromEntries(deck.slides.map((s, n) => [n, path.resolve(shots, s.name + '.png')]).filter(([, f]) => fs.existsSync(f)));
+  if (shots) deck._report.refs = refs;
   return deck;
 }
 
