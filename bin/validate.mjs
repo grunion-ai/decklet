@@ -9,6 +9,8 @@ import {pathToFileURL} from 'node:url';
 export const ROLES = ['Title', 'Supertitle', 'H1', 'H2', 'Body', 'Caption', 'Label', 'Stat'];
 export const ANIMS = ['rise', 'fade', 'pop', 'wipe'];   // entrance motion on slide entry — the engine ignores anything else
 export const FORMATS = ['slides', 'carousel', 'carousel-4x5', 'document-letter', 'document-a4'];
+export const ARROWS = ['start', 'end', 'both'];          // arrow heads, on a line or a curve row
+export const HREF = /^(https?:|mailto:)/i;               // href is model content: navigable schemes only, never javascript:/data:
 const LOCKED = ['font', 'size', 'lh', 'ls', 'mono'];          // only a role may set these
 const ROLE_REQ = ['font', 'size', 'weight', 'color'];   // lh is strongly recommended; null = browser-normal leading (what import-html emits for line-height:normal)
 const isNum = v => typeof v === 'number' && Number.isFinite(v);
@@ -82,6 +84,11 @@ export function validate(deck) {
     for (const p of ['x', 'y', 'h']) if (r[p] != null && !isNum(r[p])) E(`${where}: ${p} must be a number`);
     if (r.w != null && r.w !== 'auto' && !isNum(r.w)) E(`${where}: w must be a number or "auto"`);
     if (r.line && !(Array.isArray(r.line) && r.line.length === 2 && r.line.every(isNum))) E(`${where}: line must be [x2,y2]`);
+    if (r.curve && !(Array.isArray(r.curve) && r.curve.length === 6 && r.curve.every(isNum))) E(`${where}: curve must be [c1x,c1y,c2x,c2y,x2,y2]`);
+    if (r.arrow && !ARROWS.includes(r.arrow)) E(`${where}: arrow "${r.arrow}" not one of ${ARROWS.join('|')}`);
+    else if (r.arrow && !r.line && !r.curve) E(`${where}: arrow needs a line or a curve to sit on`);
+    if (r.href != null && !HREF.test(String(r.href).trim())) E(`${where}: href "${String(r.href).slice(0, 40)}" must be http, https or mailto`);
+    if (r.html) for (const m of r.html.matchAll(/<a\b[^>]*\bhref\s*=\s*["']([^"']*)["']/gi)) if (!HREF.test(m[1].trim())) E(`${where}: link run href "${m[1].slice(0, 40)}" must be http, https or mailto`);
     if (r.anim && !ANIMS.includes(r.anim)) E(`${where}: anim "${r.anim}" not one of ${ANIMS.join('|')}`);
     if (r.donut != null && !(isNum(r.donut) && r.donut >= 0 && r.donut <= 100)) E(`${where}: donut must be 0..100`);
     if (r.bar && !(isNum(r.h) && r.bg)) E(`${where}: bar needs h and bg`);

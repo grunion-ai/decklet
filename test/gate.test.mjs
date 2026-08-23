@@ -28,7 +28,7 @@ test('template + deck are self-contained (no external src/href, loaders, sockets
     assert.doesNotMatch(h, /(src|href)\s*=\s*["']https?:/i, `${n}: external src/href`);
     assert.doesNotMatch(h, /@import|<link[^>]+stylesheet|fetch\s*\(|XMLHttpRequest|new\s+WebSocket/i, `${n}: external loader`);
     assert.match(h, /const store=\{get:/, `${n}: storage shim`);
-    assert.equal((h.match(/localStorage\./g) || []).length, 3, `${n}: storage API only inside the shim`);
+    assert.equal((h.match(/localStorage\./g) || []).length, 5, `${n}: storage API only inside the shim and the availability probe`);
   }
 });
 test('no client or brand residue in the public tree', () => {
@@ -59,7 +59,7 @@ test('renderer adds nothing implicit; chrome lives on box/tile only', () => {
   assert.match(tpl, /\.el\{position:absolute;cursor:grab;padding:0;border-radius:0;white-space:normal;line-height:normal\}/);
   assert.match(tpl, /\.el\.box\{[^}]*padding:6px 8px;border-radius:8px;white-space:pre-wrap\}/);
   assert.match(tpl, /\.el\.tile\{/);
-  for (const re of [/r\.svg\)d\.innerHTML=r\.svg/, /else if\(r\.html\)d\.innerHTML=r\.html/, /s\.bg\|\|'var\(--card\)'/, /letter-spacing:\$\{r\.ls\}px/, /line-height:\$\{r\.lh\}px/, /text-transform:\$\{r\.tt\}/, /white-space:\$\{r\.ws\}/, /font-style:italic/, /opacity:\$\{r\.op\}/, /border-top:\$\{r\.bt\}/, /box-shadow:\$\{r\.shadow\}/, /r\.nowrap\?'white-space:nowrap;'/, /r\.w==='auto'\?'auto'/, /deck\.styles\.pad\[r\.p\]/, /r\.line\)/, /conic-gradient\(/, /r\.h\?/]) assert.match(tpl, re, String(re));
+  for (const re of [/r\.svg\)d\.innerHTML=r\.svg/, /else if\(r\.html\)\{d\.innerHTML=r\.html/, /s\.bg\|\|'var\(--card\)'/, /letter-spacing:\$\{r\.ls\}px/, /line-height:\$\{r\.lh\}px/, /text-transform:\$\{r\.tt\}/, /white-space:\$\{r\.ws\}/, /font-style:italic/, /opacity:\$\{r\.op\}/, /border-top:\$\{r\.bt\}/, /box-shadow:\$\{r\.shadow\}/, /r\.nowrap\?'white-space:nowrap;'/, /r\.w==='auto'\?'auto'/, /deck\.styles\.pad\[r\.p\]/, /r\.line\)/, /conic-gradient\(/, /r\.h\?/]) assert.match(tpl, re, String(re));
 });
 test('selection chrome: nib only for one painting row, never in present mode; present hides HUD (NOT the toolbar — editing is allowed; sheet stays usable)', () => {
   assert.match(tpl, /sel\.size===1&&!present\(\)/); assert.match(tpl, /paints\(r\)&&r\.w!==0&&r\.h!==0/);
@@ -79,7 +79,7 @@ test('roles are the type system: eight complete roles in the template, locked ke
   const m = modelOf(tpl);
   assert.deepEqual(Object.keys(m.styles.roles), ROLES);
   for (const r of Object.values(m.styles.roles)) for (const p of ['font', 'size', 'weight', 'lh', 'color']) assert.ok(r[p] != null, p); // the template's own roles carry lh
-  assert.match(tpl, /data-cmd="bold"[\s\S]*data-cmd="italic"[\s\S]*data-cmd="underline"[\s\S]*data-cmd="strikeThrough"/); assert.doesNotMatch(tpl, /data-cmd="(subscript|superscript)"/, 'no sub/sup buttons'); assert.doesNotMatch(tpl, /tb-fill|dataset\.fill|data-fill|deckBgs/, 'no box-fill feature'); assert.match(tpl, /#tb \.seg\{display:inline-flex;align-items:center;gap:2px;padding:2px 4px 2px 0;/, 'segments are one centred line box with symmetric top/bottom padding'); assert.match(tpl, /#tb \.sw\{width:16px;height:16px;padding:0;margin:0;vertical-align:middle;/, 'swatches symmetric'); assert.match(tpl, /<kbd>select text<\/kbd> → roles · B I U S̶ · color<\/div>/, 'popover toolbar line'); assert.doesNotMatch(tpl.match(/<div id="helpmenu"[\s\S]*?<\/div>\s*<\/div>/)[0], /fill/i, 'no "fill" in the popover');
+  assert.match(tpl, /data-cmd="bold"[\s\S]*data-cmd="italic"[\s\S]*data-cmd="underline"[\s\S]*data-cmd="strikeThrough"/); assert.doesNotMatch(tpl, /data-cmd="(subscript|superscript)"/, 'no sub/sup buttons'); assert.doesNotMatch(tpl, /tb-fill|dataset\.fill|data-fill|deckBgs/, 'no box-fill feature'); assert.match(tpl, /#tb \.seg\{display:inline-flex;align-items:center;gap:2px;padding:2px 4px 2px 0;/, 'segments are one centred line box with symmetric top/bottom padding'); assert.match(tpl, /#tb \.sw\{width:16px;height:16px;padding:0;margin:0;vertical-align:middle;/, 'swatches symmetric'); assert.match(tpl, /<kbd>select text<\/kbd> → roles · B I U S̶ · link · color<\/div>/, 'popover toolbar line'); assert.doesNotMatch(tpl.match(/<div id="helpmenu"[\s\S]*?<\/div>\s*<\/div>/)[0], /fill/i, 'no "fill" in the popover');
   assert.match(tpl, /\.el sub,\.el sup\{font-size:inherit;line-height:0/, 'sub/sup never change size');
   assert.match(tpl, /const LOCK=\['font','size','lh','ls'\]/); assert.match(tpl, /if\(r\[k\]==null\|\|LOCK\.includes\(k\)\)r\[k\]=t\[k\]/, 'role always wins the locked keys');
   assert.doesNotMatch(tpl, /<select|type="color"|font-picker|fontFamily|id="font|id="size|id="color/);
@@ -89,19 +89,42 @@ test('roles are the type system: eight complete roles in the template, locked ke
 test('HUD contract is a set: ‹ · › · autosave · + (Text/Box/Slide) · ⊞ · ⤓ · ⛶ · ⓘ', () => {
   assert.match(tpl, /<button id="prev" title="Previous slide \(←\)" aria-label="Previous slide \(←\)">‹<\/button>/, 'prev is icon-only'); assert.match(tpl, /<button id="next" title="Next slide \(→\)" aria-label="Next slide \(→\)">›<\/button>/, 'next is icon-only');
   const ids = [...tpl.matchAll(/<div id="hud">[\s\S]*?<\/div>\n<div id="sheet"/g)][0][0].match(/id="([^"]+)"/g).map(s => s.slice(4, -1)).filter(s => s !== 'hud' && s !== 'sheet').sort();
-  assert.deepEqual(ids, ['add-box', 'add-text', 'addbtn', 'addmenu', 'addwrap', 'autosave', 'fs', 'grid-btn', 'help', 'helpmenu', 'helpwrap', 'next', 'pdf', 'prev', 'sadd']);
+  assert.deepEqual(ids, ['add-box', 'add-text', 'addbtn', 'addmenu', 'addwrap', 'autosave', 'fs', 'grid-btn', 'help', 'helpmenu', 'helpwrap', 'next', 'pdf', 'prev', 'sadd', 'savecopy']);
   assert.deepEqual([...tpl.match(/<div id="hud">[\s\S]*?\n<\/div>/)[0].matchAll(/id="(prev|next|autosave|addbtn|grid-btn|pdf|fs|help)"/g)].map(m => m[1]), ['prev', 'next', 'autosave', 'addbtn', 'grid-btn', 'pdf', 'fs', 'help'], 'autosave immediately left of +, ⓘ rightmost');
   assert.match(tpl, /<button id="help"[^>]*aria-label="Shortcuts"[^>]*>ⓘ<\/button>/); assert.match(tpl, /<kbd>← → \/ ↑ ↓<\/kbd> navigate/, 'popover nav line'); assert.match(tpl, /<button id="sheet-back" title="Back to slide \(Esc\)" aria-label="Back to slide \(Esc\)">← Back<\/button>/, 'contact sheet ← Back');
   assert.match(tpl, /if\(\(e\.metaKey\|\|e\.ctrlKey\)&&e\.key\.toLowerCase\(\)==='s'\)\{e\.preventDefault\(\);saveCopy\(\);return\}/, '⌘S save-a-copy, keyboard only'); assert.doesNotMatch(tpl, /id="save"/);
   assert.match(tpl, /if\(e\.key==='ArrowRight'\|\|e\.key==='ArrowDown'\|\|e\.key===' '\)nav\(1\)/, '↓ = next'); assert.match(tpl, /if\(e\.key==='ArrowLeft'\|\|e\.key==='ArrowUp'\)nav\(-1\)/, '↑ = prev');
   assert.match(tpl, /PKEY=NS\+':pos'/, 'position persisted'); assert.match(tpl, /if\(animate\)\{store\.set\(PKEY,i\);location\.replace\('#'\+\(i\+1\)\)\}/, 'slide change → pos + #n hash'); assert.match(tpl, /addEventListener\('hashchange'/, 'hash → slide');
   // autosave indicator: the shim's set reports success; save() drives the dot; reduced motion kills glow + pulse
-  assert.match(tpl, /set:\(k,v\)=>\{try\{localStorage\.setItem\(k,v\);lastSavedAt=new Date\(\);return true\}catch\{return false\}\}/, 'store.set returns boolean + stamps lastSavedAt on a confirmed write'); assert.match(tpl, /<span id="autosave" role="status"/); assert.match(tpl, /prefers-reduced-motion:reduce\)\{#autosave\{box-shadow:none;animation:none!important\}\}/);
+  assert.match(tpl, /set:\(k,v\)=>\{try\{localStorage\.setItem\(k,v\);lastSavedAt=new Date\(\);return true\}catch\{mem\.set\(k,v\);return false\}\}/, 'store.set returns boolean + stamps lastSavedAt on a confirmed write; a blocked write still holds the session in memory'); assert.match(tpl, /<span id="autosave" role="status"/); assert.match(tpl, /prefers-reduced-motion:reduce\)\{#autosave\{box-shadow:none;animation:none!important\}\}/);
   assert.match(tpl, /\$\('pdf'\)\.onclick=\(\)=>exportPdf\(\)\.catch\(\(\)=>print\(\)\)/, '⤓ writes a PDF in-file; print() is the fallback'); assert.match(tpl, /requestFullscreen/);
 });
-test('⤓ PDF writer: slide-sized pages from foreignObject rasters, byte-exact xref, zero dependencies', () => {
+test('⤓ PDF writer: slide-sized pages from foreignObject rasters, byte-exact xref, real link annotations, zero dependencies', () => {
   for (const re of [/async function exportPdf\(\)\{\n\s*commitEdit\(\)/, /<foreignObject width="\$\{W\}" height="\$\{H\}">/, /'data:image\/svg\+xml;charset=utf-8,'\+encodeURIComponent\(svg\)/, /c\.toDataURL\('image\/jpeg',\.92\)/, /\/MediaBox \[0 0 \$\{W\} \$\{H\}\]/, /\/Filter \/DCTDecode/, /startxref\\n\$\{x\}\\n%%EOF/, /type:'application\/pdf'/, /\.pdf';a\.click\(\)/]) assert.match(tpl, re, String(re));
+  assert.match(tpl, /\/Subtype \/Link[\s\S]{0,120}\/S \/URI/, 'links reach the PDF as annotations — LinkedIn document posts read those');
   assert.doesNotMatch(tpl, /jspdf|pdf-lib|html2canvas/i);
+  // the rasteriser never touches the visible page: the clone lives in an offscreen host and the page colour is read off the clone
+  assert.match(tpl, /const host=document\.createElement\('div'\);host\.style\.cssText='position:fixed;left:-99999px/, 'one offscreen host holds every clone');
+  assert.doesNotMatch(tpl, /canvas\.style\.background=s\.bg/, 'the visible canvas is never repainted mid-export (that was the colour flash)');
+  assert.doesNotMatch(tpl, /cv\.style\.left='0'/, 'the clone is never moved on-screen to be serialised');
+  assert.match(tpl, /pdfbtn\.setAttribute\('aria-busy'/, '⤓ reports that it is working');
+});
+test('links: one href model — a whole-row link and an inline link mark, http/https/mailto only', () => {
+  assert.match(tpl, /const href=u=>\{u=String\(u==null\?'':u\)\.trim\(\);return \/\^\(https\?:\|mailto:\)\/i\.test\(u\)\?u:''\}/, 'one scheme gate for both surfaces');
+  assert.match(tpl, /d\.querySelectorAll\('a\[href\]'\)\.forEach/, 'inline runs are re-gated at render — a saved copy can carry anything');
+  assert.match(tpl, /a\.className='lk';a\.href=href\(r\.href\)/, 'a row href paints one inset anchor over the whole row (the CTA box is a box + a text row)');
+  assert.match(tpl, /body\.present \.el a\.lk\{pointer-events:auto\}/, 'clickable while presenting, inert while editing');
+  // the mark sits in the inline segment, immediately after strikethrough
+  assert.match(tpl, /data-cmd="strikeThrough"[^\n]*\n\s*<button data-link="1"/, 'B I U S̶ → link, in that order');
+  assert.match(tpl, /document\.execCommand\('createLink',false,href\(u\)\)/); assert.match(tpl, /document\.execCommand\('unlink'\)/, 'clearing the field removes the link');
+  assert.match(tpl, /<kbd>select text<\/kbd> → roles · B I U S̶ · link · color<\/div>/, 'popover names it');
+});
+test('curve + arrow: a bezier connector is a row like line/donut/bar, and either end can carry a head', () => {
+  assert.match(tpl, /if\(r\.curve\)\{/); assert.match(tpl, /M\$\{P\(sx,sy\)\}C\$\{P\(c1x,c1y\)\} \$\{P\(c2x,c2y\)\} \$\{P\(ex,ey\)\}/, 'one cubic bezier, absolute canvas coords like line');
+  assert.match(tpl, /orient="auto-start-reverse"/, 'one marker def serves both ends');
+  assert.match(tpl, /const AR=r=>\(\{start:\[1,0\],end:\[0,1\],both:\[1,1\]\}\[r\.arrow\]\|\|\[0,0\]\)/, 'one arrow prop, shared by line and curve');
+  assert.match(tpl, /r\.line&&r\.arrow/, 'a straight line gets a head too — no hand-built trig in the model');
+  assert.match(tpl, /const paints=r=>[^\n]*r\.curve/, 'a curve paints (nib, parity, collision all read this)');
 });
 test('contact sheet: 3 across, pointer-drag reorder with FLIP (no HTML5 DnD), never deletes the last slide, ⌘C/⌘V/⌘D/⌘Z', () => {
   assert.match(tpl, /#grid\{display:grid;grid-template-columns:repeat\(3,1fr\)/);
@@ -117,6 +140,16 @@ test('contact sheet: 3 across, pointer-drag reorder with FLIP (no HTML5 DnD), ne
 test('print: named page sizes only (Safari), per-page bg, A4 injected from deck.page', () => {
   assert.match(tpl, /@page\{size:letter;margin:0\}/); assert.doesNotMatch(tpl, /@page\{size:\d+px/);
   assert.match(tpl, /PW=PAGE==='a4'\?794:816/); assert.match(tpl, /st\.textContent='@page\{size:a4;margin:0\}'/);
+});
+
+// ── 2a. storage that is honest about being blocked (Safari refuses localStorage on file:// — the browser decks open in) ──
+test('blocked storage: probed at load, says what to do, and reveals ⌘S save-a-copy as the durable path', () => {
+  assert.match(tpl, /const CANSTORE=\(\(\)=>\{try\{localStorage\.setItem\(NS\+':probe','1'\);localStorage\.removeItem\(NS\+':probe'\);return true\}catch\{return false\}\}\)\(\)/, 'availability is probed, not inferred from the first failed save');
+  assert.match(tpl, /const mem=new Map\(\)/, 'the shim keeps edits for the session even when nothing persists');
+  assert.match(tpl, /document\.body\.classList\.add\('nostore'\)/);
+  assert.match(tpl, /blocks storage for local files[^']*⌘S[^']*Chrome/, 'the message names the durable path and the browser that works');
+  assert.match(tpl, /body\.nostore #savecopy\{display:inline-flex\}/, '⌘S gets a button in exactly the state where it is the only way to keep an edit');
+  assert.equal((tpl.match(/localStorage\./g) || []).length, 5, 'storage API only inside the shim and the probe');
 });
 
 // ── 2b. motion: a four-word vocabulary, replayed on slide ENTRY only, absent from print/parity/reduced motion ──
@@ -205,6 +238,32 @@ test('validator: warns on hardcoded counters, likely overflow, raw css, off-canv
   ]}]}));
   assert.equal(v.ok, true);
   for (const re of [/hardcoded page counter/, /likely wider than w=60/, /raw css/, /past the right edge/]) assert.ok(v.warnings.some(w => re.test(w)), String(re));
+});
+test('validator: href is model content — http/https/mailto only, on a row and inside an inline run', () => {
+  const ok = validate(withRoles({w: 960, h: 540, slides: [{els: [
+    {x: 0, y: 0, w: 200, h: 40, bg: '#000', href: 'https://example.com/x?a=1'},
+    {x: 0, y: 0, w: 200, role: 'Body', text: 'mail', href: 'mailto:hi@example.com'},
+    {x: 0, y: 0, w: 200, role: 'Body', html: 'read <a href="http://example.com">the note</a>'},
+  ]}]}));
+  assert.deepEqual(ok.errors, []);
+  const bad = validate(withRoles({w: 960, h: 540, slides: [{els: [
+    {x: 0, y: 0, w: 200, h: 40, bg: '#000', href: 'javascript:alert(1)'},
+    {x: 0, y: 0, w: 200, role: 'Body', html: 'x <a href="JavaScript:alert(1)">y</a>'},
+    {x: 0, y: 0, w: 200, role: 'Body', html: 'x <a href="data:text/html,z">y</a>'},
+  ]}]}));
+  assert.equal(bad.errors.length, 3, JSON.stringify(bad.errors));
+  for (const e of bad.errors) assert.match(e, /href .* must be http/);
+});
+test('validator: curve is six numbers, arrow is one of three and only on a line or a curve', () => {
+  const v = validate(withRoles({w: 960, h: 540, slides: [{els: [
+    {x: 10, y: 10, curve: [40, 10, 40, 90, 80, 90], bg: '#fff', arrow: 'end'},
+    {x: 10, y: 10, line: [90, 90], bg: '#fff', arrow: 'both'},
+    {x: 10, y: 10, curve: [1, 2, 3]},
+    {x: 10, y: 10, line: [90, 90], arrow: 'barb'},
+    {x: 0, y: 0, w: 100, role: 'Body', text: 'plain', arrow: 'end'},
+  ]}]}));
+  for (const re of [/curve must be \[c1x,c1y,c2x,c2y,x2,y2\]/, /arrow "barb"/, /arrow needs a line or a curve/]) assert.ok(v.errors.some(e => re.test(e)), String(re));
+  assert.equal(v.errors.length, 3, JSON.stringify(v.errors));
 });
 test('validator: structural errors', () => {
   assert.ok(validate(null).errors.length); assert.ok(validate({w: 1, h: 1, styles: {roles: {}}, slides: []}).errors.some(e => /slides must be/.test(e)));
@@ -423,6 +482,122 @@ live('live: editor rules — nib, present backdrop, master fork + inline counter
   assert.equal(await ev(() => [...document.styleSheets].some(s => { try { return [...s.cssRules].some(r => r.cssText.includes('a4')); } catch { return false; } })), true);
   assert.equal(await ev(() => document.documentElement.style.getPropertyValue('--Z')), '1.0000', 'A4 document prints at zoom 1');
   await b.close();
+});
+// blocked storage, driven in WebKit — Safari's engine. Playwright's WebKit does NOT enforce Safari's file:// storage ban,
+// so the ban is injected: what is being proved is that the engine reacts usefully, in the engine Kyle's browser runs.
+live('live: storage blocked (Safari on file://) — the deck says so, keeps the session, and puts ⌘S in front of you', async () => {
+  const f = path.join(tmp, 'nostore.html');
+  fs.writeFileSync(f, create(explainer.model, {title: 'blocked'}).html);
+  for (const engine of ['chromium', 'webkit']) {
+    const b = await pw[engine].launch(); const p = await b.newPage();
+    await p.addInitScript(() => Object.defineProperty(window, 'localStorage', {get() { throw new DOMException('The operation is insecure.', 'SecurityError'); }}));
+    await p.goto(pathToFileURL(f).href); await p.waitForSelector('#canvas .el');
+    const s = await p.evaluate(() => { const a = document.getElementById('autosave');
+      return {nostore: document.body.classList.contains('nostore'), state: a.dataset.state, tip: a.title, button: getComputedStyle(document.getElementById('savecopy')).display}; });
+    assert.equal(s.nostore, true, engine + ': blocked storage detected at load, before the first edit');
+    assert.equal(s.state, 'bad', engine);
+    assert.match(s.tip, /⌘S/, engine + ': the tooltip names the durable path');
+    assert.notEqual(s.button, 'none', engine + ': ⌘S has a button in this state');
+    // the session still works: edits, navigation and undo all survive without persistence
+    assert.deepEqual(await p.evaluate(() => { sel.clear(); sel.add(2); render(); snap(); slide().els[2].text = 'still editable'; save(); nav(1); nav(-1); const t = slide().els[2].text; undo(); return [t, slide().els[2].text.slice(0, 6)]; }), ['still editable', 'Agent-'], engine + ': in-memory shim keeps the session');
+    await b.close();
+  }
+});
+live('live: ⤓ export never touches the visible page — nothing flashes', async () => {
+  const b = await pw.chromium.launch(); const p = await b.newPage({viewport: {width: 1280, height: 800}});
+  await p.goto(pathToFileURL(path.join(root, 'deck.html')).href); await p.waitForSelector('#canvas .el');
+  // sampled every frame WHILE the export runs — the clone used to be dropped into document flow to be serialised
+  const seen = await p.evaluate(async () => {
+    const bg0 = getComputedStyle(canvas).backgroundColor, hits = [], CHROME = ['wrap', 'hud', 'sheet', 'tb'];
+    let run = true, busySeen = false;
+    const sample = () => {
+      if (!run) return;
+      for (const nd of document.body.children) {
+        if (CHROME.includes(nd.id)) continue;
+        const r = nd.getBoundingClientRect();
+        if (r.width && r.height && r.right > 0 && r.bottom > 0 && r.left < innerWidth && r.top < innerHeight) hits.push(nd.tagName + JSON.stringify([r.left, r.top, r.width, r.height].map(Math.round)));
+      }
+      const bg = getComputedStyle(canvas).backgroundColor; if (bg !== bg0) hits.push('canvas background ' + bg);
+      busySeen ||= document.getElementById('pdf').hasAttribute('aria-busy');
+      requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+    HTMLAnchorElement.prototype.click = () => {}; URL.createObjectURL = () => 'blob:x';
+    await exportPdf(); run = false;
+    return {hits: [...new Set(hits)], busySeen, bg1: getComputedStyle(canvas).backgroundColor, bg0, busy: document.getElementById('pdf').hasAttribute('aria-busy')};
+  });
+  await b.close();
+  assert.deepEqual(seen.hits, [], 'something the export created was visible on the page');
+  assert.equal(seen.bg1, seen.bg0);
+  assert.equal(seen.busySeen, true, '⤓ reports that it is working'); assert.equal(seen.busy, false, '…and stops when it is done');
+});
+live('live: links survive — clickable in the deck, real /Link annotations in the ⤓ PDF, and they round-trip', async () => {
+  const model = {w: 960, h: 540, styles: {roles: modelOf(tpl).styles.roles}, slides: [{name: 'cta', els: [
+    {x: 60, y: 200, w: 300, h: 60, bg: '#5B9CF6', radius: 8, href: 'https://calendly.com/d/cym7-q65-cht/discovery'},
+    {x: 60, y: 218, w: 300, role: 'Body', align: 'center', text: 'Book a discovery call', href: 'https://calendly.com/d/cym7-q65-cht/discovery'},
+    {x: 60, y: 320, w: 500, role: 'Body', html: 'or write to <a href="mailto:hi@example.com">hi@example.com</a> instead'},
+  ]}]};
+  const f = path.join(tmp, 'links.html'); fs.writeFileSync(f, create(model).html);
+  assert.equal(modelOf(fs.readFileSync(f, 'utf8')).slides[0].els[0].href, model.slides[0].els[0].href, 'href round-trips through create');
+  const b = await pw.chromium.launch(); const p = await b.newPage({viewport: {width: 1280, height: 800}});
+  const errs = []; p.on('pageerror', e => errs.push(String(e)));
+  await p.goto(pathToFileURL(f).href); await p.waitForSelector('#canvas .el');
+  assert.deepEqual(await p.evaluate(() => [...canvas.querySelectorAll('a[href]')].map(a => [a.className, a.href, a.target, getComputedStyle(a).pointerEvents])), [
+    ['lk', 'https://calendly.com/d/cym7-q65-cht/discovery', '_blank', 'none'],
+    ['lk', 'https://calendly.com/d/cym7-q65-cht/discovery', '_blank', 'none'],
+    ['', 'mailto:hi@example.com', '_blank', 'auto'],
+  ], 'row links are inert while editing; inline marks are ordinary anchors');
+  assert.equal(await p.evaluate(() => { document.body.classList.add('present'); const v = getComputedStyle(canvas.querySelector('a.lk')).pointerEvents; document.body.classList.remove('present'); return v; }), 'auto', 'clickable while presenting');
+  const pdf = await p.evaluate(async () => { let blob; URL.createObjectURL = x => { blob = x; return 'blob:x'; }; HTMLAnchorElement.prototype.click = () => {}; await exportPdf(); return blob.text(); });
+  await b.close();
+  assert.equal((pdf.match(/\/Subtype \/Link/g) || []).length, 3, 'one annotation per link — two on the CTA, one on the inline mark');
+  assert.ok(pdf.includes('(https://calendly.com/d/cym7-q65-cht/discovery)') && pdf.includes('(mailto:hi@example.com)'), 'the URIs are in the file');
+  assert.match(pdf, /\/Annots \[/); assert.deepEqual(errs, []);
+});
+live('live: a curve is a bezier row, and arrow heads come from the engine', async () => {
+  const model = {w: 960, h: 540, styles: {roles: modelOf(tpl).styles.roles}, slides: [{els: [
+    {x: 100, y: 200, curve: [180, 200, 170, 100, 240, 100], bg: '#5B9CF6', h: 3, arrow: 'end'},
+    {x: 400, y: 200, line: [560, 260], bg: '#5B9CF6', h: 3, arrow: 'both'},
+  ]}]};
+  const f = path.join(tmp, 'curve.html'); fs.writeFileSync(f, create(model).html);
+  const b = await pw.chromium.launch(); const p = await b.newPage({viewport: {width: 1280, height: 800}});
+  const errs = []; p.on('pageerror', e => errs.push(String(e)));
+  await p.goto(pathToFileURL(f).href); await p.waitForSelector('#canvas .el');
+  const got = await p.evaluate(() => {
+    const c = canvas.querySelector('[data-n="0"]'), pa = c.querySelector('svg > path');  // the connector, not the marker's own path
+    return {d: pa.getAttribute('d'), stroke: pa.getAttribute('stroke-width'), markerEnd: !!pa.getAttribute('marker-end'), markerStart: !!pa.getAttribute('marker-start'),
+      // offsets, not client rects: #canvas is scaled to fit the window and the hull is asserted in model space
+      covers: [c.offsetLeft <= 100, c.offsetLeft + c.offsetWidth >= 240, c.offsetTop <= 100, c.offsetTop + c.offsetHeight >= 200],
+      heads: canvas.querySelectorAll('[data-n="1"] i.ar').length};
+  });
+  await b.close();
+  assert.match(got.d, /^M[\d.\- ]+C[\d.\- ]+ [\d.\- ]+ [\d.\- ]+$/, 'one cubic segment: ' + got.d);
+  assert.deepEqual([got.markerEnd, got.markerStart], [true, false], 'arrow:"end" heads one end only');
+  assert.deepEqual(got.covers, [true, true, true, true], 'the row box wraps the whole control hull, so parity can measure it');
+  assert.equal(got.heads, 2, 'arrow:"both" puts a head on each end of a straight line');
+  assert.deepEqual(errs, []);
+});
+live('live: parity catches a painted row drawn THROUGH a text row (the class of defect a human sees instantly)', async () => {
+  const roles = modelOf(tpl).styles.roles;
+  const label = {x: 300, y: 260, w: 220, role: 'Body', nowrap: 1, text: 'grade held at B'};
+  const mk = els => ({w: 960, h: 540, styles: {roles}, slides: [{els}]});
+  const thru = {x: 120, y: 268, line: [820, 268], h: 3, bg: '#5B9CF6'};           // a leader line straight across the label
+  const cases = {
+    hit:  mk([thru, label]),
+    over: mk([{...thru, over: 1}, label]),                                        // declared overlay: allowed
+    tile: mk([{x: 280, y: 240, w: 260, h: 90, tile: 1, bg: '#1A1D21'}, label]),   // text INSIDE a painted box: always fine
+    miss: mk([{...thru, y: 480, line: [820, 480]}, label]),
+  };
+  const res = {};
+  for (const [k, m] of Object.entries(cases)) {
+    const f = path.join(tmp, 'collide-' + k + '.html'); fs.writeFileSync(f, create(m).html);
+    res[k] = await verify(f, {out: path.join(tmp, 'v-collide-' + k), log: () => {}});
+  }
+  assert.equal(res.hit.parity[0].pass, false, 'a line crossing a label must fail the gate');
+  assert.match(JSON.stringify(res.hit.parity[0].rows), /overlapped by/);
+  assert.equal(res.over.parity[0].pass, true, 'over:1 is how a deliberate overlay is expressed');
+  assert.equal(res.tile.parity[0].pass, true, 'a text row sitting inside a tile is containment, not collision');
+  assert.equal(res.miss.parity[0].pass, true);
 });
 live('live: the tab title is the model title — the ⤓ PDF and the ⌘S copy inherit it clean', async () => {
   const f = path.join(tmp, 'titled.html');

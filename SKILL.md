@@ -83,7 +83,8 @@ Refuses an invalid model (`--force` to override while iterating). Stamps a per-d
 node bin/verify.mjs deck.html [--refs shots/] [--out verify-out/] [--threshold 0.5] [--strict]
 ```
 - **Contract** — always.
-- **Layout parity** — always (needs Playwright): no text row overflows its box, every `nowrap` row renders one line, imported rows render their source line count, every element is inside the canvas, zero page errors.
+- **Layout parity** — always (needs Playwright): no text row overflows its box, every `nowrap` row renders one line, imported rows render their source line count, every element is inside the canvas, **no painted row is drawn through a text row**, zero page errors.
+  Collision is measured on glyph rects, not boxes. Containment is not collision — text on a tile, a label inside a box, a slide backdrop all pass. A leader line crossing a label fails; if the overlay is deliberate, say so with `over:1`.
 - **AE pixel diff** — when `--refs` exists (needs ImageMagick): `< 0.5%` of pixels differ at 2% fuzz. AE alone passes wrapped labels; parity is what catches them — that is why parity is not optional.
 
 Fix the model, not the output. Re-run until `VERIFY PASS`. Attach `verify-out/results.json` to your report.
@@ -91,12 +92,13 @@ Fix the model, not the output. Re-run until `VERIFY PASS`. Attach `verify-out/re
 ### Step 6 — hand-off notes for the human editor
 Say, in this order:
 1. Where the file is and that it opens from disk in any browser, no install, no network.
-2. **Toolbar:** `‹ prev` / `next ›` · `+` (Text / Box / Slide) · `⊞` contact sheet (G or Esc) · `⤓` PDF · `⛶` fullscreen (F). Drag to move, ⌘-click to multi-select, double-click to retype, corner nib to resize, ⌘Z to undo (persists across reloads). Selecting text shows a floating toolbar: role segment, B/I/U/S and sub/superscript marks (marks never change size), the deck's own colours as swatches, "Apply to layout", "Apply to all slides".
+2. **Toolbar:** `‹ prev` / `next ›` · `+` (Text / Box / Slide) · `⊞` contact sheet (G or Esc) · `⤓` PDF · `⛶` fullscreen (F). Drag to move, ⌘-click to multi-select, double-click to retype, corner nib to resize, ⌘Z to undo (persists across reloads). Selecting text shows a floating toolbar: role segment, **B / I / U / S̶ / 🔗 link** (marks never change size; the link takes http, https or mailto — an empty field unlinks), the deck's own colours as swatches, "Apply to layout", "Apply to all slides".
 3. **Contact sheet:** live thumbnails 3-across; click / ⌘ / shift select, double-click opens, grab-and-drag reorders (mouse or touch — the other cells slide aside), ⌫ deletes (never the last), ⌘C ⌘V ⌘D ⌘Z. It also opens in present mode.
-4. **PDF:** `⤓` downloads a **true slide-sized PDF written inside the file** — no library, no server. Each slide is rasterised from its live DOM (SVG `foreignObject` → canvas at 2× → JPEG) onto a W×H pt page, so a 16:9 deck is a 16:9 PDF with no letterboxing; fonts must be local (they are — the deck loads none). Verified in Chromium; **Safari's `foreignObject` path is unconfirmed** — if rasterising throws or the canvas is tainted, `⤓` falls back to `print()`. **⌘P is the paper path:** one page per slide, each with its own background, on a **named** page size — Letter (A4 for `document-a4`) — because Safari ignores pixel `@page` sizes; the slide is zoomed to the printable width. Choose "Save as PDF" there for a paper-shaped file.
+4. **PDF:** links become real `/Link` annotations, so a LinkedIn document post is clickable. `⤓` downloads a **true slide-sized PDF written inside the file** — no library, no server. Each slide is rasterised from its live DOM (SVG `foreignObject` → canvas at 2× → JPEG) onto a W×H pt page, so a 16:9 deck is a 16:9 PDF with no letterboxing; fonts must be local (they are — the deck loads none). Verified in Chromium; **Safari's `foreignObject` path is unconfirmed** — if rasterising throws or the canvas is tainted, `⤓` falls back to `print()`. **⌘P is the paper path:** one page per slide, each with its own background, on a **named** page size — Letter (A4 for `document-a4`) — because Safari ignores pixel `@page` sizes; the slide is zoomed to the printable width. Choose "Save as PDF" there for a paper-shaped file.
 5. **Presenting:** F or `⛶`; chrome hides, backdrop = current slide's background, HUD peeks back when the pointer rests at the bottom edge and stays pinned while the + menu, the text toolbar or the contact sheet is open. Arrow keys / space advance; Esc opens the contact sheet to jump.
-6. Edits persist in the browser's local storage per deck. To publish an edited deck, copy the model back: in the console `copy(JSON.stringify(deck))` (or read the `decklet:<hash>:model` storage key) → `model.json` → re-create.
-7. What you inferred (style, layout choices) and anything marked experimental.
+6. **Persistence, honestly:** edits autosave to the browser's local storage per deck — **except in Safari opened from `file://`, which blocks storage entirely.** The deck detects that at load: the autosave dot goes red with the reason, and a `⤒` **Save a copy** button appears next to `⤓`. In that state `⌘S` (or `⤒`) is the durable path — it downloads a self-contained `.html` with the current model baked in — or open the deck in Chrome. The session itself is never lost mid-edit; only a refresh is.
+7. To publish an edited deck, copy the model back: in the console `copy(JSON.stringify(deck))` (or read the `decklet:<hash>:model` storage key) → `model.json` → re-create. Everything a human applies in the editor — including links — round-trips that way.
+8. What you inferred (style, layout choices) and anything marked experimental.
 
 ---
 
@@ -130,7 +132,7 @@ Row — every prop optional; a row is whatever its props make it:
 | `slot` | string | — | inherit geometry + role from the layout/deck slot; own x/y/w/h are overrides |
 | `role` | string | slot's role | text treatment from `styles.roles` — **required for text** |
 | `text` | string | — | plain text; `\n` = line break |
-| `html` | string | — | inline runs: `<b> <i> <u> <s> <span style="color:…">` only; no size/family/leading |
+| `html` | string | — | inline runs: `<b> <i> <u> <s> <span style="color:…"> <a href="…">` only; no size/family/leading |
 | `weight` | number | role | font-weight override |
 | `color` | css | role | text colour (`var(--accent)` etc.) |
 | `tt` | css | role | `uppercase` / `none` |
@@ -148,6 +150,10 @@ Row — every prop optional; a row is whatever its props make it:
 | `tile` | 1 | — | filled card chrome (card bg, hairline, centred, flex-centred vertically) |
 | `bar` | 1 | — | bar: rounded top; needs `h` + `bg` |
 | `line` | `[x2,y2]` | — | straight line from (x,y) to (x2,y2); `h` = thickness (3), `bg` = colour |
+| `curve` | `[c1x,c1y,c2x,c2y,x2,y2]` | — | cubic bezier connector from (x,y); absolute coords like `line`; `h` = thickness, `bg` = colour |
+| `arrow` | `start`\|`end`\|`both` | — | arrow head on a `line` or a `curve` — never hand-build one out of three lines |
+| `href` | url | — | http/https/mailto only. One inset anchor over the whole row (a painted CTA box + its label each carry it); live in present mode, a real `/Link` annotation in the `⤓` PDF |
+| `over` | 1 | — | declares a deliberate overlay: `verify`'s collision check leaves this row (and what it crosses) alone |
 | `donut` | 0–100 | — | ring, `w` = diameter, `color` = fill |
 | `svg` | string | — | inline SVG markup (no script, no external href) |
 | `img` | data: URI | — | image; `fit`, `pos` = object-fit/position |
@@ -208,12 +214,13 @@ Four words, and no fifth: `rise` (text — the default), `fade` (quiet chrome), 
 ## VERIFICATION thresholds
 | check | tool | pass |
 |---|---|---|
-| contract | `validate` | 0 errors (0 warnings with `--strict`) |
+| contract | `validate --style` | 0 errors (0 warnings with `--strict`) |
 | self-contained | `verify` | no `http(s)` src/href, no loaders, no sockets |
 | overflow | `verify` parity | `scrollWidth ≤ clientWidth + 1` on every text row |
 | single line | `verify` parity | `nowrap` rows and imported single-line rows render 1 line |
 | line count | `verify` parity | imported rows: rendered lines == source `_lines` |
 | bounds | `verify` parity | every element inside the canvas |
+| collision | `verify` parity | no painted row crosses a text row's glyphs (containment is fine; `over:1` opts out) |
 | page errors | `verify` | none |
 | AE | `verify --refs` | `< 0.5%` pixels at `-fuzz 2%` (set `--threshold`) |
 
@@ -222,6 +229,9 @@ Four words, and no fifth: `rise` (text — the default), `fade` (quiet chrome), 
 - **Per-slide chrome drift.** A footer or mark redrawn on each slide with slightly different x/y. It is one master row; slides fork only when a human edits.
 - **Size overrides.** `size:18` on a Body row "because it needs to be bigger". Change the role, or use the right role (`Title` for a display headline, `H1` for a slide title). Same for `font`, `lh`, `ls`, `mono`.
 - **Wrapping labels.** Chips, axis labels, step numbers, supertitles that wrap to two lines. `nowrap:1` + width, or `w:'auto'`. Parity fails these on purpose.
+- **Hand-built arrow heads.** Three `line` rows and a trig helper to draw one arrow. `arrow:'end'` on a `line` or a `curve`. Stiff diagonals where the source had a spline: that is what `curve` is for.
+- **A dead CTA.** A painted button with no `href` looks like a link and is not one — no click in the deck, no annotation in the PDF, and a LinkedIn document post has nothing to follow. Put the `href` on the box **and** on its label row.
+- **Leader lines through labels.** Route the line, or declare the overlay with `over:1`. `verify` fails it either way until you decide.
 - **Hardcoded counters.** `"3 / 9"` typed into a row. The footer master renders the counter.
 - **Font pickers / ad-hoc colours.** No per-row font families, no rainbow of hexes. Tokens and roles only; literal hex is for chart series.
 - **Walls of text.** More than ~60 Body words on a 16:9 slide, or Body wrapping past 3 lines. Split the slide.
@@ -249,7 +259,7 @@ Model (the numbers slide):
 ]}
 ```
 ```
-node bin/validate.mjs examples/quarterly-update/model.json
+node bin/validate.mjs examples/quarterly-update/model.json --style examples/quarterly-update/style.json
 node bin/create.mjs --model examples/quarterly-update/model.json --style examples/quarterly-update/style.json --out q3.html --format slides
 node bin/verify.mjs q3.html
 ```

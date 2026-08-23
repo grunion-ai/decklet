@@ -46,7 +46,26 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
     for (let n = 0; n < N; n++) {
       await p.evaluate(k => { i = k; sel.clear(); render(); }, n); await p.waitForTimeout(150);
       const name = deck.slides[n].name || `slide-${n + 1}`;
-      const bad = await p.evaluate(([W, H]) => [...document.querySelectorAll('#canvas .el')].map(d => {
+      const bad = await p.evaluate(([W, H]) => {
+      // collision: ink drawn THROUGH a text row — the defect a human sees instantly and no other gate catches. The engine marks
+      // its own ink (data-seg = a line, data-cur = a curve, data-ink = a thin rule/dot); a card, tile, bar, donut or backdrop is
+      // something text sits ON, never a collision. A stroke is sampled along its real path, so a diagonal leader line is judged by
+      // where it is drawn and not by its bounding square. `over:1` declares a deliberate overlay.
+      const cvr = document.getElementById('canvas').getBoundingClientRect();
+      const bez = (a, b, c, e, t) => { const u = 1 - t; return u * u * u * a + 3 * u * u * t * b + 3 * u * t * t * c + t * t * t * e; };
+      const ink = [...document.querySelectorAll('#canvas .el[data-seg],#canvas .el[data-cur],#canvas .el[data-ink]')].filter(d => d.dataset.over == null).map(d => {
+        const key = d.dataset.n ?? ('m:' + d.dataset.m), pt = (x, y) => ({x: cvr.left + x, y: cvr.top + y}), pts = [];
+        if (d.dataset.seg) { const [x1, y1, x2, y2, th] = d.dataset.seg.split(',').map(Number);
+          for (let k = 0; k <= 80; k++) pts.push(pt(x1 + (x2 - x1) * k / 80, y1 + (y2 - y1) * k / 80));
+          return {key, pts, t: th / 2 + 1}; }
+        if (d.dataset.cur) { const [x1, y1, c1x, c1y, c2x, c2y, x2, y2, th] = d.dataset.cur.split(',').map(Number);
+          for (let k = 0; k <= 80; k++) { const u = k / 80; pts.push(pt(bez(x1, c1x, c2x, x2, u), bez(y1, c1y, c2y, y2, u))); }
+          return {key, pts, t: th / 2 + 1}; }
+        const b = d.getBoundingClientRect();   // a thin rule or dot: axis-aligned, sample its own footprint
+        for (let k = 0; k <= 40; k++) { const u = k / 40; pts.push({x: b.left + b.width * u, y: b.top + b.height * u}, {x: b.left + b.width * u, y: b.bottom - b.height * u}); }
+        return {key, pts, t: Math.min(b.width, b.height) / 2 + 1};
+      });
+      return [...document.querySelectorAll('#canvas .el')].map(d => {
         const r = d.getBoundingClientRect(), cv = document.getElementById('canvas').getBoundingClientRect();
         const o = {text: (d.textContent || '').trim().slice(0, 40), n: d.dataset.n ?? ('m:' + d.dataset.m), problems: [], ...(d.dataset.snapped ? {snapped: 1} : {})};
         const textual = !!(d.textContent || '').trim() && !d.querySelector('svg,img');
@@ -58,10 +77,17 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
           if (d.style.whiteSpace === 'nowrap' && lines > 1) o.problems.push(`nowrap row renders ${lines} lines`);
           if (d.dataset.lines && +d.dataset.lines !== lines) o.problems.push(`source had ${d.dataset.lines} line(s), renders ${lines}`);
           o.lines = lines;
+          if (d.dataset.over == null && ink.length) {
+            // glyph rects carry the line box's leading; inset it so a rule sitting just under a heading is not a "collision".
+            // TWO samples inside = the stroke passes THROUGH the glyphs; one = it merely touches an edge (a leader pointing at a label).
+            const gl = [...rg.getClientRects()].filter(x => x.width > 1 && x.height > 1).map(x => ({l: x.left, r: x.right, t: x.top + x.height * .15, b: x.bottom - x.height * .15}));
+            const hit = ink.filter(q => q.pts.filter(z => gl.some(g => z.x > g.l - q.t && z.x < g.r + q.t && z.y > g.t - q.t && z.y < g.b + q.t)).length >= 2);
+            if (hit.length) o.problems.push('overlapped by ' + hit.map(q => q.key).join(','));
+          }
         }
         if (r.right > cv.left + W + 1 || r.bottom > cv.top + H + 1 || r.left < cv.left - 1 || r.top < cv.top - 1) o.problems.push('outside the canvas');
         return o;
-      }).filter(o => o.problems.length), [W, H]);
+      }).filter(o => o.problems.length); }, [W, H]);
       // a row the type scale changed (imported with _src) may wrap or crowd differently from its source: that is a consequence of the
       // scale, not a layout fault — reported as scale crowding for a human decision, never a failure. Everything else stays hard.
       // …only when it renders FEWER lines (collapsed runs); more lines or overflow means the importer's fit cap failed — hard
