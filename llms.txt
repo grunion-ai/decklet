@@ -15,7 +15,8 @@ PDF: the ⤓ button writes a true slide-sized PDF inside the file (foreignObject
 ## Files
 - SKILL.md: the agent authoring skill — inputs, process, model + style contracts, layouts, master, verification thresholds, anti-patterns, worked examples
 - README.md: what/for whom/guarantees/feature matrix/roadmap
-- deck.html: the engine with its own explainer deck (10 slides)
+- deck.html: the engine with its own explainer deck (10 slides) — live at https://grunion-ai.github.io/decklet/deck.html
+- docs/demo.gif, docs/demo-poster.png: README demo recording, a build product of deck.html via docs/record-demo.mjs (Playwright + ffmpeg)
 - template.html: the engine with an empty model; create.mjs fills /*DECK*/ /*TOKENS*/ /*TITLE*/ /*KEY*/ markers
 - bin/validate.mjs: pure-Node model contract validator (exit 1 on errors; --strict for warnings)
 - bin/create.mjs: model (+style) -> deck.html with format presets

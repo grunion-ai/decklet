@@ -9,6 +9,10 @@
 
 Agent-generated, brand-true, real-time editable presentations and assets — one portable HTML file, no office suite.
 
+![decklet demo: drag, retype, reorder slides in the contact sheet, write a PDF](docs/demo.gif)
+
+**Try it live:** https://grunion-ai.github.io/decklet/deck.html — drag, retype, ⊞ contact sheet, ⤓ PDF, F fullscreen.
+
 **What it is.** A slide engine where the deck is a JSON model and the renderer is the editor. `create` turns `model.json` into one self-contained `deck.html`: open it from disk, drag and retype in place, present fullscreen, print to PDF. No install, no server, no network request, ever.
 
 **Who it is for.** Agents (Claude Code, Codex, Cursor, any tool-using model) that must turn content into a deck a human will then edit. Humans get a file they can open and change; agents get a contract they can validate before a browser is involved.
