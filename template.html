@@ -240,6 +240,10 @@ const paints=r=>!!(r.text||r.html||r.svg||r.img||r.bg||r.bd||r.bt||r.br||r.bb||r
 const href=u=>{u=String(u==null?'':u).trim();return /^(https?:|mailto:)/i.test(u)?u:''};
 // arrow heads: which ends of a line or a curve carry one
 const AR=r=>({start:[1,0],end:[0,1],both:[1,1]}[r.arrow]||[0,0]);
+// The head IS the terminus. Its tip lands ON the row's stated end point and the stroke is shortened to make room — the head
+// is never APPENDED beyond the end. (It used to be: every connector drew ~3.2x its stroke width longer than it was authored,
+// so a symmetric 8px gap rendered 8px at the tail and -7px at the nose, and authors hand-inset every target to pay it back.)
+const HEAD=sw=>({len:sw*3.2,half:sw*1.6});
 // `to` / `from`: terminate a connector AGAINST another row instead of at a hand-computed standoff. A connector points AT a
 // thing, so an author naturally gives the target's coordinate — and the head then floats inside its fill. The engine finds
 // where the stroke crosses the target's box and stops there, so the head tips ON the border. Target = a row `id` (on this
@@ -255,6 +259,11 @@ const edgeT=(P,b,end)=>{const a=end?1:0,z=end?0:1;if(!inBox(P(a),b)||inBox(P(z),
   let lo=a,hi=z;for(let k=0;k<40;k++){const m=(lo+hi)/2;inBox(P(m),b)?lo=m:hi=m}return hi};
 const lerp=(a,b,t)=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});
 // de Casteljau: the sub-curve between t0 and t1, so a clipped bezier is still one exact cubic
+// the t at which `L` of arc length remains from one end — how far back to trim so the head has room
+const bezPt=(q,t)=>{const u=1-t,f=(a,b,c,d)=>u*u*u*a+3*u*u*t*b+3*u*t*t*c+t*t*t*d;return {x:f(q[0].x,q[1].x,q[2].x,q[3].x),y:f(q[0].y,q[1].y,q[2].y,q[3].y)}};
+const tAtLen=(q,L,fromEnd)=>{const N=240;let prev=bezPt(q,fromEnd?1:0),acc=0;
+  for(let k=1;k<=N;k++){const t=fromEnd?1-k/N:k/N,p=bezPt(q,t);acc+=Math.hypot(p.x-prev.x,p.y-prev.y);prev=p;if(acc>=L)return t}
+  return fromEnd?0:1};
 const bezPart=(p,t0,t1)=>{const cut=(q,t)=>{const a=lerp(q[0],q[1],t),b=lerp(q[1],q[2],t),c=lerp(q[2],q[3],t),d=lerp(a,b,t),e=lerp(b,c,t),f=lerp(d,e,t);return [[q[0],a,d,f],[f,e,c,q[3]]]};
   let q=p;if(t1<1)q=cut(q,t1)[0];if(t0>0)q=cut(q,(t1<1&&t1>0)?t0/t1:t0)[1];return q};
 // clip a connector row in place against whatever `from`/`to` name
@@ -303,20 +312,28 @@ function drawEls(s,root,animate){
     // footer master: the counter is appended INSIDE this row; the row is anchored to the content edge (styles.margin) and grows inward
     if(r.footer){d.dataset.footer='1';d.style.whiteSpace='nowrap';d.style.width='auto';if((r.x||0)+(typeof r.w==='number'?r.w:0)/2>W/2){d.style.left='auto';d.style.right=MG()+'px'}else d.style.left=MG()+'px'}
     // line = one rotated div (no SVG layer); donut = one conic-gradient ring with a mask hole
-    if(r.line){const dx=r.line[0]-r.x,dy=r.line[1]-r.y;
-      d.style.cssText+=`width:${Math.hypot(dx,dy).toFixed(1)}px;height:${r.h||3}px;padding:0;background:${r.bg||'var(--accent)'};transform:rotate(${Math.atan2(dy,dx)}rad);transform-origin:0 50%;border-radius:2px;`}
+    if(r.line){const x0=r.x||0,y0=r.y||0,dx=r.line[0]-x0,dy=r.line[1]-y0,len=Math.hypot(dx,dy),a=Math.atan2(dy,dx);
+      const sw=r.h||3,c=r.bg||'var(--accent)',[as,ae]=AR(r),hd=HEAD(sw);
+      // the shaft gives up hd.len at every headed end; the row's own origin moves forward when the TAIL carries a head
+      const back=as?Math.min(hd.len,len/2):0,fwd=ae?Math.min(hd.len,len/2):0,shaft=Math.max(0,len-back-fwd);
+      d.style.cssText+=`left:${(x0+Math.cos(a)*back).toFixed(2)}px;top:${(y0+Math.sin(a)*back).toFixed(2)}px;width:${shaft.toFixed(1)}px;height:${sw}px;padding:0;background:${c};transform:rotate(${a}rad);transform-origin:0 50%;border-radius:2px;`;
+      // one CSS triangle per head, sized only by the borders that show, so its box edge IS its tip
+      for(const [on,fw] of [[ae,1],[as,0]]) if(on){const t=document.createElement('i');t.className='ar';
+        t.style.cssText=`position:absolute;top:50%;left:${fw?shaft:-hd.len}px;width:0;height:0;border-top:${hd.half}px solid transparent;border-bottom:${hd.half}px solid transparent;border-${fw?'left':'right'}:${hd.len}px solid ${c};transform:translateY(-50%)`;d.appendChild(t)}}
     // curve = one cubic bezier drawn as an SVG path; the row box wraps the whole control hull so parity/collision can measure it
-    if(r.curve){const [c1x,c1y,c2x,c2y,ex,ey]=r.curve,sx=r.x||0,sy=r.y||0,sw=r.h||3,c=r.bg||'var(--accent)',[as,ae]=AR(r);
+    if(r.curve){const [c1x,c1y,c2x,c2y,ex,ey]=r.curve,sx=r.x||0,sy=r.y||0,sw=r.h||3,c=r.bg||'var(--accent)',[as,ae]=AR(r),hd=HEAD(sw);
       const pad=sw*4+2,xs=[sx,c1x,c2x,ex],ys=[sy,c1y,c2y,ey],bx=Math.min(...xs)-pad,by=Math.min(...ys)-pad;
-      const bw=Math.max(...xs)-Math.min(...xs)+pad*2,bh=Math.max(...ys)-Math.min(...ys)+pad*2,P=(x,y)=>`${(x-bx).toFixed(1)} ${(y-by).toFixed(1)}`,id='ah'+(++uid);
+      const bw=Math.max(...xs)-Math.min(...xs)+pad*2,bh=Math.max(...ys)-Math.min(...ys)+pad*2,P=p=>`${(p.x-bx).toFixed(2)} ${(p.y-by).toFixed(2)}`,id='ah'+(++uid);
+      // trim the drawn path by one head length at each headed end; the marker is anchored by its BASE (refX 0) so it occupies
+      // exactly that gap and its tip lands on the stated end point. markerUnits=strokeWidth, so the box is hd.len x 2*hd.half.
+      let q=[{x:sx,y:sy},{x:c1x,y:c1y},{x:c2x,y:c2y},{x:ex,y:ey}];
+      const t0=as?tAtLen(q,hd.len,false):0,t1=ae?tAtLen(q,hd.len,true):1;
+      if(t1-t0>.02)q=bezPart(q,t0,t1);
+      const mk=`<marker id="${id}" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="${(hd.len/sw).toFixed(3)}" markerHeight="${(hd.half*2/sw).toFixed(3)}" orient="auto-start-reverse" markerUnits="strokeWidth"><path d="M0 0L10 5L0 10z" fill="${c}"/></marker>`;
       d.innerHTML=`<svg width="${bw}" height="${bh}" viewBox="0 0 ${bw} ${bh}" fill="none" xmlns="http://www.w3.org/2000/svg">`+
-        (as||ae?`<defs><marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse" markerUnits="strokeWidth"><path d="M0 0L10 5L0 10z" fill="${c}"/></marker></defs>`:'')+
-        `<path d="M${P(sx,sy)}C${P(c1x,c1y)} ${P(c2x,c2y)} ${P(ex,ey)}" stroke="${c}" stroke-width="${sw}" stroke-linecap="round"${ae?` marker-end="url(#${id})"`:''}${as?` marker-start="url(#${id})"`:''}/></svg>`;
+        (as||ae?`<defs>${mk}</defs>`:'')+
+        `<path d="M${P(q[0])}C${P(q[1])} ${P(q[2])} ${P(q[3])}" stroke="${c}" stroke-width="${sw}" stroke-linecap="butt"${ae?` marker-end="url(#${id})"`:''}${as?` marker-start="url(#${id})"`:''}/></svg>`;
       d.style.cssText+=`left:${bx}px;top:${by}px;width:${bw}px;height:${bh}px;padding:0;background:none;border:0;`}
-    // arrow heads on a straight line: the row is already rotated along the line, so a CSS triangle at either edge points the right way
-    if(r.line&&r.arrow){const [as,ae]=AR(r),c=r.bg||'var(--accent)',hw=(r.h||3)*3;
-      for(const [on,at] of [[ae,1],[as,0]]) if(on){const t=document.createElement('i');t.className='ar';
-        t.style.cssText=`position:absolute;top:50%;${at?'right':'left'}:${-hw*2}px;width:0;height:0;border:${hw}px solid transparent;border-${at?'left':'right'}-color:${c};transform:translateY(-50%)`;d.appendChild(t)}}
     if(r.donut!=null)d.style.cssText+=`width:${r.w}px;height:${r.w}px;padding:0;border-radius:50%;background:conic-gradient(${r.color||'var(--accent)'} ${r.donut}%,var(--line) 0);-webkit-mask:radial-gradient(#0000 55%,#000 56%);mask:radial-gradient(#0000 55%,#000 56%);`;
     // a row's own href: ONE inset anchor over the whole row, so a painted CTA box is clickable even though its label is a separate row
     if(href(r.href)){const a=document.createElement('a');a.className='lk';a.href=href(r.href);a.target='_blank';a.rel='noopener noreferrer';a.setAttribute('aria-label',r.text||r.href);d.appendChild(a)}

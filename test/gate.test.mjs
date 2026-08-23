@@ -120,11 +120,17 @@ test('links: one href model — a whole-row link and an inline link mark, http/h
   assert.match(tpl, /<kbd>select text<\/kbd> → roles · B I U S̶ · link · color<\/div>/, 'popover names it');
 });
 test('curve + arrow: a bezier connector is a row like line/donut/bar, and either end can carry a head', () => {
-  assert.match(tpl, /if\(r\.curve\)\{/); assert.match(tpl, /M\$\{P\(sx,sy\)\}C\$\{P\(c1x,c1y\)\} \$\{P\(c2x,c2y\)\} \$\{P\(ex,ey\)\}/, 'one cubic bezier, absolute canvas coords like line');
+  assert.match(tpl, /if\(r\.curve\)\{/); assert.match(tpl, /M\$\{P\(q\[0\]\)\}C\$\{P\(q\[1\]\)\} \$\{P\(q\[2\]\)\} \$\{P\(q\[3\]\)\}/, 'one cubic bezier, absolute canvas coords like line');
   assert.match(tpl, /orient="auto-start-reverse"/, 'one marker def serves both ends');
   assert.match(tpl, /const AR=r=>\(\{start:\[1,0\],end:\[0,1\],both:\[1,1\]\}\[r\.arrow\]\|\|\[0,0\]\)/, 'one arrow prop, shared by line and curve');
-  assert.match(tpl, /r\.line&&r\.arrow/, 'a straight line gets a head too — no hand-built trig in the model');
   assert.match(tpl, /const paints=r=>[^\n]*r\.curve/, 'a curve paints (nib, parity, collision all read this)');
+  // the head is the TERMINUS on both painters: the stroke gives up room for it, it is never appended past the stated end
+  assert.match(tpl, /const HEAD=sw=>\(\{len:sw\*3\.2,half:sw\*1\.6\}\)/, 'one head size, shared by line and curve');
+  assert.match(tpl, /const back=as\?Math\.min\(hd\.len,len\/2\):0,fwd=ae\?Math\.min\(hd\.len,len\/2\):0,shaft=Math\.max\(0,len-back-fwd\)/, 'line: the shaft gives up a head length at each headed end');
+  assert.match(tpl, /left:\$\{fw\?shaft:-hd\.len\}px/, 'line: the triangle sits in the gap it was given, tip on the stated end');
+  assert.match(tpl, /const t0=as\?tAtLen\(q,hd\.len,false\):0,t1=ae\?tAtLen\(q,hd\.len,true\):1/, 'curve: the path is trimmed by one head length per headed end');
+  assert.match(tpl, /refX="0"/, 'curve: the marker is anchored by its BASE, so it fills the gap and tips on the stated end');
+  assert.doesNotMatch(tpl, /right:\$\{-hw\*2\}px/, 'the old appended-outside head is gone');
 });
 test('contact sheet: 3 across, pointer-drag reorder with FLIP (no HTML5 DnD), never deletes the last slide, ⌘C/⌘V/⌘D/⌘Z', () => {
   assert.match(tpl, /#grid\{display:grid;grid-template-columns:repeat\(3,1fr\)/);
@@ -581,6 +587,76 @@ live('live: links survive — clickable in the deck, real /Link annotations in t
   assert.equal((pdf.match(/\/Subtype \/Link/g) || []).length, 3, 'one annotation per link — two on the CTA, one on the inline mark');
   assert.ok(pdf.includes('(https://calendly.com/d/cym7-q65-cht/discovery)') && pdf.includes('(mailto:hi@example.com)'), 'the URIs are in the file');
   assert.match(pdf, /\/Annots \[/); assert.deepEqual(errs, []);
+});
+// The head IS the terminus. It used to be APPENDED outside the stated end, so every connector drew ~15px longer than it was
+// authored: a symmetric 8px gap at both ends rendered as 8px at the tail and −7px at the nose, i.e. the head inside the target.
+// That one behaviour is what made authors hand-inset every endpoint. Measured here in model space, transform off.
+live('live: an arrow head ENDS on the row\'s stated end point — the connector never draws longer than authored', async () => {
+  const model = {w: 960, h: 540, styles: {roles: modelOf(tpl).styles.roles}, slides: [{els: [
+    {x: 100, y: 100, line: [400, 100], bg: '#5B9CF6', h: 3, arrow: 'end'},
+    {x: 100, y: 160, line: [400, 160], bg: '#5B9CF6', h: 3, arrow: 'both'},
+    {x: 100, y: 220, line: [400, 220], bg: '#5B9CF6', h: 3},
+    {x: 100, y: 300, curve: [200, 300, 300, 400, 400, 400], bg: '#6B9E8C', h: 3, arrow: 'end'},
+  ]}]};
+  const f = path.join(tmp, 'terminus.html'); fs.writeFileSync(f, create(model).html);
+  const b = await pw.chromium.launch(); const p = await b.newPage({viewport: {width: 1280, height: 800}});
+  const errs = []; p.on('pageerror', e => errs.push(String(e)));
+  await p.goto(pathToFileURL(f).href); await p.waitForSelector('#canvas .el');
+  const got = await p.evaluate(() => {
+    canvas.style.transform = 'none'; canvas.style.border = '0';   // measure in model space (the 1px canvas border shifts children)
+    const cb = canvas.getBoundingClientRect(), L = e => { const r = e.getBoundingClientRect(); return {l: r.left - cb.left, r: r.right - cb.left, t: r.top - cb.top, b: r.bottom - cb.top}; };
+    const row = k => { const d = canvas.querySelector(`[data-n="${k}"]`); return {shaft: L(d), heads: [...d.querySelectorAll('i.ar')].map(L)}; };
+    const cv = canvas.querySelector('[data-n="3"]'), pa = cv.querySelector('svg > path');
+    const sv = cv.querySelector('svg').getBoundingClientRect(), end = pa.getPointAtLength(pa.getTotalLength());
+    return {end: row(0), both: row(1), none: row(2),
+      curveShaftEnd: {x: sv.left - cb.left + end.x, y: sv.top - cb.top + end.y}, curveLen: pa.getTotalLength()};
+  });
+  await b.close();
+  assert.deepEqual(errs, []);
+  // arrow:'end' — the head's tip is the stated end (400); the shaft stops short of it and never pokes through
+  assert.equal(got.end.heads.length, 1);
+  assert.ok(Math.abs(got.end.heads[0].r - 400) < 1, `head tip at ${got.end.heads[0].r}, stated end is 400`);
+  assert.ok(got.end.shaft.r <= got.end.heads[0].l + 0.5, `shaft ends at ${got.end.shaft.r}, head starts at ${got.end.heads[0].l} — the line must not extend past the head`);
+  assert.ok(Math.abs(got.end.shaft.l - 100) < 1, 'the tail end is untouched');
+  // arrow:'both' — a tip on each stated end, shaft strictly between them
+  assert.equal(got.both.heads.length, 2);
+  const xs = got.both.heads.map(h => [h.l, h.r]).flat();
+  assert.ok(Math.abs(Math.min(...xs) - 100) < 1 && Math.abs(Math.max(...xs) - 400) < 1, `heads span ${Math.min(...xs)}..${Math.max(...xs)}, stated 100..400`);
+  assert.ok(got.both.shaft.l > 100.5 && got.both.shaft.r < 399.5, 'the shaft is shortened at BOTH ends to make room');
+  // no arrow — geometry is exactly what was written
+  assert.ok(Math.abs(got.none.shaft.l - 100) < 1 && Math.abs(got.none.shaft.r - 400) < 1, 'a headless line is unchanged');
+  // a curve's path is trimmed by the head length, and its marker tip lands on the stated end (400,400)
+  assert.ok(Math.hypot(got.curveShaftEnd.x - 400, got.curveShaftEnd.y - 400) > 4, `the curve's own path must stop short of the tip to make room: ${JSON.stringify(got.curveShaftEnd)}`);
+  assert.ok(Math.hypot(got.curveShaftEnd.x - 400, got.curveShaftEnd.y - 400) < 16, 'but only by the head length');
+});
+live('live: A1 from the connector probe — a symmetric 8px gap renders symmetric at BOTH ends', async () => {
+  // the probe's A1: 132x62 boxes, shaft authored 8px clear of each. The head used to land 7px INSIDE the target.
+  const BW = 132, BH = 62;
+  const model = {w: 960, h: 540, styles: {roles: modelOf(tpl).styles.roles}, slides: [{els: [
+    {x: 60, y: 100, w: BW, h: BH, bg: '#1A1D21', bd: '2px solid #2C3138', radius: 12},
+    {x: 60 + 252, y: 100, w: BW, h: BH, bg: '#1A1D21', bd: '2px solid #2C3138', radius: 12},
+    {x: 60 + BW + 8, y: 131, line: [60 + 244, 131], bg: '#5B9CF6', h: 2.5, arrow: 'end'},
+  ]}]};
+  const f = path.join(tmp, 'a1.html'); fs.writeFileSync(f, create(model).html);
+  const b = await pw.chromium.launch(); const p = await b.newPage({viewport: {width: 1280, height: 800}});
+  await p.goto(pathToFileURL(f).href); await p.waitForSelector('#canvas .el');
+  const g = await p.evaluate(() => { canvas.style.transform = 'none'; canvas.style.border = '0';
+    const cb = canvas.getBoundingClientRect(), X = (s, k) => { const r = canvas.querySelector(s).getBoundingClientRect(); return r[k] - cb.left; };
+    const head = canvas.querySelector('[data-n="2"] i.ar').getBoundingClientRect();
+    return {fromRight: X('[data-n="0"]', 'right'), toLeft: X('[data-n="1"]', 'left'), shaftLeft: X('[data-n="2"]', 'left'), tip: head.right - cb.left};
+  });
+  await b.close();
+  const tail = g.shaftLeft - g.fromRight, nose = g.toLeft - g.tip;
+  assert.ok(Math.abs(tail - 8) < 1, `tail gap ${tail}, authored 8`);
+  assert.ok(Math.abs(nose - 8) < 1, `nose gap ${nose}, authored 8 — the head used to overshoot to −7`);
+  // and the gate now measures the same geometry the eye sees
+  const r = await verify(f, {out: path.join(tmp, 'v-a1'), log: () => {}});
+  assert.equal(r.parity[0].pass, true, JSON.stringify(r.parity[0].rows));
+  const bad = {...model, slides: [{els: [model.slides[0].els[0], model.slides[0].els[1], {...model.slides[0].els[2], line: [60 + 272, 131]}]}]};
+  const fb = path.join(tmp, 'a1-bad.html'); fs.writeFileSync(fb, create(bad).html);
+  const rb = await verify(fb, {out: path.join(tmp, 'v-a1-bad'), log: () => {}});
+  assert.equal(rb.parity[0].pass, false, 'a head aimed 20px into the target is still a failure');
+  assert.match(JSON.stringify(rb.parity[0].rows), /arrow lands inside/);
 });
 live('live: a curve is a bezier row, and arrow heads come from the engine', async () => {
   const model = {w: 960, h: 540, styles: {roles: modelOf(tpl).styles.roles}, slides: [{els: [
