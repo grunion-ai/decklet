@@ -28,6 +28,13 @@ body{background:var(--bg);color:var(--fg);font:16px/1.45 -apple-system,BlinkMacS
 .pin{position:absolute;bottom:10px;font:12px ui-monospace,Menlo,monospace;color:var(--muted);letter-spacing:.08em}
 /* inline marks change weight/style/position/colour — never size: sub/sup shift the baseline only */
 .el sub,.el sup{font-size:inherit;line-height:0;vertical-align:sub}.el sup{vertical-align:super}
+/* autosave dot: green ✓ persisted · red edits lost on refresh · amber pulse saving */
+#autosave{width:9px;height:9px;border-radius:50%;background:#3fb950;box-shadow:0 0 6px #3fb95088;position:relative;flex:none}
+#autosave::after{content:'✓';position:absolute;inset:0;font:bold 7px/9px sans-serif;color:#0b2e14;text-align:center}
+#autosave[data-state=bad]{background:#f85149;box-shadow:0 0 6px #f8514988}#autosave[data-state=bad]::after{content:''}
+#autosave[data-state=busy]{background:#d29922;box-shadow:0 0 6px #d2992288;animation:asave .6s ease-in-out infinite alternate}#autosave[data-state=busy]::after{content:''}
+@keyframes asave{from{opacity:.5}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){#autosave{box-shadow:none;animation:none!important}}
 #hud{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 16px;border-top:1px solid var(--line);font:12px ui-monospace,Menlo,monospace;color:var(--muted)}
 #hud button,#tb button{background:var(--card);border:1px solid var(--line);color:var(--fg);border-radius:6px;padding:4px 10px;cursor:pointer;font:inherit}
 #hud .sep{width:1px;height:18px;background:var(--line)}
@@ -46,10 +53,11 @@ body{background:var(--bg);color:var(--fg);font:16px/1.45 -apple-system,BlinkMacS
 #tb .sw{width:16px;height:16px;padding:0;border-radius:50%;border:2px solid var(--line)}
 #tb .sw.on{border-color:var(--fg);box-shadow:0 0 0 1px var(--fg)}
 /* contact sheet: the slide manager — 3 across, rows scroll, live thumbnails */
-#sheet{position:fixed;inset:0;z-index:20;background:var(--bg);overflow:auto;padding:24px}
+#sheet{position:fixed;inset:0;z-index:20;background:var(--bg);overflow:auto;padding:24px;-webkit-user-select:none;user-select:none}
+body.dragging{-webkit-user-select:none;user-select:none}
 #sheet[hidden]{display:none}
 #grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
-.cell{position:relative;aspect-ratio:var(--AR);border:2px solid var(--line);border-radius:8px;overflow:hidden;cursor:grab;background:var(--card);touch-action:none;user-select:none;transition:transform .15s ease}
+.cell{position:relative;aspect-ratio:var(--AR);border:2px solid var(--line);border-radius:8px;overflow:hidden;cursor:grab;background:var(--card);touch-action:none;-webkit-user-select:none;user-select:none;transition:transform .15s ease}
 .cell.sel{border-color:var(--sel);box-shadow:0 0 0 2px var(--sel)}
 /* pointer drag: the grabbed cell lifts (scale + shadow, tracks the pointer with no transition); siblings FLIP aside; drop eases in */
 .cell.lift{z-index:3;transition:none;box-shadow:0 14px 36px rgba(0,0,0,.55);pointer-events:none;cursor:grabbing}
@@ -95,8 +103,8 @@ body.present.peek #hud{display:flex!important;position:fixed;left:0;right:0;bott
   <button id="tb-master" hidden title="Promote this slide-local override back to every slide">Apply to all slides</button>
 </div>
 <div id="hud">
-  <button id="prev" title="Previous slide (←)" aria-label="Previous slide">‹ prev</button>
-  <button id="next" title="Next slide (→)" aria-label="Next slide">next ›</button>
+  <button id="prev" title="Previous slide (←)" aria-label="Previous slide (←)">‹</button>
+  <button id="next" title="Next slide (→)" aria-label="Next slide (→)">›</button>
   <div class="spacer"></div>
   <div id="addwrap">
     <button id="addbtn" aria-haspopup="true" aria-expanded="false" title="Add" aria-label="Add">+</button>
@@ -108,6 +116,7 @@ body.present.peek #hud{display:flex!important;position:fixed;left:0;right:0;bott
   </div>
   <button id="grid-btn" title="Slides (G / Esc)" aria-label="Slides">⊞</button>
   <button id="pdf" title="Download PDF (⌘P prints)" aria-label="PDF">⤓</button>
+  <span id="autosave" role="status" data-state="ok" title="Autosaved" aria-label="Autosaved"></span>
   <div class="sep"></div>
   <button id="fs" title="Full screen (F)" aria-label="Full screen (F)">⛶</button>
 </div>
@@ -132,7 +141,7 @@ body.present.peek #hud{display:flex!important;position:fixed;left:0;right:0;bott
 const DECK=/*DECK*/{"w":960,"h":540,"styles":{"roles":{"Title":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":64,"weight":800,"lh":68,"ls":-1.5,"color":"var(--fg)"},"Supertitle":{"font":"ui-monospace,Menlo,Consolas,monospace","size":12,"weight":500,"lh":16,"ls":1.5,"color":"var(--accent)","tt":"uppercase"},"H1":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":34,"weight":800,"lh":40,"ls":-0.5,"color":"var(--fg)"},"H2":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":22,"weight":600,"lh":28,"ls":-0.3,"color":"var(--fg)"},"Body":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":16,"weight":400,"lh":24,"ls":0,"color":"var(--fg)"},"Caption":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":13,"weight":400,"lh":18,"ls":0,"color":"var(--muted)"},"Label":{"font":"ui-monospace,Menlo,Consolas,monospace","size":11,"weight":500,"lh":14,"ls":1,"color":"var(--muted)","tt":"uppercase"},"Stat":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":40,"weight":800,"lh":44,"ls":-1,"color":"var(--accent)"}},"margin":60,"pad":{"chip":"3px 8px","pill":"5px 12px"}},"slots":{},"layouts":{},"master":[],"slides":[{"els":[]}]}/*/DECK*/;
 
 // store shim: localStorage throws in sandboxed contexts (data:/locked-down file:) — degrade to no-persistence, never to a dead page
-const store={get:k=>{try{return localStorage.getItem(k)}catch{return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch{}},del:k=>{try{localStorage.removeItem(k)}catch{}}};
+const store={get:k=>{try{return localStorage.getItem(k)}catch{return null}},set:(k,v)=>{try{localStorage.setItem(k,v);return true}catch{return false}},del:k=>{try{localStorage.removeItem(k)}catch{}}};
 // storage namespace is per deck (create.mjs stamps it from the model hash) — two decks on one origin never share edits
 const NS=/*KEY*/'decklet:template'/*/KEY*/,KEY=NS+':model',HKEY=NS+':hist',canvas=document.getElementById('canvas'),$=id=>document.getElementById(id);
 let deck=JSON.parse(store.get(KEY)||'null')||structuredClone(DECK),i=0,sel=new Set();
@@ -150,7 +159,9 @@ function undo(){if(!history.length)return;deck=JSON.parse(history.pop());hsave()
 function fit(){const s=document.fullscreenElement?Math.min(innerWidth/W,innerHeight/H):Math.min((innerWidth-12)/W,(innerHeight-52)/H);canvas.style.transform=`scale(${s})`;placeTb()}
 addEventListener('resize',fit);
 
-function save(){store.set(KEY,JSON.stringify(deck))}
+// autosave indicator: amber pulse while saving → green ✓ when the shim persisted → red when edits would be lost on refresh
+const autosave=(st)=>{const a=$('autosave');if(!a)return;a.dataset.state=st;const txt={ok:'Autosaved',bad:'Not saved — edits will be lost on refresh',busy:'Saving…'}[st];a.title=txt;a.setAttribute('aria-label',txt)};
+let asT;function save(){autosave('busy');const ok=store.set(KEY,JSON.stringify(deck));clearTimeout(asT);asT=setTimeout(()=>autosave(ok?'ok':'bad'),250)}
 const slide=()=>deck.slides[i];
 const LAY=s=>({...(deck.slots||{}),...((deck.layouts||{})[s.layout]||{})}); // deck-wide slots under the layout's content slots
 const MG=()=>deck.styles&&deck.styles.margin!=null?deck.styles.margin:Math.round(W*.06);
@@ -349,7 +360,7 @@ function sheetRender(){
   });
 }
 grid.addEventListener('mousedown',e=>{
-  const c=e.target.closest('.cell');if(!c)return;const n=+c.dataset.n;
+  const c=e.target.closest('.cell');if(!c)return;e.preventDefault();const n=+c.dataset.n; // preventDefault: thumbnails are renders, never text — no native selection/focus on press
   if(e.metaKey||e.ctrlKey){gsel.has(n)?gsel.delete(n):gsel.add(n)}
   else if(e.shiftKey){const [a,b]=[Math.min(ganchor,n),Math.max(ganchor,n)];for(let x=a;x<=b;x++)gsel.add(x)}
   else{if(e.detail>=2){i=n;sheetClose();return}if(!gsel.has(n)){gsel=new Set([n]);ganchor=n}}
@@ -363,7 +374,7 @@ const landing=()=>{const mv=[...gsel].sort((a,b)=>a-b),at2=ins-mv.filter(n=>n<in
 grid.addEventListener('pointerdown',e=>{const c=e.target.closest('.cell');if(!c||e.button)return;pd={c,n:+c.dataset.n,x:e.clientX,y:e.clientY,on:false};c.setPointerCapture(e.pointerId)});
 grid.addEventListener('pointermove',e=>{
   if(!pd)return;const dx=e.clientX-pd.x,dy=e.clientY-pd.y;
-  if(!pd.on){if(Math.hypot(dx,dy)<6)return;pd.on=true;pd.cells=[...grid.querySelectorAll('.cell')];pd.rects=pd.cells.map(c=>c.getBoundingClientRect());pd.c.classList.add('lift')}
+  if(!pd.on){if(Math.hypot(dx,dy)<6)return;pd.on=true;e.preventDefault();getSelection().removeAllRanges();document.body.classList.add('dragging');pd.cells=[...grid.querySelectorAll('.cell')];pd.rects=pd.cells.map(c=>c.getBoundingClientRect());pd.c.classList.add('lift')}
   pd.c.style.transform=`translate(${dx}px,${dy}px) scale(1.05)`;
   const k=pd.rects.findIndex(r=>e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom);
   if(k>=0)ins=k+(e.clientX<pd.rects[k].left+pd.rects[k].width/2?0:1);
@@ -371,7 +382,7 @@ grid.addEventListener('pointermove',e=>{
   const order=landing();
   pd.cells.forEach((c,n)=>{if(c===pd.c)return;const to=pd.rects[order.indexOf(n)],from=pd.rects[n];c.style.transform=to===from?'':`translate(${to.left-from.left}px,${to.top-from.top}px)`});
 });
-const pend=()=>{if(!pd)return;const d=pd;pd=null;if(!d.on)return;
+const pend=()=>{if(!pd)return;const d=pd;pd=null;if(!d.on)return;document.body.classList.remove('dragging');
   if(ins==null){d.c.classList.remove('lift');d.cells.forEach(c=>c.style.transform='');return}
   const to=d.rects[landing().indexOf(d.n)],from=d.rects[d.n];d.c.classList.replace('lift','drop');d.c.style.transform=`translate(${to.left-from.left}px,${to.top-from.top}px)`;
   const land=()=>{const at=ins;ins=null;reorder(at)};RM.matches?land():setTimeout(land,170)};
@@ -493,7 +504,7 @@ $('prev').onclick=()=>nav(-1);
 $('next').onclick=()=>nav(1);
 // + Slide: same layout as the current slide, title slot filled; deleting/reordering lives in the contact sheet
 $('sadd').onclick=()=>{commitEdit();menu(false);snap();const s=slide(),ns={els:[]};if(s.bg)ns.bg=s.bg;if(s.layout){ns.layout=s.layout;const t=Object.entries(LAY(s)).find(([,v])=>v.role==='H1');ns.els.push(t?{slot:t[0],text:'New slide'}:{x:60,y:88,w:W-120,role:'H1',text:'New slide'})}else ns.els.push({x:60,y:88,w:W-120,role:'H1',text:'New slide'});deck.slides.splice(i+1,0,ns);i++;sel.clear();save();render()};
-fit();render();
+fit();render();autosave(store.set(KEY,JSON.stringify(deck))?'ok':'bad'); // on load: green when storage takes a write, red when the shim reports it unavailable
 
 // self-check — model round-trips through JSON and renderer draws every element (+ master rows + counter)
 console.assert(JSON.parse(JSON.stringify(DECK)).slides.length===DECK.slides.length,'model round-trip');

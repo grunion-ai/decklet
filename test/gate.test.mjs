@@ -84,9 +84,12 @@ test('roles are the type system: eight complete roles in the template, locked ke
   assert.match(tpl, /\['weight','color','tt','italic'\]\.forEach\(p=>delete el\[p\]\)/, 'applying a role clears the row-level overrides');
   assert.doesNotMatch(tpl, /r\.mono\?/, 'mono is not a row prop — Label is the mono role');
 });
-test('HUD contract is a set: prev · next · + (Text/Box/Slide) · ⊞ · ⤓ · ⛶', () => {
+test('HUD contract is a set: ‹ · › · + (Text/Box/Slide) · ⊞ · ⤓ · ⛶', () => {
+  assert.match(tpl, /<button id="prev" title="Previous slide \(←\)" aria-label="Previous slide \(←\)">‹<\/button>/, 'prev is icon-only'); assert.match(tpl, /<button id="next" title="Next slide \(→\)" aria-label="Next slide \(→\)">›<\/button>/, 'next is icon-only');
   const ids = [...tpl.matchAll(/<div id="hud">[\s\S]*?<\/div>\n<div id="sheet"/g)][0][0].match(/id="([^"]+)"/g).map(s => s.slice(4, -1)).filter(s => s !== 'hud' && s !== 'sheet').sort();
-  assert.deepEqual(ids, ['add-box', 'add-text', 'addbtn', 'addmenu', 'addwrap', 'fs', 'grid-btn', 'next', 'pdf', 'prev', 'sadd']);
+  assert.deepEqual(ids, ['add-box', 'add-text', 'addbtn', 'addmenu', 'addwrap', 'autosave', 'fs', 'grid-btn', 'next', 'pdf', 'prev', 'sadd']);
+  // autosave indicator: the shim's set reports success; save() drives the dot; reduced motion kills glow + pulse
+  assert.match(tpl, /set:\(k,v\)=>\{try\{localStorage\.setItem\(k,v\);return true\}catch\{return false\}\}/, 'store.set returns boolean'); assert.match(tpl, /<span id="autosave" role="status"/); assert.match(tpl, /prefers-reduced-motion:reduce\)\{#autosave\{box-shadow:none;animation:none!important\}\}/);
   assert.match(tpl, /\$\('pdf'\)\.onclick=\(\)=>exportPdf\(\)\.catch\(\(\)=>print\(\)\)/, '⤓ writes a PDF in-file; print() is the fallback'); assert.match(tpl, /requestFullscreen/);
 });
 test('⤓ PDF writer: slide-sized pages from foreignObject rasters, byte-exact xref, zero dependencies', () => {
@@ -99,6 +102,9 @@ test('contact sheet: 3 across, pointer-drag reorder with FLIP (no HTML5 DnD), ne
   assert.doesNotMatch(tpl, /c\.draggable=true|addEventListener\('drop'/, 'no HTML5 drag-and-drop');
   assert.match(tpl, /\.cell\.lift\{/); assert.match(tpl, /\.cell\.drop\{/); assert.match(tpl, /Math\.hypot\(dx,dy\)<6/); assert.match(tpl, /prefers-reduced-motion:reduce/);
   assert.match(tpl, /if\(del\.length>=deck\.slides\.length\)del\.pop\(\)/);
+  // thumbnails are non-interactive renders: never selectable; a drag never runs native text selection alongside it
+  assert.match(tpl, /#sheet\{[^}]*user-select:none/, 'sheet is user-select:none'); assert.match(tpl, /\.cell\{[^}]*user-select:none/, 'cells are user-select:none'); assert.match(tpl, /body\.dragging\{[^}]*user-select:none/, 'body.dragging is user-select:none');
+  assert.match(tpl, /closest\('\.cell'\);if\(!c\)return;e\.preventDefault\(\);/, 'press on a cell preventDefaults'); assert.match(tpl, /pd\.on=true;e\.preventDefault\(\);getSelection\(\)\.removeAllRanges\(\);document\.body\.classList\.add\('dragging'\)/, 'drag start preventDefaults, clears selection, flags body');
   for (const k of ['c', 'v', 'd', 'z']) assert.match(tpl, new RegExp(`mod&&k==='${k}'`));
 });
 test('print: named page sizes only (Safari), per-page bg, A4 injected from deck.page', () => {
@@ -289,7 +295,16 @@ live('live: editor rules — nib, present backdrop, master fork + inline counter
   // contact sheet renders every slide
   await ev(() => sheetOpen());
   assert.equal(await ev(() => document.querySelectorAll('#grid .cell').length), 11);
+  // pointer drag across cells never leaves a text selection behind (thumbnails are renders)
+  { const [a, z] = await ev(() => [0, 4].map(k => { const r = document.querySelectorAll('#grid .cell')[k].getBoundingClientRect(); return { x: r.x, y: r.y }; }));
+    await p.mouse.move(a.x + 20, a.y + 20); await p.mouse.down(); for (let k = 1; k <= 8; k++) await p.mouse.move(a.x + 20 + (z.x - a.x) * k / 8, a.y + 20 + (z.y - a.y) * k / 8); await p.waitForTimeout(50);
+    assert.equal(await ev(() => getSelection().toString()), '', 'no text selected mid-drag'); assert.equal(await ev(() => document.body.classList.contains('dragging')), true, 'body.dragging while dragging');
+    await p.mouse.up(); await p.waitForTimeout(250); assert.equal(await ev(() => document.body.classList.contains('dragging')), false, 'dragging flag cleared on drop'); await ev(() => undo()); }
   await ev(() => sheetClose());
+  // autosave dot: a normal save lands green; a shim that cannot persist lands red with the warning label
+  await ev(() => save()); await p.waitForTimeout(400); assert.deepEqual(await ev(() => [document.getElementById('autosave').dataset.state, document.getElementById('autosave').getAttribute('aria-label')]), ['ok', 'Autosaved']);
+  await ev(() => { window.__set = store.set; store.set = () => false; save(); }); assert.equal(await ev(() => document.getElementById('autosave').dataset.state), 'busy', 'amber while saving'); await p.waitForTimeout(400);
+  assert.deepEqual(await ev(() => [document.getElementById('autosave').dataset.state, document.getElementById('autosave').getAttribute('aria-label')]), ['bad', 'Not saved — edits will be lost on refresh']); await ev(() => { store.set = window.__set; save(); }); await p.waitForTimeout(400);
   // ⤓ PDF: in-file writer produces a real PDF with one W×H pt page per slide (Chromium rasterises foreignObject untainted)
   const pdf = await ev(async () => { const orig = URL.createObjectURL; let blob; URL.createObjectURL = b => { blob = b; return 'blob:x'; }; HTMLAnchorElement.prototype.click = () => {}; await exportPdf(); URL.createObjectURL = orig; const t = await blob.text(); return {type: blob.type, head: t.slice(0, 8), pages: (t.match(/\/Type \/Page\b/g) || []).length, box: /\/MediaBox \[0 0 960 540\]/.test(t), eof: /%%EOF\n$/.test(t), size: blob.size}; });
   assert.deepEqual([pdf.type, pdf.head, pdf.pages, pdf.box, pdf.eof], ['application/pdf', '%PDF-1.4', 11, true, true]); assert.ok(pdf.size > 20000, 'rasters are real');

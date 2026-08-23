@@ -1,4 +1,8 @@
 # Changelog
+## Unreleased
+- HUD: `‹` / `›` nav buttons are icon-only (aria-label/title "Previous slide (←)" / "Next slide (→)"), matching `⤓ ⊞ ⛶`.
+- Contact sheet: a pointer drag never runs native text selection alongside it — `user-select:none` on the sheet, cells and `body.dragging`; press and drag start `preventDefault()` and clear any selection.
+- Autosave status dot beside `⤓`: green `✓` when the last mutation persisted through the storage shim, red when edits would be lost on refresh (shim reports storage unavailable / a save failed), amber pulse while saving; `store.set` now returns success; honours `prefers-reduced-motion`.
 ## 0.3.2
 - verify: AE pixel diff was a silent pass — `magick compare` exits 1 whenever the images differ and prints `AE (normalised)` on stderr; the parser read that as NaN → 0 → PASS on every deck. Now parses the leading number and throws on anything else. Gate test renders a red box against a blank reference and asserts the pixel count.
 - verify: AE for imported decks is three columns — raw · chrome masked · chrome + snapped rows masked (the pass column), mirroring the harness proof: deck-wide chrome and rows the type scale changed deviate from the mockup on purpose. Masks come from the deck (`data-m`, supertitle slot, `_src` + `_box`) and the importer's `model.report.json` (`--report`, default beside the deck). `--fonts <css url>` injects a webfont stylesheet at test time only so the shot uses the reference's font build; the counter is hidden for the shot.
