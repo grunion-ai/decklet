@@ -9,7 +9,7 @@
 
 Agent-generated, brand-true, real-time editable presentations and assets — one portable HTML file, no office suite.
 
-![decklet demo: drag, retype, reorder slides in the contact sheet, write a PDF](docs/demo.gif)
+![decklet demo: drag a row, page through slides that animate in, the inlined editor clips, the four anims, contact-sheet reorder, write a PDF](docs/demo.gif)
 
 **Try it live:** https://grunion-ai.github.io/decklet/deck.html — drag, retype, ⊞ contact sheet, ⤓ PDF, F fullscreen.
 
