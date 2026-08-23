@@ -61,10 +61,10 @@ test('renderer adds nothing implicit; chrome lives on box/tile only', () => {
   assert.match(tpl, /\.el\.tile\{/);
   for (const re of [/r\.svg\)d\.innerHTML=r\.svg/, /else if\(r\.html\)d\.innerHTML=r\.html/, /s\.bg\|\|'var\(--card\)'/, /letter-spacing:\$\{r\.ls\}px/, /line-height:\$\{r\.lh\}px/, /text-transform:\$\{r\.tt\}/, /white-space:\$\{r\.ws\}/, /font-style:italic/, /opacity:\$\{r\.op\}/, /border-top:\$\{r\.bt\}/, /box-shadow:\$\{r\.shadow\}/, /r\.nowrap\?'white-space:nowrap;'/, /r\.w==='auto'\?'auto'/, /deck\.styles\.pad\[r\.p\]/, /r\.line\)/, /conic-gradient\(/, /r\.h\?/]) assert.match(tpl, re, String(re));
 });
-test('selection chrome: nib only for one painting row, never in present mode; present hides HUD/toolbar (sheet stays usable)', () => {
+test('selection chrome: nib only for one painting row, never in present mode; present hides HUD (NOT the toolbar — editing is allowed; sheet stays usable)', () => {
   assert.match(tpl, /sel\.size===1&&!present\(\)/); assert.match(tpl, /paints\(r\)&&r\.w!==0&&r\.h!==0/);
-  assert.match(tpl, /body\.present #hud,body\.present #tb,body\.present \.h\{display:none!important\}/);
-  assert.match(tpl, /const pinned=\(\)=>addmenu\.classList\.contains\('open'\)\|\|!tb\.hidden\|\|!sheet\.hidden/, 'peek HUD stays pinned while a menu/toolbar/sheet is open');
+  assert.match(tpl, /body\.present #hud,body\.present \.h\{display:none!important\}/); assert.doesNotMatch(tpl, /body\.present #tb/, 'toolbar floats on a text selection in present mode');
+  assert.match(tpl, /const pinned=\(\)=>addmenu\.classList\.contains\('open'\)\|\|helpmenu\.classList\.contains\('open'\)\|\|!tb\.hidden\|\|!sheet\.hidden/, 'peek HUD stays pinned while a menu/popover/toolbar/sheet is open');
   assert.match(tpl, /document\.body\.style\.background=present\(\)\?\(s\.bg\|\|'var\(--card\)'\):''/);
 });
 test('master layer: partial fork on edit, hide per slide, footer carries the inline counter on the margin, on screen and in print', () => {
@@ -75,23 +75,28 @@ test('slots: deck-scope slots under per-layout slots; + Text binds a free slot; 
   assert.match(tpl, /const free=Object\.keys\(LAY\(s\)\)\.find\(n=>!s\.els\.some\(e=>e\.slot===n\)\)/);
   assert.match(tpl, /text:\{[^}]*role:'Body'/); assert.match(tpl, /id="tb-layout"/); assert.match(tpl, /id="tb-master"/);
 });
-test('roles are the type system: eight complete roles in the template, locked keys, B/I/U/S + sub/sup marks, NO font/size/color pickers', () => {
+test('roles are the type system: eight complete roles in the template, locked keys, B I U S̶ only (no sub/sup buttons; existing runs still render), NO font/size/color pickers, NO box-fill', () => {
   const m = modelOf(tpl);
   assert.deepEqual(Object.keys(m.styles.roles), ROLES);
   for (const r of Object.values(m.styles.roles)) for (const p of ['font', 'size', 'weight', 'lh', 'color']) assert.ok(r[p] != null, p); // the template's own roles carry lh
-  assert.match(tpl, /data-cmd="bold"[\s\S]*data-cmd="italic"[\s\S]*data-cmd="underline"[\s\S]*data-cmd="strikeThrough"[\s\S]*data-cmd="subscript"[\s\S]*data-cmd="superscript"/);
+  assert.match(tpl, /data-cmd="bold"[\s\S]*data-cmd="italic"[\s\S]*data-cmd="underline"[\s\S]*data-cmd="strikeThrough"/); assert.doesNotMatch(tpl, /data-cmd="(subscript|superscript)"/, 'no sub/sup buttons'); assert.doesNotMatch(tpl, /tb-fill|dataset\.fill|data-fill|deckBgs/, 'no box-fill feature'); assert.match(tpl, /#tb \.seg\{display:inline-flex;align-items:center;gap:2px;padding:2px 4px 2px 0;/, 'segments are one centred line box with symmetric top/bottom padding'); assert.match(tpl, /#tb \.sw\{width:16px;height:16px;padding:0;margin:0;vertical-align:middle;/, 'swatches symmetric'); assert.match(tpl, /<kbd>select text<\/kbd> → roles · B I U S̶ · color<\/div>/, 'popover toolbar line'); assert.doesNotMatch(tpl.match(/<div id="helpmenu"[\s\S]*?<\/div>\s*<\/div>/)[0], /fill/i, 'no "fill" in the popover');
   assert.match(tpl, /\.el sub,\.el sup\{font-size:inherit;line-height:0/, 'sub/sup never change size');
   assert.match(tpl, /const LOCK=\['font','size','lh','ls'\]/); assert.match(tpl, /if\(r\[k\]==null\|\|LOCK\.includes\(k\)\)r\[k\]=t\[k\]/, 'role always wins the locked keys');
   assert.doesNotMatch(tpl, /<select|type="color"|font-picker|fontFamily|id="font|id="size|id="color/);
   assert.match(tpl, /\['weight','color','tt','italic'\]\.forEach\(p=>delete el\[p\]\)/, 'applying a role clears the row-level overrides');
   assert.doesNotMatch(tpl, /r\.mono\?/, 'mono is not a row prop — Label is the mono role');
 });
-test('HUD contract is a set: ‹ · › · + (Text/Box/Slide) · ⊞ · ⤓ · ⛶', () => {
+test('HUD contract is a set: ‹ · › · autosave · + (Text/Box/Slide) · ⊞ · ⤓ · ⛶ · ⓘ', () => {
   assert.match(tpl, /<button id="prev" title="Previous slide \(←\)" aria-label="Previous slide \(←\)">‹<\/button>/, 'prev is icon-only'); assert.match(tpl, /<button id="next" title="Next slide \(→\)" aria-label="Next slide \(→\)">›<\/button>/, 'next is icon-only');
   const ids = [...tpl.matchAll(/<div id="hud">[\s\S]*?<\/div>\n<div id="sheet"/g)][0][0].match(/id="([^"]+)"/g).map(s => s.slice(4, -1)).filter(s => s !== 'hud' && s !== 'sheet').sort();
-  assert.deepEqual(ids, ['add-box', 'add-text', 'addbtn', 'addmenu', 'addwrap', 'autosave', 'fs', 'grid-btn', 'next', 'pdf', 'prev', 'sadd']);
+  assert.deepEqual(ids, ['add-box', 'add-text', 'addbtn', 'addmenu', 'addwrap', 'autosave', 'fs', 'grid-btn', 'help', 'helpmenu', 'helpwrap', 'next', 'pdf', 'prev', 'sadd']);
+  assert.deepEqual([...tpl.match(/<div id="hud">[\s\S]*?\n<\/div>/)[0].matchAll(/id="(prev|next|autosave|addbtn|grid-btn|pdf|fs|help)"/g)].map(m => m[1]), ['prev', 'next', 'autosave', 'addbtn', 'grid-btn', 'pdf', 'fs', 'help'], 'autosave immediately left of +, ⓘ rightmost');
+  assert.match(tpl, /<button id="help"[^>]*aria-label="Shortcuts"[^>]*>ⓘ<\/button>/); assert.match(tpl, /<kbd>← → \/ ↑ ↓<\/kbd> navigate/, 'popover nav line'); assert.match(tpl, /<button id="sheet-back" title="Back to slide \(Esc\)" aria-label="Back to slide \(Esc\)">← Back<\/button>/, 'contact sheet ← Back');
+  assert.match(tpl, /if\(\(e\.metaKey\|\|e\.ctrlKey\)&&e\.key\.toLowerCase\(\)==='s'\)\{e\.preventDefault\(\);saveCopy\(\);return\}/, '⌘S save-a-copy, keyboard only'); assert.doesNotMatch(tpl, /id="save"/);
+  assert.match(tpl, /if\(e\.key==='ArrowRight'\|\|e\.key==='ArrowDown'\|\|e\.key===' '\)nav\(1\)/, '↓ = next'); assert.match(tpl, /if\(e\.key==='ArrowLeft'\|\|e\.key==='ArrowUp'\)nav\(-1\)/, '↑ = prev');
+  assert.match(tpl, /PKEY=NS\+':pos'/, 'position persisted'); assert.match(tpl, /if\(animate\)\{store\.set\(PKEY,i\);location\.replace\('#'\+\(i\+1\)\)\}/, 'slide change → pos + #n hash'); assert.match(tpl, /addEventListener\('hashchange'/, 'hash → slide');
   // autosave indicator: the shim's set reports success; save() drives the dot; reduced motion kills glow + pulse
-  assert.match(tpl, /set:\(k,v\)=>\{try\{localStorage\.setItem\(k,v\);return true\}catch\{return false\}\}/, 'store.set returns boolean'); assert.match(tpl, /<span id="autosave" role="status"/); assert.match(tpl, /prefers-reduced-motion:reduce\)\{#autosave\{box-shadow:none;animation:none!important\}\}/);
+  assert.match(tpl, /set:\(k,v\)=>\{try\{localStorage\.setItem\(k,v\);lastSavedAt=new Date\(\);return true\}catch\{return false\}\}/, 'store.set returns boolean + stamps lastSavedAt on a confirmed write'); assert.match(tpl, /<span id="autosave" role="status"/); assert.match(tpl, /prefers-reduced-motion:reduce\)\{#autosave\{box-shadow:none;animation:none!important\}\}/);
   assert.match(tpl, /\$\('pdf'\)\.onclick=\(\)=>exportPdf\(\)\.catch\(\(\)=>print\(\)\)/, '⤓ writes a PDF in-file; print() is the fallback'); assert.match(tpl, /requestFullscreen/);
 });
 test('⤓ PDF writer: slide-sized pages from foreignObject rasters, byte-exact xref, zero dependencies', () => {
@@ -381,9 +386,9 @@ live('live: editor rules — nib, present backdrop, master fork + inline counter
     await p.mouse.up(); await p.waitForTimeout(250); assert.equal(await ev(() => document.body.classList.contains('dragging')), false, 'dragging flag cleared on drop'); await ev(() => undo()); }
   await ev(() => sheetClose());
   // autosave dot: a normal save lands green; a shim that cannot persist lands red with the warning label
-  await ev(() => save()); await p.waitForTimeout(400); assert.deepEqual(await ev(() => [document.getElementById('autosave').dataset.state, document.getElementById('autosave').getAttribute('aria-label')]), ['ok', 'Autosaved']);
+  await ev(() => save()); await p.waitForTimeout(400); assert.deepEqual(await ev(() => [document.getElementById('autosave').dataset.state, document.getElementById('autosave').getAttribute('aria-label')]), ['ok', await ev(() => document.getElementById('autosave').title)]); assert.match(await ev(() => document.getElementById('autosave').title), /^Autosaved · \d\d:\d\d:\d\d$/, 'tooltip carries the last save time');
   await ev(() => { window.__set = store.set; store.set = () => false; save(); }); assert.equal(await ev(() => document.getElementById('autosave').dataset.state), 'busy', 'amber while saving'); await p.waitForTimeout(400);
-  assert.deepEqual(await ev(() => [document.getElementById('autosave').dataset.state, document.getElementById('autosave').getAttribute('aria-label')]), ['bad', 'Not saved — edits will be lost on refresh']); await ev(() => { store.set = window.__set; save(); }); await p.waitForTimeout(400);
+  { const bad = await ev(() => [document.getElementById('autosave').dataset.state, document.getElementById('autosave').getAttribute('aria-label')]); assert.equal(bad[0], 'bad'); assert.match(bad[1], /^Not saved — edits will be lost on refresh( \(last saved \d\d:\d\d:\d\d\))?$/, 'bad tooltip names the last successful save time'); } await ev(() => { store.set = window.__set; save(); }); await p.waitForTimeout(400);
   // ⤓ PDF: in-file writer produces a real PDF with one W×H pt page per slide (Chromium rasterises foreignObject untainted)
   const pdf = await ev(async () => { const orig = URL.createObjectURL; let blob; URL.createObjectURL = b => { blob = b; return 'blob:x'; }; HTMLAnchorElement.prototype.click = () => {}; await exportPdf(); URL.createObjectURL = orig; const t = await blob.text(); return {type: blob.type, head: t.slice(0, 8), pages: (t.match(/\/Type \/Page\b/g) || []).length, box: /\/MediaBox \[0 0 960 540\]/.test(t), eof: /%%EOF\n$/.test(t), size: blob.size}; });
   assert.deepEqual([pdf.type, pdf.head, pdf.pages, pdf.box, pdf.eof], ['application/pdf', '%PDF-1.4', 13, true, true]); assert.ok(pdf.size > 20000, 'rasters are real');
