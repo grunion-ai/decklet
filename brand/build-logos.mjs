@@ -23,9 +23,8 @@ const outline = (c, stroke, sw = 3.5) =>
 // Candidate marks. Each returns {defs, body} in one colour `c`.
 export const MARKS = {
   // A — stack: three cards, the front one solid, two behind as a fanned deck.
-  stack(c, id = "a") {
+  stack(c, id = "a", gw = 2.5) {
     const f = card(6, 16.5, 36), m = card(9, 11, 30), b = card(12, 6, 24);
-    const gw = 2.5;
     const defs = `<mask id="${id}M" maskUnits="userSpaceOnUse" x="0" y="0" width="48" height="48"><rect width="48" height="48" fill="#fff"/>` +
       `<rect x="${f.x - gw}" y="${f.y - gw}" width="${f.w + 2 * gw}" height="${f.h + 2 * gw}" rx="${f.r + gw}" fill="#000"/>` +
       `<rect x="${m.x - gw}" y="${m.y - gw}" width="${m.w + 2 * gw}" height="${m.h + 2 * gw}" rx="${m.r + gw}" fill="#000" mask="url(#${id}F)"/></mask>` +
@@ -81,15 +80,41 @@ export const MARKS = {
 const svgOf = ({ defs, body }, vb = "0 0 48 48", extra = "") =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}"${extra}>${defs ? `<defs>${defs}</defs>` : ""}${body}</svg>`;
 
-// Canonical mark (decision 2026-08-23): F · dcard.
-export const CANON = "dcard";
+// Canonical mark (decision 2026-08-23, revised same day): A · stack.
+export const CANON = "stack";
+
+// ---------------------------------------------------------------------------
+// Loader: cycling through the deck. Each card advances one slot (back → mid →
+// front → off the bottom) while a new one fades in at the back; after one step
+// the picture equals the start, so a single step loops seamlessly. SMIL only —
+// works inline, in <img>, and as a CSS background. The under-card cuts carry
+// the SAME keyframes as the cards cutting them, so gaps stay registered.
+export const LOADER_CYCLE_MS = 1400;
+const SLOTS = [card(14, 2.5, 20), card(12, 6, 24), card(9, 11, 30), card(6, 16.5, 36), card(8, 21, 32)];
+const OP = [0, 1, 1, 1, 0]; // slot opacity (-1 and 3 are invisible)
+export function loaderStack({ c = PALETTE.blue, id = "ls", dur = LOADER_CYCLE_MS / 1000 } = {}) {
+  const gw = 2.5, kt = "0;.6;1", spline = ` calcMode="spline" keyTimes="${kt}" keySplines=".45 0 .25 1;0 0 1 1"`;
+  const an = (attr, a, b, t = spline) => `<animate attributeName="${attr}" values="${a};${b};${b}" dur="${dur}s" repeatCount="indefinite"${t}/>`;
+  const fast = ` calcMode="spline" keyTimes="0;.3;1" keySplines=".4 0 1 1;0 0 1 1"`; // the exiting card is gone early
+  // A rect moving from slot i to i+1; `pad` grows it for mask cuts.
+  const mover = (i, fill, pad = 0, extra = "") => {
+    const A = SLOTS[i], B = SLOTS[i + 1];
+    return `<rect x="${A.x - pad}" y="${A.y - pad}" width="${A.w + 2 * pad}" height="${A.h + 2 * pad}" rx="${A.r + pad}" fill="${fill}" opacity="${OP[i]}"${extra}>` +
+      an("x", A.x - pad, B.x - pad) + an("y", A.y - pad, B.y - pad) + an("width", A.w + 2 * pad, B.w + 2 * pad) +
+      an("height", A.h + 2 * pad, B.h + 2 * pad) + an("opacity", OP[i], OP[i + 1], i === 3 ? fast : spline) + `</rect>`;
+  };
+  const region = `maskUnits="userSpaceOnUse" x="0" y="0" width="48" height="48"`;
+  // Card moving from slot i is cut by every card in front of it (slots > i).
+  // The exiting card (3→4) drops BEHIND the deck: drawn first, cut by all three.
+  const mask = (i, cutters) => `<mask id="${id}${i}" ${region}><rect width="48" height="48" fill="#fff"/>` +
+    cutters.map(j => mover(j, "#000", gw)).join("") + `</mask>`;
+  const defs = mask(3, [0, 1, 2]) + mask(0, [1, 2]) + mask(1, [2]);
+  const body = mover(3, c, 0, ` mask="url(#${id}3)"`) + mover(0, c, 0, ` mask="url(#${id}0)"`) + mover(1, c, 0, ` mask="url(#${id}1)"`) + mover(2, c);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="Loading"><defs>${defs}</defs>${body}</svg>`;
+}
 
 // Favicon: the d at 16px needs a heavier stroke (optical correction, as weave).
-export function faviconSvg() {
-  const c = PALETTE.blue, sw = 6, s = card(6 + sw / 2, 22, 30 - sw, 2);
-  const asc = `<rect x="${s.x + s.w - sw / 2}" y="6" width="${sw}" height="${s.h + 16}" rx="${sw / 2}" fill="${c}"/>`;
-  return svgOf({ defs: "", body: outline(s, c, sw) + asc });
-}
+export function faviconSvg() { return svgOf(MARKS.stack(PALETTE.blue, "fav", 3.5)); }
 
 export function markSvg(name, c = PALETTE.blue) { return svgOf(MARKS[name](c)); }
 
@@ -136,6 +161,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     "decklet-favicon.svg": faviconSvg(),
     "decklet-lockup.svg": lockupSvg(CANON),
     "decklet-lockup-dark.svg": lockupSvg(CANON, PALETTE.sky, PALETTE.cream),
+    "decklet-loader.svg": loaderStack(),
+    "decklet-loader-cream.svg": loaderStack({ c: PALETTE.cream }),
   };
   if (process.argv.includes("--candidates")) files["decklet-candidates.svg"] = contactSheet();
   for (const [f, s] of Object.entries(files)) writeFileSync(join(out, f), s);

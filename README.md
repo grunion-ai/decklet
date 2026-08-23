@@ -1,3 +1,8 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="brand/assets/decklet-loader-dark.gif">
+  <img src="brand/assets/decklet-loader-light.gif" width="72" height="72" alt="">
+</picture>
+
 # decklet
 
 Agent-generated, brand-true, real-time editable presentations and assets — one portable HTML file, no office suite.
