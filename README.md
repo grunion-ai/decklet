@@ -1,7 +1,9 @@
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="brand/assets/decklet-loader-dark.gif">
-  <img src="brand/assets/decklet-loader-light.gif" width="72" height="72" alt="">
-</picture>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="brand/assets/decklet-loader-dark.gif">
+    <img src="brand/assets/decklet-loader-light.gif" width="96" height="96" alt="">
+  </picture>
+</p>
 
 # decklet
 

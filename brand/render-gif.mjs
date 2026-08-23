@@ -15,7 +15,7 @@ const { chromium } = createRequire(process.env.PW_ROOT ? process.env.PW_ROOT + "
 const ffmpeg = process.env.FFMPEG || "ffmpeg";
 const out = join(dirname(fileURLToPath(import.meta.url)), "assets");
 mkdirSync(out, { recursive: true });
-const S = 96, FRAMES = 28, FPS = Math.round(FRAMES / (LOADER_CYCLE_MS / 1000));
+const S = 96, FRAMES = 45, FPS = Math.round(FRAMES / (LOADER_CYCLE_MS / 1000));
 const BUILDS = [["decklet-loader-light.gif", PALETTE.blue, "#ffffff"], ["decklet-loader-dark.gif", PALETTE.cream, "#0d1117"]];
 
 const browser = await chromium.launch({ executablePath: process.env.CHROME || undefined });

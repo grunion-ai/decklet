@@ -89,13 +89,13 @@ export const CANON = "stack";
 // the picture equals the start, so a single step loops seamlessly. SMIL only —
 // works inline, in <img>, and as a CSS background. The under-card cuts carry
 // the SAME keyframes as the cards cutting them, so gaps stay registered.
-export const LOADER_CYCLE_MS = 1400;
+export const LOADER_CYCLE_MS = 900;
 const SLOTS = [card(14, 2.5, 20), card(12, 6, 24), card(9, 11, 30), card(6, 16.5, 36), card(8, 21, 32)];
 const OP = [0, 1, 1, 1, 0]; // slot opacity (-1 and 3 are invisible)
 export function loaderStack({ c = PALETTE.blue, id = "ls", dur = LOADER_CYCLE_MS / 1000 } = {}) {
-  const gw = 2.5, kt = "0;.6;1", spline = ` calcMode="spline" keyTimes="${kt}" keySplines=".45 0 .25 1;0 0 1 1"`;
+  const gw = 2.5, kt = "0;.82;1", spline = ` calcMode="spline" keyTimes="${kt}" keySplines=".4 0 .2 1;0 0 1 1"`;
   const an = (attr, a, b, t = spline) => `<animate attributeName="${attr}" values="${a};${b};${b}" dur="${dur}s" repeatCount="indefinite"${t}/>`;
-  const fast = ` calcMode="spline" keyTimes="0;.3;1" keySplines=".4 0 1 1;0 0 1 1"`; // the exiting card is gone early
+  const fast = ` calcMode="spline" keyTimes="0;.45;1" keySplines=".3 0 .7 1;0 0 1 1"`; // the exiting card is gone early
   // A rect moving from slot i to i+1; `pad` grows it for mask cuts.
   const mover = (i, fill, pad = 0, extra = "") => {
     const A = SLOTS[i], B = SLOTS[i + 1];
