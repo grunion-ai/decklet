@@ -1,0 +1,11 @@
+name: test
+on: [push, pull_request]
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      # no browser: the engine/validator/create/import (pure) tests run; live proofs skip without Playwright
+      - run: node --test test/**/*.test.mjs

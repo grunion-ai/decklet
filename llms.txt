@@ -1,0 +1,24 @@
+# decklet
+
+> Agent-generated, brand-true, real-time editable presentations and assets — one portable HTML file, no office suite.
+
+decklet is a slide engine for agents. The deck is a JSON model; the renderer is the editor; the output is ONE self-contained .html (no dependencies, no network) a human can drag, retype, present and print. Plain Node >= 22 CLI. Playwright is optional and only used by verify/import-html.
+
+Loop: content + format + style -> model.json -> `node bin/validate.mjs model.json` -> `node bin/create.mjs --model model.json [--style style.json] --out deck.html --format slides|carousel|carousel-4x5|document-letter|document-a4` -> `node bin/verify.mjs deck.html [--refs shots/]` -> hand-off.
+
+Formats: slides (960x540 or 1600x900) supported; carousel (1080x1080, 1080x1350) and document (Letter 816x1056, A4 794x1123) experimental (sizing/editing/PDF work; text does not flow across pages).
+
+Model: {w,h,format,styles:{roles,pad},slots,layouts:{name:{slot:{x,y,w,role}}},master:[rows with id],slides:[{layout,bg,hide,els:[rows]}]}. A row is {x,y,w,role,text} plus optional box/tile/bar/line/donut/svg/img/html/nowrap/p/bg/bd/radius/align/color/weight/tt. Seven roles (Supertitle,H1,H2,Body,Caption,Label,Stat) are the only source of font/size/lh/ls; rows may not override them.
+
+## Files
+- SKILL.md: the agent authoring skill — inputs, process, model + style contracts, layouts, master, verification thresholds, anti-patterns, worked examples
+- README.md: what/for whom/guarantees/feature matrix/roadmap
+- deck.html: the engine with its own explainer deck (9 slides)
+- template.html: the engine with an empty model; create.mjs fills /*DECK*/ /*TOKENS*/ /*TITLE*/ /*KEY*/ markers
+- bin/validate.mjs: pure-Node model contract validator (exit 1 on errors; --strict for warnings)
+- bin/create.mjs: model (+style) -> deck.html with format presets
+- bin/verify.mjs: self-containment + contract + layout parity (always) + AE vs refs (optional); writes results.json
+- bin/import-html.mjs: HTML pages at a fixed viewport -> model.json (master/slots/roles lifted; _lines intent for parity)
+- examples/explainer, examples/quarterly-update, examples/launch-carousel, examples/one-pager: brief.md -> model.json (+ style.json)
+- test/gate.test.mjs: node --test gate (engine contract, validator, create, import, live proofs)
+- CHANGELOG.md, LICENSE (MIT)

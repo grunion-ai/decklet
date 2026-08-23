@@ -1,0 +1,37 @@
+{
+  "title": "One-pager",
+  "format": "document-letter",
+  "layouts": {
+    "page": { "supertitle": { "x": 72, "y": 72, "w": 672, "role": "Supertitle" }, "title": { "x": 72, "y": 92, "w": 672, "role": "H1" } }
+  },
+  "master": [
+    { "id": "rule", "x": 72, "y": 980, "h": 1, "line": [744, 980], "bg": "var(--line)" },
+    { "id": "foot", "footer": 1, "x": 444, "y": 990, "w": 300, "align": "right", "role": "Label", "text": "one-pager" }
+  ],
+  "slides": [
+    { "name": "page-1", "layout": "page", "els": [
+      { "slot": "supertitle", "text": "Overview" },
+      { "slot": "title", "text": "First drafts, faster." },
+      { "x": 72, "y": 150, "w": 672, "role": "Body", "text": "Teams lose the first day of every project to a blank page. The draft that unblocks everyone is the one nobody has time to write." },
+      { "x": 72, "y": 210, "w": 672, "role": "H2", "text": "What you get" },
+      { "x": 72,  "y": 246, "w": 208, "h": 110, "tile": 1, "role": "Body", "text": "A draft in minutes, not days" },
+      { "x": 304, "y": 246, "w": 208, "h": 110, "tile": 1, "role": "Body", "text": "Your own structure and voice" },
+      { "x": 536, "y": 246, "w": 208, "h": 110, "tile": 1, "role": "Body", "text": "Edit in place — it is a file" },
+      { "x": 72, "y": 400, "w": 300, "role": "Stat", "text": "37%" },
+      { "x": 72, "y": 442, "w": 300, "role": "Label", "text": "less time to first draft" },
+      { "x": 400, "y": 400, "w": 344, "role": "Body", "color": "var(--muted)", "text": "Measured across 40 projects in the pilot: time from kickoff to a reviewable draft dropped from 2.7 days to 1.7." }
+    ]},
+    { "name": "page-2", "layout": "page", "els": [
+      { "slot": "supertitle", "text": "How it works" },
+      { "slot": "title", "text": "Three steps." },
+      { "x": 72, "y": 150, "w": 672, "role": "H2", "text": "1 · Paste the source" },
+      { "x": 72, "y": 176, "w": 672, "role": "Body", "text": "Notes, a transcript, a spreadsheet — anything with the facts in it." },
+      { "x": 72, "y": 220, "w": 672, "role": "H2", "text": "2 · Pick a format and a style" },
+      { "x": 72, "y": 246, "w": 672, "role": "Body", "text": "Slides, carousel or document. Your brand tokens, or a neutral default." },
+      { "x": 72, "y": 290, "w": 672, "role": "H2", "text": "3 · Edit the file" },
+      { "x": 72, "y": 316, "w": 672, "role": "Body", "text": "Drag, retype, present, print. Nothing to install, nothing to sync." },
+      { "x": 72, "y": 390, "w": 672, "role": "Body", "box": 1, "align": "left", "text": "Pricing: free for individuals. Teams from $12 per seat per month." },
+      { "x": 72, "y": 460, "w": 672, "role": "Caption", "text": "Contact: hello@example.com" }
+    ]}
+  ]
+}

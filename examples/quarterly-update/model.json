@@ -1,0 +1,54 @@
+{
+  "title": "Q3 update",
+  "layouts": {
+    "title":   { "supertitle": { "x": 60, "y": 170, "w": 840, "role": "Supertitle" }, "title": { "x": 60, "y": 196, "w": 800, "role": "H1" } },
+    "content": { "supertitle": { "x": 60, "y": 52, "w": 840, "role": "Supertitle" }, "title": { "x": 60, "y": 76, "w": 840, "role": "H1" } }
+  },
+  "master": [
+    { "id": "foot", "footer": 1, "x": 60, "y": 500, "w": 300, "role": "Label", "text": "Q3 update" }
+  ],
+  "slides": [
+    { "name": "cover", "layout": "title", "els": [
+      { "slot": "supertitle", "text": "Quarterly update" },
+      { "slot": "title", "text": "Q3 in one page." },
+      { "x": 60, "y": 260, "w": 700, "role": "Body", "color": "var(--muted)", "text": "What moved, what didn't, and what we do next quarter." }
+    ]},
+    { "name": "numbers", "layout": "content", "els": [
+      { "slot": "supertitle", "text": "The numbers" },
+      { "slot": "title", "text": "Growth held. Time-to-value halved." },
+      { "x": 60,  "y": 170, "w": 195, "h": 110, "tile": 1, "role": "Stat", "text": "1,240" },
+      { "x": 275, "y": 170, "w": 195, "h": 110, "tile": 1, "role": "Stat", "text": "$86K" },
+      { "x": 490, "y": 170, "w": 195, "h": 110, "tile": 1, "role": "Stat", "text": "4.6" },
+      { "x": 705, "y": 170, "w": 195, "h": 110, "tile": 1, "role": "Stat", "text": "12 d" },
+      { "x": 60,  "y": 292, "w": 195, "role": "Label", "align": "center", "text": "Signups · +18%" },
+      { "x": 275, "y": 292, "w": 195, "role": "Label", "align": "center", "text": "MRR · +11%" },
+      { "x": 490, "y": 292, "w": 195, "role": "Label", "align": "center", "text": "CSAT" },
+      { "x": 705, "y": 292, "w": 195, "role": "Label", "align": "center", "text": "Median time-to-value" },
+      { "x": 60, "y": 360, "w": 840, "role": "Body", "text": "Signups and revenue grew on the same curve as Q2. The step change is time-to-value: onboarding v1 cut the median from 25 days to 12." }
+    ]},
+    { "name": "signups", "layout": "content", "els": [
+      { "slot": "supertitle", "text": "Signups by month" },
+      { "slot": "title", "text": "Three months, one slope." },
+      { "x": 200, "y": 420, "h": 2, "line": [760, 420], "bg": "var(--line)" },
+      { "x": 240, "y": 230, "w": 120, "h": 190, "bg": "#E8B59E", "bar": 1 },
+      { "x": 420, "y": 215, "w": 120, "h": 205, "bg": "#D9825C", "bar": 1 },
+      { "x": 600, "y": 195, "w": 120, "h": 225, "bg": "#C2410C", "bar": 1 },
+      { "x": 240, "y": 206, "w": 120, "role": "Label", "align": "center", "color": "var(--fg)", "text": "380" },
+      { "x": 420, "y": 191, "w": 120, "role": "Label", "align": "center", "color": "var(--fg)", "text": "410" },
+      { "x": 600, "y": 171, "w": 120, "role": "Label", "align": "center", "color": "var(--fg)", "text": "450" },
+      { "x": 240, "y": 430, "w": 120, "role": "Label", "align": "center", "text": "Jul" },
+      { "x": 420, "y": 430, "w": 120, "role": "Label", "align": "center", "text": "Aug" },
+      { "x": 600, "y": 430, "w": 120, "role": "Label", "align": "center", "text": "Sep" }
+    ]},
+    { "name": "next", "layout": "content", "els": [
+      { "slot": "supertitle", "text": "Next quarter" },
+      { "slot": "title", "text": "Three commitments." },
+      { "x": 60,  "y": 170, "w": 260, "h": 200, "tile": 1, "role": "Body", "text": "Ship onboarding v2" },
+      { "x": 350, "y": 170, "w": 260, "h": 200, "tile": 1, "role": "Body", "text": "Close three design partners" },
+      { "x": 640, "y": 170, "w": 260, "h": 200, "tile": 1, "role": "Body", "text": "Hire one support engineer" },
+      { "x": 60,  "y": 382, "w": 260, "role": "Label", "align": "center", "text": "01 · Product" },
+      { "x": 350, "y": 382, "w": 260, "role": "Label", "align": "center", "text": "02 · Revenue" },
+      { "x": 640, "y": 382, "w": 260, "role": "Label", "align": "center", "text": "03 · Team" }
+    ]}
+  ]
+}

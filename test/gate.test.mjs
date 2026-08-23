@@ -1,0 +1,267 @@
+// decklet gate — engine contract + validator + create + import-html (pure) + live browser proofs (Playwright, skipped when absent)
+// run: npm test   (= node --test test/**/*.test.mjs)
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import {fileURLToPath, pathToFileURL} from 'node:url';
+import {validate, ROLES} from '../bin/validate.mjs';
+import {create, FORMAT} from '../bin/create.mjs';
+import {assemble, extractInPage, classify} from '../bin/import-html.mjs';
+import {verify, modelOf} from '../bin/verify.mjs';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const read = f => fs.readFileSync(path.join(root, f), 'utf8');
+const tpl = read('template.html'), deck = read('deck.html');
+const example = n => ({model: JSON.parse(read(`examples/${n}/model.json`)), style: fs.existsSync(path.join(root, `examples/${n}/style.json`)) ? JSON.parse(read(`examples/${n}/style.json`)) : null});
+const explainer = example('explainer');
+const withRoles = m => create(m, {}).deck; // fills neutral roles exactly like the CLI does
+let pw = null; try { pw = await import('playwright'); } catch {}
+const live = pw ? test : test.skip;
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'decklet-'));
+
+// ── 1. the core guarantee: single file, zero network ──
+test('template + deck are self-contained (no external src/href, loaders, sockets)', () => {
+  for (const [n, h] of [['template', tpl], ['deck', deck]]) {
+    assert.doesNotMatch(h, /(src|href)\s*=\s*["']https?:/i, `${n}: external src/href`);
+    assert.doesNotMatch(h, /@import|<link[^>]+stylesheet|fetch\s*\(|XMLHttpRequest|new\s+WebSocket/i, `${n}: external loader`);
+    assert.match(h, /const store=\{get:/, `${n}: storage shim`);
+    assert.equal((h.match(/localStorage\./g) || []).length, 3, `${n}: storage API only inside the shim`);
+  }
+});
+test('no client or brand residue in the public tree', () => {
+  const files = fs.globSync('**/*.{html,mjs,md,json,txt,yml}', {cwd: root}).filter(f => !/node_modules|^\.git\/|^test\//.test(f));
+  for (const f of files) assert.doesNotMatch(read(f), /ponytail|Approach C|deckC7|Presenton|PPTist/, `${f}: residue`);
+});
+
+// ── 2. engine static contract (the rules the editor is built on) ──
+test('template markers + per-deck storage namespace', () => {
+  assert.match(tpl, /<title>\/\*TITLE\*\/[^<]*\/\*\/TITLE\*\/<\/title>/);
+  assert.match(tpl, /:root\{\/\*TOKENS\*\/[^}]*\/\*\/TOKENS\*\/;--W:/);
+  assert.match(tpl, /const DECK=\/\*DECK\*\/\{[\s\S]*?\}\/\*\/DECK\*\/;/);
+  assert.match(tpl, /const NS=\/\*KEY\*\/'decklet:template'\/\*\/KEY\*\/,KEY=NS\+':model',HKEY=NS\+':hist'/);
+  assert.match(deck, /const NS=\/\*KEY\*\/'decklet:[0-9a-f]{10}'\/\*\/KEY\*\//, 'deck: namespace stamped from the model hash');
+});
+test('editing: double-click via detail, multiselect, undo stack (persisted, capped), click-off deselect', () => {
+  assert.match(tpl, /e\.detail>=2/); assert.match(tpl, /e\.metaKey\|\|e\.ctrlKey/); assert.match(tpl, /function undo/);
+  assert.match(tpl, /store\.get\(HKEY\)\|\|'\[\]'/); assert.match(tpl, /history\.length>50/);
+  assert.match(tpl, /if\(!t\)\{if\(sel\.size\)\{sel\.clear\(\);render\(\)\}return\}/); assert.match(tpl, /\$\('wrap'\)\.addEventListener\('mousedown'/);
+});
+test('commitEdit runs first on every path that destroys the live editor', () => {
+  assert.match(tpl, /function commitEdit\(\)\{\n\s*const t=canvas\.querySelector\('\.el\[contenteditable="true"\]'\)/);
+  for (const re of [/const nav=d=>\{commitEdit\(\);/, /'sadd'\)\.onclick=\(\)=>\{commitEdit\(\);/, /const fs=\(\)=>\{commitEdit\(\);/, /'beforeprint',\(\)=>\{commitEdit\(\);/, /function sheetOpen\(\)\{commitEdit\(\);/, /t\.onblur=commitEdit;/, /el\.html=t\.innerHTML;delete el\.text/]) assert.match(tpl, re);
+});
+test('renderer adds nothing implicit; chrome lives on box/tile only', () => {
+  assert.match(tpl, /\.el\{position:absolute;cursor:grab;padding:0;border-radius:0;white-space:normal;line-height:normal\}/);
+  assert.match(tpl, /\.el\.box\{[^}]*padding:6px 8px;border-radius:8px;white-space:pre-wrap\}/);
+  assert.match(tpl, /\.el\.tile\{/);
+  for (const re of [/r\.svg\)d\.innerHTML=r\.svg/, /else if\(r\.html\)d\.innerHTML=r\.html/, /s\.bg\|\|'var\(--card\)'/, /letter-spacing:\$\{r\.ls\}px/, /line-height:\$\{r\.lh\}px/, /text-transform:\$\{r\.tt\}/, /white-space:\$\{r\.ws\}/, /font-style:italic/, /opacity:\$\{r\.op\}/, /border-top:\$\{r\.bt\}/, /box-shadow:\$\{r\.shadow\}/, /r\.nowrap\?'white-space:nowrap;'/, /r\.w==='auto'\?'auto'/, /deck\.styles\.pad\[r\.p\]/, /r\.line\)/, /conic-gradient\(/, /r\.h\?/]) assert.match(tpl, re, String(re));
+});
+test('selection chrome: nib only for one painting row, never in present mode; present hides HUD/toolbar/sheet', () => {
+  assert.match(tpl, /sel\.size===1&&!present\(\)/); assert.match(tpl, /paints\(r\)&&r\.w!==0&&r\.h!==0/);
+  assert.match(tpl, /body\.present #hud,body\.present #tb,body\.present #sheet,body\.present \.h\{display:none!important\}/);
+  assert.match(tpl, /document\.body\.style\.background=present\(\)\?\(s\.bg\|\|'var\(--card\)'\):''/);
+});
+test('master layer: fork on edit, hide per slide, footer carries the inline counter on screen and in print', () => {
+  for (const re of [/function fork\(id\)/, /o\.override=id/, /\(s\.hide\|\|\[\]\)\.includes\(m\.id\)/, /d\.dataset\.footer='1'/, /root\.querySelector\('\[data-footer\]'\)/, /className=f\?'num':'num pin'/, /num\(cv,n\+1\)/, /pg\.style\.background=s\.bg\|\|'var\(--card\)'/]) assert.match(tpl, re, String(re));
+});
+test('slots: deck-scope slots under per-layout slots; + Text binds a free slot; promote actions exist', () => {
+  assert.match(tpl, /const LAY=s=>\(\{\.\.\.\(deck\.slots\|\|\{\}\),\.\.\.\(\(deck\.layouts\|\|\{\}\)\[s\.layout\]\|\|\{\}\)\}\)/);
+  assert.match(tpl, /const free=Object\.keys\(LAY\(s\)\)\.find\(n=>!s\.els\.some\(e=>e\.slot===n\)\)/);
+  assert.match(tpl, /text:\{[^}]*role:'Body'/); assert.match(tpl, /id="tb-layout"/); assert.match(tpl, /id="tb-master"/);
+});
+test('roles are the type system: seven complete roles in the template, B/I/U/S marks, NO font/size/color pickers', () => {
+  const m = modelOf(tpl);
+  assert.deepEqual(Object.keys(m.styles.roles), ROLES);
+  for (const r of Object.values(m.styles.roles)) for (const p of ['font', 'size', 'weight', 'lh', 'color']) assert.ok(r[p] != null, p); // the template's own roles carry lh
+  assert.match(tpl, /data-cmd="bold"[\s\S]*data-cmd="italic"[\s\S]*data-cmd="underline"[\s\S]*data-cmd="strikeThrough"/);
+  assert.doesNotMatch(tpl, /<select|type="color"|font-picker|fontFamily|id="font|id="size|id="color/);
+  assert.match(tpl, /\['font','size','weight','lh','ls','color','tt','mono'\]\.forEach\(p=>delete el\[p\]\)/, 'applying a role clears raw overrides');
+});
+test('HUD contract is a set: prev · next · + (Text/Box/Slide) · ⊞ · ⤓ · ⛶', () => {
+  const ids = [...tpl.matchAll(/<div id="hud">[\s\S]*?<\/div>\n<div id="sheet"/g)][0][0].match(/id="([^"]+)"/g).map(s => s.slice(4, -1)).filter(s => s !== 'hud' && s !== 'sheet').sort();
+  assert.deepEqual(ids, ['add-box', 'add-text', 'addbtn', 'addmenu', 'addwrap', 'fs', 'grid-btn', 'next', 'pdf', 'prev', 'sadd']);
+  assert.match(tpl, /\$\('pdf'\)\.onclick=\(\)=>print\(\)/); assert.match(tpl, /requestFullscreen/);
+});
+test('contact sheet: 3 across, drag reorder, never deletes the last slide, ⌘C/⌘V/⌘D/⌘Z', () => {
+  assert.match(tpl, /#grid\{display:grid;grid-template-columns:repeat\(3,1fr\)/); assert.match(tpl, /grid\.addEventListener\('drop'/);
+  assert.match(tpl, /if\(del\.length>=deck\.slides\.length\)del\.pop\(\)/);
+  for (const k of ['c', 'v', 'd', 'z']) assert.match(tpl, new RegExp(`mod&&k==='${k}'`));
+});
+test('print: named page sizes only (Safari), per-page bg, A4 injected from deck.page', () => {
+  assert.match(tpl, /@page\{size:letter;margin:0\}/); assert.doesNotMatch(tpl, /@page\{size:\d+px/);
+  assert.match(tpl, /PW=PAGE==='a4'\?794:816/); assert.match(tpl, /st\.textContent='@page\{size:a4;margin:0\}'/);
+});
+
+// ── 3. deck.html is exactly what create() produces from the explainer model (determinism + self-hosting) ──
+test('deck.html == create(examples/explainer)', () => {
+  const {html} = create(explainer.model, {title: 'decklet'});
+  assert.equal(html, deck, 'rebuild with: node bin/create.mjs --model examples/explainer/model.json --out deck.html --title decklet');
+  const m = modelOf(deck);
+  assert.equal(m.slides.length, 9); assert.equal(m.master.filter(x => x.footer).length, 1);
+  assert.ok(m.slides.every(s => s.layout && s.els.some(e => e.slot === 'title')), 'every explainer slide is slotted');
+});
+
+// ── 4. validator ──
+test('validator: explainer + three examples are clean', () => {
+  for (const n of ['explainer', 'quarterly-update', 'launch-carousel', 'one-pager']) {
+    const {model, style} = example(n); const v = validate(create(model, {style}).deck);
+    assert.deepEqual(v.errors, [], n); assert.deepEqual(v.warnings, [], n + ' warnings');
+  }
+});
+test('validator: rejects size/font overrides, unknown roles/slots/layouts, bad master refs, html with size runs, non-data img', () => {
+  const bad = withRoles({w: 960, h: 540, layouts: {content: {title: {x: 0, y: 0, w: 100, role: 'H1'}}}, master: [{id: 'foot', footer: 1, x: 0, y: 0, w: 100, role: 'Label', text: 'x'}], slides: [
+    {layout: 'content', els: [
+      {slot: 'title', text: 'ok'},
+      {x: 0, y: 0, w: 100, role: 'Body', size: 18, text: 'size override'},
+      {x: 0, y: 0, w: 100, role: 'Body', font: 'Comic Sans', text: 'font override'},
+      {x: 0, y: 0, w: 100, role: 'Nope', text: 'unknown role'},
+      {slot: 'nope', text: 'unknown slot'},
+      {x: 0, y: 0, w: 100, text: 'no role at all'},
+      {x: 0, y: 0, w: 100, role: 'Body', html: '<span style="font-size:30px">run</span>'},
+      {x: 0, y: 0, w: 100, role: 'Body', override: 'ghost', text: 'bad override'},
+      {x: 0, y: 0, w: 100, img: 'https://x/y.png'},
+      {x: 0, y: 0, w: 100, donut: 140},
+    ], hide: ['ghost']},
+    {layout: 'missing', els: []},
+  ]});
+  const v = validate(bad);
+  assert.equal(v.ok, false);
+  for (const re of [/overrides size/, /overrides font/, /role "Nope"/, /slot "nope"/, /has no role/, /runs carry size/, /override "ghost"/, /img must be a data: URI/, /donut must be 0\.\.100/, /hide "ghost"/, /layout "missing"/]) assert.ok(v.errors.some(e => re.test(e)), String(re));
+});
+test('validator: warns on hardcoded counters, likely overflow, raw css, off-canvas rows', () => {
+  const v = validate(withRoles({w: 960, h: 540, slides: [{els: [
+    {x: 0, y: 0, w: 100, role: 'Label', text: '3 / 9'},
+    {x: 0, y: 0, w: 60, role: 'Body', nowrap: 1, text: 'this is far too long for sixty pixels'},
+    {x: 0, y: 0, w: 100, role: 'Body', css: 'transform:rotate(1deg)', text: 'css'},
+    {x: 900, y: 0, w: 200, role: 'Body', text: 'off the edge'},
+  ]}]}));
+  assert.equal(v.ok, true);
+  for (const re of [/hardcoded page counter/, /likely wider than w=60/, /raw css/, /past the right edge/]) assert.ok(v.warnings.some(w => re.test(w)), String(re));
+});
+test('validator: structural errors', () => {
+  assert.ok(validate(null).errors.length); assert.ok(validate({w: 1, h: 1, styles: {roles: {}}, slides: []}).errors.some(e => /slides must be/.test(e)));
+  assert.ok(validate({w: 1, h: 1, styles: {roles: {}}, slides: [{els: []}]}).errors.some(e => /styles\.roles missing/.test(e)));
+  assert.ok(validate({w: 1, h: 1, styles: {roles: {H1: {font: 'x'}}}, slides: [{els: []}]}).errors.some(e => /role H1: missing size/.test(e)));
+  assert.ok(validate({w: 1, h: 1, format: 'poster', styles: {roles: {}}, slides: [{els: []}]}).errors.some(e => /format "poster"/.test(e)));
+});
+
+// ── 5. create ──
+test('create: format presets set canvas + page; --space overrides; model w/h wins over preset', () => {
+  const m = {styles: {roles: modelOf(tpl).styles.roles}, slides: [{els: []}]};
+  for (const [f, p] of Object.entries(FORMAT)) { const d = create(m, {format: f}).deck; assert.deepEqual([d.w, d.h, d.page, d.format], [p.w, p.h, p.page, f], f); }
+  assert.deepEqual((d => [d.w, d.h])(create(m, {format: 'slides', space: '1600x900'}).deck), [1600, 900]);
+  assert.deepEqual((d => [d.w, d.h])(create({...m, w: 1200, h: 700}, {format: 'slides'}).deck), [1200, 700]);
+  assert.throws(() => create(m, {format: 'poster'}), /unknown format/);
+});
+test('create: style.json tokens land in :root, roles merge (model wins per role), no roles anywhere → template neutral scale', () => {
+  const style = {tokens: {accent: '#FF0000', bg: '#000'}, roles: {H1: {font: 'Georgia', size: 50, weight: 700, lh: 56, color: '#fff'}}};
+  const {html, deck: d} = create({styles: {roles: {Body: {font: 'x', size: 10, weight: 400, lh: 12, color: '#000'}}}, slides: [{els: []}]}, {style});
+  assert.match(html, /:root\{\/\*TOKENS\*\/--accent:#FF0000;--bg:#000\/\*\/TOKENS\*\//);
+  assert.equal(d.styles.roles.H1.size, 50); assert.equal(d.styles.roles.Body.size, 10);
+  const e = create({slides: [{els: []}]}, {}).deck; assert.deepEqual(Object.keys(e.styles.roles), ROLES);
+});
+test('create: title escaped, </script> in content escaped, namespace follows the model', () => {
+  const base = {styles: {roles: modelOf(tpl).styles.roles}, slides: [{els: [{x: 0, y: 0, w: 10, role: 'Body', text: 'a</script><b>'}]}]};
+  const a = create(base, {title: 'x<y&z'});
+  assert.match(a.html, /<title>\/\*TITLE\*\/x&lt;y&amp;z\/\*\/TITLE\*\/<\/title>/);
+  assert.ok(!/a<\/script><b>/.test(a.html) && a.html.includes('a<\\/script><b>'));
+  assert.deepEqual(modelOf(a.html).slides[0].els[0].text, 'a</script><b>', 'round-trips through modelOf');
+  const b = create({...base, slides: [{els: []}]}, {}); assert.notEqual(a.hash, b.hash);
+});
+
+// ── 6. import-html: pure structure lifting on a fixture ──
+test('import-html assemble: master from recurring chrome, footer, layout slots, roles seeded from signatures, nowrap intent', () => {
+  const logo = '<svg viewBox="0 0 10 10"><rect width="10" height="10"/></svg>';
+  const mk = (name, bg, extra = []) => ({name, bg, els: [
+    {x: 10, y: 10, w: 100, h: 20, svg: logo},
+    {x: 0, y: 0, w: 800, h: 450},
+    {x: 20, y: 30, w: 600, font: 'Inter', size: 14, weight: 600, color: '#C97A54', tt: 'uppercase', ls: 1, text: 'KICKER ' + name, _lines: 1, nowrap: 1},
+    {x: 20, y: 60, w: 600, font: 'Inter', size: 44, weight: 700, color: '#23262C', text: name + ' title', _lines: 1, nowrap: 1},
+    {x: 700, y: 420, w: 'auto', font: 'Inter', size: 12, weight: 400, color: '#3A3F47', text: 'footer · deck', _lines: 1, nowrap: 1},
+    ...extra]});
+  const raw = [mk('a', '#fff'), mk('b', '#fff'), mk('c', '#fff', [{x: 20, y: 200, w: 300, font: 'DM Sans', size: 16, weight: 400, color: '#3A3F47', text: 'body', _lines: 2}])];
+  raw[2].els[0] = {...raw[2].els[0], x: 12}; // same logo nudged 2px on one slide → mockup drift, normalised to the master rect
+  const d = assemble(raw, {w: 800, h: 450});
+  assert.equal(d.master.filter(m => m.svg).length, 1); assert.equal(d.master.find(m => m.svg).x, 10);
+  assert.ok(!d.slides[2].els.some(e => e.override), 'drift is normalised away, not forked');
+  assert.ok(d._report.normalised.some(n => n.slide === 'c' && n.what === 'rect'), 'drift recorded in the report');
+  assert.ok(d.slides.every(s => !s.els.some(e => !e.text && !e.svg && !e.bg && !e.bd)), 'paintless wrapper dropped');
+  assert.ok(/^footer/.test(d.master.find(m => m.footer).text));
+  assert.deepEqual(Object.keys(d.layouts), ['content']); assert.deepEqual(d.layouts.content.title, {x: 20, y: 60, w: 600, role: 'H1'});
+  assert.ok(d.slides.every(s => s.layout === 'content' && s.els.some(e => e.slot === 'title' && e.x === undefined)));
+  assert.equal(d.styles.roles.H1.size, 44); assert.equal(d.styles.roles.Body.font, 'DM Sans'); assert.equal(d.styles.roles.H2.size, 36, 'undetected role keeps the neutral seed');
+  assert.equal(d.slides[0].els.find(e => e.slot === 'supertitle').nowrap, 1);
+  assert.ok(d.slots.supertitle, 'supertitle is a deck-scope slot');
+  const v = validate(d); assert.deepEqual(v.errors, [], 'imported model passes the contract');
+  assert.equal(classify({size: 64, text: '1,240'}), 'Stat'); assert.equal(classify({size: 12, font: 'Menlo', text: 'x'}), 'Label');
+});
+
+// ── 7. live proofs (Playwright optional devDependency) ──
+live('live: explainer + three examples pass verify (layout parity, no page errors)', async () => {
+  for (const n of ['explainer', 'quarterly-update', 'launch-carousel', 'one-pager']) {
+    const {model, style} = example(n); const f = path.join(tmp, n + '.html');
+    fs.writeFileSync(f, create(model, {style}).html);
+    const r = await verify(f, {out: path.join(tmp, 'v-' + n)});
+    assert.deepEqual(r.errors, [], n + ': ' + JSON.stringify(r.parity.filter(p => !p.pass)));
+    assert.equal(r.parity.length, model.slides.length);
+  }
+});
+live('live: editor rules — nib, present backdrop, master fork + inline counter, edit commit, undo, slots, A4 page rule', async () => {
+  const b = await pw.chromium.launch(); const p = await b.newPage({viewport: {width: 1280, height: 800}});
+  const errs = []; p.on('pageerror', e => errs.push(String(e)));
+  await p.goto(pathToFileURL(path.join(root, 'deck.html')).href); await p.waitForTimeout(200);
+  await p.evaluate(() => { localStorage.clear(); }); await p.reload(); await p.waitForTimeout(200);
+  const ev = (fn, ...a) => p.evaluate(fn, ...a);
+  // nib
+  await ev(() => { sel.clear(); sel.add(2); render(); });
+  assert.equal(await ev(() => canvas.querySelectorAll('.h').length), 1, 'nib for one selected text row');
+  assert.equal(await ev(() => { document.body.classList.add('present'); render(); const n = canvas.querySelectorAll('.h').length; document.body.classList.remove('present'); return n; }), 0, 'no nib in present');
+  // present backdrop = current slide bg
+  await ev(() => { deck.slides[1].bg = '#123456'; document.body.classList.add('present'); i = 1; sel.clear(); render(); });
+  assert.equal(await ev(() => getComputedStyle(document.body).backgroundColor), 'rgb(18, 52, 86)');
+  await ev(() => { document.body.classList.remove('present'); delete deck.slides[1].bg; i = 0; render(); });
+  // counter inline in the footer master, on every slide
+  assert.equal(await ev(() => canvas.querySelector('[data-footer] .num').textContent), ' · 1 / 9');
+  assert.equal(await ev(() => canvas.querySelectorAll('.num.pin').length), 0, 'no generic pin when a footer exists');
+  // master fork on edit: dragging the footer creates override:'foot' on that slide only
+  assert.equal(await ev(() => { sel.clear(); sel.add('m:foot'); const k = fork('foot'); return slide().els[k].override; }), 'foot');
+  assert.equal(await ev(() => deck.slides[1].els.some(e => e.override)), false, 'other slides untouched');
+  await ev(() => { deck = structuredClone(DECK); sel.clear(); render(); });
+  // text edit commits through commitEdit on nav (no blur needed), and undo restores it
+  await ev(() => { sel.clear(); sel.add(2); render(); edit(2); });
+  await p.keyboard.type('Replaced');
+  await ev(() => nav(1));
+  assert.equal(await ev(() => deck.slides[0].els[2].text), 'Replaced');
+  await ev(() => undo());
+  assert.match(await ev(() => deck.slides[0].els[2].text), /^Agent-generated/);
+  // slotted rows resolve geometry from the layout
+  const t = await ev(() => { i = 1; sel.clear(); render(); const d = canvas.querySelector('[data-n="1"]'); return [d.style.left, d.style.top, d.style.fontSize]; });
+  assert.deepEqual(t, ['60px', '76px', '34px']);
+  // + Text binds the first free slot; + Slide copies the layout
+  await ev(() => { i = 1; render(); deck.slides[1].els = deck.slides[1].els.filter(e => e.slot !== 'supertitle'); render(); document.getElementById('add-text').click(); });
+  assert.equal(await ev(() => slide().els.at(-1).slot), 'supertitle');
+  await ev(() => document.getElementById('sadd').click());
+  assert.deepEqual(await ev(() => [slide().layout, slide().els[0].slot, deck.slides.length]), ['content', 'title', 10]);
+  // contact sheet renders every slide
+  await ev(() => sheetOpen());
+  assert.equal(await ev(() => document.querySelectorAll('#grid .cell').length), 10);
+  await ev(() => sheetClose());
+  assert.deepEqual(errs, []);
+  // A4 document injects the a4 page rule; Letter decks do not
+  const a4 = path.join(tmp, 'a4.html'); fs.writeFileSync(a4, create(example('one-pager').model, {style: example('one-pager').style, format: 'document-a4'}).html);
+  await p.goto(pathToFileURL(a4).href); await p.waitForTimeout(200);
+  assert.equal(await ev(() => [...document.styleSheets].some(s => { try { return [...s.cssRules].some(r => r.cssText.includes('a4')); } catch { return false; } })), true);
+  assert.equal(await ev(() => document.documentElement.style.getPropertyValue('--Z')), '1.0000', 'A4 document prints at zoom 1');
+  await b.close();
+});
+live('live: import-html in-page intent capture (line count, nowrap, hugging chip)', async () => {
+  const b = await pw.chromium.launch(); const p = await b.newPage({viewport: {width: 800, height: 450}});
+  await p.setContent('<body style="margin:0;width:800px;height:450px;font:16px/1.5 sans-serif"><div style="padding:20px"><p style="width:200px">one two three four five six seven eight nine ten eleven twelve</p><div style="display:flex;gap:8px"><span style="background:#eee;padding:4px 10px;border-radius:999px;border:1px solid #999">chip</span><span>label</span></div><div style="width:300px;height:10px"></div></div></body>');
+  const rows = (await p.evaluate(extractInPage, 800)).els; await b.close();
+  const para = rows.find(r => /^one two/.test(r.text || '')), chip = rows.find(r => r.text === 'chip'), label = rows.find(r => r.text === 'label');
+  assert.ok(para._lines > 1 && !para.nowrap); assert.deepEqual([label._lines, label.nowrap], [1, 1]);
+  assert.deepEqual([chip.w, chip.p, chip.bg, chip.bd, chip.radius], ['auto', '4px 10px 4px 10px', '#EEEEEE', '1px solid #999999', 999]);
+  assert.ok(!rows.some(r => r.x === 20 && r.w === 300 && !r.text));
+});

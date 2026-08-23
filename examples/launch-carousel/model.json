@@ -1,0 +1,36 @@
+{
+  "title": "Launch carousel",
+  "format": "carousel",
+  "layouts": {
+    "card": { "supertitle": { "x": 90, "y": 120, "w": 900, "role": "Supertitle" }, "title": { "x": 90, "y": 170, "w": 900, "role": "H1" } }
+  },
+  "master": [
+    { "id": "foot", "footer": 1, "x": 690, "y": 990, "w": 300, "align": "right", "role": "Label", "text": "swipe" }
+  ],
+  "slides": [
+    { "name": "hook", "layout": "card", "els": [
+      { "slot": "supertitle", "text": "New" },
+      { "slot": "title", "text": "Your docs are a deck now." },
+      { "x": 90, "y": 520, "w": 900, "role": "Body", "color": "var(--muted)", "text": "Paste a doc. Get an editable deck. One file, no app." }
+    ]},
+    { "name": "problem", "layout": "card", "els": [
+      { "slot": "supertitle", "text": "The problem" },
+      { "slot": "title", "text": "Slides go stale the day after the meeting." },
+      { "x": 90, "y": 520, "w": 900, "role": "Body", "text": "The doc moves on. The deck doesn't. Every update is a rebuild." }
+    ]},
+    { "name": "how", "layout": "card", "els": [
+      { "slot": "supertitle", "text": "How it works" },
+      { "slot": "title", "text": "Content in.\nDeck out." },
+      { "x": 90,  "y": 520, "w": 270, "h": 150, "box": 1, "role": "Body", "text": "doc" },
+      { "x": 405, "y": 520, "w": 270, "h": 150, "box": 1, "role": "Body", "text": "model" },
+      { "x": 720, "y": 520, "w": 270, "h": 150, "box": 1, "role": "Body", "text": "deck.html" },
+      { "x": 90, "y": 740, "w": 900, "role": "Caption", "text": "Drag, retype, present, print — in the file itself." }
+    ]},
+    { "name": "cta", "layout": "card", "els": [
+      { "slot": "supertitle", "text": "Try it" },
+      { "slot": "title", "text": "Link in the post." },
+      { "x": 90, "y": 520, "w": 900, "role": "Stat", "text": "1 file" },
+      { "x": 90, "y": 660, "w": 900, "role": "Label", "text": "zero dependencies · zero network" }
+    ]}
+  ]
+}

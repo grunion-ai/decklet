@@ -1,0 +1,27 @@
+{
+  "name": "@grunion/decklet",
+  "version": "0.3.0",
+  "description": "Agent-generated, brand-true, real-time editable presentations and assets — one portable HTML file, no office suite.",
+  "license": "MIT",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "bin": {
+    "decklet-create": "bin/create.mjs",
+    "decklet-validate": "bin/validate.mjs",
+    "decklet-verify": "bin/verify.mjs",
+    "decklet-import-html": "bin/import-html.mjs"
+  },
+  "files": ["deck.html", "template.html", "bin", "examples", "SKILL.md", "llms.txt", "README.md", "CHANGELOG.md", "LICENSE"],
+  "scripts": {
+    "test": "node --test test/**/*.test.mjs",
+    "test:live": "npx playwright install chromium && node --test test/**/*.test.mjs",
+    "build:deck": "node bin/create.mjs --model examples/explainer/model.json --out deck.html --title decklet",
+    "verify:deck": "node bin/verify.mjs deck.html"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "playwright": "^1.55.0"
+  },
+  "peerDependenciesMeta": { "playwright": { "optional": true } },
+  "keywords": ["slides", "presentation", "deck", "single-file", "html", "editable", "agent", "llm", "claude-code", "skill", "carousel", "one-pager", "pdf", "zero-dependency"]
+}

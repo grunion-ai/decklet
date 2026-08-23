@@ -1,0 +1,13 @@
+{
+  "tokens": { "bg": "#E8E4DA", "fg": "#1B1B1F", "muted": "#6B6F76", "accent": "#C2410C", "card": "#F4F1EA", "line": "#D6D1C4", "sel": "#C2410C", "box": "#FBE9DF" },
+  "roles": {
+    "Supertitle": { "font": "ui-monospace,Menlo,Consolas,monospace", "size": 12, "weight": 500, "lh": 16, "ls": 1.5, "color": "var(--accent)", "tt": "uppercase" },
+    "H1":      { "font": "Georgia,'Times New Roman',serif", "size": 36, "weight": 700, "lh": 42, "ls": -0.4, "color": "var(--fg)" },
+    "H2":      { "font": "Georgia,'Times New Roman',serif", "size": 22, "weight": 700, "lh": 28, "ls": -0.2, "color": "var(--fg)" },
+    "Body":    { "font": "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif", "size": 16, "weight": 400, "lh": 24, "ls": 0, "color": "var(--fg)" },
+    "Caption": { "font": "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif", "size": 13, "weight": 400, "lh": 18, "ls": 0, "color": "var(--muted)" },
+    "Label":   { "font": "ui-monospace,Menlo,Consolas,monospace", "size": 11, "weight": 500, "lh": 14, "ls": 1, "color": "var(--muted)", "tt": "uppercase" },
+    "Stat":    { "font": "Georgia,'Times New Roman',serif", "size": 40, "weight": 700, "lh": 44, "ls": -0.8, "color": "var(--accent)" }
+  },
+  "pad": { "chip": "3px 8px", "pill": "5px 12px" }
+}
