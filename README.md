@@ -7,7 +7,7 @@ Agent-generated, brand-true, real-time editable presentations and assets — one
 **Who it is for.** Agents (Claude Code, Codex, Cursor, any tool-using model) that must turn content into a deck a human will then edit. Humans get a file they can open and change; agents get a contract they can validate before a browser is involved.
 
 **Inputs → outputs.**
-- in: any content (outline, notes, markdown, transcript, data) + a format (`slides`, `carousel`, `document-letter`, `document-a4`) + a style (brand tokens + seven text roles, or the neutral default)
+- in: any content (outline, notes, markdown, transcript, data) + a format (`slides`, `carousel`, `document-letter`, `document-a4`) + a style (brand tokens + eight text roles, or the neutral default)
 - out: `deck.html` — one file, ~40 KB, editable, printable, verifiable
 
 **Zero dependencies.** The engine is plain HTML/CSS/JS in a single file. The CLI is plain Node ≥ 22. Playwright is an *optional* devDependency used only by `verify` and `import-html`.
@@ -25,15 +25,15 @@ node bin/verify.mjs deck.html [--refs shots/]                     # layout parit
 node bin/import-html.mjs --w 1600 --h 900 --out model.json 'pages/*.html'   # finished HTML → model
 ```
 
-[`llms.txt`](llms.txt) is the machine summary and file map. [`deck.html`](deck.html) is the engine explaining itself — nine slides built from [`examples/explainer/model.json`](examples/explainer/model.json) by the same CLI.
+[`llms.txt`](llms.txt) is the machine summary and file map. [`deck.html`](deck.html) is the engine explaining itself — ten slides built from [`examples/explainer/model.json`](examples/explainer/model.json) by the same CLI.
 
 ## Guarantees
 
 - **Single file.** Model + renderer + editor in one `.html`; nothing is fetched at runtime.
 - **Zero network.** No webfonts, CDNs or remote images; images are data: URIs. The gate greps for it.
-- **Editable.** Drag, ⌘-multi-select, double-click to retype, corner-nib resize, floating role/mark/colour toolbar, undo that survives reload, contact sheet for slide management.
-- **Brand-true.** Seven text roles are the only source of font/size/leading; rows cannot override them. Tokens re-theme every deck.
-- **PDF.** One page per slide at true model size, named page sizes only (Safari-safe), each page painted with its own background.
+- **Editable.** Drag, ⌘-multi-select, double-click to retype, corner-nib resize, floating role/mark/colour toolbar (B/I/U/S, sub/sup, the deck's own swatches), undo that survives reload, contact sheet with grab-and-drag reordering.
+- **Brand-true.** Eight text roles (Title, Supertitle, H1, H2, Body, Caption, Label, Stat) are the only source of font/size/leading; rows cannot override them. Chrome is one deck-wide master layer on a `margin` token. Tokens re-theme every deck.
+- **PDF.** `⤓` writes a true slide-sized PDF inside the file (foreignObject → canvas → JPEG → PDF, zero dependencies); `⌘P` is the paper path with named Letter/A4 pages (Safari-safe), one page per slide. Safari's in-file raster path is unconfirmed — it falls back to print.
 - **Verified.** `validate` (pure Node) + `verify` (layout parity in a real browser, AE pixel diff against references). A deck that fails parity is not done.
 
 ## Model snippet
@@ -69,9 +69,9 @@ A row is text by default; `box`, `tile`, `bar`, `line`, `donut`, `svg`, `img` ar
 | bars, lines, donuts, tiles, boxes | supported | one row each, no SVG layer |
 | SVG / raster images | supported | inline `svg`, data: `img` |
 | entrance animation | supported | `anim:'rise'`, respects reduced-motion |
-| contact sheet (select, reorder, dup, delete) | supported | 3-across live thumbnails |
-| fullscreen presentation | supported | F / ⛶, hover-peek HUD |
-| PDF | supported | ⤓ → browser print, Letter/A4 named sizes |
+| contact sheet (select, reorder, dup, delete) | supported | 3-across live thumbnails; pointer-drag reorder (mouse + touch), also in present mode |
+| fullscreen presentation | supported | F / ⛶, hover-peek HUD (pinned while a menu or the sheet is open) |
+| PDF | supported | ⤓ → slide-sized PDF written in-file (Chromium verified; Safari unconfirmed → print fallback); ⌘P → paper, Letter/A4 named sizes |
 | HTML pages → model | supported | `bin/import-html.mjs` (Playwright) |
 | validate / verify | supported | parity mandatory, AE optional |
 | PPTX / Google Slides export | no | out of scope |

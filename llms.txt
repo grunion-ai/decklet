@@ -8,17 +8,19 @@ Loop: content + format + style -> model.json -> `node bin/validate.mjs model.jso
 
 Formats: slides (960x540 or 1600x900) supported; carousel (1080x1080, 1080x1350) and document (Letter 816x1056, A4 794x1123) experimental (sizing/editing/PDF work; text does not flow across pages).
 
-Model: {w,h,format,styles:{roles,pad},slots,layouts:{name:{slot:{x,y,w,role}}},master:[rows with id],slides:[{layout,bg,hide,els:[rows]}]}. A row is {x,y,w,role,text} plus optional box/tile/bar/line/donut/svg/img/html/nowrap/p/bg/bd/radius/align/color/weight/tt. Seven roles (Supertitle,H1,H2,Body,Caption,Label,Stat) are the only source of font/size/lh/ls; rows may not override them.
+Model: {w,h,format,styles:{roles,margin,pad},slots,layouts:{name:{slot:{x,y,w,role}}},master:[rows with id],slides:[{layout,bg,hide,els:[rows]}]}. A row is {x,y,w,role,text} plus optional box/tile/bar/line/donut/svg/img/html/nowrap/p/bg/bd/radius/align/color/weight/tt. Eight roles (Title,Supertitle,H1,H2,Body,Caption,Label,Stat) are the only source of font/size/lh/ls; rows may not override them (no H3, no Subtitle; Title = display headline for cover/closing slides, H1 = content-slide title). styles.margin is the content inset chrome sits on; master chrome is deck-wide and never varies per layout; a slide override row is partial (only the changed props).
+
+PDF: the ⤓ button writes a true slide-sized PDF inside the file (foreignObject -> canvas -> JPEG -> PDF, zero dependencies; verified in Chromium, Safari unconfirmed -> falls back to print). ⌘P is the paper path: named Letter/A4 pages, one slide per page.
 
 ## Files
 - SKILL.md: the agent authoring skill — inputs, process, model + style contracts, layouts, master, verification thresholds, anti-patterns, worked examples
 - README.md: what/for whom/guarantees/feature matrix/roadmap
-- deck.html: the engine with its own explainer deck (9 slides)
+- deck.html: the engine with its own explainer deck (10 slides)
 - template.html: the engine with an empty model; create.mjs fills /*DECK*/ /*TOKENS*/ /*TITLE*/ /*KEY*/ markers
 - bin/validate.mjs: pure-Node model contract validator (exit 1 on errors; --strict for warnings)
 - bin/create.mjs: model (+style) -> deck.html with format presets
 - bin/verify.mjs: self-containment + contract + layout parity (always) + AE vs refs (optional); writes results.json
-- bin/import-html.mjs: HTML pages at a fixed viewport -> model.json (master/slots/roles lifted; _lines intent for parity)
+- bin/import-html.mjs: HTML pages at a fixed viewport -> model.json (master/slots/roles lifted, Title detected on non-content layouts; _lines intent for parity)
 - examples/explainer, examples/quarterly-update, examples/launch-carousel, examples/one-pager: brief.md -> model.json (+ style.json)
 - test/gate.test.mjs: node --test gate (engine contract, validator, create, import, live proofs)
 - CHANGELOG.md, LICENSE (MIT)

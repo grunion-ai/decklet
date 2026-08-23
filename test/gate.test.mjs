@@ -8,7 +8,7 @@ import os from 'node:os';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {validate, ROLES} from '../bin/validate.mjs';
 import {create, FORMAT} from '../bin/create.mjs';
-import {assemble, extractInPage, classify} from '../bin/import-html.mjs';
+import {assemble, extractInPage, classify, detectTitle} from '../bin/import-html.mjs';
 import {verify, modelOf} from '../bin/verify.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -32,7 +32,7 @@ test('template + deck are self-contained (no external src/href, loaders, sockets
 });
 test('no client or brand residue in the public tree', () => {
   const files = fs.globSync('**/*.{html,mjs,md,json,txt,yml}', {cwd: root}).filter(f => !/node_modules|^\.git\/|^test\//.test(f));
-  for (const f of files) assert.doesNotMatch(read(f), /ponytail|Approach C|deckC7|Presenton|PPTist/, `${f}: residue`);
+  for (const f of files) assert.doesNotMatch(read(f), /ponytail|Approach C|deckC[0-9]|Presenton|PPTist|undersight|underchat|AFB|Sajit|grunion-internal/, `${f}: residue`);
 });
 
 // ── 2. engine static contract (the rules the editor is built on) ──
@@ -58,34 +58,45 @@ test('renderer adds nothing implicit; chrome lives on box/tile only', () => {
   assert.match(tpl, /\.el\.tile\{/);
   for (const re of [/r\.svg\)d\.innerHTML=r\.svg/, /else if\(r\.html\)d\.innerHTML=r\.html/, /s\.bg\|\|'var\(--card\)'/, /letter-spacing:\$\{r\.ls\}px/, /line-height:\$\{r\.lh\}px/, /text-transform:\$\{r\.tt\}/, /white-space:\$\{r\.ws\}/, /font-style:italic/, /opacity:\$\{r\.op\}/, /border-top:\$\{r\.bt\}/, /box-shadow:\$\{r\.shadow\}/, /r\.nowrap\?'white-space:nowrap;'/, /r\.w==='auto'\?'auto'/, /deck\.styles\.pad\[r\.p\]/, /r\.line\)/, /conic-gradient\(/, /r\.h\?/]) assert.match(tpl, re, String(re));
 });
-test('selection chrome: nib only for one painting row, never in present mode; present hides HUD/toolbar/sheet', () => {
+test('selection chrome: nib only for one painting row, never in present mode; present hides HUD/toolbar (sheet stays usable)', () => {
   assert.match(tpl, /sel\.size===1&&!present\(\)/); assert.match(tpl, /paints\(r\)&&r\.w!==0&&r\.h!==0/);
-  assert.match(tpl, /body\.present #hud,body\.present #tb,body\.present #sheet,body\.present \.h\{display:none!important\}/);
+  assert.match(tpl, /body\.present #hud,body\.present #tb,body\.present \.h\{display:none!important\}/);
+  assert.match(tpl, /const pinned=\(\)=>addmenu\.classList\.contains\('open'\)\|\|!tb\.hidden\|\|!sheet\.hidden/, 'peek HUD stays pinned while a menu/toolbar/sheet is open');
   assert.match(tpl, /document\.body\.style\.background=present\(\)\?\(s\.bg\|\|'var\(--card\)'\):''/);
 });
-test('master layer: fork on edit, hide per slide, footer carries the inline counter on screen and in print', () => {
-  for (const re of [/function fork\(id\)/, /o\.override=id/, /\(s\.hide\|\|\[\]\)\.includes\(m\.id\)/, /d\.dataset\.footer='1'/, /root\.querySelector\('\[data-footer\]'\)/, /className=f\?'num':'num pin'/, /num\(cv,n\+1\)/, /pg\.style\.background=s\.bg\|\|'var\(--card\)'/]) assert.match(tpl, re, String(re));
+test('master layer: partial fork on edit, hide per slide, footer carries the inline counter on the margin, on screen and in print', () => {
+  for (const re of [/function fork\(id\)\{slide\(\)\.els\.push\(\{override:id\}\)/, /const MG=\(\)=>deck\.styles&&deck\.styles\.margin!=null\?deck\.styles\.margin/, /d\.style\.right=MG\(\)\+'px'/, /\(s\.hide\|\|\[\]\)\.includes\(m\.id\)/, /d\.dataset\.footer='1'/, /root\.querySelector\('\[data-footer\]'\)/, /className=f\?'num':'num pin'/, /num\(cv,n\+1\)/, /pg\.style\.background=s\.bg\|\|'var\(--card\)'/]) assert.match(tpl, re, String(re));
 });
 test('slots: deck-scope slots under per-layout slots; + Text binds a free slot; promote actions exist', () => {
   assert.match(tpl, /const LAY=s=>\(\{\.\.\.\(deck\.slots\|\|\{\}\),\.\.\.\(\(deck\.layouts\|\|\{\}\)\[s\.layout\]\|\|\{\}\)\}\)/);
   assert.match(tpl, /const free=Object\.keys\(LAY\(s\)\)\.find\(n=>!s\.els\.some\(e=>e\.slot===n\)\)/);
   assert.match(tpl, /text:\{[^}]*role:'Body'/); assert.match(tpl, /id="tb-layout"/); assert.match(tpl, /id="tb-master"/);
 });
-test('roles are the type system: seven complete roles in the template, B/I/U/S marks, NO font/size/color pickers', () => {
+test('roles are the type system: eight complete roles in the template, locked keys, B/I/U/S + sub/sup marks, NO font/size/color pickers', () => {
   const m = modelOf(tpl);
   assert.deepEqual(Object.keys(m.styles.roles), ROLES);
   for (const r of Object.values(m.styles.roles)) for (const p of ['font', 'size', 'weight', 'lh', 'color']) assert.ok(r[p] != null, p); // the template's own roles carry lh
-  assert.match(tpl, /data-cmd="bold"[\s\S]*data-cmd="italic"[\s\S]*data-cmd="underline"[\s\S]*data-cmd="strikeThrough"/);
+  assert.match(tpl, /data-cmd="bold"[\s\S]*data-cmd="italic"[\s\S]*data-cmd="underline"[\s\S]*data-cmd="strikeThrough"[\s\S]*data-cmd="subscript"[\s\S]*data-cmd="superscript"/);
+  assert.match(tpl, /\.el sub,\.el sup\{font-size:inherit;line-height:0/, 'sub/sup never change size');
+  assert.match(tpl, /const LOCK=\['font','size','lh','ls'\]/); assert.match(tpl, /if\(r\[k\]==null\|\|LOCK\.includes\(k\)\)r\[k\]=t\[k\]/, 'role always wins the locked keys');
   assert.doesNotMatch(tpl, /<select|type="color"|font-picker|fontFamily|id="font|id="size|id="color/);
-  assert.match(tpl, /\['font','size','weight','lh','ls','color','tt','mono'\]\.forEach\(p=>delete el\[p\]\)/, 'applying a role clears raw overrides');
+  assert.match(tpl, /\['weight','color','tt','italic'\]\.forEach\(p=>delete el\[p\]\)/, 'applying a role clears the row-level overrides');
+  assert.doesNotMatch(tpl, /r\.mono\?/, 'mono is not a row prop — Label is the mono role');
 });
 test('HUD contract is a set: prev · next · + (Text/Box/Slide) · ⊞ · ⤓ · ⛶', () => {
   const ids = [...tpl.matchAll(/<div id="hud">[\s\S]*?<\/div>\n<div id="sheet"/g)][0][0].match(/id="([^"]+)"/g).map(s => s.slice(4, -1)).filter(s => s !== 'hud' && s !== 'sheet').sort();
   assert.deepEqual(ids, ['add-box', 'add-text', 'addbtn', 'addmenu', 'addwrap', 'fs', 'grid-btn', 'next', 'pdf', 'prev', 'sadd']);
-  assert.match(tpl, /\$\('pdf'\)\.onclick=\(\)=>print\(\)/); assert.match(tpl, /requestFullscreen/);
+  assert.match(tpl, /\$\('pdf'\)\.onclick=\(\)=>exportPdf\(\)\.catch\(\(\)=>print\(\)\)/, '⤓ writes a PDF in-file; print() is the fallback'); assert.match(tpl, /requestFullscreen/);
 });
-test('contact sheet: 3 across, drag reorder, never deletes the last slide, ⌘C/⌘V/⌘D/⌘Z', () => {
-  assert.match(tpl, /#grid\{display:grid;grid-template-columns:repeat\(3,1fr\)/); assert.match(tpl, /grid\.addEventListener\('drop'/);
+test('⤓ PDF writer: slide-sized pages from foreignObject rasters, byte-exact xref, zero dependencies', () => {
+  for (const re of [/async function exportPdf\(\)\{\n\s*commitEdit\(\)/, /<foreignObject width="\$\{W\}" height="\$\{H\}">/, /'data:image\/svg\+xml;charset=utf-8,'\+encodeURIComponent\(svg\)/, /c\.toDataURL\('image\/jpeg',\.92\)/, /\/MediaBox \[0 0 \$\{W\} \$\{H\}\]/, /\/Filter \/DCTDecode/, /startxref\\n\$\{x\}\\n%%EOF/, /type:'application\/pdf'/, /\.pdf';a\.click\(\)/]) assert.match(tpl, re, String(re));
+  assert.doesNotMatch(tpl, /jspdf|pdf-lib|html2canvas/i);
+});
+test('contact sheet: 3 across, pointer-drag reorder with FLIP (no HTML5 DnD), never deletes the last slide, ⌘C/⌘V/⌘D/⌘Z', () => {
+  assert.match(tpl, /#grid\{display:grid;grid-template-columns:repeat\(3,1fr\)/);
+  for (const ev of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel']) assert.match(tpl, new RegExp(`grid\\.addEventListener\\('${ev}'`), ev);
+  assert.doesNotMatch(tpl, /c\.draggable=true|addEventListener\('drop'/, 'no HTML5 drag-and-drop');
+  assert.match(tpl, /\.cell\.lift\{/); assert.match(tpl, /\.cell\.drop\{/); assert.match(tpl, /Math\.hypot\(dx,dy\)<6/); assert.match(tpl, /prefers-reduced-motion:reduce/);
   assert.match(tpl, /if\(del\.length>=deck\.slides\.length\)del\.pop\(\)/);
   for (const k of ['c', 'v', 'd', 'z']) assert.match(tpl, new RegExp(`mod&&k==='${k}'`));
 });
@@ -99,8 +110,11 @@ test('deck.html == create(examples/explainer)', () => {
   const {html} = create(explainer.model, {title: 'decklet'});
   assert.equal(html, deck, 'rebuild with: node bin/create.mjs --model examples/explainer/model.json --out deck.html --title decklet');
   const m = modelOf(deck);
-  assert.equal(m.slides.length, 9); assert.equal(m.master.filter(x => x.footer).length, 1);
+  assert.equal(m.slides.length, 10); assert.equal(m.master.filter(x => x.footer).length, 1);
   assert.ok(m.slides.every(s => s.layout && s.els.some(e => e.slot === 'title')), 'every explainer slide is slotted');
+  assert.equal(m.layouts.title.title.role, 'Title', 'cover headline uses the display role'); assert.equal(m.layouts.content.title.role, 'H1');
+  assert.equal(m.styles.margin, 60, 'explainer sets the margin token');
+  assert.ok(JSON.stringify(m).includes('foreignObject'), 'explainer mentions the in-file PDF writer');
 });
 
 // ── 4. validator ──
@@ -195,7 +209,12 @@ test('import-html assemble: master from recurring chrome, footer, layout slots, 
   assert.equal(d.slides[0].els.find(e => e.slot === 'supertitle').nowrap, 1);
   assert.ok(d.slots.supertitle, 'supertitle is a deck-scope slot');
   const v = validate(d); assert.deepEqual(v.errors, [], 'imported model passes the contract');
-  assert.equal(classify({size: 64, text: '1,240'}), 'Stat'); assert.equal(classify({size: 12, font: 'Menlo', text: 'x'}), 'Label');
+  assert.equal(classify({size: 64, text: '1,240'}), 'Stat'); assert.equal(classify({size: 12, font: 'Menlo', text: 'x'}), 'Label'); assert.equal(classify({size: 96, text: 'Welcome'}), 'H1', 'classify never emits Title'); assert.equal(classify({size: 48, text: 'Section'}), 'H1');
+  // Title: the larger headline that lives only on non-content layouts; its slot rebinds too
+  const lay = {title: {title: {x: 0, y: 0, w: 100, role: 'H1'}}, content: {title: {x: 0, y: 0, w: 100, role: 'H1'}}};
+  const sl = [{layout: 'title', els: [{slot: 'title', size: 72, text: 'Welcome'}]}, {layout: 'content', els: [{slot: 'title', size: 44, text: 'Section'}]}];
+  assert.equal(detectTitle(sl, lay).length, 1); assert.equal(sl[0].els[0].role, 'Title'); assert.equal(lay.title.title.role, 'Title'); assert.equal(lay.content.title.role, 'H1');
+  assert.equal(detectTitle([{layout: 'title', els: [{slot: 'title', size: 44, text: 'Same size'}]}, sl[1]], structuredClone(lay)).length, 0, 'no Title when the cover headline is not larger than content H1');
 });
 
 // ── 7. live proofs (Playwright optional devDependency) ──
@@ -223,7 +242,8 @@ live('live: editor rules — nib, present backdrop, master fork + inline counter
   assert.equal(await ev(() => getComputedStyle(document.body).backgroundColor), 'rgb(18, 52, 86)');
   await ev(() => { document.body.classList.remove('present'); delete deck.slides[1].bg; i = 0; render(); });
   // counter inline in the footer master, on every slide
-  assert.equal(await ev(() => canvas.querySelector('[data-footer] .num').textContent), ' · 1 / 9');
+  assert.equal(await ev(() => canvas.querySelector('[data-footer] .num').textContent), ' · 1 / 10');
+  assert.equal(await ev(() => canvas.querySelector('[data-footer]').style.right), '60px', 'footer right edge sits on styles.margin');
   assert.equal(await ev(() => canvas.querySelectorAll('.num.pin').length), 0, 'no generic pin when a footer exists');
   // master fork on edit: dragging the footer creates override:'foot' on that slide only
   assert.equal(await ev(() => { sel.clear(); sel.add('m:foot'); const k = fork('foot'); return slide().els[k].override; }), 'foot');
@@ -243,11 +263,14 @@ live('live: editor rules — nib, present backdrop, master fork + inline counter
   await ev(() => { i = 1; render(); deck.slides[1].els = deck.slides[1].els.filter(e => e.slot !== 'supertitle'); render(); document.getElementById('add-text').click(); });
   assert.equal(await ev(() => slide().els.at(-1).slot), 'supertitle');
   await ev(() => document.getElementById('sadd').click());
-  assert.deepEqual(await ev(() => [slide().layout, slide().els[0].slot, deck.slides.length]), ['content', 'title', 10]);
+  assert.deepEqual(await ev(() => [slide().layout, slide().els[0].slot, deck.slides.length]), ['content', 'title', 11]);
   // contact sheet renders every slide
   await ev(() => sheetOpen());
-  assert.equal(await ev(() => document.querySelectorAll('#grid .cell').length), 10);
+  assert.equal(await ev(() => document.querySelectorAll('#grid .cell').length), 11);
   await ev(() => sheetClose());
+  // ⤓ PDF: in-file writer produces a real PDF with one W×H pt page per slide (Chromium rasterises foreignObject untainted)
+  const pdf = await ev(async () => { const orig = URL.createObjectURL; let blob; URL.createObjectURL = b => { blob = b; return 'blob:x'; }; HTMLAnchorElement.prototype.click = () => {}; await exportPdf(); URL.createObjectURL = orig; const t = await blob.text(); return {type: blob.type, head: t.slice(0, 8), pages: (t.match(/\/Type \/Page\b/g) || []).length, box: /\/MediaBox \[0 0 960 540\]/.test(t), eof: /%%EOF\n$/.test(t), size: blob.size}; });
+  assert.deepEqual([pdf.type, pdf.head, pdf.pages, pdf.box, pdf.eof], ['application/pdf', '%PDF-1.4', 11, true, true]); assert.ok(pdf.size > 20000, 'rasters are real');
   assert.deepEqual(errs, []);
   // A4 document injects the a4 page rule; Letter decks do not
   const a4 = path.join(tmp, 'a4.html'); fs.writeFileSync(a4, create(example('one-pager').model, {style: example('one-pager').style, format: 'document-a4'}).html);

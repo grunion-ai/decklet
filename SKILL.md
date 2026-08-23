@@ -41,7 +41,7 @@ Experimental means: canvas sizing, editing, contact sheet and PDF all work; **te
 
 ### 3. Style — a style guide, an inferred brand, or the neutral fallback
 `style.json` = `{tokens, roles, pad}` (STYLE CONTRACT below). Obtain it in this order:
-1. **Style guide / brand file given** → map its palette to `tokens`, its type scale to the seven `roles`. Fonts must be installed on the viewer's machine or be system stacks — the deck loads no webfonts. Put the brand font first, a system fallback after.
+1. **Style guide / brand file given** → map its palette to `tokens`, its type scale to the eight `roles`. Fonts must be installed on the viewer's machine or be system stacks — the deck loads no webfonts. Put the brand font first, a system fallback after.
 2. **URL or screenshots given** → infer: background, ink, muted ink, one accent, a card surface, a hairline. Headline family (serif/sans/mono), body family. Build `tokens` + `roles` from that. Say in the hand-off what you inferred.
 3. **Nothing given** → omit `--style`; the template's neutral dark scale is used.
 
@@ -52,13 +52,13 @@ Sizes in `roles` are in **model pixels** for the chosen canvas. Rough scale fact
 ## PROCESS
 
 ### Step 1 — slide plan (write it down before any JSON)
-For each slide: `name · layout · supertitle · title · body elements (kind + count)`. Cap: ~60 words of `Body` per 16:9 slide, 3–4 tiles per row, 5 bars per chart, 4 boxes per flow. A title is one line at H1 unless the slide is a cover.
+For each slide: `name · layout · supertitle · title · body elements (kind + count)`. Cap: ~60 words of `Body` per 16:9 slide, 3–4 tiles per row, 5 bars per chart, 4 boxes per flow. A content-slide title is one line at `H1`; a cover or closing headline uses `Title` (the display size), two lines at most.
 
 ### Step 2 — model rows
 Discipline, in order of importance:
 - **Role discipline.** Every text row has a `role` (or a `slot` whose layout slot has one). A row never sets `font`, `size`, `lh`, `ls` or `mono` — the validator rejects it. Rows may set `weight`, `color`, `tt`, `italic`, `align`.
 - **Slot discipline.** Supertitle and title geometry lives in `layouts.<name>`; the slide row is `{slot:'title', text:'…'}` with no x/y/w. Define one layout per slide family (`title`, `content`; add `section`, `two-col` as needed).
-- **Master discipline.** Anything that appears on every slide (footer, rule, mark) is a `master` row, once. Exactly one master row has `footer:1`; the engine renders the page counter inside it. Never type `3 / 9` into a row.
+- **Master discipline.** Anything that appears on every slide (footer, rule, mark) is a `master` row, once — chrome is deck-wide and never varies per layout. Exactly one master row has `footer:1`; the engine renders the page counter inside it, with its right edge on `styles.margin`. Never type `3 / 9` into a row.
 - **Text-fit.** A label that must stay on one line gets `nowrap:1` and enough `w` (≈ 0.55 × size × chars), or `w:'auto'` to hug. Chips/pills: `w:'auto'` + `p:'chip'` (+ `bg`/`bd`/`radius`). Body copy gets a `w` that yields ≤ 3 lines at the role's size.
 - **Charts are rows.** Bars: `{x,y,w,h,bg,bar:1}` bottom-aligned on a baseline `line`; value labels as `Label` rows above, axis labels below. Donut: `{x,y,w,donut:72}` + a `Stat` row centred on it. Tiles: `{x,y,w,h,tile:1,role:'Stat',text}` + a `Label` row beneath.
 - **Colour.** Use `var(--accent)`, `var(--fg)`, `var(--muted)`, `var(--line)`, `var(--card)` so a style swap re-themes the deck; literal hex only for chart series.
@@ -88,10 +88,10 @@ Fix the model, not the output. Re-run until `VERIFY PASS`. Attach `verify-out/re
 ### Step 6 — hand-off notes for the human editor
 Say, in this order:
 1. Where the file is and that it opens from disk in any browser, no install, no network.
-2. **Toolbar:** `‹ prev` / `next ›` · `+` (Text / Box / Slide) · `⊞` contact sheet (G or Esc) · `⤓` PDF · `⛶` fullscreen (F). Drag to move, ⌘-click to multi-select, double-click to retype, corner nib to resize, ⌘Z to undo (persists across reloads). Selecting text shows a floating toolbar: role segment, B/I/U/S, the deck's own colours, "Apply to layout", "Apply to all slides".
-3. **Contact sheet:** live thumbnails 3-across; click / ⌘ / shift select, double-click opens, drag reorders, ⌫ deletes (never the last), ⌘C ⌘V ⌘D ⌘Z.
-4. **PDF:** `⤓` prints one page per slide at true model size, each with its own background. Safari ignores pixel page sizes, so the page is **Letter** (A4 for `document-a4`) and the slide is zoomed to the printable width; choose "Save as PDF" in the dialog. Chrome/Edge honour the same named size.
-5. **Presenting:** F or `⛶`; chrome hides, backdrop = current slide's background, HUD peeks back when the pointer rests at the bottom edge. Arrow keys / space advance.
+2. **Toolbar:** `‹ prev` / `next ›` · `+` (Text / Box / Slide) · `⊞` contact sheet (G or Esc) · `⤓` PDF · `⛶` fullscreen (F). Drag to move, ⌘-click to multi-select, double-click to retype, corner nib to resize, ⌘Z to undo (persists across reloads). Selecting text shows a floating toolbar: role segment, B/I/U/S and sub/superscript marks (marks never change size), the deck's own colours as swatches, "Apply to layout", "Apply to all slides".
+3. **Contact sheet:** live thumbnails 3-across; click / ⌘ / shift select, double-click opens, grab-and-drag reorders (mouse or touch — the other cells slide aside), ⌫ deletes (never the last), ⌘C ⌘V ⌘D ⌘Z. It also opens in present mode.
+4. **PDF:** `⤓` downloads a **true slide-sized PDF written inside the file** — no library, no server. Each slide is rasterised from its live DOM (SVG `foreignObject` → canvas at 2× → JPEG) onto a W×H pt page, so a 16:9 deck is a 16:9 PDF with no letterboxing; fonts must be local (they are — the deck loads none). Verified in Chromium; **Safari's `foreignObject` path is unconfirmed** — if rasterising throws or the canvas is tainted, `⤓` falls back to `print()`. **⌘P is the paper path:** one page per slide, each with its own background, on a **named** page size — Letter (A4 for `document-a4`) — because Safari ignores pixel `@page` sizes; the slide is zoomed to the printable width. Choose "Save as PDF" there for a paper-shaped file.
+5. **Presenting:** F or `⛶`; chrome hides, backdrop = current slide's background, HUD peeks back when the pointer rests at the bottom edge and stays pinned while the + menu, the text toolbar or the contact sheet is open. Arrow keys / space advance; Esc opens the contact sheet to jump.
 6. Edits persist in the browser's local storage per deck. To publish an edited deck, copy the model back: in the console `copy(JSON.stringify(deck))` (or read the `decklet:<hash>:model` storage key) → `model.json` → re-create.
 7. What you inferred (style, layout choices) and anything marked experimental.
 
@@ -107,8 +107,9 @@ Top level:
 | `page` | `letter`\|`a4` | from format | set by create |
 | `title` | string | `decklet` | `"Q3 update"` |
 | `styles.roles` | `{Role: treatment}` | template neutral | see STYLE CONTRACT |
+| `styles.margin` | number | `round(w × 0.06)` | content inset chrome sits on: the footer counter's right edge = `w − margin` |
 | `styles.pad` | `{token: css}` | `{chip:'3px 8px', pill:'5px 12px'}` | `p:'chip'` on a row |
-| `slots` | `{slot: geometry}` | `{}` | deck-scope slots under every layout |
+| `slots` | `{slot: geometry}` | `{}` | deck-scope slots under every layout (`{supertitle:{x:60,y:52,w:840,role:'Supertitle'}}`) |
 | `layouts` | `{name: {slot: geometry}}` | `{}` | `{content:{title:{x:60,y:76,w:840,role:'H1'}}}` |
 | `master` | row[] with `id` | `[]` | `[{id:'foot',footer:1,…}]` |
 | `slides` | slide[] (≥1) | — | |
@@ -149,17 +150,18 @@ Row — every prop optional; a row is whatever its props make it:
 | `img` | data: URI | — | image; `fit`, `pos` = object-fit/position |
 | `anim` | `'rise'` | — | entrance animation on slide entry (120 ms stagger) |
 | `css` | string | — | raw CSS escape hatch — validator warns |
-| `override` | masterId | — | this row replaces that master row on this slide |
+| `override` | masterId | — | partial row: only the props it carries replace the master's on this slide |
 | `footer` | 1 | — | master only: the page counter renders inline here |
 | `id` | string | — | master only, unique |
 
-Resolution order for any row: slot geometry+role ← role treatment ← the row's own props.
+Resolution order for any row: slot geometry ← master row (for `override` rows) ← the row's own props ← role treatment. The role fills whatever the row left unset **and always wins** `font`/`size`/`lh`/`ls` — a row can never change family, size, leading or tracking.
 
 ## STYLE CONTRACT (`style.json`)
 ```json
 {
   "tokens": { "bg": "#111315", "fg": "#F3F4F6", "muted": "#9CA3AF", "accent": "#5B9CF6", "card": "#1A1D21", "line": "#2C3138", "sel": "#5B9CF6", "box": "#20262E" },
   "roles": {
+    "Title": { "font": "…", "size": 64, "weight": 800, "lh": 68, "ls": -1.5, "color": "var(--fg)" },
     "Supertitle": { "font": "ui-monospace,Menlo,monospace", "size": 12, "weight": 500, "lh": 16, "ls": 1.5, "color": "var(--accent)", "tt": "uppercase" },
     "H1":   { "font": "…", "size": 34, "weight": 800, "lh": 40, "ls": -0.5, "color": "var(--fg)" },
     "H2":   { "font": "…", "size": 22, "weight": 600, "lh": 28, "ls": -0.3, "color": "var(--fg)" },
@@ -168,11 +170,13 @@ Resolution order for any row: slot geometry+role ← role treatment ← the row'
     "Label": { "font": "ui-monospace,Menlo,monospace", "size": 11, "weight": 500, "lh": 14, "ls": 1, "color": "var(--muted)", "tt": "uppercase" },
     "Stat":  { "font": "…", "size": 40, "weight": 800, "lh": 44, "ls": -1, "color": "var(--accent)" }
   },
-  "pad": { "chip": "3px 8px", "pill": "5px 12px" }
+  "pad": { "chip": "3px 8px", "pill": "5px 12px" },
+  "margin": 60
 }
 ```
 - `tokens` → CSS custom properties on `:root`. `bg` is the editor chrome behind the slide; `card` is the slide surface; `box` the outlined-box fill; `sel` the selection colour.
-- The seven roles are the whole type system. A role is a complete treatment: `font`, `size`, `weight`, `lh`, `ls`, `color`, optional `tt`. One font and one size per role — never two sizes of "Body".
+- The eight roles are the whole type system — exactly these names: `Title` (display headline for cover/closing slides), `Supertitle` (kicker), `H1` (content-slide title), `H2`, `Body`, `Caption`, `Label` (mono, uppercase — chips, axis labels, footer), `Stat`. No H3, no Subtitle. A role is a complete treatment: `font`, `size`, `weight`, `lh`, `ls`, `color`, optional `tt`. One font and one size per role — never two sizes of "Body". A row may add `weight`, `color`, `tt`, `italic`; it can never carry `font`, `size`, `lh`, `ls` or `mono` (the validator rejects it, the engine ignores it).
+- `margin` is the content inset the chrome sits on (footer counter's right edge, default 6% of `w`). Set it to match your layouts' left edge.
 - The model's own `styles.roles` win over `style.json` per role; a model with no roles inherits the template's neutral scale.
 
 ## LAYOUTS (slots)
@@ -182,9 +186,9 @@ Resolution order for any row: slot geometry+role ← role treatment ← the row'
 - Conventional slot names: `supertitle`, `title`, `body`, `body2`. Conventional layouts: `title` (cover), `content`, `section`.
 
 ## MASTER layer
-- Drawn under every slide, in array order. Rows need a unique `id`.
-- A slide hides one with `hide:['id']`; replaces one with a row carrying `override:'id'` (the editor creates these when a human edits chrome on one slide).
-- Exactly one `footer:1` row: the counter `· n / N` is appended inside it, inheriting its font, baseline and edge alignment. Right-anchored footers (centre past W/2) grow leftwards.
+- Drawn under every slide, in array order, identically — chrome is deck-wide and never varies per layout. Rows need a unique `id`.
+- A slide hides one with `hide:['id']`; overrides one with a **partial** row carrying `override:'id'` plus only the props that change — everything else keeps reading from the master (the editor creates these when a human edits chrome on one slide; "Apply to all slides" merges them back).
+- Exactly one `footer:1` row: the counter `· n / N` is appended inside it, inheriting its font and baseline. The row is anchored to the content edge — right edge at `w − styles.margin` when its centre is past W/2, otherwise left edge at `margin` — and grows inward. With no footer row the counter renders as a pin at the same margin.
 
 ## VERIFICATION thresholds
 | check | tool | pass |
@@ -201,7 +205,7 @@ Resolution order for any row: slot geometry+role ← role treatment ← the row'
 ## ANTI-PATTERNS (each is a review failure)
 - **Implicit padding / chrome on plain text.** A text row is text. Padding, radius, pre-wrap belong to `box`/`tile` or explicit `p`. Never fake a card with a padded text row.
 - **Per-slide chrome drift.** A footer or mark redrawn on each slide with slightly different x/y. It is one master row; slides fork only when a human edits.
-- **Size overrides.** `size:18` on a Body row "because it needs to be bigger". Change the role, or use the right role. Same for `font`, `lh`, `ls`.
+- **Size overrides.** `size:18` on a Body row "because it needs to be bigger". Change the role, or use the right role (`Title` for a display headline, `H1` for a slide title). Same for `font`, `lh`, `ls`, `mono`.
 - **Wrapping labels.** Chips, axis labels, step numbers, supertitles that wrap to two lines. `nowrap:1` + width, or `w:'auto'`. Parity fails these on purpose.
 - **Hardcoded counters.** `"3 / 9"` typed into a row. The footer master renders the counter.
 - **Font pickers / ad-hoc colours.** No per-row font families, no rainbow of hexes. Tokens and roles only; literal hex is for chart series.
@@ -235,7 +239,7 @@ node bin/verify.mjs q3.html
 ```
 
 ### B — social post → carousel (`examples/launch-carousel`)
-Input: four beats (hook, problem, how, CTA). Style inferred from product screenshots: near-black, violet accent. Canvas 1080×1080, so roles scale ×1.9 (H1 72, Body 30, Stat 120).
+Input: four beats (hook, problem, how, CTA). Style inferred from product screenshots: near-black, violet accent. Canvas 1080×1080, so roles scale ×1.9 (Title 120, H1 72, Body 30, Stat 120).
 
 One layout `card` with `supertitle` at y 120 and `title` at y 170; the "how" card is three `box` rows in a row.
 ```json
@@ -250,7 +254,7 @@ node bin/verify.mjs carousel.html
 Experimental: 1:1 sizing, editing and one-page-per-card PDF work; there is no per-platform export (PNG per card) yet — print to PDF and split, or screenshot from `verify-out/`.
 
 ### C — doc → two-page one-pager (`examples/one-pager`)
-Input: title, problem, three benefits, one number; page 2: three steps, pricing, contact. No brand → neutral light style in `style.json`. Canvas 816×1056 so roles scale ×0.75 (H1 28, Body 12).
+Input: title, problem, three benefits, one number; page 2: three steps, pricing, contact. No brand → neutral light style in `style.json`. Canvas 816×1056 so roles scale ×0.75 (Title 48, H1 28, Body 12).
 
 Each page is a slide on layout `page` (supertitle y 72, title y 92, 72 px margins). Page 2 starts a new slide — text does not flow.
 ```
@@ -266,4 +270,4 @@ node bin/import-html.mjs --w 1600 --h 900 --out model.json --shots shots/ 'pages
 node bin/create.mjs --model model.json --out deck.html --space 1600x900
 node bin/verify.mjs deck.html --refs shots/
 ```
-The importer lifts recurring chrome into `master`, heading signatures into layout slots, style signatures into the seven roles, and records `_lines`/`nowrap` intent so parity can compare against the source. Read `model.report.json`: `conflicts` lists rows whose size was snapped to their role — those are the source's own inconsistencies, decide whether to keep the snap.
+The importer lifts recurring chrome into `master`, heading signatures into layout slots, style signatures into the eight roles (a cover headline larger than any content `H1` becomes `Title`), and records `_lines`/`nowrap` intent so parity can compare against the source. Read `model.report.json`: `conflicts` lists rows whose size was snapped to their role — those are the source's own inconsistencies, decide whether to keep the snap.

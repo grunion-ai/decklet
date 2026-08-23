@@ -116,9 +116,9 @@ const kin = (a, b) => { const k = kind(a); if (k !== kind(b)) return false; if (
 const mode = arr => { const c = new Map(); for (const v of arr) c.set(v, (c.get(v) || 0) + 1); return [...c.entries()].sort((a, b) => b[1] - a[1])[0][0]; };
 const rkey = r => [r.x, r.y, r.w, r.h].join(',');
 
-// ── the seven roles. Roles are the ONLY source of family / size / line-height / tracking; a row may carry weight,
+// ── the eight roles. Roles are the ONLY source of family / size / line-height / tracking; a row may carry weight,
 //    colour, case, italic — never size: for any text type there is exactly one font/size/leading combination.
-export const ROLES = ['Supertitle', 'H1', 'H2', 'Body', 'Caption', 'Label', 'Stat'];
+export const ROLES = ['Title', 'Supertitle', 'H1', 'H2', 'Body', 'Caption', 'Label', 'Stat'];
 const LOCKED = ['font', 'size', 'lh', 'ls', 'mono'];
 const upper = r => r.tt === 'uppercase' || (/[A-Z]/.test(plain(r)) && plain(r) === plain(r).toUpperCase());
 const isMono = r => /mono|menlo|courier|fira code/i.test(r.font || '');
@@ -127,12 +127,13 @@ export const classify = r => {
   if (s >= 28 && /\d/.test(t) && t.length <= 12) return 'Stat';
   if (r.w === 'auto' && r.p || isMono(r) || (upper(r) && s < 14)) return 'Label';   // chips, pills, step numbers, mono tags
   if (upper(r) && s <= 18) return 'Supertitle';
-  if (s >= 40) return 'H1';
+  if (s >= 40) return 'H1';   // Title is never emitted here — detectTitle assigns it after layouts
   if (s >= 20 && (r.weight || 400) >= 600) return 'H2';
   if (s <= 14) return 'Caption';
   return 'Body';
 };
-const SEED = { // neutral seven-role scale (px at 1600 model space); detected modal signatures override these seeds
+const SEED = { // neutral eight-role scale (px at 1600 model space); detected modal signatures override these seeds
+  Title: { font: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', size: 106, weight: 800, lh: 113, ls: -2.5, color: '#F3F4F6', tt: null }, // display: 1.9× H1; detectTitle assigns it
     Supertitle: { font: 'ui-monospace, Menlo, Consolas, monospace', size: 20, weight: 500, lh: 26, ls: 2.5, color: '#5B9CF6', tt: 'uppercase' },
   H1: { font: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', size: 56, weight: 800, lh: 66, ls: -0.8, color: '#F3F4F6', tt: null },
   H2: { font: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', size: 36, weight: 600, lh: 46, ls: -0.5, color: '#F3F4F6', tt: null },
@@ -210,7 +211,17 @@ export function detectLayouts(slides, W, H) {
   if (sup.length) { slots.supertitle = { x: +mode(sup.map(r => r.x)), y: +mode(sup.map(r => r.y)), w: mode(sup.map(r => r.w)), role: 'Supertitle' }; sup.forEach(r => ['x', 'y', 'w'].forEach(p => delete r[p])); }
   return { layouts, slots };
 }
-// roles: neutral seed ← modal detected signature. Every text row gets one of the seven roles; locked props (font/size/lh/ls)
+// Title: the headline signature that appears ONLY on non-content layouts (title / closing) and is larger than any content
+// H1 — the largest display cluster. Rebinds the slot role too when the headline is slot-bound.
+export function detectTitle(slides, layouts) {
+  const h1s = s => s.els.filter(e => kind(e) === 'text' && !e.override && (e.role || classify(e)) === 'H1');
+  const contentMax = Math.max(0, ...slides.filter(s => s.layout === 'content').flatMap(h1s).map(e => e.size || 0));
+  const heads = slides.filter(s => s.layout !== 'content').flatMap(s => h1s(s).filter(e => (e.size || 0) > contentMax).map(e => ({ s, e })));
+  if (!heads.length) return [];
+  heads.forEach(({ s, e }) => { e.role = 'Title'; if (e.slot && layouts[s.layout] && layouts[s.layout][e.slot]) layouts[s.layout][e.slot].role = 'Title'; });
+  return heads.map(h => h.e);
+}
+// roles: neutral seed ← modal detected signature. Every text row gets one of the eight roles; locked props (font/size/lh/ls)
 // are deleted from the row outright — a row that disagreed with its role is a type-scale CONFLICT, recorded, never kept.
 export function detectRoles(slides, master) {
   const all = [...slides.flatMap(s => s.els), ...master].filter(e => kind(e) === 'text');
@@ -236,6 +247,7 @@ export function assemble(raw, { w: W = 1600, h: H = 900 } = {}) {
   const slides = raw.map(s => ({ name: s.name, bg: s.bg, els: s.els.filter(paints).map(e => { const o = { ...e }; if (o.text != null || o.html != null) { o._box = [o.x, o.y, o._w ?? o.w, o.h]; delete o._w; delete o.h; } if (o.w === 'auto') delete o.h; return o; }) }));
   const { master, normalised } = detectMaster(slides, W, H);
   const { layouts, slots } = detectLayouts(slides, W, H);
+  detectTitle(slides, layouts);
   const { roles, conflicts } = detectRoles(slides, master);
   // margin token: the content inset chrome sits on — modal inset of the master rows from either canvas edge
   const ins = master.flatMap(m => [m.x, ...(m.w !== 'auto' && m.w ? [W - m.x - m.w] : [])]).map(Math.round);

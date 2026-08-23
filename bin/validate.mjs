@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import {pathToFileURL} from 'node:url';
 
-export const ROLES = ['Supertitle', 'H1', 'H2', 'Body', 'Caption', 'Label', 'Stat'];
+export const ROLES = ['Title', 'Supertitle', 'H1', 'H2', 'Body', 'Caption', 'Label', 'Stat'];
 export const FORMATS = ['slides', 'carousel', 'carousel-4x5', 'document-letter', 'document-a4'];
 const LOCKED = ['font', 'size', 'lh', 'ls', 'mono'];          // only a role may set these
 const ROLE_REQ = ['font', 'size', 'weight', 'color'];   // lh is strongly recommended; null = browser-normal leading (what import-html emits for line-height:normal)
@@ -22,16 +22,18 @@ export function validate(deck) {
   if (!isNum(H) || H <= 0) E('deck.h must be a positive number');
   if (deck.format && !FORMATS.includes(deck.format)) E(`deck.format "${deck.format}" not one of ${FORMATS.join('|')}`);
   if (deck.page && !['letter', 'a4'].includes(deck.page)) E(`deck.page "${deck.page}" must be letter|a4`);
-  // styles.roles — the seven-role strict type scale: every role is a complete treatment; one font+size per role
+  // styles.roles — the eight-role strict type scale: every role is a complete treatment; one font+size per role
+  // (Title = display size for title/closing-slide headlines; H1 = content-slide title)
   const roles = deck.styles && deck.styles.roles;
   if (!roles || typeof roles !== 'object' || !Object.keys(roles).length) E('styles.roles missing — every text row needs a role');
   else {
     for (const [name, t] of Object.entries(roles)) {
-      if (!ROLES.includes(name)) Wn(`role "${name}" is outside the seven-role scale (${ROLES.join(', ')})`);
+      if (!ROLES.includes(name)) Wn(`role "${name}" is outside the eight-role scale (${ROLES.join(', ')})`);
       for (const p of ROLE_REQ) if (t[p] == null) E(`role ${name}: missing ${p}`);
       if (t.size != null && !isNum(t.size)) E(`role ${name}: size must be a number`);
     }
-    if (Object.keys(roles).length > 7) Wn(`${Object.keys(roles).length} roles — more than seven dilutes the scale`);
+    if (Object.keys(roles).length > 8) Wn(`${Object.keys(roles).length} roles — more than eight dilutes the scale`);
+    if (Object.keys(roles).length && !roles.Body) Wn('no Body role — text rows without a role fall back to Body at render time');
   }
   const roleOk = n => !!(roles && roles[n]);
   const roleOf = n => (roles && roles[n]) || null;

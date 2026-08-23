@@ -1,7 +1,7 @@
 {
   "title": "Q3 update",
   "layouts": {
-    "title":   { "supertitle": { "x": 60, "y": 170, "w": 840, "role": "Supertitle" }, "title": { "x": 60, "y": 196, "w": 800, "role": "H1" } },
+    "title":   { "supertitle": { "x": 60, "y": 160, "w": 840, "role": "Supertitle" }, "title": { "x": 60, "y": 186, "w": 840, "role": "Title" } },
     "content": { "supertitle": { "x": 60, "y": 52, "w": 840, "role": "Supertitle" }, "title": { "x": 60, "y": 76, "w": 840, "role": "H1" } }
   },
   "master": [
@@ -11,7 +11,7 @@
     { "name": "cover", "layout": "title", "els": [
       { "slot": "supertitle", "text": "Quarterly update" },
       { "slot": "title", "text": "Q3 in one page." },
-      { "x": 60, "y": 260, "w": 700, "role": "Body", "color": "var(--muted)", "text": "What moved, what didn't, and what we do next quarter." }
+      { "x": 60, "y": 280, "w": 700, "role": "Body", "color": "var(--muted)", "text": "What moved, what didn't, and what we do next quarter." }
     ]},
     { "name": "numbers", "layout": "content", "els": [
       { "slot": "supertitle", "text": "The numbers" },

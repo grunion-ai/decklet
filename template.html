@@ -25,7 +25,9 @@ body{background:var(--bg);color:var(--fg);font:16px/1.45 -apple-system,BlinkMacS
 /* counter: inline inside the footer master element (inherits its font/baseline) — or the generic pin when no footer exists */
 .num{pointer-events:none}
 .el .num{white-space:nowrap}
-.pin{position:absolute;right:14px;bottom:10px;font:12px ui-monospace,Menlo,monospace;color:var(--muted);letter-spacing:.08em}
+.pin{position:absolute;bottom:10px;font:12px ui-monospace,Menlo,monospace;color:var(--muted);letter-spacing:.08em}
+/* inline marks change weight/style/position/colour — never size: sub/sup shift the baseline only */
+.el sub,.el sup{font-size:inherit;line-height:0;vertical-align:sub}.el sup{vertical-align:super}
 #hud{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 16px;border-top:1px solid var(--line);font:12px ui-monospace,Menlo,monospace;color:var(--muted)}
 #hud button,#tb button{background:var(--card);border:1px solid var(--line);color:var(--fg);border-radius:6px;padding:4px 10px;cursor:pointer;font:inherit}
 #hud .sep{width:1px;height:18px;background:var(--line)}
@@ -47,16 +49,18 @@ body{background:var(--bg);color:var(--fg);font:16px/1.45 -apple-system,BlinkMacS
 #sheet{position:fixed;inset:0;z-index:20;background:var(--bg);overflow:auto;padding:24px}
 #sheet[hidden]{display:none}
 #grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
-.cell{position:relative;aspect-ratio:var(--AR);border:2px solid var(--line);border-radius:8px;overflow:hidden;cursor:pointer;background:var(--card)}
+.cell{position:relative;aspect-ratio:var(--AR);border:2px solid var(--line);border-radius:8px;overflow:hidden;cursor:grab;background:var(--card);touch-action:none;user-select:none;transition:transform .15s ease}
 .cell.sel{border-color:var(--sel);box-shadow:0 0 0 2px var(--sel)}
+/* pointer drag: the grabbed cell lifts (scale + shadow, tracks the pointer with no transition); siblings FLIP aside; drop eases in */
+.cell.lift{z-index:3;transition:none;box-shadow:0 14px 36px rgba(0,0,0,.55);pointer-events:none;cursor:grabbing}
+.cell.drop{z-index:3;transition:transform .16s ease}
+@media (prefers-reduced-motion:reduce){.cell,.cell.drop{transition:none}}
 .cell .cv{position:absolute;left:0;top:0;width:var(--W);height:var(--H);transform-origin:0 0;pointer-events:none}
 .cell .cv .el{cursor:default}
 .cell .n{position:absolute;left:8px;top:6px;z-index:1;font:12px ui-monospace,Menlo,monospace;color:var(--fg);background:rgba(0,0,0,.55);padding:1px 6px;border-radius:4px}
-.cell.ins-before::before,.cell.ins-after::after{content:"";position:absolute;top:0;bottom:0;width:4px;background:var(--accent);z-index:2}
-.cell.ins-before::before{left:-12px}.cell.ins-after::after{right:-12px}
 #print{display:none}
 /* fullscreen = presentation mode: chrome hidden; body backdrop is set by render() to the CURRENT slide's bg */
-body.present #hud,body.present #tb,body.present #sheet,body.present .h{display:none!important}
+body.present #hud,body.present #tb,body.present .h{display:none!important}
 body.present #canvas{border:0;border-radius:0}
 /* …but the HUD peeks back in while the pointer hovers the bottom twelfth (video-player controls pattern) */
 body.present.peek #hud{display:flex!important;position:fixed;left:0;right:0;bottom:0;z-index:10;background:var(--card);border-top:1px solid var(--line)}
@@ -83,6 +87,8 @@ body.present.peek #hud{display:flex!important;position:fixed;left:0;right:0;bott
     <button data-cmd="italic" title="Italic" aria-label="Italic"><i>I</i></button>
     <button data-cmd="underline" title="Underline" aria-label="Underline"><u>U</u></button>
     <button data-cmd="strikeThrough" title="Strikethrough" aria-label="Strikethrough"><s>S</s></button>
+    <button data-cmd="subscript" title="Subscript" aria-label="Subscript">x<sub>2</sub></button>
+    <button data-cmd="superscript" title="Superscript" aria-label="Superscript">x<sup>2</sup></button>
   </span>
   <span class="seg" id="tb-colors"></span>
   <button id="tb-layout" hidden title="Promote this geometry to the layout slot">Apply to layout</button>
@@ -101,7 +107,7 @@ body.present.peek #hud{display:flex!important;position:fixed;left:0;right:0;bott
     </div>
   </div>
   <button id="grid-btn" title="Slides (G / Esc)" aria-label="Slides">⊞</button>
-  <button id="pdf" title="PDF (print)" aria-label="PDF">⤓</button>
+  <button id="pdf" title="Download PDF (⌘P prints)" aria-label="PDF">⤓</button>
   <div class="sep"></div>
   <button id="fs" title="Full screen (F)" aria-label="Full screen (F)">⛶</button>
 </div>
@@ -110,15 +116,20 @@ body.present.peek #hud{display:flex!important;position:fixed;left:0;right:0;bott
 
 <script>
 // ONE element type; box/tile/bar(h+bg)/line/donut/align/radius/anim/svg/img/html are optional props on it.
-// Deck = {w,h, format?, page?, styles:{roles,pad}, slots?:{…}, layouts:{name:{slot:{x,y,w,h?,role}}}, master:[…], slides:[{layout?,bg?,hide?,els}]}
+// Deck = {w,h, format?, page?, styles:{roles,margin,pad}, slots:{…deck-wide}, layouts:{name:{slot:{x,y,w,h?,role}}}, master:[…], slides:[{layout?,bg?,hide?,els}]}
 // Full contract: SKILL.md (MODEL CONTRACT) · validator: bin/validate.mjs
-//  · role      → complete text treatment from styles.roles; raw font props on a row are overrides only
-//  · slot      → row inherits the layout slot's geometry+role; its own x/y/w/h are slide-local overrides
-//  · master    → drawn under every slide; a slide edit forks a row with override:<id>; hide:[id] suppresses one
-//  · footer    → master flag: the page counter renders inline inside this row (same font/baseline/edge padding)
+//  · role      → the text treatment. EIGHT roles (Title, Supertitle, H1, H2, Body, Caption, Label, Stat), each ONE font/size/line-height —
+//                the only source of family/size/lh/tracking. A row may carry weight/color/tt/italic; it can never carry size/font/lh
+//                (the validator rejects it). No H3, no Subtitle. Title = display size for title/closing slides; H1 = content-slide title.
+//  · slot      → row inherits the slot's geometry+role; its own x/y/w/h are slide-local overrides. deck.slots are deck-wide
+//                (the supertitle lives there); layouts vary CONTENT slots only (title/body)
+//  · master    → chrome, deck-wide: drawn identically under every slide. An edit forks {override:<id>,…changed props only};
+//                hide:[id] suppresses one. Chrome never varies per layout.
+//  · margin    → styles.margin: the content inset chrome sits on; the counter's right edge = W - margin, never the canvas edge
+//  · footer    → master flag: the page counter renders inline inside this row (same font/baseline, right edge on the margin)
 //  · nowrap / w:'auto' / p → text-fit intent: single line, shrink-to-fit, explicit padding (or a styles.pad token)
 // img (data-URI) and css (raw escape hatch) are supported but discouraged — the validator warns on css.
-const DECK=/*DECK*/{"w":960,"h":540,"styles":{"roles":{"Supertitle":{"font":"ui-monospace,Menlo,Consolas,monospace","size":12,"weight":500,"lh":16,"ls":1.5,"color":"var(--accent)","tt":"uppercase"},"H1":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":34,"weight":800,"lh":40,"ls":-0.5,"color":"var(--fg)"},"H2":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":22,"weight":600,"lh":28,"ls":-0.3,"color":"var(--fg)"},"Body":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":16,"weight":400,"lh":24,"ls":0,"color":"var(--fg)"},"Caption":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":13,"weight":400,"lh":18,"ls":0,"color":"var(--muted)"},"Label":{"font":"ui-monospace,Menlo,Consolas,monospace","size":11,"weight":500,"lh":14,"ls":1,"color":"var(--muted)","tt":"uppercase"},"Stat":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":40,"weight":800,"lh":44,"ls":-1,"color":"var(--accent)"}},"pad":{"chip":"3px 8px","pill":"5px 12px"}},"layouts":{},"master":[],"slides":[{"els":[]}]}/*/DECK*/;
+const DECK=/*DECK*/{"w":960,"h":540,"styles":{"roles":{"Title":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":64,"weight":800,"lh":68,"ls":-1.5,"color":"var(--fg)"},"Supertitle":{"font":"ui-monospace,Menlo,Consolas,monospace","size":12,"weight":500,"lh":16,"ls":1.5,"color":"var(--accent)","tt":"uppercase"},"H1":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":34,"weight":800,"lh":40,"ls":-0.5,"color":"var(--fg)"},"H2":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":22,"weight":600,"lh":28,"ls":-0.3,"color":"var(--fg)"},"Body":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":16,"weight":400,"lh":24,"ls":0,"color":"var(--fg)"},"Caption":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":13,"weight":400,"lh":18,"ls":0,"color":"var(--muted)"},"Label":{"font":"ui-monospace,Menlo,Consolas,monospace","size":11,"weight":500,"lh":14,"ls":1,"color":"var(--muted)","tt":"uppercase"},"Stat":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":40,"weight":800,"lh":44,"ls":-1,"color":"var(--accent)"}},"margin":60,"pad":{"chip":"3px 8px","pill":"5px 12px"}},"slots":{},"layouts":{},"master":[],"slides":[{"els":[]}]}/*/DECK*/;
 
 // store shim: localStorage throws in sandboxed contexts (data:/locked-down file:) — degrade to no-persistence, never to a dead page
 const store={get:k=>{try{return localStorage.getItem(k)}catch{return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch{}},del:k=>{try{localStorage.removeItem(k)}catch{}}};
@@ -141,9 +152,13 @@ addEventListener('resize',fit);
 
 function save(){store.set(KEY,JSON.stringify(deck))}
 const slide=()=>deck.slides[i];
-const LAY=s=>({...(deck.slots||{}),...((deck.layouts||{})[s.layout]||{})});
-// res(): slot geometry+role ← role treatment ← the row's own props (overrides). Every consumer reads through this.
-const res=(el,s)=>{const sl=el.slot&&LAY(s)[el.slot]||{};const r=el.role||sl.role;return {...sl,...(r&&deck.styles&&deck.styles.roles[r]||{}),...el}};
+const LAY=s=>({...(deck.slots||{}),...((deck.layouts||{})[s.layout]||{})}); // deck-wide slots under the layout's content slots
+const MG=()=>deck.styles&&deck.styles.margin!=null?deck.styles.margin:Math.round(W*.06);
+// res(): slot geometry ← master row (for override rows) ← the row's own props ← role treatment. The role fills what the row
+// left unset AND always wins the LOCKED keys: a row can never change family/size/line-height/tracking. Every consumer reads through this.
+const LOCK=['font','size','lh','ls'];
+const res=(el,s)=>{const m=el.override&&(deck.master||[]).find(x=>x.id===el.override)||{};const sl=el.slot&&LAY(s)[el.slot]||{};const r={...sl,...m,...el};
+  const R=deck.styles&&deck.styles.roles||{},t=R[r.role]||((r.text!=null||r.html!=null)&&R.Body)||{};for(const k in t)if(r[k]==null||LOCK.includes(k))r[k]=t[k];return r};
 const paints=r=>!!(r.text||r.html||r.svg||r.img||r.bg||r.bd||r.bt||r.br||r.bb||r.bl||r.box||r.tile||r.line||r.donut!=null);
 // shared element painter — render(), the contact sheet and the print pipeline all use it
 function drawEls(s,root,animate){
@@ -162,7 +177,7 @@ function drawEls(s,root,animate){
     const pad=r.p!=null?(deck.styles&&deck.styles.pad&&deck.styles.pad[r.p])||(typeof r.p==='number'?r.p+'px':r.p):null;
     d.style.cssText=`left:${r.x||0}px;top:${r.y||0}px;width:${r.w==='auto'?'auto':(r.w||0)+'px'};font-size:${r.size||14}px;`+
       (r.weight?`font-weight:${r.weight};`:'')+(r.color?`color:${r.color};`:'')+
-      (r.font?`font-family:${r.font};`:'')+(r.mono?'font-family:ui-monospace,Menlo,monospace;letter-spacing:.12em;':'')+
+      (r.font?`font-family:${r.font};`:'')+
       (r.ls!=null?`letter-spacing:${r.ls}px;`:'')+(r.lh!=null?`line-height:${r.lh}px;`:'')+(r.tt?`text-transform:${r.tt};`:'')+
       (r.ws?`white-space:${r.ws};`:'')+(r.nowrap?'white-space:nowrap;':'')+(!r.html&&/\n/.test(r.text||'')?'white-space:pre-wrap;':'')+(r.italic?'font-style:italic;':'')+(r.op!=null?`opacity:${r.op};`:'')+
       (pad?`padding:${pad};`:'')+(r.h?`height:${r.h}px;`:'')+(r.bg?`background:${r.bg};`:'')+
@@ -170,7 +185,8 @@ function drawEls(s,root,animate){
       (r.shadow?`box-shadow:${r.shadow};`:'')+(r.bar?'border-radius:6px 6px 0 0;':'')+
       (r.align?`text-align:${r.align};`:'')+(r.radius!=null?`border-radius:${typeof r.radius==='number'?r.radius+'px':r.radius};`:'')+(r.img||r.svg?'overflow:hidden;':'')+(r.css?r.css+';':'');
     // footer master: the counter is appended INSIDE this row, so anchor it to its nearer edge and let it grow away from it
-    if(r.footer){d.dataset.footer='1';d.style.whiteSpace='nowrap';if((r.x||0)+(r.w||0)/2>W/2){d.style.left='auto';d.style.right=(W-(r.x||0)-(r.w||0))+'px';d.style.width='auto'}}
+    // footer master: the counter is appended INSIDE this row; the row is anchored to the content edge (styles.margin) and grows inward
+    if(r.footer){d.dataset.footer='1';d.style.whiteSpace='nowrap';d.style.width='auto';if((r.x||0)+(typeof r.w==='number'?r.w:0)/2>W/2){d.style.left='auto';d.style.right=MG()+'px'}else d.style.left=MG()+'px'}
     // line = one rotated div (no SVG layer); donut = one conic-gradient ring with a mask hole
     if(r.line){const dx=r.line[0]-r.x,dy=r.line[1]-r.y;
       d.style.cssText+=`width:${Math.hypot(dx,dy).toFixed(1)}px;height:${r.h||3}px;padding:0;background:${r.bg||'var(--accent)'};transform:rotate(${Math.atan2(dy,dx)}rad);transform-origin:0 50%;border-radius:2px;`}
@@ -200,13 +216,14 @@ function render(){
   placeTb();
 }
 // counter: inside the footer master row when one exists (inherits its font/baseline/padding); else the generic pin
-const num=(root,n)=>{const f=root.querySelector('[data-footer]');const c=document.createElement(f?'span':'div');c.className=f?'num':'num pin';c.textContent=(f?' · ':'')+n+' / '+deck.slides.length;(f||root).appendChild(c)};
+const num=(root,n)=>{const f=root.querySelector('[data-footer]');const c=document.createElement(f?'span':'div');c.className=f?'num':'num pin';c.textContent=(f?' · ':'')+n+' / '+deck.slides.length;if(!f)c.style.right=MG()+'px';(f||root).appendChild(c)};
 // print: every slide becomes one page painted with its own bg — same drawEls, no handlers needed
 addEventListener('beforeprint',()=>{commitEdit();const p=$('print');p.innerHTML='';deck.slides.forEach((s,n)=>{const pg=document.createElement('div');pg.className='pg';pg.style.background=s.bg||'var(--card)';const cv=document.createElement('div');cv.className='cv';drawEls(s,cv,false);num(cv,n+1);pg.appendChild(cv);p.appendChild(pg)})});
 addEventListener('afterprint',()=>{$('print').innerHTML=''});
 
-// master fork: the first edit of a master row on a slide copies it into the slide as override:<id> — identical everywhere until then
-function fork(id){const m=deck.master.find(m=>m.id===id);const o=structuredClone(m);delete o.id;o.override=id;slide().els.push(o);return slide().els.length-1}
+// master fork: the first edit of a master row on a slide adds {override:<id>} — a PARTIAL row holding only what the slide changed;
+// everything else keeps reading from the master (identical everywhere until edited)
+function fork(id){slide().els.push({override:id});return slide().els.length-1}
 const selEl=()=>{if(sel.size!==1)return null;const k=[...sel][0];return typeof k==='number'?slide().els[k]:null};
 // drag + resize + select + edit — listener sits on #wrap so click-off ANYWHERE outside an element
 // (canvas gaps AND the margin around the canvas) deselects; the HUD is outside #wrap
@@ -309,11 +326,11 @@ tb.addEventListener('click',e=>{
   if(b.dataset.role){ // role applies to the WHOLE field: raw overrides are cleared so the treatment takes effect
     const t=canvas.querySelector('.el[contenteditable="true"]');if(t)commitEdit();
     snap();if(typeof k!=='number'){k=fork(k.slice(2));sel.clear();sel.add(k)}
-    const el=slide().els[k];el.role=b.dataset.role;['font','size','weight','lh','ls','color','tt','mono'].forEach(p=>delete el[p]);save();render();return;
+    const el=slide().els[k];el.role=b.dataset.role;['weight','color','tt','italic'].forEach(p=>delete el[p]);save();render();return;
   }
   const el=slide().els[k];
   if(b.id==='tb-layout'){snap();const sl=LAY(slide())[el.slot];['x','y','w','h'].forEach(p=>{if(el[p]!=null){sl[p]=el[p];delete el[p]}});save();render()}
-  if(b.id==='tb-master'){snap();const id=el.override,mi=deck.master.findIndex(m=>m.id===id);const m={...el,id};delete m.override;deck.master[mi]=m;slide().els.splice(k,1);sel.clear();save();render()}
+  if(b.id==='tb-master'){snap();const id=el.override,mi=deck.master.findIndex(m=>m.id===id);const m={...deck.master[mi],...el,id};delete m.override;deck.master[mi]=m;slide().els.splice(k,1);sel.clear();save();render()}
 });
 document.addEventListener('selectionchange',()=>{if(!tb.hidden||canvas.querySelector('[contenteditable="true"]'))placeTb()});
 // ── contact sheet: the slide manager ──
@@ -323,7 +340,7 @@ function sheetClose(){sheet.hidden=true;render()}
 function sheetRender(){
   grid.innerHTML='';
   deck.slides.forEach((s,n)=>{
-    const c=document.createElement('div');c.className='cell'+(gsel.has(n)?' sel':'');c.draggable=true;c.dataset.n=n;
+    const c=document.createElement('div');c.className='cell'+(gsel.has(n)?' sel':'');c.dataset.n=n;
     const cv=document.createElement('div');cv.className='cv';drawEls(s,cv,false);num(cv,n+1);
     const lb=document.createElement('span');lb.className='n';lb.textContent=n+1;
     c.append(cv,lb);grid.appendChild(c);
@@ -334,14 +351,30 @@ grid.addEventListener('mousedown',e=>{
   const c=e.target.closest('.cell');if(!c)return;const n=+c.dataset.n;
   if(e.metaKey||e.ctrlKey){gsel.has(n)?gsel.delete(n):gsel.add(n)}
   else if(e.shiftKey){const [a,b]=[Math.min(ganchor,n),Math.max(ganchor,n)];for(let x=a;x<=b;x++)gsel.add(x)}
-  else{if(e.detail>=2){i=n;sheetClose();return}gsel=new Set([n]);ganchor=n}
-  sheetRender();
+  else{if(e.detail>=2){i=n;sheetClose();return}if(!gsel.has(n)){gsel=new Set([n]);ganchor=n}}
+  grid.querySelectorAll('.cell').forEach(x=>x.classList.toggle('sel',gsel.has(+x.dataset.n))); // no re-render: a pointer drag may be starting on this node
 });
-grid.addEventListener('dragstart',e=>{const c=e.target.closest('.cell');if(!c)return;const n=+c.dataset.n;if(!gsel.has(n)){gsel=new Set([n]);ganchor=n}e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',String(n))});
-grid.addEventListener('dragover',e=>{const c=e.target.closest('.cell');if(!c)return;e.preventDefault();const r=c.getBoundingClientRect(),before=e.clientX<r.left+r.width/2;
-  ins=+c.dataset.n+(before?0:1);grid.querySelectorAll('.cell').forEach(x=>x.classList.remove('ins-before','ins-after'));c.classList.add(before?'ins-before':'ins-after')});
-grid.addEventListener('dragleave',e=>{if(!grid.contains(e.relatedTarget)){ins=null;grid.querySelectorAll('.cell').forEach(x=>x.classList.remove('ins-before','ins-after'))}});
-grid.addEventListener('drop',e=>{e.preventDefault();if(ins==null)return;reorder(ins);ins=null});
+// pointer drag (mouse AND touch — pointer events, no HTML5 DnD): past a 6px threshold the grabbed cell lifts and tracks the pointer;
+// the landing slot is the midline of the cell under the pointer; every other cell FLIPs to where it will land (transform only).
+// Drop eases the lifted cell into its slot, then reorder() commits ONE undo snapshot. prefers-reduced-motion: no transitions.
+let pd=null;const RM=matchMedia('(prefers-reduced-motion:reduce)');
+const landing=()=>{const mv=[...gsel].sort((a,b)=>a-b),at2=ins-mv.filter(n=>n<ins).length,order=deck.slides.map((_,n)=>n).filter(n=>!gsel.has(n));order.splice(at2,0,...mv);return order}; // new order of old indices
+grid.addEventListener('pointerdown',e=>{const c=e.target.closest('.cell');if(!c||e.button)return;pd={c,n:+c.dataset.n,x:e.clientX,y:e.clientY,on:false};c.setPointerCapture(e.pointerId)});
+grid.addEventListener('pointermove',e=>{
+  if(!pd)return;const dx=e.clientX-pd.x,dy=e.clientY-pd.y;
+  if(!pd.on){if(Math.hypot(dx,dy)<6)return;pd.on=true;pd.cells=[...grid.querySelectorAll('.cell')];pd.rects=pd.cells.map(c=>c.getBoundingClientRect());pd.c.classList.add('lift')}
+  pd.c.style.transform=`translate(${dx}px,${dy}px) scale(1.05)`;
+  const k=pd.rects.findIndex(r=>e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom);
+  if(k>=0)ins=k+(e.clientX<pd.rects[k].left+pd.rects[k].width/2?0:1);
+  if(ins==null)return;
+  const order=landing();
+  pd.cells.forEach((c,n)=>{if(c===pd.c)return;const to=pd.rects[order.indexOf(n)],from=pd.rects[n];c.style.transform=to===from?'':`translate(${to.left-from.left}px,${to.top-from.top}px)`});
+});
+const pend=()=>{if(!pd)return;const d=pd;pd=null;if(!d.on)return;
+  if(ins==null){d.c.classList.remove('lift');d.cells.forEach(c=>c.style.transform='');return}
+  const to=d.rects[landing().indexOf(d.n)],from=d.rects[d.n];d.c.classList.replace('lift','drop');d.c.style.transform=`translate(${to.left-from.left}px,${to.top-from.top}px)`;
+  const land=()=>{const at=ins;ins=null;reorder(at)};RM.matches?land():setTimeout(land,170)};
+grid.addEventListener('pointerup',pend);grid.addEventListener('pointercancel',pend);
 // reorder: ONE snapshot per drop; moved slides keep their relative order and land at the insertion index
 function reorder(at){
   const mv=[...gsel].sort((a,b)=>a-b);if(!mv.length)return;snap();
@@ -367,7 +400,7 @@ addEventListener('keydown',e=>{
   if(e.target.isContentEditable){if(e.key==='Escape')e.target.blur();return}
   if(!sheet.hidden){if(sheetKey(e))e.preventDefault();return}
   if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){e.preventDefault();undo();return}
-  if(e.key==='Escape'){if(sel.size){sel.clear();render()}else if(!present())sheetOpen();return}
+  if(e.key==='Escape'){if(sel.size){sel.clear();render()}else sheetOpen();return}
   if(e.key==='ArrowRight'||e.key===' ')nav(1);
   if(e.key==='ArrowLeft')nav(-1);
   if((e.key==='Backspace'||e.key==='Delete')&&sel.size){
@@ -380,10 +413,40 @@ addEventListener('keydown',e=>{
 // native Fullscreen API — F or button toggles; fullscreen IS presentation mode (chrome hidden, slide fills the screen)
 const fs=()=>{commitEdit();return document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen()};
 document.addEventListener('fullscreenchange',()=>{document.body.classList.toggle('present',!!document.fullscreenElement);document.body.classList.remove('peek');sel.clear();sheet.hidden=true;render();fit()});
-// present mode: HUD reappears while the pointer hovers the bottom twelfth of the screen, hides on leaving
-addEventListener('mousemove',e=>{if(present())document.body.classList.toggle('peek',e.clientY>innerHeight*11/12)});
+// present mode: HUD reappears while the pointer hovers the bottom twelfth of the screen, hides on leaving —
+// but never auto-hides while something it opened is still open (the + menu, the text toolbar, the contact sheet)
+const pinned=()=>addmenu.classList.contains('open')||!tb.hidden||!sheet.hidden;
+addEventListener('mousemove',e=>{if(present())document.body.classList.toggle('peek',e.clientY>innerHeight*11/12||pinned())});
 $('fs').onclick=fs;
-$('pdf').onclick=()=>print();
+// ⤓ PDF: a TRUE slide-sized PDF written in-file, zero dependencies. Each slide is rasterised from its live DOM — the deck's
+// <style> + the slide's XHTML inside an SVG foreignObject → <img> → canvas at 2× → JPEG → one DCTDecode XObject drawn
+// full-page on a W×H pt page (1 model px = 1 pt, so 1600×900 / 960×540 — real 16:9, no letterboxing). Fonts must be local
+// (the deck makes no requests anyway). Falls back to print() — the paper path, ⌘P — if rasterisation throws or the canvas
+// is tainted (Safari's foreignObject path taints; unconfirmed here). The xref table is byte-exact.
+async function exportPdf(){
+  commitEdit();const css=document.querySelector('style').textContent,S=2,jpg=[];
+  for(const [n,s] of deck.slides.entries()){
+    const cv=document.createElement('div');cv.style.cssText=`position:relative;width:${W}px;height:${H}px;overflow:hidden;font:16px/1.45 -apple-system,BlinkMacSystemFont,sans-serif;color:${getComputedStyle(canvas).color}`;drawEls(s,cv,false);num(cv,n+1);
+    const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><style>${css}</style><foreignObject width="${W}" height="${H}"><div xmlns="http://www.w3.org/1999/xhtml" style="--W:${W}px;--H:${H}px">${new XMLSerializer().serializeToString(cv)}</div></foreignObject></svg>`;
+    const im=new Image(); // data: URL, not blob: — a blob minted by a file:// page is cross-origin to itself and taints the canvas
+    await new Promise((ok,no)=>{im.onload=ok;im.onerror=no;im.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg)});
+    const c=document.createElement('canvas');c.width=W*S;c.height=H*S;const g=c.getContext('2d');
+    canvas.style.background=s.bg||'';g.fillStyle=getComputedStyle(canvas).backgroundColor;canvas.style.background='';g.fillRect(0,0,c.width,c.height);g.drawImage(im,0,0,c.width,c.height);
+    jpg.push(atob(c.toDataURL('image/jpeg',.92).split(',')[1])); // SecurityError here = tainted canvas → caller falls back to print()
+  }
+  // minimal PDF: 1 catalog · 2 pages · per slide {page, image XObject, content}; offsets tracked as bytes (latin-1 strings)
+  const obj=[],off=[];let out='%PDF-1.4\n%\xE2\xE3\xCF\xD3\n';
+  const add=body=>{obj.push(body);return obj.length};
+  add('<< /Type /Catalog /Pages 2 0 R >>');const pagesId=add('');const kids=[];
+  jpg.forEach((j,n)=>{const p=add('');kids.push(p+' 0 R');const im=add(`<< /Type /XObject /Subtype /Image /Width ${W*S} /Height ${H*S} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${j.length} >>\nstream\n${j}\nendstream`);
+    const cs=`q ${W} 0 0 ${H} 0 0 cm /Im Do Q`,ct=add(`<< /Length ${cs.length} >>\nstream\n${cs}\nendstream`);
+    obj[p-1]=`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /XObject << /Im ${im} 0 R >> >> /Contents ${ct} 0 R >>`});
+  obj[pagesId-1]=`<< /Type /Pages /Kids [${kids.join(' ')}] /Count ${kids.length} >>`;
+  obj.forEach((b,n)=>{off.push(out.length);out+=`${n+1} 0 obj\n${b}\nendobj\n`});
+  const x=out.length;out+=`xref\n0 ${obj.length+1}\n0000000000 65535 f \n`+off.map(o=>String(o).padStart(10,'0')+' 00000 n \n').join('')+`trailer\n<< /Size ${obj.length+1} /Root 1 0 R >>\nstartxref\n${x}\n%%EOF\n`;
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([Uint8Array.from(out,ch=>ch.charCodeAt(0))],{type:'application/pdf'}));a.download=document.title.replace(/[\/:*?"<>|]+/g,'-')+'.pdf';a.click();
+}
+$('pdf').onclick=()=>exportPdf().catch(()=>print());
 $('grid-btn').onclick=()=>sheet.hidden?sheetOpen():sheetClose();
 // "+" micro-menu: one HUD button fans out Text / Box / Slide; any pick or a click anywhere outside closes it
 const addmenu=$('addmenu'),addbtn=$('addbtn');
@@ -393,7 +456,7 @@ document.addEventListener('mousedown',e=>{if(!e.target.closest('#addwrap'))menu(
 // add text + box: new text is born Body — or binds to a free slot of the slide's layout (inheriting its role + geometry)
 const TPL={
   text:{x:Math.round(W*.4),y:Math.round(H*.46),w:Math.round(W*.31),role:'Body',text:'New text — double-click to edit'},
-  box:{x:Math.round(W*.42),y:Math.round(H*.43),w:Math.round(W*.19),size:15,box:1,text:'box'}
+  box:{x:Math.round(W*.42),y:Math.round(H*.43),w:Math.round(W*.19),role:'Body',box:1,text:'box'}
 };
 for(const k in TPL)$('add-'+k).onclick=()=>{
   commitEdit();menu(false);snap();const s=slide(),el=structuredClone(TPL[k]);
@@ -408,7 +471,7 @@ $('next').onclick=()=>nav(1);
 $('sadd').onclick=()=>{commitEdit();menu(false);snap();const s=slide(),ns={els:[]};if(s.bg)ns.bg=s.bg;if(s.layout){ns.layout=s.layout;const t=Object.entries(LAY(s)).find(([,v])=>v.role==='H1');ns.els.push(t?{slot:t[0],text:'New slide'}:{x:60,y:88,w:W-120,role:'H1',text:'New slide'})}else ns.els.push({x:60,y:88,w:W-120,role:'H1',text:'New slide'});deck.slides.splice(i+1,0,ns);i++;sel.clear();save();render()};
 fit();render();
 
-// self-check — model round-trips through JSON and renderer draws every element (+ master rows)
+// self-check — model round-trips through JSON and renderer draws every element (+ master rows + counter)
 console.assert(JSON.parse(JSON.stringify(DECK)).slides.length===DECK.slides.length,'model round-trip');
 console.assert(canvas.querySelectorAll('.el').length===DECK.slides[0].els.length+(DECK.master||[]).length,'renderer draws all elements');
 </script>
