@@ -23,6 +23,7 @@ await page.goto(pathToFileURL(resolve(here, "..", "deck.html")).href);
 await page.evaluate(() => { try { localStorage.clear() } catch {} });
 await page.reload();
 await page.waitForSelector("#canvas .el");
+await page.waitForTimeout(1400);   // let the cover settle: frame 0 is also the poster
 await page.mouse.move(W / 2, H + 40);
 const shot = () => page.screenshot({ path: join(dir, `f${String(n++).padStart(4, "0")}.png`) });
 // hold(sec): film a still for that long; glide(from,to,sec): move the mouse while filming

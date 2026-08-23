@@ -15,9 +15,16 @@ body{background:var(--bg);color:var(--fg);font:16px/1.45 -apple-system,BlinkMacS
 .el.box{border:1.5px solid var(--accent);background:var(--box);text-align:center;padding:6px 8px;border-radius:8px;white-space:pre-wrap}
 .el.tile{background:var(--card);border:1px solid var(--line);border-radius:12px;text-align:center;display:flex;flex-direction:column;justify-content:center}
 .el svg{display:block;width:100%;height:100%}
+/* motion: four entrance anims, staggered 120 ms on slide ENTRY. rise = text, fade = quiet chrome, pop = stats/tiles, wipe = bars, lines, rules */
 .el.rise{animation:rise .5s cubic-bezier(.2,.7,.3,1) backwards}
+.el.fade{animation:fade .5s ease backwards}
+.el.pop{animation:pop .42s cubic-bezier(.2,.8,.3,1.25) backwards}
+.el.wipe{animation:wipe .5s cubic-bezier(.2,.7,.3,1) backwards}
 @keyframes rise{from{opacity:0;transform:translateY(16px)}}
-@media (prefers-reduced-motion:reduce){.el.rise{animation:none}}
+@keyframes fade{from{opacity:0}}
+@keyframes pop{from{opacity:0;transform:scale(.92)}}
+@keyframes wipe{from{clip-path:inset(0 100% 0 0)}}
+@media (prefers-reduced-motion:reduce){.el.rise,.el.fade,.el.pop,.el.wipe{animation:none}}
 .el.selected{outline:2px solid var(--sel);outline-offset:2px}
 .el[contenteditable="true"]{cursor:text;outline:2px dashed var(--sel);outline-offset:2px}
 /* resize nib = selection chrome only: drawn by render() for one selected painting row; never in present/print */
@@ -125,6 +132,8 @@ body.present.peek #hud{display:flex!important;position:fixed;left:0;right:0;bott
 
 <script>
 // ONE element type; box/tile/bar(h+bg)/line/donut/align/radius/anim/svg/img/html are optional props on it.
+//  · anim      → entrance motion on slide ENTRY: rise | fade | pop | wipe, staggered 120 ms in model order. Print, the contact
+//                sheet, the PDF rasteriser and verify all draw the settled frame; prefers-reduced-motion turns it off entirely.
 // Deck = {w,h, format?, page?, styles:{roles,margin,pad}, slots:{…deck-wide}, layouts:{name:{slot:{x,y,w,h?,role}}}, master:[…], slides:[{layout?,bg?,hide?,els}]}
 // Full contract: SKILL.md (MODEL CONTRACT) · validator: bin/validate.mjs
 //  · role      → the text treatment. EIGHT roles (Title, Supertitle, H1, H2, Body, Caption, Label, Stat), each ONE font/size/line-height —
@@ -170,6 +179,8 @@ const MG=()=>deck.styles&&deck.styles.margin!=null?deck.styles.margin:Math.round
 const LOCK=['font','size','lh','ls'];
 const res=(el,s)=>{const m=el.override&&(deck.master||[]).find(x=>x.id===el.override)||{};const sl=el.slot&&LAY(s)[el.slot]||{};const r={...sl,...m,...el};
   const R=deck.styles&&deck.styles.roles||{},t=R[r.role]||((r.text!=null||r.html!=null)&&R.Body)||{};for(const k in t)if(r[k]==null||LOCK.includes(k))r[k]=t[k];return r};
+// motion vocabulary — the only four anims an element may carry; anything else is ignored (the validator rejects it upstream)
+const ANIM=['rise','fade','pop','wipe'];
 const paints=r=>!!(r.text||r.html||r.svg||r.img||r.bg||r.bd||r.bt||r.br||r.bb||r.bl||r.box||r.tile||r.line||r.donut!=null);
 // shared element painter — render(), the contact sheet and the print pipeline all use it
 function drawEls(s,root,animate){
@@ -180,7 +191,8 @@ function drawEls(s,root,animate){
   (s.els||[]).forEach((el,n)=>items.push({el,n}));
   items.forEach(({el,n,m})=>{
     const r=res(el,s),d=document.createElement('div');
-    d.className='el'+(r.box?' box':'')+(r.tile?' tile':'')+(r.anim&&animate?' '+r.anim:'');
+    const an=animate&&ANIM.includes(r.anim)?r.anim:'';
+    d.className='el'+(r.box?' box':'')+(r.tile?' tile':'')+(an?' '+an:'');
     if(r.svg)d.innerHTML=r.svg;
     else if(r.img){const im=new Image();im.src=r.img;im.style.cssText=`display:block;width:100%;height:100%;object-fit:${r.fit||'fill'};object-position:${r.pos||'50% 50%'};pointer-events:none`;d.appendChild(im)}
     else if(r.html)d.innerHTML=r.html; // rich inline runs (<b>/<i>/<u>/<s>/<span>) — trusted model content
@@ -202,7 +214,7 @@ function drawEls(s,root,animate){
     if(r.line){const dx=r.line[0]-r.x,dy=r.line[1]-r.y;
       d.style.cssText+=`width:${Math.hypot(dx,dy).toFixed(1)}px;height:${r.h||3}px;padding:0;background:${r.bg||'var(--accent)'};transform:rotate(${Math.atan2(dy,dx)}rad);transform-origin:0 50%;border-radius:2px;`}
     if(r.donut!=null)d.style.cssText+=`width:${r.w}px;height:${r.w}px;padding:0;border-radius:50%;background:conic-gradient(${r.color||'var(--accent)'} ${r.donut}%,var(--line) 0);-webkit-mask:radial-gradient(#0000 55%,#000 56%);mask:radial-gradient(#0000 55%,#000 56%);`;
-    if(r.anim&&animate)d.style.animationDelay=(a++*120)+'ms';
+    if(an)d.style.animationDelay=(a++*120)+'ms';
     if(el._lines)d.dataset.lines=el._lines; // extractor metadata: source line count (layout-parity proof)
     if(el._src)d.dataset.snapped=1; // extractor metadata: the type scale changed this row (its line-count drift is scale crowding, not a parity failure)
     if(n!=null)d.dataset.n=n;else d.dataset.m=m;

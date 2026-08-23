@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import {pathToFileURL} from 'node:url';
 
 export const ROLES = ['Title', 'Supertitle', 'H1', 'H2', 'Body', 'Caption', 'Label', 'Stat'];
+export const ANIMS = ['rise', 'fade', 'pop', 'wipe'];   // entrance motion on slide entry — the engine ignores anything else
 export const FORMATS = ['slides', 'carousel', 'carousel-4x5', 'document-letter', 'document-a4'];
 const LOCKED = ['font', 'size', 'lh', 'ls', 'mono'];          // only a role may set these
 const ROLE_REQ = ['font', 'size', 'weight', 'color'];   // lh is strongly recommended; null = browser-normal leading (what import-html emits for line-height:normal)
@@ -70,6 +71,7 @@ export function validate(deck) {
     for (const p of ['x', 'y', 'h']) if (r[p] != null && !isNum(r[p])) E(`${where}: ${p} must be a number`);
     if (r.w != null && r.w !== 'auto' && !isNum(r.w)) E(`${where}: w must be a number or "auto"`);
     if (r.line && !(Array.isArray(r.line) && r.line.length === 2 && r.line.every(isNum))) E(`${where}: line must be [x2,y2]`);
+    if (r.anim && !ANIMS.includes(r.anim)) E(`${where}: anim "${r.anim}" not one of ${ANIMS.join('|')}`);
     if (r.donut != null && !(isNum(r.donut) && r.donut >= 0 && r.donut <= 100)) E(`${where}: donut must be 0..100`);
     if (r.bar && !(isNum(r.h) && r.bg)) E(`${where}: bar needs h and bg`);
     if (r.p != null && typeof r.p === 'string' && !pad[r.p] && !/px|em|%/.test(r.p)) E(`${where}: p "${r.p}" is neither a styles.pad token nor a CSS length`);

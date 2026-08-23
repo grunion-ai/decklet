@@ -8,15 +8,16 @@ Loop: content + format + style -> model.json -> `node bin/validate.mjs model.jso
 
 Formats: slides (960x540 or 1600x900) supported; carousel (1080x1080, 1080x1350) and document (Letter 816x1056, A4 794x1123) experimental (sizing/editing/PDF work; text does not flow across pages).
 
-Model: {w,h,format,styles:{roles,margin,pad},slots,layouts:{name:{slot:{x,y,w,role}}},master:[rows with id],slides:[{layout,bg,hide,els:[rows]}]}. A row is {x,y,w,role,text} plus optional box/tile/bar/line/donut/svg/img/html/nowrap/p/bg/bd/radius/align/color/weight/tt. Eight roles (Title,Supertitle,H1,H2,Body,Caption,Label,Stat) are the only source of font/size/lh/ls; rows may not override them (no H3, no Subtitle; Title = display headline for cover/closing slides, H1 = content-slide title). styles.margin is the content inset chrome sits on; master chrome is deck-wide and never varies per layout; a slide override row is partial (only the changed props).
+Model: {w,h,format,styles:{roles,margin,pad},slots,layouts:{name:{slot:{x,y,w,role}}},master:[rows with id],slides:[{layout,bg,hide,els:[rows]}]}. A row is {x,y,w,role,text} plus optional box/tile/bar/line/donut/svg/img/html/anim/nowrap/p/bg/bd/radius/align/color/weight/tt. anim is one of rise|fade|pop|wipe: entrance motion on slide ENTRY, staggered 120ms in model order, off under prefers-reduced-motion and absent from print/PDF/contact sheet/verify (they draw the settled frame); any other value is a validate error. Eight roles (Title,Supertitle,H1,H2,Body,Caption,Label,Stat) are the only source of font/size/lh/ls; rows may not override them (no H3, no Subtitle; Title = display headline for cover/closing slides, H1 = content-slide title). styles.margin is the content inset chrome sits on; master chrome is deck-wide and never varies per layout; a slide override row is partial (only the changed props).
 
 PDF: the ⤓ button writes a true slide-sized PDF inside the file (foreignObject -> canvas -> JPEG -> PDF, zero dependencies; verified in Chromium, Safari unconfirmed -> falls back to print). ⌘P is the paper path: named Letter/A4 pages, one slide per page.
 
 ## Files
 - SKILL.md: the agent authoring skill — inputs, process, model + style contracts, layouts, master, verification thresholds, anti-patterns, worked examples
 - README.md: what/for whom/guarantees/feature matrix/roadmap
-- deck.html: the engine with its own explainer deck (10 slides) — live at https://grunion-ai.github.io/decklet/deck.html
+- deck.html: the engine with its own explainer deck (12 slides, incl. the motion vocabulary and three inlined GIF clips of the editor) — live at https://grunion-ai.github.io/decklet/deck.html
 - docs/demo.gif, docs/demo-poster.png: README demo recording, a build product of deck.html via docs/record-demo.mjs (Playwright + ffmpeg)
+- docs/record-clips.mjs: films the three editor clips on the explainer's "filmed" slide from deck.html and writes them into examples/explainer/model.json as data: URIs (Playwright + ffmpeg)
 - template.html: the engine with an empty model; create.mjs fills /*DECK*/ /*TOKENS*/ /*TITLE*/ /*KEY*/ markers
 - bin/validate.mjs: pure-Node model contract validator (exit 1 on errors; --strict for warnings)
 - bin/create.mjs: model (+style) -> deck.html with format presets

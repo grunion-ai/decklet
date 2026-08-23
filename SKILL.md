@@ -148,7 +148,7 @@ Row — every prop optional; a row is whatever its props make it:
 | `donut` | 0–100 | — | ring, `w` = diameter, `color` = fill |
 | `svg` | string | — | inline SVG markup (no script, no external href) |
 | `img` | data: URI | — | image; `fit`, `pos` = object-fit/position |
-| `anim` | `'rise'` | — | entrance animation on slide entry (120 ms stagger) |
+| `anim` | `rise`\|`fade`\|`pop`\|`wipe` | — | entrance motion on slide entry, staggered 120 ms in model order (see MOTION) |
 | `css` | string | — | raw CSS escape hatch — validator warns |
 | `override` | masterId | — | partial row: only the props it carries replace the master's on this slide |
 | `footer` | 1 | — | master only: the page counter renders inline here |
@@ -190,6 +190,18 @@ Resolution order for any row: slot geometry ← master row (for `override` rows)
 - A slide hides one with `hide:['id']`; overrides one with a **partial** row carrying `override:'id'` plus only the props that change — everything else keeps reading from the master (the editor creates these when a human edits chrome on one slide; "Apply to all slides" merges them back).
 - Exactly one `footer:1` row: the counter `· n / N` is appended inside it, inheriting its font and baseline. The row is anchored to the content edge — right edge at `w − styles.margin` when its centre is past W/2, otherwise left edge at `margin` — and grows inward. With no footer row the counter renders as a pin at the same margin.
 
+## MOTION (`anim`)
+Four words, and no fifth: `rise` (text — the default), `fade` (quiet chrome), `pop` (stats, tiles, images), `wipe` (bars, lines, rules). Anything else is an error in `validate` and is ignored by the renderer.
+
+- **Entry only.** Animated rows enter in model order, staggered 120 ms, and only when a slide is *entered*. Dragging, selecting, retyping or undoing re-render the same slide without restaggering it. Order the rows the way you want them to arrive.
+- **Never in the artifact.** Print, the contact sheet, the `⤓` PDF and `verify` all draw the settled frame — motion cannot change what is measured, printed or exported.
+- **Off is a first-class state.** `prefers-reduced-motion: reduce` turns every anim off; a deck must read exactly the same standing still.
+- **Motion is punctuation, not decoration.** Animate the rows that carry the beat of the slide (title, then the two or three rows the audience should read in order). A slide where every row moves reads as noise — and a wall of `anim` is a review failure.
+- Pair a row with its label (tile then caption, both with the same anim) so they arrive together instead of the labels landing four steps later.
+
+## GIFS AND IMAGES
+`img` takes a data: URI — an animated GIF plays as-is. The rule is the same as every other asset: **inline, or it does not ship.** A short cropped clip of a real interaction is worth more than a paragraph describing it; `docs/record-clips.mjs` shows the pattern — drive the deck with Playwright, film a model-space crop, encode with ffmpeg (`palettegen`/`paletteuse`, ≤ 48 colours, ~10 fps, ≤ 3 s), and write the base64 back into the model so the clip is a build product, not a screen capture. Budget ≈ 100 KB per clip; keep the whole file under ~1 MB. Give a clip row explicit `w`/`h` (parity measures rects) and `fit:'cover'`.
+
 ## VERIFICATION thresholds
 | check | tool | pass |
 |---|---|---|
@@ -210,7 +222,8 @@ Resolution order for any row: slot geometry ← master row (for `override` rows)
 - **Hardcoded counters.** `"3 / 9"` typed into a row. The footer master renders the counter.
 - **Font pickers / ad-hoc colours.** No per-row font families, no rainbow of hexes. Tokens and roles only; literal hex is for chart series.
 - **Walls of text.** More than ~60 Body words on a 16:9 slide, or Body wrapping past 3 lines. Split the slide.
-- **Network anything.** No webfonts, CDNs, remote images. Images are data: URIs; fonts are installed or system stacks.
+- **Network anything.** No webfonts, CDNs, remote images. Images and clips are data: URIs; fonts are installed or system stacks.
+- **Motion everywhere.** Every row carrying `anim`, or an anim invented outside the four. Motion marks the reading order of a few rows; the rest are already there.
 - **Unverified hand-off.** A deck without a `VERIFY PASS` is not done.
 
 ---

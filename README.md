@@ -19,7 +19,7 @@ Agent-generated, brand-true, real-time editable presentations and assets — one
 
 **Inputs → outputs.**
 - in: any content (outline, notes, markdown, transcript, data) + a format (`slides`, `carousel`, `document-letter`, `document-a4`) + a style (brand tokens + eight text roles, or the neutral default)
-- out: `deck.html` — one file, ~40 KB, editable, printable, verifiable
+- out: `deck.html` — one file, ~40 KB (this repo's explainer carries three inlined screen clips, so it weighs ~270 KB), editable, printable, verifiable
 
 **Zero dependencies.** The engine is plain HTML/CSS/JS in a single file. The CLI is plain Node ≥ 22. Playwright is an *optional* devDependency used only by `verify` and `import-html`.
 
@@ -36,13 +36,14 @@ node bin/verify.mjs deck.html [--refs shots/]                     # layout parit
 node bin/import-html.mjs --w 1600 --h 900 --out model.json 'pages/*.html'   # finished HTML → model
 ```
 
-[`llms.txt`](llms.txt) is the machine summary and file map. [`deck.html`](deck.html) is the engine explaining itself — ten slides built from [`examples/explainer/model.json`](examples/explainer/model.json) by the same CLI.
+[`llms.txt`](llms.txt) is the machine summary and file map. [`deck.html`](deck.html) is the engine explaining itself — twelve slides built from [`examples/explainer/model.json`](examples/explainer/model.json) by the same CLI, including the motion vocabulary and three GIF clips of the editor filmed from the deck itself.
 
 ## Guarantees
 
 - **Single file.** Model + renderer + editor in one `.html`; nothing is fetched at runtime.
 - **Zero network.** No webfonts, CDNs or remote images; images are data: URIs. The gate greps for it.
 - **Editable.** Drag, ⌘-multi-select, double-click to retype, corner-nib resize, floating role/mark/colour toolbar (B/I/U/S, sub/sup, the deck's own swatches), undo that survives reload, contact sheet with grab-and-drag reordering.
+- **Motion, honestly.** Four entrance anims — `rise`, `fade`, `pop`, `wipe` — staggered 120 ms on slide *entry* only. `prefers-reduced-motion` turns them off, and print, the contact sheet, the PDF and `verify` all draw the settled frame, so motion can never change what is measured or exported.
 - **Brand-true.** Eight text roles (Title, Supertitle, H1, H2, Body, Caption, Label, Stat) are the only source of font/size/leading; rows cannot override them. Chrome is one deck-wide master layer on a `margin` token. Tokens re-theme every deck.
 - **PDF.** `⤓` writes a true slide-sized PDF inside the file (foreignObject → canvas → JPEG → PDF, zero dependencies); `⌘P` is the paper path with named Letter/A4 pages (Safari-safe), one page per slide. Safari's in-file raster path is unconfirmed — it falls back to print.
 - **Verified.** `validate` (pure Node) + `verify` (layout parity in a real browser, AE pixel diff against references). A deck that fails parity is not done.
@@ -79,7 +80,8 @@ A row is text by default; `box`, `tile`, `bar`, `line`, `donut`, `svg`, `img` ar
 | roles · slots · master layer · footer counter | supported | see SKILL.md |
 | bars, lines, donuts, tiles, boxes | supported | one row each, no SVG layer |
 | SVG / raster images | supported | inline `svg`, data: `img` |
-| entrance animation | supported | `anim:'rise'`, respects reduced-motion |
+| entrance motion | supported | `anim`: `rise`\|`fade`\|`pop`\|`wipe`, 120 ms stagger on slide entry, respects reduced-motion, never in print/PDF/parity |
+| animated GIF clips | supported | `img` data: URI plays as-is; `docs/record-clips.mjs` films them from the deck and writes them back into the model |
 | contact sheet (select, reorder, dup, delete) | supported | 3-across live thumbnails; pointer-drag reorder (mouse + touch), also in present mode |
 | fullscreen presentation | supported | F / ⛶, hover-peek HUD (pinned while a menu or the sheet is open) |
 | PDF | supported | ⤓ → slide-sized PDF written in-file (Chromium verified; Safari unconfirmed → print fallback); ⌘P → paper, Letter/A4 named sizes |

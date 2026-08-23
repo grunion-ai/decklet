@@ -7,7 +7,7 @@ import path from 'node:path';
 import os from 'node:os';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath, pathToFileURL} from 'node:url';
-import {validate, ROLES} from '../bin/validate.mjs';
+import {validate, ROLES, ANIMS} from '../bin/validate.mjs';
 import {create, FORMAT} from '../bin/create.mjs';
 import {assemble, extractInPage, classify, detectTitle} from '../bin/import-html.mjs';
 import {verify, modelOf} from '../bin/verify.mjs';
@@ -33,7 +33,9 @@ test('template + deck are self-contained (no external src/href, loaders, sockets
 });
 test('no client or brand residue in the public tree', () => {
   const files = fs.globSync('**/*.{html,mjs,md,json,txt,yml}', {cwd: root}).filter(f => !/node_modules|^\.git\/|^test\//.test(f));
-  for (const f of files) assert.doesNotMatch(read(f), /ponytail|Approach C|deckC[0-9]|Presenton|PPTist|undersight|underchat|AFB|Sajit|grunion-internal/, `${f}: residue`);
+  // base64 payloads (the inlined clips) are not prose — a random three-letter run inside one is not residue
+  const prose = f => read(f).replace(/base64,[A-Za-z0-9+/=]+/g, 'base64,…');
+  for (const f of files) assert.doesNotMatch(prose(f), /ponytail|Approach C|deckC[0-9]|Presenton|PPTist|undersight|underchat|AFB|Sajit|grunion-internal/, `${f}: residue`);
 });
 
 // ── 2. engine static contract (the rules the editor is built on) ──
@@ -112,16 +114,54 @@ test('print: named page sizes only (Safari), per-page bg, A4 injected from deck.
   assert.match(tpl, /PW=PAGE==='a4'\?794:816/); assert.match(tpl, /st\.textContent='@page\{size:a4;margin:0\}'/);
 });
 
+// ── 2b. motion: a four-word vocabulary, replayed on slide ENTRY only, absent from print/parity/reduced motion ──
+test('motion: rise · fade · pop · wipe are the whole vocabulary; unknown anims paint nothing', () => {
+  assert.match(tpl, /const ANIM=\['rise','fade','pop','wipe'\]/, 'renderer whitelists the vocabulary');
+  assert.match(tpl, /const an=animate&&ANIM\.includes\(r\.anim\)\?r\.anim:''/, 'an unknown anim gets no class and no stagger slot');
+  for (const a of ['rise', 'fade', 'pop', 'wipe']) {
+    assert.match(tpl, new RegExp(`\\.el\\.${a}\\{animation:${a} `), a + ': class');
+    assert.match(tpl, new RegExp(`@keyframes ${a}\\{`), a + ': keyframes');
+  }
+  assert.match(tpl, /@media \(prefers-reduced-motion:reduce\)\{\.el\.rise,\.el\.fade,\.el\.pop,\.el\.wipe\{animation:none\}\}/, 'one guard turns all four off');
+  assert.match(tpl, /if\(an\)d\.style\.animationDelay=\(a\+\+\*120\)\+'ms'/, '120 ms stagger, counted over animated rows only');
+  assert.match(tpl, /let lastAnim=-1/); assert.match(tpl, /animate=i!==lastAnim/, 'entry only — drag/select re-renders never restagger');
+  assert.equal((tpl.match(/drawEls\([^)]*,false\)/g) || []).length, 3, 'print + contact sheet + PDF rasteriser draw un-animated');
+  assert.match(read('bin/verify.mjs'), /\.el\{animation:none!important\}/, 'parity measures the settled frame');
+});
+
+test('validator: anim must be one of the four', () => {
+  const v = validate(withRoles({w: 960, h: 540, slides: [{els: [
+    {x: 0, y: 0, w: 100, role: 'Body', anim: 'rise', text: 'ok'},
+    {x: 0, y: 0, w: 100, role: 'Body', anim: 'spin', text: 'invented'},
+  ]}]}));
+  assert.equal(v.errors.length, 1); assert.match(v.errors[0], /anim "spin"/);
+  assert.deepEqual(ANIMS, ['rise', 'fade', 'pop', 'wipe']);
+});
+
 // ── 3. deck.html is exactly what create() produces from the explainer model (determinism + self-hosting) ──
 test('deck.html == create(examples/explainer)', () => {
   const {html} = create(explainer.model, {title: 'decklet'});
   assert.equal(html, deck, 'rebuild with: node bin/create.mjs --model examples/explainer/model.json --out deck.html --title decklet');
   const m = modelOf(deck);
-  assert.equal(m.slides.length, 10); assert.equal(m.master.filter(x => x.footer).length, 1);
+  assert.equal(m.slides.length, 12); assert.equal(m.master.filter(x => x.footer).length, 1);
   assert.ok(m.slides.every(s => s.layout && s.els.some(e => e.slot === 'title')), 'every explainer slide is slotted');
   assert.equal(m.layouts.title.title.role, 'Title', 'cover headline uses the display role'); assert.equal(m.layouts.content.title.role, 'H1');
   assert.equal(m.styles.margin, 60, 'explainer sets the margin token');
   assert.ok(JSON.stringify(m).includes('foreignObject'), 'explainer mentions the in-file PDF writer');
+});
+
+test('explainer: the deck moves the way it documents, and shows the editor as filmed clips', () => {
+  const m = modelOf(deck);
+  const anims = [...new Set(m.slides.flatMap(s => s.els.map(e => e.anim)).filter(Boolean))].sort();
+  assert.deepEqual(anims, ['fade', 'pop', 'rise', 'wipe'], 'the deck demonstrates every anim it documents');
+  const clips = m.slides.flatMap(s => s.els.filter(e => e.img));
+  assert.ok(clips.length >= 3, `${clips.length} clips — the editor slide films drag, reorder and PDF`);
+  for (const r of clips) {
+    assert.match(r.img, /^data:image\/gif;base64,/, 'a clip is an inlined GIF — still zero network');
+    assert.ok(typeof r.w === 'number' && typeof r.h === 'number', 'a clip row is a fixed rect, so parity can measure it');
+    assert.ok(r.img.length < 400_000, `clip is ${Math.round(r.img.length / 1024)} KB of base64 — keep the file portable`);
+  }
+  assert.ok(deck.length < 1_400_000, `deck.html is ${Math.round(deck.length / 1024)} KB — the one-file promise has a ceiling`);
 });
 
 // ── 4. validator ──
@@ -275,6 +315,25 @@ live('live: AE — a deck that differs from its reference reports the real pixel
   const r = await verify(f, {refs, out: path.join(tmp, 'v-ae'), log: () => {}});
   assert.ok(r.ae[0].px > 70000 && r.ae[0].pass === false, `AE must see the 400×200 box: ${JSON.stringify(r.ae[0])}`);
 });
+live('live: motion — anims run on slide entry, never on a re-render, and are gone under reduced motion', async () => {
+  const b = await pw.chromium.launch();
+  const open = async (opts) => { const p = await b.newPage({viewport: {width: 1280, height: 800}, ...opts});
+    await p.goto(pathToFileURL(path.join(root, 'deck.html')).href); await p.evaluate(() => { localStorage.clear(); }); await p.reload();
+    await p.waitForSelector('#canvas .el'); return p };
+  const names = p => p.evaluate(n => { i = n; render(); return [...document.querySelectorAll('#canvas .el')].map(d => getComputedStyle(d).animationName) },
+    modelOf(deck).slides.findIndex(s => s.name === 'motion'));
+  const p = await open();
+  const first = await names(p);
+  assert.deepEqual(first.filter(n => n !== 'none'), ['fade', 'rise', 'rise', 'rise', 'fade', 'fade', 'pop', 'pop', 'wipe', 'wipe'], 'the motion slide enters with all four anims, tile then caption');
+  const delays = await p.evaluate(() => [...document.querySelectorAll('#canvas .el')].filter(d => getComputedStyle(d).animationName !== 'none').map(d => d.style.animationDelay));
+  assert.deepEqual(delays.slice(0, 3), ['0ms', '120ms', '240ms'], '120 ms stagger in model order');
+  await p.evaluate(() => render());   // a re-render of the SAME slide does not restagger
+  assert.deepEqual((await p.evaluate(() => [...document.querySelectorAll('#canvas .el')].map(d => getComputedStyle(d).animationName))).filter(n => n !== 'none'), []);
+  const r = await open({reducedMotion: 'reduce'});
+  assert.deepEqual((await names(r)).filter(n => n !== 'none'), [], 'reduced motion: nothing animates');
+  await b.close();
+});
+
 live('live: editor rules — nib, present backdrop, master fork + inline counter, edit commit, undo, slots, A4 page rule', async () => {
   const b = await pw.chromium.launch(); const p = await b.newPage({viewport: {width: 1280, height: 800}});
   const errs = []; p.on('pageerror', e => errs.push(String(e)));
@@ -290,7 +349,7 @@ live('live: editor rules — nib, present backdrop, master fork + inline counter
   assert.equal(await ev(() => getComputedStyle(document.body).backgroundColor), 'rgb(18, 52, 86)');
   await ev(() => { document.body.classList.remove('present'); delete deck.slides[1].bg; i = 0; render(); });
   // counter inline in the footer master, on every slide
-  assert.equal(await ev(() => canvas.querySelector('[data-footer] .num').textContent), ' · 1 / 10');
+  assert.equal(await ev(() => canvas.querySelector('[data-footer] .num').textContent), ' · 1 / 12');
   assert.equal(await ev(() => canvas.querySelector('[data-footer]').style.right), '60px', 'footer right edge sits on styles.margin');
   assert.equal(await ev(() => canvas.querySelectorAll('.num.pin').length), 0, 'no generic pin when a footer exists');
   // master fork on edit: dragging the footer creates override:'foot' on that slide only
@@ -311,10 +370,10 @@ live('live: editor rules — nib, present backdrop, master fork + inline counter
   await ev(() => { i = 1; render(); deck.slides[1].els = deck.slides[1].els.filter(e => e.slot !== 'supertitle'); render(); document.getElementById('add-text').click(); });
   assert.equal(await ev(() => slide().els.at(-1).slot), 'supertitle');
   await ev(() => document.getElementById('sadd').click());
-  assert.deepEqual(await ev(() => [slide().layout, slide().els[0].slot, deck.slides.length]), ['content', 'title', 11]);
+  assert.deepEqual(await ev(() => [slide().layout, slide().els[0].slot, deck.slides.length]), ['content', 'title', 13]);
   // contact sheet renders every slide
   await ev(() => sheetOpen());
-  assert.equal(await ev(() => document.querySelectorAll('#grid .cell').length), 11);
+  assert.equal(await ev(() => document.querySelectorAll('#grid .cell').length), 13);
   // pointer drag across cells never leaves a text selection behind (thumbnails are renders)
   { const [a, z] = await ev(() => [0, 4].map(k => { const r = document.querySelectorAll('#grid .cell')[k].getBoundingClientRect(); return { x: r.x, y: r.y }; }));
     await p.mouse.move(a.x + 20, a.y + 20); await p.mouse.down(); for (let k = 1; k <= 8; k++) await p.mouse.move(a.x + 20 + (z.x - a.x) * k / 8, a.y + 20 + (z.y - a.y) * k / 8); await p.waitForTimeout(50);
@@ -327,7 +386,7 @@ live('live: editor rules — nib, present backdrop, master fork + inline counter
   assert.deepEqual(await ev(() => [document.getElementById('autosave').dataset.state, document.getElementById('autosave').getAttribute('aria-label')]), ['bad', 'Not saved — edits will be lost on refresh']); await ev(() => { store.set = window.__set; save(); }); await p.waitForTimeout(400);
   // ⤓ PDF: in-file writer produces a real PDF with one W×H pt page per slide (Chromium rasterises foreignObject untainted)
   const pdf = await ev(async () => { const orig = URL.createObjectURL; let blob; URL.createObjectURL = b => { blob = b; return 'blob:x'; }; HTMLAnchorElement.prototype.click = () => {}; await exportPdf(); URL.createObjectURL = orig; const t = await blob.text(); return {type: blob.type, head: t.slice(0, 8), pages: (t.match(/\/Type \/Page\b/g) || []).length, box: /\/MediaBox \[0 0 960 540\]/.test(t), eof: /%%EOF\n$/.test(t), size: blob.size}; });
-  assert.deepEqual([pdf.type, pdf.head, pdf.pages, pdf.box, pdf.eof], ['application/pdf', '%PDF-1.4', 11, true, true]); assert.ok(pdf.size > 20000, 'rasters are real');
+  assert.deepEqual([pdf.type, pdf.head, pdf.pages, pdf.box, pdf.eof], ['application/pdf', '%PDF-1.4', 13, true, true]); assert.ok(pdf.size > 20000, 'rasters are real');
   assert.deepEqual(errs, []);
   // A4 document injects the a4 page rule; Letter decks do not
   const a4 = path.join(tmp, 'a4.html'); fs.writeFileSync(a4, create(example('one-pager').model, {style: example('one-pager').style, format: 'document-a4'}).html);
