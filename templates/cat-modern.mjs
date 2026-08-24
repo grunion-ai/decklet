@@ -19,7 +19,7 @@ export default [
 { id: 'image-hero-overlay', name: 'Full-bleed image with overlay', tier: 'core', cat: 'Modern', note: 'Image fills the canvas, a scrim carries the type. Swap the placeholder for img.', layout: null,
   els: [ shot(0, 0, 960, 540, { radius: 0 }), rect(0, 300, 960, 240, { bg: 'linear-gradient(transparent,rgba(0,0,0,.72))' }),
     lab(M, 360, 400, 'Field report', { color: '#fff' }),
-    t(M, 386, 840, 'Title', 'Ninety seconds a packet.', { color: '#fff', nowrap: 1 }),
+    t(M, 386, 'auto', 'Title', 'Ninety seconds a packet.', { color: '#fff', nowrap: 1 }),
     cap(M, 470, 520, 'Kessler Capital · Newark, NJ', { color: 'rgba(255,255,255,.75)' }) ] },
 
 { id: 'image-split', name: 'Split — image half, argument half', tier: 'core', cat: 'Modern', note: 'The one image layout that never fights the type.', layout: null,
@@ -78,7 +78,7 @@ export default [
 
 { id: 'team-grid', name: 'Team — faces and one line each', tier: 'standard', cat: 'Modern', note: 'Four people, one credential each. Never a paragraph of bio.', layout: 'content',
   els: [ { slot: 'supertitle', text: 'Who you work with' }, { slot: 'title', text: 'Four people, forty years of underwriting.' },
-    ...cols(4, CW, 20).flatMap((c, i) => { const s = [['Sajit R.', 'Ex-head of credit, 12 yrs'], ['Kyle A.', 'Built the parser'], ['Roshan M.', 'Forward-deployed'], ['Dana P.', 'Ops, ex-Kessler']][i];
+    ...cols(4, CW, 20).flatMap((c, i) => { const s = [['A. Rivera', 'Ex-head of credit, 12 yrs'], ['Kyle A.', 'Built the parser'], ['Roshan M.', 'Forward-deployed'], ['Dana P.', 'Ops, ex-Kessler']][i];
       return [ rect(c.x, 172, c.w, c.w, { bg: 'linear-gradient(140deg,var(--box),var(--line))', radius: 10 }),
         t(c.x, 372, c.w, 'H2', s[0], { nowrap: 1 }), cap(c.x, 404, c.w, s[1]) ]; }) ] },
 ];

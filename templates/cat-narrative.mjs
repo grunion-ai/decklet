@@ -8,7 +8,7 @@ export default [
     lab(M, 424, 400, 'August 2026 · Prepared for the board') ] },
 
 { id: 'cover-split', name: 'Cover — split panel', tier: 'core', cat: 'Narrative', note: 'Half-canvas colour field carries the mark; type sits on the light half.', layout: null,
-  els: [ rect(0, 0, 360, 540, { bg: 'var(--accent)' }), lab(48, 60, 264, 'Undersight', { color: 'var(--card)' }),
+  els: [ rect(0, 0, 360, 540, { bg: 'var(--accent)' }), lab(48, 60, 264, 'Northwind', { color: 'var(--card)' }),
     lab(48, 440, 264, 'Confidential draft', { color: 'var(--card)', op: 0.7 }),
     t(420, 190, 480, 'Supertitle', 'Series A'), t(420, 218, 480, 'Title', 'The parsing layer.'),
     body(420, 372, 440, 'One number, one claim, one ask — in eleven slides.', { color: 'var(--muted)' }) ] },
