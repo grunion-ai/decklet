@@ -2,3 +2,9 @@ node_modules/
 verify-out/
 *.log
 .DS_Store
+templates/shots/
+templates/thumbs/
+templates/candidates.html
+templates/candidates.model.json
+templates/candidates.index.json
+package-lock.json
