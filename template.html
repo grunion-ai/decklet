@@ -34,6 +34,8 @@ body.present .el a.lk{pointer-events:auto}
 @keyframes wipe{from{clip-path:inset(0 100% 0 0)}}
 @media (prefers-reduced-motion:reduce){.el.rise,.el.fade,.el.pop,.el.wipe{animation:none}}
 .el.selected{outline:2px solid var(--sel);outline-offset:2px}
+/* marquee = selection chrome too: the drag window render() paints while a band is being pulled; never in present/print */
+.band{position:absolute;z-index:9;pointer-events:none;border:1px solid var(--sel);background:color-mix(in srgb,var(--sel) 14%,transparent)}
 .el[contenteditable="true"]{cursor:text;outline:2px dashed var(--sel);outline-offset:2px}
 /* resize nib = selection chrome only: drawn by render() for one selected painting row; never in present/print */
 .el .h{position:absolute;right:-7px;bottom:-7px;width:13px;height:13px;background:var(--accent);border:2px solid var(--bg);border-radius:4px;cursor:nwse-resize}
@@ -155,7 +157,7 @@ body.present.peek #hud .spacer{display:none}
       <div><kbd>F</kbd> fullscreen (presentation)</div>
       <div><kbd>Esc · G</kbd> contact sheet (slides)</div>
       <div><kbd>⌘-click · ⇧-click</kbd> multi-select</div>
-      <div><kbd>drag</kbd> move · corner handle resizes</div>
+      <div><kbd>drag</kbd> move · corner handle resizes · drag empty canvas = marquee (⇧ adds)</div>
       <div><kbd>double-click</kbd> edit text</div>
       <div><kbd>select text</kbd> → roles · B I U S̶ · link · color</div>
       <div><kbd>⌫</kbd> delete</div>
@@ -396,6 +398,7 @@ function render(){
   drawEls(s,canvas,animate);
   const node=k=>canvas.querySelector(typeof k==='number'?`[data-n="${k}"]`:`[data-m="${k.slice(2)}"]`);
   sel.forEach(k=>{const d=node(k);d&&d.classList.add('selected')});
+  if(drag&&drag.mode==='band'&&drag.box){const bd=document.createElement('div');bd.className='band';const[x1,y1,x2,y2]=drag.box;bd.style.cssText=`left:${x1}px;top:${y1}px;width:${x2-x1}px;height:${y2-y1}px`;canvas.appendChild(bd)}
   // nib: one selected row that paints and has size; never in present mode (print never calls render)
   if(sel.size===1&&!present()){const k=[...sel][0],d=node(k);const r=d&&res(typeof k==='number'?s.els[k]:deck.master.find(m=>m.id===k.slice(2)),s);
     if(d&&paints(r)&&r.w!==0&&r.h!==0){const h=document.createElement('i');h.className='h';d.appendChild(h)}}
@@ -427,7 +430,12 @@ $('wrap').addEventListener('mousedown',e=>{
     e.preventDefault();return;
   }
   const t=e.target.closest('.el');
-  if(!t){if(sel.size){sel.clear();render()}return} // click-off = deselect (nib goes with it)
+  // click-off = deselect (nib goes with it). Hold and move, and the SAME press becomes a marquee: a drag window that
+  // takes every row it wholly contains. Containment, not touch — a band pulled across a full-bleed backdrop takes the
+  // rows drawn on it, never the backdrop. ⇧ (or ⌘) keeps what was already selected. Present mode is for reading: no band.
+  if(!t){const keep=e.shiftKey||e.metaKey||e.ctrlKey;if(!keep)sel.clear();
+    if(!present()){const cr=canvas.getBoundingClientRect();drag={mode:'band',bx:(e.clientX-cr.left)/scale,by:(e.clientY-cr.top)/scale,base:new Set(sel),box:null};e.preventDefault()}
+    render();return}
   if(t.isContentEditable)return;
   const k=t.dataset.n!=null?+t.dataset.n:'m:'+t.dataset.m;
   if(e.metaKey||e.ctrlKey){sel.has(k)?sel.delete(k):sel.add(k)}
@@ -435,13 +443,22 @@ $('wrap').addEventListener('mousedown',e=>{
   // double-click handled via e.detail — the selection re-render on click 1 destroys the
   // node, so a real dblclick event never fires on it (this was the "can't edit" bug)
   if(e.detail>=2){edit(k);return}
-  drag={mode:'move',items:[...sel].map(m=>{const el=typeof m==='number'?slide().els[m]:deck.master.find(x=>x.id===m.slice(2));const r=res(el,slide());return {k:m,el,ox:r.x||0,oy:r.y||0}}),
+  drag={mode:'move',items:[...sel].map(m=>{const el=typeof m==='number'?slide().els[m]:deck.master.find(x=>x.id===m.slice(2));const r=res(el,slide());return {k:m,el,ox:r.x||0,oy:r.y||0,ol:r.line&&r.line.slice(),oc:r.curve&&r.curve.slice()}}),
         sx:e.clientX/scale,sy:e.clientY/scale,moved:false};
   render();
 });
 addEventListener('mousemove',e=>{
   if(!drag)return;
   const scale=canvas.getBoundingClientRect().width/W;
+  if(drag.mode==='band'){ // marquee: re-test containment from the live DOM boxes, so lines, curves and text all hit the same way
+    const cr=canvas.getBoundingClientRect(),x=(e.clientX-cr.left)/scale,y=(e.clientY-cr.top)/scale;
+    if(!drag.box&&Math.abs(x-drag.bx)<4&&Math.abs(y-drag.by)<4)return; // under 4px it is still a click, not a drag window
+    drag.box=[Math.min(drag.bx,x),Math.min(drag.by,y),Math.max(drag.bx,x),Math.max(drag.by,y)];
+    const[b0,b1,b2,b3]=drag.box;sel.clear();drag.base.forEach(k=>sel.add(k));
+    canvas.querySelectorAll('.el').forEach(d=>{const q=d.getBoundingClientRect();
+      if((q.left-cr.left)/scale>=b0&&(q.top-cr.top)/scale>=b1&&(q.right-cr.left)/scale<=b2&&(q.bottom-cr.top)/scale<=b3)sel.add(d.dataset.n!=null?+d.dataset.n:'m:'+d.dataset.m)});
+    render();return;
+  }
   const dx=e.clientX/scale-drag.sx,dy=e.clientY/scale-drag.sy;
   if(drag.mode==='size'){
     drag.el.w=Math.max(20,Math.round(drag.ow+dx));
@@ -449,10 +466,15 @@ addEventListener('mousemove',e=>{
     render();return;
   }
   if(!drag.moved){snap();drag.moved=true;drag.items.forEach(it=>{if(typeof it.k!=='number'){const n=fork(it.k.slice(2));sel.delete(it.k);sel.add(n);it.el=slide().els[n]}})}
-  drag.items.forEach(it=>{it.el.x=Math.round(it.ox+dx);it.el.y=Math.round(it.oy+dy)});
+  // a connector's far end is model geometry in canvas space (line:[x2,y2], curve:[c1,c2,end]) — writing x/y alone
+  // dragged the tail and left the head pinned, stretching the stroke. Every point of a row travels by the same delta.
+  drag.items.forEach(it=>{const px=Math.round(it.ox+dx),py=Math.round(it.oy+dy),mx=px-it.ox,my=py-it.oy;
+    it.el.x=px;it.el.y=py;
+    if(it.ol)it.el.line=[it.ol[0]+mx,it.ol[1]+my];
+    if(it.oc)it.el.curve=it.oc.map((v,j)=>j%2?v+my:v+mx)});
   render();
 });
-addEventListener('mouseup',()=>{if(drag){drag=null;save()}});
+addEventListener('mouseup',()=>{if(drag){const b=drag.mode==='band';drag=null;b?render():save()}}); // a band moved nothing: clear it, never save
 // commitEdit: the ONE place a live text edit lands in the model. Called first on every path that re-renders or
 // destroys nodes (click-off, nav, slide add/delete, add element, fullscreen, print) — a blur handler alone is too late:
 // render() wipes the contenteditable node before blur fires, and the typed text died with it. edit() snaps first, so ⌘Z restores.

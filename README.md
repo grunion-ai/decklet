@@ -42,7 +42,7 @@ node bin/import-html.mjs --w 1600 --h 900 --out model.json 'pages/*.html'   # fi
 
 - **Single file.** Model + renderer + editor in one `.html`; nothing is fetched at runtime.
 - **Zero network.** No webfonts, CDNs or remote images; images are data: URIs. The gate greps for it.
-- **Editable.** Drag, ⌘-multi-select, double-click to retype, corner-nib resize, floating role/mark/colour toolbar (B/I/U/S, sub/sup, the deck's own swatches), undo that survives reload, contact sheet with grab-and-drag reordering.
+- **Editable.** Drag, ⌘-multi-select, marquee select (drag a window on empty canvas), double-click to retype, corner-nib resize, floating role/mark/colour toolbar (B/I/U/S, sub/sup, the deck's own swatches), undo that survives reload, contact sheet with grab-and-drag reordering.
 - **Motion, honestly.** Four entrance anims — `rise`, `fade`, `pop`, `wipe` — staggered 120 ms on slide *entry* only. `prefers-reduced-motion` turns them off, and print, the contact sheet, the PDF and `verify` all draw the settled frame, so motion can never change what is measured or exported.
 - **Brand-true.** Eight text roles (Title, Supertitle, H1, H2, Body, Caption, Label, Stat) are the only source of font/size/leading; rows cannot override them. Chrome is one deck-wide master layer on a `margin` token. Tokens re-theme every deck.
 - **PDF.** `⤓` writes a true slide-sized PDF inside the file (foreignObject → canvas → JPEG → PDF, zero dependencies); `⌘P` is the paper path with named Letter/A4 pages (Safari-safe), one page per slide. Safari's in-file raster path is unconfirmed — it falls back to print.

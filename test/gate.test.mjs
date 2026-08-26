@@ -49,7 +49,7 @@ test('template markers + per-deck storage namespace', () => {
 test('editing: double-click via detail, multiselect, undo stack (persisted, capped), click-off deselect', () => {
   assert.match(tpl, /e\.detail>=2/); assert.match(tpl, /e\.metaKey\|\|e\.ctrlKey/); assert.match(tpl, /function undo/);
   assert.match(tpl, /store\.get\(HKEY\)\|\|'\[\]'/); assert.match(tpl, /history\.length>50/);
-  assert.match(tpl, /if\(!t\)\{if\(sel\.size\)\{sel\.clear\(\);render\(\)\}return\}/); assert.match(tpl, /\$\('wrap'\)\.addEventListener\('mousedown'/);
+  assert.match(tpl, /if\(!t\)\{[^\n]*sel\.clear\(\)/, 'a press on empty canvas drops the selection'); assert.match(tpl, /mode:'band'/, 'and the same press starts a marquee'); assert.match(tpl, /\$\('wrap'\)\.addEventListener\('mousedown'/);
 });
 test('commitEdit runs first on every path that destroys the live editor', () => {
   assert.match(tpl, /function commitEdit\(\)\{\n\s*const t=canvas\.querySelector\('\.el\[contenteditable="true"\]'\)/);
@@ -611,6 +611,106 @@ live('live: editor rules — nib, present backdrop, master fork + inline counter
   assert.equal(await ev(() => [...document.styleSheets].some(s => { try { return [...s.cssRules].some(r => r.cssText.includes('a4')); } catch { return false; } })), true);
   assert.equal(await ev(() => document.documentElement.style.getPropertyValue('--Z')), '1.0000', 'A4 document prints at zoom 1');
   await b.close();
+});
+// ── 2d-bis. a move moves ALL of a row: a connector's far end is model geometry, not a rendered consequence ──
+// The bug this catches: drag wrote x/y only, so line:[x2,y2] / curve:[…] stayed where they were authored and the
+// connector stretched instead of travelling — one end followed the mouse, the other stayed pinned to the canvas.
+live('live: a dragged connector travels WHOLE — every point moves by the same delta, length and angle unchanged', async () => {
+  const model = {w: 960, h: 540, styles: {roles: modelOf(tpl).styles.roles}, slides: [{els: [
+    {x: 100, y: 100, line: [400, 220], bg: '#5B9CF6', h: 3, arrow: 'end'},
+    {x: 100, y: 300, curve: [200, 300, 300, 400, 400, 400], bg: '#6B9E8C', h: 3, arrow: 'end'},
+    {x: 600, y: 120, w: 160, h: 80, box: 1, bd: '#5B9CF6'},
+  ]}]};
+  const f = path.join(tmp, 'drag-connector.html'); fs.writeFileSync(f, create(model).html);
+  const b = await pw.chromium.launch(); const p = await b.newPage({viewport: {width: 1280, height: 800}});
+  const errs = []; p.on('pageerror', e => errs.push(String(e)));
+  await p.goto(pathToFileURL(f).href); await p.waitForSelector('#canvas .el');
+  await p.evaluate(() => { localStorage.clear(); canvas.style.transform = 'none'; }); // model space: 1 canvas px = 1 client px
+  const DX = 120, DY = -40;
+  const boxOfRow = n => p.locator(`#canvas .el[data-n="${n}"]`).boundingBox();
+  const dragRow = async n => {
+    const bb = await boxOfRow(n), cx = bb.x + bb.width / 2, cy = bb.y + bb.height / 2;
+    await p.mouse.move(cx, cy); await p.mouse.down();
+    await p.mouse.move(cx + DX / 2, cy + DY / 2); await p.mouse.move(cx + DX, cy + DY); await p.mouse.up();
+    return bb;
+  };
+  const row = n => p.evaluate(k => structuredClone(slide().els[k]), n);
+  // a straight connector
+  const before0 = await dragRow(0), after0 = await row(0), painted0 = await boxOfRow(0);
+  assert.deepEqual([after0.x, after0.y], [100 + DX, 100 + DY], 'the tail travelled');
+  assert.deepEqual(after0.line, [400 + DX, 220 + DY], 'the head travelled by the SAME delta — it is not pinned');
+  assert.ok(Math.abs(painted0.width - before0.width) < 1 && Math.abs(painted0.height - before0.height) < 1,
+    `the stroke kept its length and angle: ${before0.width}x${before0.height} became ${painted0.width}x${painted0.height}`);
+  assert.ok(Math.abs(painted0.x - before0.x - DX) < 1.5 && Math.abs(painted0.y - before0.y - DY) < 1.5, 'and it landed where the mouse left it');
+  // a bezier connector: start, both control points and the end all translate
+  const before1 = await boxOfRow(1); await dragRow(1); const after1 = await row(1), painted1 = await boxOfRow(1);
+  assert.deepEqual([after1.x, after1.y], [100 + DX, 300 + DY]);
+  assert.deepEqual(after1.curve, [200 + DX, 300 + DY, 300 + DX, 400 + DY, 400 + DX, 400 + DY], 'control points and end travel with the start');
+  assert.ok(Math.abs(painted1.width - before1.width) < 1 && Math.abs(painted1.height - before1.height) < 1, 'the curve kept its shape');
+  // multi-select: a connector dragged alongside a box keeps step with it
+  await p.evaluate(() => { sel.clear(); sel.add(0); sel.add(2); render(); });
+  const boxBefore = await row(2), connBefore = await row(0);
+  const bb = await boxOfRow(2), cx = bb.x + bb.width / 2, cy = bb.y + bb.height / 2;
+  await p.mouse.move(cx, cy); await p.mouse.down(); // pressing a row that is already selected keeps the whole group
+  await p.mouse.move(cx + 40, cy + 40); await p.mouse.move(cx + 80, cy + 80); await p.mouse.up();
+  const boxAfter = await row(2), connAfter = await row(0);
+  assert.deepEqual([boxAfter.x - boxBefore.x, boxAfter.y - boxBefore.y], [80, 80]);
+  assert.deepEqual([connAfter.x - connBefore.x, connAfter.y - connBefore.y], [80, 80], 'the connector moved with the group');
+  assert.deepEqual([connAfter.line[0] - connBefore.line[0], connAfter.line[1] - connBefore.line[1]], [80, 80], 'head included');
+  // ⌘Z restores the whole row, geometry and all
+  await p.evaluate(() => undo());
+  const undone = await row(0);
+  assert.deepEqual([undone.x, undone.y, ...undone.line], [100 + DX, 100 + DY, 400 + DX, 220 + DY], 'undo restores the pre-drag geometry');
+  await b.close();
+  assert.deepEqual(errs, []);
+});
+// ── 2d-ter. the marquee: a drag window is the only way to take a group without clicking each row ──
+live('live: marquee — a drag from empty canvas takes every row it fully contains, ⇧ adds, partial overlap takes nothing, a click still deselects', async () => {
+  const model = {w: 960, h: 540, styles: {roles: modelOf(tpl).styles.roles}, slides: [{els: [
+    {x: 100, y: 100, w: 120, h: 60, box: 1, bd: '#5B9CF6'},   // 0 — inside band A
+    {x: 300, y: 100, w: 120, h: 60, box: 1, bd: '#5B9CF6'},   // 1 — inside band A
+    {x: 100, y: 300, w: 120, h: 60, box: 1, bd: '#5B9CF6'},   // 2 — inside band B only
+    {x: 400, y: 60, w: 300, h: 300, box: 1, bd: '#6B9E8C'},   // 3 — straddles band A's edge: never taken
+  ]}]};
+  const f = path.join(tmp, 'marquee.html'); fs.writeFileSync(f, create(model).html);
+  const b = await pw.chromium.launch(); const p = await b.newPage({viewport: {width: 1280, height: 800}});
+  const errs = []; p.on('pageerror', e => errs.push(String(e)));
+  await p.goto(pathToFileURL(f).href); await p.waitForSelector('#canvas .el');
+  await p.evaluate(() => { localStorage.clear(); canvas.style.transform = 'none'; });
+  const org = await p.evaluate(() => { const r = canvas.getBoundingClientRect(); return {x: r.left, y: r.top}; });
+  const at = (x, y) => [org.x + x, org.y + y];
+  const band = async (x1, y1, x2, y2, mod) => {
+    await p.mouse.move(...at(x1, y1)); if (mod) await p.keyboard.down(mod); await p.mouse.down();
+    await p.mouse.move(...at((x1 + x2) / 2, (y1 + y2) / 2)); await p.mouse.move(...at(x2, y2));
+    const mid = await p.evaluate(() => canvas.querySelectorAll('.band').length);
+    await p.mouse.up(); if (mod) await p.keyboard.up(mod);
+    return mid;
+  };
+  const picked = () => p.evaluate(() => [...sel].sort());
+  const model0 = await p.evaluate(() => JSON.stringify(slide().els));
+  // band A: 60,60 → 460,200
+  const drawn = await band(60, 60, 460, 200);
+  assert.equal(drawn, 1, 'the drag window is drawn while the button is down');
+  assert.deepEqual(await picked(), [0, 1], 'rows wholly inside are taken; the row straddling the edge is not');
+  assert.equal(await p.evaluate(() => canvas.querySelectorAll('.band').length), 0, 'and it is gone on release');
+  assert.equal(await p.evaluate(() => JSON.stringify(slide().els)), model0, 'a marquee selects — it never moves anything');
+  // ⇧-band B adds row 2 to the standing selection
+  await band(60, 260, 300, 420, 'Shift');
+  assert.deepEqual(await picked(), [0, 1, 2], '⇧ adds to the selection instead of replacing it');
+  // a band with no rows wholly inside it clears the selection
+  await band(700, 400, 900, 500);
+  assert.deepEqual(await picked(), [], 'an empty band takes nothing');
+  // a plain click on empty canvas still deselects
+  await p.evaluate(() => { sel.clear(); sel.add(0); sel.add(1); render(); });
+  await p.mouse.click(...at(60, 480));
+  assert.deepEqual(await picked(), [], 'click-off deselects');
+  // present mode is for reading: no marquee, no band
+  await p.evaluate(() => { document.body.classList.add('present'); render(); });
+  const inPresent = await band(60, 60, 460, 200);
+  assert.equal(inPresent, 0, 'no drag window in present mode');
+  await p.evaluate(() => { document.body.classList.remove('present'); render(); });
+  await b.close();
+  assert.deepEqual(errs, []);
 });
 // blocked storage, driven in WebKit — Safari's engine. Playwright's WebKit does NOT enforce Safari's file:// storage ban,
 // so the ban is injected: what is being proved is that the engine reacts usefully, in the engine Kyle's browser runs.
