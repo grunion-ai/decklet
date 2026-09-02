@@ -19,7 +19,7 @@ You produce a **model** (JSON). The toolchain produces a **deck** (one `.html` f
 content + format + style  →  slide plan  →  model.json  →  validate  →  create  →  verify  →  hand-off
 ```
 
-All commands run from the repo root with plain Node ≥ 22. Only `verify` (and `import-html`) need the optional `playwright` devDependency.
+All commands run from the repo root with plain Node ≥ 22. Installed as a Claude Code plugin, the repo root is `${CLAUDE_PLUGIN_ROOT}`; installed with `npx skills add`, it is the skill's own directory. Only `verify` (and `import-html`) need the optional `playwright` devDependency.
 
 ---
 

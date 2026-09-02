@@ -1,0 +1,14 @@
+{
+  "name": "grunion",
+  "owner": { "name": "Grunion AI", "url": "https://github.com/grunion-ai" },
+  "description": "Agent-first tools from Grunion AI: decklet (editable single-file HTML decks).",
+  "plugins": [
+    {
+      "name": "decklet",
+      "source": "./",
+      "description": "Turn any content into one self-contained, hand-editable HTML slide deck with brand-true type roles, an in-file PDF writer and a layout verifier. Zero dependencies.",
+      "version": "0.3.3",
+      "category": "productivity"
+    }
+  ]
+}

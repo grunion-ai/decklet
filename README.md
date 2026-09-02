@@ -20,10 +20,18 @@ Open-source alternative to PowerPoint, Keynote, Gamma and the PPTX-generator ski
 Node ≥ 22, nothing to `npm install`. Install it as a skill, or clone it anywhere and call the CLI.
 
 ```bash
-# As a Claude Code skill: SKILL.md is picked up on the next session.
+# Claude Code plugin (marketplace + plugin live in this repo)
+claude plugin marketplace add grunion-ai/decklet
+claude plugin install decklet@grunion
+
+# Any skills-aware agent (Claude Code, Codex, Cursor, Amp, and the rest)
+npx skills add grunion-ai/decklet
+
+# Or by hand: SKILL.md is picked up on the next session
 git clone https://github.com/grunion-ai/decklet ~/.claude/skills/decklet
-# Then, in any session: "make a deck from these notes"
 ```
+
+Then, in any session: "make a deck from these notes".
 
 ```bash
 # As a CLI
