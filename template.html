@@ -59,6 +59,12 @@ body.present .el a.lk{pointer-events:auto}
 #hud button,#tb button,#sheet-back{background:var(--card);border:1px solid var(--line);color:var(--fg);border-radius:6px;padding:4px 10px;cursor:pointer;font:inherit}
 #hud .sep{width:1px;height:18px;background:var(--line)}
 #hud .spacer{flex:1}
+/* HUD icons: the Lucide shapes with movingicons.dev motion that weave uses (github.com/jis3r/icons, MIT). Each plays once on load, a beat apart, and once per hover — never on a loop. The unicode glyphs (⤓ ⊞) drew too small to parse. */
+#hud button{display:inline-flex;align-items:center;justify-content:center;min-height:26px}
+#hud button svg{display:block;width:16px;height:16px;overflow:visible}
+#tb button svg{display:block;width:13px;height:13px}
+.mi-chevron-left path { transition: all 0.2s ease-in; } .mi-chevron-left .chevron { transform: translateX(-3px); }.mi-chevron-right path { transition: all 0.2s ease-in; } .mi-chevron-right .chevron { transform: translateX(3px); }.mi-plus .plus { overflow: visible; } .mi-plus .horizontal, .mi-plus .vertical { stroke-dasharray: 14; stroke-dashoffset: 0; transition: stroke-dashoffset 0.15s ease-out; } .mi-plus .plus.animate .horizontal { opacity: 0; animation: mi-plus-lineAnimation 0.3s ease-out forwards; } .mi-plus .plus.animate .vertical { opacity: 0; animation: mi-plus-lineAnimation 0.3s ease-out 0.25s forwards; /* Start shortly before horizontal ends */ } @keyframes mi-plus-lineAnimation { 0% { opacity: 0; stroke-dashoffset: 14; } 15% { opacity: 1; stroke-dashoffset: 14; } 100% { opacity: 1; stroke-dashoffset: 0; } }.mi-layout-grid .layout-grid-icon { overflow: visible; } .mi-layout-grid .layout-grid-icon.animate .top-right-panel { opacity: 0; animation: mi-layout-grid-fadeInTop 0.35s ease-out forwards; } .mi-layout-grid .layout-grid-icon.animate .bottom-right-panel { opacity: 0; animation: mi-layout-grid-fadeInRight 0.35s ease-out 0.1s forwards; } .mi-layout-grid .layout-grid-icon.animate .bottom-left-panel { opacity: 0; animation: mi-layout-grid-fadeInBottom 0.35s ease-out 0.2s forwards; } .mi-layout-grid .layout-grid-icon.animate .top-left-panel { opacity: 0; animation: mi-layout-grid-fadeInLeft 0.35s ease-out 0.3s forwards; } @keyframes mi-layout-grid-fadeInLeft { 0%, 50% { opacity: 0; transform: translateX(-10px); } 80% { opacity: 0.8; transform: translateX(2px); } 100% { opacity: 1; transform: translateX(0); } } @keyframes mi-layout-grid-fadeInRight { 0%, 50% { opacity: 0; transform: translateX(10px); } 80% { opacity: 0.8; transform: translateX(-2px); } 100% { opacity: 1; transform: translateX(0); } } @keyframes mi-layout-grid-fadeInTop { 0%, 50% { opacity: 0; transform: translateY(-10px); } 80% { opacity: 0.8; transform: translateY(2px); } 100% { opacity: 1; transform: translateY(0); } } @keyframes mi-layout-grid-fadeInBottom { 0%, 50% { opacity: 0; transform: translateY(10px); } 80% { opacity: 0.8; transform: translateY(-2px); } 100% { opacity: 1; transform: translateY(0); } }.mi-copy .copy-rect, .mi-copy .copy-path { transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1); } .mi-copy .copy-rect.animate { transform: translate(-3px, -3px); } .mi-copy .copy-path.animate { transform: translate(3px, 3px); } .mi-copy svg { overflow: visible; }.mi-file-down g.animate path { transform: translateY(2px); transition: transform 0.3s cubic-bezier(0.68, -0.6, 0.32, 1.6); } .mi-file-down g path { transform: translateY(0); transition: transform 0.3s cubic-bezier(0.68, -0.6, 0.32, 1.6); }.mi-maximize path { transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); } .mi-maximize .bottom-right { transform: translate(2px, 2px); } .mi-maximize .bottom-left { transform: translate(-2px, 2px); } .mi-maximize .top-right { transform: translate(2px, -2px); } .mi-maximize .top-left { transform: translate(-2px, -2px); } .mi-maximize svg { overflow: visible; }.mi-circle-question-mark .animate-icon { transition: transform 0.5s ease-in-out; } .mi-circle-question-mark .animate-path { transition: transform 0.5s ease-in-out; transform-origin: center; animation: mi-circle-question-mark-rotateAnimation 0.5s ease-in-out; } @keyframes mi-circle-question-mark-rotateAnimation { 0% { transform: rotate(0deg); } 20% { transform: rotate(-10deg); } 40% { transform: rotate(10deg); } 60% { transform: rotate(-10deg); } 100% { transform: rotate(0deg); } }
+@media (prefers-reduced-motion:reduce){.mi svg,.mi svg *{animation:none!important;transition:none!important}}
 /* "+" micro-menu: the add controls (Text / Box / Slide) nest under one button; opens upward, click-away closes */
 #addwrap,#helpwrap{position:relative}
 #addmenu,#helpmenu{display:none;position:absolute;bottom:calc(100% + 6px);flex-direction:column;gap:4px;padding:6px;background:var(--card);border:1px solid var(--line);border-radius:8px;z-index:11;white-space:nowrap}
@@ -103,6 +109,8 @@ body.present #canvas{border:0;border-radius:0}
    deck's own page counter (bottom-right, on styles.margin) whenever the canvas fills the screen — a tall 4:5 deck always. */
 body.present.peek #hud{display:flex!important;position:fixed;left:50%;right:auto;transform:translateX(-50%);bottom:12px;width:auto;max-width:calc(100vw - 24px);flex-wrap:nowrap;z-index:10;background:var(--card);border:1px solid var(--line);border-top:1px solid var(--line);border-radius:10px}
 body.present.peek #hud .spacer{display:none}
+/* the peek pill must clear a 4:5 deck's bottom-right counter: icon buttons are wider than typed glyphs, so the pill tightens */
+body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{padding:3px 6px}
 /* print: Safari forces US Letter PORTRAIT — it ignores px @page sizes AND the landscape keyword (margin:0 is honored).
    Layout is page-size-independent: each page is the model space at true size (absolute px, no clamps),
    `zoom`ed to the printable page width (816/W for Letter, 794/W for A4 — see deck.page). Each page paints ITS slide's bg; the dark body paints the letterbox. */
@@ -126,32 +134,32 @@ body.present.peek #hud .spacer{display:none}
     <button data-cmd="italic" title="Italic" aria-label="Italic"><i>I</i></button>
     <button data-cmd="underline" title="Underline" aria-label="Underline"><u>U</u></button>
     <button data-cmd="strikeThrough" title="Strikethrough" aria-label="Strikethrough"><s>S</s></button>
-    <button data-link="1" title="Link (http, https or mailto)" aria-label="Link"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M6.6 9.4a2.6 2.6 0 0 0 3.7 0l2.4-2.4a2.6 2.6 0 0 0-3.7-3.7l-1 1"/><path d="M9.4 6.6a2.6 2.6 0 0 0-3.7 0L3.3 9a2.6 2.6 0 0 0 3.7 3.7l1-1"/></svg></button>
+    <button data-link="1" title="Link (http, https or mailto)" aria-label="Link"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /> <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg></button>
   </span>
   <span class="seg" id="tb-colors"></span>
   <button id="tb-layout" hidden title="Promote this geometry to the layout slot" aria-label="Promote this geometry to the layout slot">Apply to layout</button>
   <button id="tb-master" hidden title="Promote this slide-local override back to every slide" aria-label="Promote this slide-local override back to every slide">Apply to all slides</button>
 </div>
 <div id="hud">
-  <button id="prev" title="Previous slide (←)" aria-label="Previous slide (←)">‹</button>
-  <button id="next" title="Next slide (→)" aria-label="Next slide (→)">›</button>
+  <button id="prev" class="mi mi-chevron-left" data-ms="200" title="Previous slide (←)" aria-label="Previous slide (←)"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" data-mi="chevron"/></svg></button>
+  <button id="next" class="mi mi-chevron-right" data-ms="200" title="Next slide (→)" aria-label="Next slide (→)"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" data-mi="chevron"/></svg></button>
   <div class="spacer"></div>
   <span id="autosave" role="status" data-state="ok" title="Autosaved" aria-label="Autosaved" data-tip="Autosaved"></span>
   <div id="addwrap">
-    <button id="addbtn" aria-haspopup="true" aria-expanded="false" title="Add text, box or slide" aria-label="Add text, box or slide">+</button>
+    <button id="addbtn" class="mi mi-plus" data-ms="500" aria-haspopup="true" aria-expanded="false" title="Add text, box or slide" aria-label="Add text, box or slide"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="plus" data-mi="animate"><path d="M5 12h14" class="horizontal"/><path d="M12 5v14" class="vertical"/></svg></button>
     <div id="addmenu" role="menu">
       <button id="add-text">+ Text</button>
       <button id="add-box">+ Box</button>
       <button id="sadd">+ Slide</button>
     </div>
   </div>
-  <button id="grid-btn" title="Contact sheet (G / Esc)" aria-label="Contact sheet (G / Esc)">⊞</button>
-  <button id="savecopy" title="Save a copy (⌘S) — this browser blocks storage, so edits only survive in a copy" aria-label="Save a copy (⌘S)">⤒</button>
-  <button id="pdf" title="Download PDF (⌘P prints)" aria-label="Download PDF (⌘P prints)">⤓</button>
+  <button id="grid-btn" class="mi mi-layout-grid" data-ms="650" title="Contact sheet (G / Esc)" aria-label="Contact sheet (G / Esc)"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="layout-grid-icon" data-mi="animate"><rect width="7" height="7" x="3" y="3" rx="1" class="top-left-panel"/><rect width="7" height="7" x="14" y="3" rx="1" class="top-right-panel"/><rect width="7" height="7" x="14" y="14" rx="1" class="bottom-right-panel"/><rect width="7" height="7" x="3" y="14" rx="1" class="bottom-left-panel"/></svg></button>
+  <button id="savecopy" class="mi mi-copy" data-ms="900" title="Save a copy (⌘S) — this browser blocks storage, so edits only survive in a copy" aria-label="Save a copy (⌘S)"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" class="copy-rect" data-mi="animate"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" class="copy-path" data-mi="animate"/></svg></button>
+  <button id="pdf" class="mi mi-file-down" data-ms="900" title="Download PDF (⌘P prints)" aria-label="Download PDF (⌘P prints)"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><g data-mi="animate"><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></g></svg></button>
   <div class="sep"></div>
-  <button id="fs" title="Full screen (F)" aria-label="Full screen (F)">⛶</button>
+  <button id="fs" class="mi mi-maximize" data-ms="900" title="Full screen (F)" aria-label="Full screen (F)"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3" data-mi="top-left"/><path d="M21 8V5a2 2 0 0 0-2-2h-3" data-mi="top-right"/><path d="M3 16v3a2 2 0 0 0 2 2h3" data-mi="bottom-left"/><path d="M16 21h3a2 2 0 0 0 2-2v-3" data-mi="bottom-right"/></svg></button>
   <div id="helpwrap">
-    <button id="help" aria-haspopup="true" aria-expanded="false" title="Shortcuts" aria-label="Shortcuts">ⓘ</button>
+    <button id="help" class="mi mi-circle-question-mark" data-ms="500" aria-haspopup="true" aria-expanded="false" title="Shortcuts" aria-label="Shortcuts"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-mi="animate-icon"><circle cx="12" cy="12" r="10"/><g data-mi="animate-path"><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></g></svg></button>
     <div id="helpmenu" role="dialog" aria-label="Shortcuts">
       <div><kbd>← → / ↑ ↓</kbd> navigate</div>
       <div><kbd>F</kbd> fullscreen (presentation)</div>
@@ -163,8 +171,8 @@ body.present.peek #hud .spacer{display:none}
       <div><kbd>⌫</kbd> delete</div>
       <div><kbd>⌘Z</kbd> undo</div>
       <div><kbd>⌘C · ⌘V · ⌘D</kbd> copy · paste · duplicate slides (in the sheet)</div>
-      <div><kbd>⌘S</kbd> save a copy (.html) · the <b>⤒</b> button when storage is blocked</div>
-      <div><kbd>⤓ · ⌘P</kbd> PDF · paper print</div>
+      <div><kbd>⌘S</kbd> save a copy (.html) · the copy button when storage is blocked</div>
+      <div><kbd>⌘P</kbd> PDF (the download button) · paper print</div>
     </div>
   </div>
 </div>
@@ -205,6 +213,9 @@ const CANSTORE=(()=>{try{localStorage.setItem(NS+':probe','1');localStorage.remo
 // position: the URL hash (#4 = slide 4) wins over the stored position; render() clamps to the slide count
 const hashPos=()=>parseInt(location.hash.slice(1))-1;
 let deck=JSON.parse(store.get(KEY)||'null')||structuredClone(DECK),i=hashPos()>=0?hashPos():parseInt(store.get(PKEY))||0,sel=new Set();
+// HUD icons move once: on load, a beat apart; then once per hover; never on a loop — the same one-run policy as weave's picker
+const miPlay=(h)=>{const ms=+h.dataset.ms||0;if(!ms||h.dataset.on||matchMedia('(prefers-reduced-motion: reduce)').matches)return;h.dataset.on='1';const parts=[...h.querySelectorAll('[data-mi]')];for(const p of parts)p.classList.add(...p.dataset.mi.split(' '));setTimeout(()=>{for(const p of parts)p.classList.remove(...p.dataset.mi.split(' '));delete h.dataset.on},ms)};
+document.querySelectorAll('.mi').forEach((h,i)=>{h.addEventListener('mouseenter',()=>miPlay(h));setTimeout(()=>miPlay(h),300+i*90)});
 document.title=deck.title||'decklet'; // the deck names itself: tab title, ⤓ PDF filename and ⌘S copy filename are all this one string
 const W=deck.w||960,H=deck.h||540;
 const PAGE=deck.page==='a4'?'a4':'letter',PW=PAGE==='a4'?794:816;

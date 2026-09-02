@@ -86,12 +86,12 @@ test('roles are the type system: eight complete roles in the template, locked ke
   assert.match(tpl, /\['weight','color','tt','italic'\]\.forEach\(p=>delete el\[p\]\)/, 'applying a role clears the row-level overrides');
   assert.doesNotMatch(tpl, /r\.mono\?/, 'mono is not a row prop — Label is the mono role');
 });
-test('HUD contract is a set: ‹ · › · autosave · + (Text/Box/Slide) · ⊞ · ⤓ · ⛶ · ⓘ', () => {
-  assert.match(tpl, /<button id="prev" title="Previous slide \(←\)" aria-label="Previous slide \(←\)">‹<\/button>/, 'prev is icon-only'); assert.match(tpl, /<button id="next" title="Next slide \(→\)" aria-label="Next slide \(→\)">›<\/button>/, 'next is icon-only');
+test('HUD contract is a set: prev · next · autosave · + (Text/Box/Slide) · contact sheet · PDF · fullscreen · shortcuts', () => {
+  assert.match(tpl, /<button id="prev" [^>]*aria-label="Previous slide \(←\)"><svg [^>]*><path [^>]*\/><\/svg><\/button>/, 'prev is icon-only'); assert.match(tpl, /<button id="next" [^>]*aria-label="Next slide \(→\)"><svg [^>]*><path [^>]*\/><\/svg><\/button>/, 'next is icon-only');
   const ids = [...tpl.matchAll(/<div id="hud">[\s\S]*?<\/div>\n<div id="sheet"/g)][0][0].match(/id="([^"]+)"/g).map(s => s.slice(4, -1)).filter(s => s !== 'hud' && s !== 'sheet').sort();
   assert.deepEqual(ids, ['add-box', 'add-text', 'addbtn', 'addmenu', 'addwrap', 'autosave', 'fs', 'grid-btn', 'help', 'helpmenu', 'helpwrap', 'next', 'pdf', 'prev', 'sadd', 'savecopy']);
   assert.deepEqual([...tpl.match(/<div id="hud">[\s\S]*?\n<\/div>/)[0].matchAll(/id="(prev|next|autosave|addbtn|grid-btn|pdf|fs|help)"/g)].map(m => m[1]), ['prev', 'next', 'autosave', 'addbtn', 'grid-btn', 'pdf', 'fs', 'help'], 'autosave immediately left of +, ⓘ rightmost');
-  assert.match(tpl, /<button id="help"[^>]*aria-label="Shortcuts"[^>]*>ⓘ<\/button>/); assert.match(tpl, /<kbd>← → \/ ↑ ↓<\/kbd> navigate/, 'popover nav line'); assert.match(tpl, /<button id="sheet-back" title="Back to slide \(Esc\)" aria-label="Back to slide \(Esc\)">← Back<\/button>/, 'contact sheet ← Back');
+  assert.match(tpl, /<button id="help" class="mi mi-circle-question-mark"[^>]*aria-label="Shortcuts"[^>]*><svg /, 'the shortcuts control is the question-mark icon'); assert.match(tpl, /<kbd>← → \/ ↑ ↓<\/kbd> navigate/, 'popover nav line'); assert.match(tpl, /<button id="sheet-back" title="Back to slide \(Esc\)" aria-label="Back to slide \(Esc\)">← Back<\/button>/, 'contact sheet ← Back');
   assert.match(tpl, /if\(\(e\.metaKey\|\|e\.ctrlKey\)&&e\.key\.toLowerCase\(\)==='s'\)\{e\.preventDefault\(\);saveCopy\(\);return\}/, '⌘S save-a-copy, keyboard only'); assert.doesNotMatch(tpl, /id="save"/);
   assert.match(tpl, /if\(e\.key==='ArrowRight'\|\|e\.key==='ArrowDown'\|\|e\.key===' '\)nav\(1\)/, '↓ = next'); assert.match(tpl, /if\(e\.key==='ArrowLeft'\|\|e\.key==='ArrowUp'\)nav\(-1\)/, '↑ = prev');
   assert.match(tpl, /PKEY=NS\+':pos'/, 'position persisted'); assert.match(tpl, /if\(animate\)\{store\.set\(PKEY,i\);location\.replace\('#'\+\(i\+1\)\)\}/, 'slide change → pos + #n hash'); assert.match(tpl, /addEventListener\('hashchange'/, 'hash → slide');
@@ -161,7 +161,7 @@ test('blocked storage: probed at load, says what to do, and reveals ⌘S save-a-
 test('toolbar: the link mark is drawn like B I U S, not an emoji', () => {
   const seg = tpl.match(/<span class="seg" id="tb-inline">[\s\S]*?<\/span>/)[0];
   assert.doesNotMatch(seg, /\uD83D[\uDD17]|🔗/u, 'no emoji in the mark segment — it is a colour raster beside four monochrome glyphs');
-  assert.match(seg, /<button data-link="1"[^>]*><svg[^>]*viewBox="0 0 16 16"[^>]*>/, 'an inline SVG at the same optical size as the letters');
+  assert.match(seg, /<button data-link="1"[^>]*><svg[^>]*width="13" height="13" viewBox="0 0 24 24"[^>]*>/, 'a Lucide link, sized to the letters');
   assert.match(seg, /stroke="currentColor"/, 'it inherits the toolbar colour and active state like the other marks');
   assert.match(seg, /aria-label="Link"/);
 });
@@ -175,6 +175,19 @@ test('shortcuts popover cannot drift from the keybindings', () => {
   // …and every plain key the template handles
   for (const [re, shown] of [[/e\.key==='ArrowRight'/, /← → \/ ↑ ↓/], [/e\.key\.toLowerCase\(\)==='f'/, /<kbd>F<\/kbd>/], [/e\.key\.toLowerCase\(\)==='g'/, /Esc · G/], [/e\.key==='Backspace'/, /<kbd>⌫<\/kbd>/]])
     if (re.test(tpl)) assert.match(pop, shown, `handled key missing from the popover: ${re}`);
+});
+
+// ── 2c′. the HUD glyphs are the moving Lucide set weave uses: one svg per control, played once, never looped ──
+test('HUD icons: every control is a Lucide shape wearing its motion parts; no unicode glyph survives; nothing loops', () => {
+  for (const id of ['prev', 'next', 'addbtn', 'grid-btn', 'savecopy', 'pdf', 'fs', 'help']) {
+    assert.match(tpl, new RegExp(`<button id="${id}" class="mi mi-[\\w-]+" data-ms="\\d+"[^>]*><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"[^>]*>[^]*?data-mi="[^"]+"[^]*?<\\/svg><\\/button>`), `${id} draws a Lucide shape on the 24 grid with its motion parts`);
+  }
+  assert.doesNotMatch(tpl, /<button id="(prev|next|addbtn|grid-btn|savecopy|pdf|fs|help)"[^>]*>[‹›+⊞⤒⤓⛶ⓘ]<\/button>/, 'no control is a typed glyph any more');
+  assert.match(tpl, /@keyframes mi-layout-grid-/, 'the motion rides in the template, scoped per icon'); assert.match(tpl, /\.mi-chevron-left path \{ transition/, 'a chevron slides on a transition, no keyframes needed');
+  assert.doesNotMatch(tpl.slice(tpl.indexOf('#hud button svg'), tpl.indexOf('@media (prefers-reduced-motion:reduce)')), /infinite/, 'nothing loops');
+  assert.match(tpl, /const miPlay=\(h\)=>\{const ms=\+h\.dataset\.ms\|\|0;if\(!ms\|\|h\.dataset\.on\|\|matchMedia\('\(prefers-reduced-motion: reduce\)'\)\.matches\)return;/, 'one run per trigger, reduced motion respected');
+  assert.match(tpl, /h\.addEventListener\('mouseenter',\(\)=>miPlay\(h\)\);setTimeout\(\(\)=>miPlay\(h\),300\+i\*90\)/, 'hover replays; load plays once, staggered');
+  assert.match(tpl, /@media \(prefers-reduced-motion:reduce\)\{\.mi svg,\.mi svg \*\{animation:none!important;transition:none!important\}\}/);
 });
 
 // ── 2c. the HUD is a contract: what ships and what SKILL.md promises are checked against each other ──
