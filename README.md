@@ -7,13 +7,51 @@
 
 # decklet
 
-Agent-generated, brand-true, real-time editable presentations and assets — one portable HTML file, no office suite.
+**Editable slide decks from any content, as one self-contained HTML file. A Claude Code and Codex skill with a plain-Node CLI: the deck is a JSON model, the file is the editor, and a verifier checks the layout before a human ever sees it.**
+
+Open-source alternative to PowerPoint, Keynote, Gamma and the PPTX-generator skills for coding agents. Next to [frontend-slides](https://github.com/zarazhangrui/frontend-slides)-style HTML skills it adds in-place editing, an enforced brand type scale, an in-file PDF writer and a layout gate. Zero dependencies, zero network, MIT.
 
 ![decklet demo: drag a row, page through slides that animate in, the inlined editor clips, the four anims, contact-sheet reorder, write a PDF](docs/demo.gif)
 
-**Try it live:** https://grunion-ai.github.io/decklet/deck.html — drag, retype, ⊞ contact sheet, ⤓ PDF, F fullscreen.
+**Try it live:** https://grunion-ai.github.io/decklet/deck.html (drag, retype, ⊞ contact sheet, ⤓ PDF, F fullscreen). If decklet builds you a deck, star the repo: stars are how agents and people find it.
 
-**What it is.** A slide engine where the deck is a JSON model and the renderer is the editor. `create` turns `model.json` into one self-contained `deck.html`: open it from disk, drag and retype in place, present fullscreen, print to PDF. No install, no server, no network request, ever.
+## Quickstart
+
+Node ≥ 22, nothing to `npm install`. Install it as a skill, or clone it anywhere and call the CLI.
+
+```bash
+# As a Claude Code skill: SKILL.md is picked up on the next session.
+git clone https://github.com/grunion-ai/decklet ~/.claude/skills/decklet
+# Then, in any session: "make a deck from these notes"
+```
+
+```bash
+# As a CLI
+git clone https://github.com/grunion-ai/decklet && cd decklet
+node bin/validate.mjs examples/explainer/model.json
+node bin/create.mjs --model examples/explainer/model.json --out deck.html --title decklet
+open deck.html
+```
+
+Works with Claude Code, Codex, Cursor and any agent that can run Node: the skill is [`SKILL.md`](SKILL.md), the toolchain is four Node scripts.
+
+## How decklet compares
+
+| | **decklet** | HTML slide skills (frontend-slides and kin) | PPTX skills (python-pptx, html2pptx) | Slidev, Marp | Gamma and hosted generators |
+| --- | --- | --- | --- | --- | --- |
+| Output | One `.html`, editable in place | HTML page(s) | `.pptx` | Markdown source plus a build | Hosted app |
+| Edit after generation | Drag, retype, resize, reorder, undo, all inside the file | Regenerate (a fork adds drag editing) | PowerPoint | Edit the markdown, rebuild | In the app |
+| Brand type scale enforced | Eight roles, no per-element size overrides, gate-checked | Theme CSS | Template | Theme | Themes |
+| Layout checked before hand-off | `verify`: parity, collisions, pixel diff against references | No | No automated gate | No | No |
+| Runtime dependencies | None | None | Python and libraries | Node toolchain | Docker or cloud |
+| Network when opened | None | Webfonts, usually | n/a | Dev server for Slidev | Yes |
+| PDF | Written inside the file, no dependencies | Browser print | Export | Playwright or Chrome export | Export |
+
+*As of September 2026; check each project for current terms.* Pick decklet when an agent drafts the deck and a person finishes it by hand. Pick a PPTX skill when the deliverable has to be a `.pptx`, and Slidev or Marp when the author writes markdown by hand.
+
+## What it is
+
+A slide engine where the deck is a JSON model and the renderer is the editor. `create` turns `model.json` into one self-contained `deck.html`: open it from disk, drag and retype in place, present fullscreen, print to PDF. No install, no server, no network request, ever.
 
 **Who it is for.** Agents (Claude Code, Codex, Cursor, any tool-using model) that must turn content into a deck a human will then edit. Humans get a file they can open and change; agents get a contract they can validate before a browser is involved.
 

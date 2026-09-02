@@ -1,0 +1,24 @@
+# GitHub Pages configuration. The repo root is published; README.md renders as the index
+# and deck.html is served as-is (the live demo).
+title: decklet
+description: >-
+  Claude Code and Codex skill plus CLI that turns any content into one self-contained,
+  hand-editable HTML slide deck. Brand-true type roles, drag-and-retype editor, in-file PDF,
+  layout verification. Zero dependencies. Open-source alternative to PowerPoint, Gamma and
+  PPTX-generator skills.
+url: https://grunion-ai.github.io
+baseurl: /decklet
+theme: jekyll-theme-primer
+plugins:
+  - jekyll-seo-tag       # <title>, meta description, Open Graph, JSON-LD
+  - jekyll-sitemap       # /sitemap.xml for crawlers
+  - jekyll-relative-links # rewrites relative .md links to their .html pages
+lang: en
+author: Grunion AI
+twitter:
+  card: summary_large_image
+exclude:
+  - node_modules
+  - test
+  - verify-out
+  - package-lock.json
