@@ -19,7 +19,7 @@ Be decent. Assume good faith. Argue about the deck, not the person.
 
 ## Enforcement
 
-Maintainers may edit, remove, or lock contributions that break this code, and may block repeat offenders from the repo. Report a problem to the maintainers through GitHub, or privately at agents@grunion.ai. Reports are read by a person and kept confidential.
+Maintainers may edit, remove, or lock contributions that break this code, and may block repeat offenders from the repo. Report a problem to the maintainers through GitHub: open an issue, or use the repo's private vulnerability report form when it should stay confidential. Reports are read by a person.
 
 ## Scope
 
