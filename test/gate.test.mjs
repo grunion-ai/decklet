@@ -89,7 +89,7 @@ test('roles are the type system: eight complete roles in the template, locked ke
 test('HUD contract is a set: prev · next · autosave · + (Text/Box/Slide) · contact sheet · PDF · fullscreen · shortcuts', () => {
   assert.match(tpl, /<button id="prev" [^>]*aria-label="Previous slide \(←\)"><svg [^>]*><path [^>]*\/><\/svg><\/button>/, 'prev is icon-only'); assert.match(tpl, /<button id="next" [^>]*aria-label="Next slide \(→\)"><svg [^>]*><path [^>]*\/><\/svg><\/button>/, 'next is icon-only');
   const ids = [...tpl.matchAll(/<div id="hud">[\s\S]*?<\/div>\n<div id="sheet"/g)][0][0].match(/id="([^"]+)"/g).map(s => s.slice(4, -1)).filter(s => s !== 'hud' && s !== 'sheet').sort();
-  assert.deepEqual(ids, ['add-box', 'add-text', 'addbtn', 'addmenu', 'addwrap', 'autosave', 'fs', 'grid-btn', 'help', 'helpmenu', 'helpwrap', 'next', 'pdf', 'prev', 'sadd', 'savecopy']);
+  assert.deepEqual(ids, ['add-box', 'add-text', 'addbtn', 'addmenu', 'addwrap', 'autosave', 'fs', 'grid-btn', 'help', 'helpmenu', 'helpwrap', 'next', 'pdf', 'prev', 'sadd', 'savecopy', 'spell']);
   assert.deepEqual([...tpl.match(/<div id="hud">[\s\S]*?\n<\/div>/)[0].matchAll(/id="(prev|next|autosave|addbtn|grid-btn|pdf|fs|help)"/g)].map(m => m[1]), ['prev', 'next', 'autosave', 'addbtn', 'grid-btn', 'pdf', 'fs', 'help'], 'autosave immediately left of +, ⓘ rightmost');
   assert.match(tpl, /<button id="help" class="mi mi-circle-question-mark"[^>]*aria-label="Shortcuts"[^>]*><svg /, 'the shortcuts control is the question-mark icon'); assert.match(tpl, /<kbd>← → \/ ↑ ↓<\/kbd> navigate/, 'popover nav line'); assert.match(tpl, /<button id="sheet-back" title="Back to slide \(Esc\)" aria-label="Back to slide \(Esc\)">← Back<\/button>/, 'contact sheet ← Back');
   assert.match(tpl, /if\(\(e\.metaKey\|\|e\.ctrlKey\)&&e\.key\.toLowerCase\(\)==='s'\)\{e\.preventDefault\(\);saveCopy\(\);return\}/, '⌘S save-a-copy, keyboard only'); assert.doesNotMatch(tpl, /id="save"/);
@@ -179,7 +179,7 @@ test('shortcuts popover cannot drift from the keybindings', () => {
 
 // ── 2c′. the HUD glyphs are the moving Lucide set weave uses: one svg per control, played once, never looped ──
 test('HUD icons: every control is a Lucide shape wearing its motion parts; no unicode glyph survives; nothing loops', () => {
-  for (const id of ['prev', 'next', 'addbtn', 'grid-btn', 'savecopy', 'pdf', 'fs', 'help']) {
+  for (const id of ['prev', 'next', 'addbtn', 'grid-btn', 'spell', 'savecopy', 'pdf', 'fs', 'help']) {
     assert.match(tpl, new RegExp(`<button id="${id}" class="mi mi-[\\w-]+" data-ms="\\d+"[^>]*><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"[^>]*>[^]*?data-mi="[^"]+"[^]*?<\\/svg><\\/button>`), `${id} draws a Lucide shape on the 24 grid with its motion parts`);
   }
   assert.doesNotMatch(tpl, /<button id="(prev|next|addbtn|grid-btn|savecopy|pdf|fs|help)"[^>]*>[‹›+⊞⤒⤓⛶ⓘ]<\/button>/, 'no control is a typed glyph any more');
@@ -1226,4 +1226,35 @@ live('live: fullscreen rejected or never settling → in-window present; Esc lea
 });
 test('the F shortcut line names the in-window fallback', () => {
   assert.match(tpl, /<kbd>F<\/kbd> fullscreen \(presentation[^<]*in-window/);
+});
+
+// ── 2k. spellcheck: the browser's own checker on the focused row; never in present, print, the ⤓ PDF or the saved file ──
+test('spellcheck: the HUD carries the toggle, on by default, per browser (localStorage under NS) — never in the model', () => {
+  assert.match(tpl, /<button id="spell" class="mi mi-spell-check" data-ms="\d+"[^>]*aria-pressed="true"[^>]*title="Spellcheck \(on\)"[^>]*><svg aria-hidden="true" viewBox="0 0 24 24"/, 'the toggle is a Lucide spell-check shape, pressed on by default');
+  assert.match(tpl, /SKEY=NS\+':spell'/, 'state is per deck, per browser'); assert.match(tpl, /<kbd>[^<]*<\/kbd> spellcheck/, 'the ⓘ popover names the toggle');
+  assert.match(tpl, /#spell\.off\{opacity:\.35\}/, 'off = dimmed');
+  assert.match(tpl, /canvas\.lang=deck\.lang\|\|'en'/, 'the dictionary follows deck.lang, else en');
+  assert.match(tpl, /d\.setAttribute\('spellcheck'/, 'every text row carries the attribute'); assert.doesNotMatch(tpl, /deck\.spell(?!check)/, 'the model never carries the toggle');
+  assert.match(read('SKILL.md'), /\| `lang` \|/, 'SKILL.md documents deck.lang');
+});
+live('live: spellcheck — rows wear the attribute, present strips it, off persists across reload, the ⤓ PDF is byte-identical either way', async () => {
+  const m = structuredClone(explainer.model); m.slides = [{els: [{x: 60, y: 200, w: 800, role: 'H1', text: 'Renewal Radar — Q3 reveiw'}]}];
+  const f = path.join(tmp, 'spell.html'); fs.writeFileSync(f, create(m, {title: 'spell'}).html);
+  const b = await pw.chromium.launch(); const p = await b.newPage({viewport: {width: 1280, height: 800}});
+  const errs = []; p.on('pageerror', e => errs.push(String(e)));
+  await p.goto(pathToFileURL(f).href); await p.waitForSelector('#canvas .el');
+  const attrs = () => p.evaluate(() => [...new Set([...document.querySelectorAll('#canvas .el')].map(d => d.getAttribute('spellcheck')))]);
+  assert.deepEqual(await attrs(), ['true'], 'on by default'); assert.equal(await p.evaluate(() => canvas.lang), 'en');
+  assert.doesNotMatch(await p.evaluate(() => { save(); return localStorage.getItem(KEY); }), /spellcheck|"lang"/, 'save() writes no spellcheck/lang key');
+  const pdf = () => p.evaluate(async () => { let blob; const o = URL.createObjectURL; URL.createObjectURL = x => { blob = x; return 'blob:x'; }; HTMLAnchorElement.prototype.click = () => {}; await exportPdf(); URL.createObjectURL = o; return [...new Uint8Array(await blob.arrayBuffer())].join(','); });
+  const on = await pdf();
+  // present (in-window fallback) strips the attribute; leaving restores it
+  await p.evaluate(() => { Element.prototype.requestFullscreen = () => Promise.reject(new TypeError('no')); }); await p.keyboard.press('f');
+  await p.waitForFunction(() => document.body.classList.contains('present'), null, {timeout: 1500});
+  assert.deepEqual(await attrs(), ['false'], 'present: no markers'); await p.keyboard.press('Escape'); assert.deepEqual(await attrs(), ['true'], 'back in the editor: restored');
+  // off: attribute false everywhere, button dimmed, and it survives a reload
+  await p.click('#spell'); assert.deepEqual(await attrs(), ['false']); assert.deepEqual(await p.evaluate(() => [spell.title, spell.getAttribute('aria-pressed'), spell.classList.contains('off'), +getComputedStyle(spell).opacity]), ['Spellcheck (off)', 'false', true, 0.35]);
+  await p.reload(); await p.waitForSelector('#canvas .el'); assert.deepEqual(await attrs(), ['false'], 'off persists per browser');
+  assert.equal(await pdf(), on, '⤓ output is byte-identical with the toggle on and off');
+  assert.deepEqual(errs, []); await b.close();
 });
