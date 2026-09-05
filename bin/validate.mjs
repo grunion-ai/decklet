@@ -10,6 +10,19 @@ import {LIBRARY, libraryFor, catalogue} from '../lib/layouts.mjs';
 import {checkChart, expandCharts} from '../lib/chart.mjs';
 
 export const ROLES = ['Title', 'Supertitle', 'H1', 'H2', 'Body', 'Caption', 'Label', 'Stat'];
+// the KPI allowance: `Stat2` is an OPTIONAL ninth role — a second, smaller stat size for tiles, so a hero "63%" and a card
+// "$1.2M" stop wearing one size (or one of them lying as H1). Derived from Stat at 0.6 only when a deck uses it and its
+// style does not define it; the eight-role scale, the template and every existing deck are untouched.
+export const OPTIONAL = ['Stat2'];
+export const kpiRole = stat => ({...stat, size: Math.round(stat.size * 0.6), ...(stat.lh != null ? {lh: Math.round(stat.lh * 0.6)} : {}), ...(stat.ls != null ? {ls: +(stat.ls * 0.6).toFixed(2)} : {})});
+const usesStat2 = deck => [...Object.values(deck.slots || {}), ...Object.values(deck.layouts || {}).flatMap(l => Object.values(l || {})), ...(deck.master || []),
+  ...(deck.slides || []).flatMap(s => (s && s.els) || [])].some(r => r && r.role === 'Stat2');
+// fill the derived Stat2 into a deck that asks for it — create() and the validate CLI both run this, so they agree
+export function fillKpi(deck) {
+  const R = deck.styles && deck.styles.roles;
+  if (R && R.Stat && !R.Stat2 && usesStat2(deck)) R.Stat2 = kpiRole(R.Stat);
+  return deck;
+}
 export const ANIMS = ['rise', 'fade', 'pop', 'wipe'];   // entrance motion on slide entry — the engine ignores anything else
 export const FORMATS = ['slides', 'carousel', 'carousel-4x5', 'document-letter', 'document-a4'];
 export const ARROWS = ['start', 'end', 'both'];          // WHICH ends carry a head
@@ -49,15 +62,15 @@ export function validate(deck) {
   if (!roles || typeof roles !== 'object' || !Object.keys(roles).length) E('styles.roles missing — every text row needs a role');
   else {
     for (const [name, t] of Object.entries(roles)) {
-      if (!ROLES.includes(name)) Wn(`role "${name}" is outside the eight-role scale (${ROLES.join(', ')})`);
+      if (!ROLES.includes(name) && !OPTIONAL.includes(name)) Wn(`role "${name}" is outside the eight-role scale (${ROLES.join(', ')})`);
       for (const p of ROLE_REQ) if (t[p] == null) E(`role ${name}: missing ${p}`);
       if (t.size != null && !isNum(t.size)) E(`role ${name}: size must be a number`);
     }
-    if (Object.keys(roles).length > 8) Wn(`${Object.keys(roles).length} roles — more than eight dilutes the scale`);
+    if (Object.keys(roles).filter(n => !OPTIONAL.includes(n)).length > 8) Wn(`${Object.keys(roles).length} roles — more than eight dilutes the scale`);
     if (Object.keys(roles).length && !roles.Body) Wn('no Body role — text rows without a role fall back to Body at render time');
   }
-  const roleOk = n => !!(roles && roles[n]);
-  const roleOf = n => (roles && roles[n]) || null;
+  const roleOk = n => !!(roles && (roles[n] || (n === 'Stat2' && roles.Stat)));   // Stat2 resolves from Stat when the style has none
+  const roleOf = n => (roles && (roles[n] || (n === 'Stat2' && roles.Stat && kpiRole(roles.Stat)))) || null;
   const pad = (deck.styles && deck.styles.pad) || {};
   // slots (deck scope) + layouts
   const checkSlot = (where, name, sl) => {
@@ -220,7 +233,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const tpl = new URL('../template.html', import.meta.url);
     if (fs.existsSync(tpl)) { const t = JSON.parse(fs.readFileSync(tpl, 'utf8').match(/\/\*DECK\*\/([\s\S]*?)\/\*\/DECK\*\//)[1]); deck.styles = {...t.styles, ...(deck.styles || {}), roles: t.styles.roles}; console.error('note    no styles.roles in the model — validated against the template\'s neutral roles (create.mjs does the same)'); }
   }
-  deck.layouts = {...libraryFor(deck), ...(deck.layouts || {})}; expandCharts(deck);   // exactly what create() does, so the same rows are judged
+  deck.layouts = {...libraryFor(deck), ...(deck.layouts || {})}; fillKpi(deck); expandCharts(deck);   // exactly what create() does, so the same rows are judged
   const r = validate(deck);
   for (const m of r.errors) console.error('ERROR   ' + m);
   for (const m of r.warnings) console.error('warning ' + m);

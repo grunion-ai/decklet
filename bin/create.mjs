@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {pathToFileURL, fileURLToPath} from 'node:url';
-import {validate, mergeStyle} from './validate.mjs';
+import {validate, mergeStyle, fillKpi} from './validate.mjs';
 import {libraryFor} from '../lib/layouts.mjs';
 import {expandCharts} from '../lib/chart.mjs';
 
@@ -45,6 +45,7 @@ export function create(model, {style = null, format, space, title, template} = {
     const tpl = JSON.parse(html.match(/\/\*DECK\*\/([\s\S]*?)\/\*\/DECK\*\//)[1]);
     deck.styles = {...tpl.styles, ...(deck.styles || {}), roles: tpl.styles.roles};
   }
+  fillKpi(deck);        // the optional Stat2 role, derived from Stat when a kpi tile asks for it and the style has none
   expandCharts(deck);   // chart rows → the ordinary rows they stand for; the runtime draws no charts
   const tokens = {...(style && style.tokens || {})};
   if (Object.keys(tokens).length) html = put(html, 'TOKENS', Object.entries(tokens).map(([k, v]) => `--${k.replace(/^--/, '')}:${v}`).join(';'));
