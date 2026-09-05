@@ -162,7 +162,7 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
     <button id="help" class="mi mi-circle-question-mark" data-ms="500" aria-haspopup="true" aria-expanded="false" title="Shortcuts" aria-label="Shortcuts"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-mi="animate-icon"><circle cx="12" cy="12" r="10"/><g data-mi="animate-path"><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></g></svg></button>
     <div id="helpmenu" role="dialog" aria-label="Shortcuts">
       <div><kbd>← → / ↑ ↓</kbd> navigate · move a selection 1px (⇧ 10px)</div>
-      <div><kbd>F</kbd> fullscreen (presentation)</div>
+      <div><kbd>F</kbd> fullscreen (presentation · in-window when the browser refuses)</div>
       <div><kbd>Esc · G</kbd> contact sheet (slides)</div>
       <div><kbd>⌘-click · ⇧-click</kbd> multi-select</div>
       <div><kbd>drag</kbd> move · corner handle resizes · drag empty canvas = marquee (⇧ adds)</div>
@@ -228,7 +228,7 @@ const snap=()=>{history.push(JSON.stringify(deck));if(history.length>50)history.
 function undo(){if(!history.length)return;deck=JSON.parse(history.pop());hsave();sel.clear();save();render()}
 
 // windowed = maximal slide: scale up as well as down (no 1-cap); reserve only real chrome (few px sides, HUD below)
-function fit(){const s=document.fullscreenElement?Math.min(innerWidth/W,innerHeight/H):Math.min((innerWidth-12)/W,(innerHeight-52)/H);canvas.style.transform=`scale(${s})`;placeTb()}
+function fit(){const s=document.fullscreenElement||document.body.classList.contains('present-inline')?Math.min(innerWidth/W,innerHeight/H):Math.min((innerWidth-12)/W,(innerHeight-52)/H);canvas.style.transform=`scale(${s})`;placeTb()}
 addEventListener('resize',fit);
 
 // autosave indicator: amber pulse while saving → green ✓ when the shim persisted → red when edits would be lost on refresh.
@@ -635,7 +635,7 @@ addEventListener('keydown',e=>{
   if(e.target.isContentEditable){if(e.key==='Escape')e.target.blur();return}
   if(!sheet.hidden){if(sheetKey(e))e.preventDefault();return}
   if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){e.preventDefault();undo();return}
-  if(e.key==='Escape'){if(helpmenu.classList.contains('open'))help(false);else if(sel.size){sel.clear();render()}else sheetOpen();return}
+  if(e.key==='Escape'){if(helpmenu.classList.contains('open'))help(false);else if(sel.size){sel.clear();render()}else if(inlineP())setPresent(false);else sheetOpen();return} // Esc leaves in-window present the way it leaves real fullscreen
   if(e.key.startsWith('Arrow')&&sel.size){e.preventDefault();nudgeSel(e.key,e.shiftKey?10:1);return} // a selection owns the arrows: nudge, never navigate
   if(e.key==='ArrowRight'||e.key==='ArrowDown'||e.key===' ')nav(1); // ↓ ≡ → (next), ↑ ≡ ← (prev); guarded above: never while editing or in the sheet
   if(e.key==='ArrowLeft'||e.key==='ArrowUp')nav(-1);
@@ -659,9 +659,18 @@ function nudgeSel(key,step){
   }
   save();render();
 }
-// native Fullscreen API — F or button toggles; fullscreen IS presentation mode (chrome hidden, slide fills the screen)
-const fs=()=>{commitEdit();return document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen()};
-document.addEventListener('fullscreenchange',()=>{document.body.classList.toggle('present',!!document.fullscreenElement);document.body.classList.remove('peek');sel.clear();sheet.hidden=true;render();fit()});
+// native Fullscreen API — F or button toggles; fullscreen IS presentation mode (chrome hidden, slide fills the screen).
+// present has two doors: real fullscreen when the browser grants it, else IN-WINDOW (`present-inline`: same chrome-off state,
+// fit() treats the viewport as the screen). Embedded webviews (Claude's browser pane, in-app browsers) reject requestFullscreen
+// or never answer it, and a button that does nothing reads as broken — so a rejection, or 400ms of silence, opens the second door.
+const inlineP=()=>document.body.classList.contains('present-inline');
+const setPresent=(on,inl)=>{document.body.classList.toggle('present',on);document.body.classList.toggle('present-inline',!!(on&&inl));document.body.classList.remove('peek');sel.clear();sheet.hidden=true;render();fit()};
+const fs=()=>{commitEdit();
+  if(document.fullscreenElement)return document.exitFullscreen();
+  if(inlineP())return setPresent(false);
+  let done=false;const fb=()=>{if(!done&&!document.fullscreenElement){done=true;setPresent(true,true)}},t=setTimeout(fb,400);
+  return Promise.resolve().then(()=>document.documentElement.requestFullscreen()).then(()=>{done=true;clearTimeout(t)},()=>{clearTimeout(t);fb()})};
+document.addEventListener('fullscreenchange',()=>setPresent(!!document.fullscreenElement));
 // present mode: HUD reappears while the pointer hovers the bottom twelfth of the screen, hides on leaving —
 // but never auto-hides while something it opened is still open (the + menu, the ⓘ popover, the text toolbar, the contact sheet)
 const pinned=()=>addmenu.classList.contains('open')||helpmenu.classList.contains('open')||!tb.hidden||!sheet.hidden;

@@ -1175,7 +1175,7 @@ test('nudge shares the drag translation path and is named in the shortcuts popov
 
 // ── 8. F presents in-window when fullscreen is refused ──
 live('live: fullscreen rejected or never settling → in-window present; Esc leaves it', async () => {
-  const f = path.join(tmp, 'fsfb.html'); fs.writeFileSync(f, create(explainer.model, explainer.style).html);
+  const f = path.join(tmp, 'fsfb.html'); fs.writeFileSync(f, create(explainer.model, {title: 'fsfb'}).html);
   const b = await pw.chromium.launch();
   for (const stub of ['reject', 'hang']) {
     const p = await b.newPage({viewport: {width: 1280, height: 800}});
