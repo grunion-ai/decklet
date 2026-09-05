@@ -7,6 +7,7 @@
 import fs from 'node:fs';
 import {pathToFileURL} from 'node:url';
 import {LIBRARY, libraryFor, catalogue} from '../lib/layouts.mjs';
+import {checkChart, expandCharts} from '../lib/chart.mjs';
 
 export const ROLES = ['Title', 'Supertitle', 'H1', 'H2', 'Body', 'Caption', 'Label', 'Stat'];
 export const ANIMS = ['rise', 'fade', 'pop', 'wipe'];   // entrance motion on slide entry — the engine ignores anything else
@@ -149,6 +150,7 @@ export function validate(deck) {
     if (r.p != null && typeof r.p === 'string' && !pad[r.p] && !/px|em|%/.test(r.p)) E(`${where}: p "${r.p}" is neither a styles.pad token nor a CSS length`);
     if (r.override && !mids.has(r.override)) E(`${where}: override "${r.override}" is not a master id`);
     if (r.css) Wn(`${where}: raw css escape hatch used`);
+    if (r.chart != null) for (const m of checkChart(r.chart)) E(`${where}: ${m}`);   // a chart row create() could not expand
     if (r.img && !/^data:/.test(r.img)) E(`${where}: img must be a data: URI (single file, zero network)`);
     if (r.svg && /<script|href\s*=\s*["']https?:/i.test(r.svg)) E(`${where}: svg contains script or external href`);
     if (textual && /^\s*\d+\s*\/\s*\d+\s*$/.test(plain(r))) Wn(`${where}: "${plain(r).trim()}" looks like a hardcoded page counter — the footer master renders it`);
@@ -218,6 +220,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const tpl = new URL('../template.html', import.meta.url);
     if (fs.existsSync(tpl)) { const t = JSON.parse(fs.readFileSync(tpl, 'utf8').match(/\/\*DECK\*\/([\s\S]*?)\/\*\/DECK\*\//)[1]); deck.styles = {...t.styles, ...(deck.styles || {}), roles: t.styles.roles}; console.error('note    no styles.roles in the model — validated against the template\'s neutral roles (create.mjs does the same)'); }
   }
+  deck.layouts = {...libraryFor(deck), ...(deck.layouts || {})}; expandCharts(deck);   // exactly what create() does, so the same rows are judged
   const r = validate(deck);
   for (const m of r.errors) console.error('ERROR   ' + m);
   for (const m of r.warnings) console.error('warning ' + m);

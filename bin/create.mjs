@@ -9,6 +9,7 @@ import {createHash} from 'node:crypto';
 import {pathToFileURL, fileURLToPath} from 'node:url';
 import {validate, mergeStyle} from './validate.mjs';
 import {libraryFor} from '../lib/layouts.mjs';
+import {expandCharts} from '../lib/chart.mjs';
 
 // page-size presets of ONE model space: canvas size + print page (named sizes only — Safari ignores px @page sizes)
 export const FORMAT = {
@@ -44,6 +45,7 @@ export function create(model, {style = null, format, space, title, template} = {
     const tpl = JSON.parse(html.match(/\/\*DECK\*\/([\s\S]*?)\/\*\/DECK\*\//)[1]);
     deck.styles = {...tpl.styles, ...(deck.styles || {}), roles: tpl.styles.roles};
   }
+  expandCharts(deck);   // chart rows → the ordinary rows they stand for; the runtime draws no charts
   const tokens = {...(style && style.tokens || {})};
   if (Object.keys(tokens).length) html = put(html, 'TOKENS', Object.entries(tokens).map(([k, v]) => `--${k.replace(/^--/, '')}:${v}`).join(';'));
   const hash = createHash('sha256').update(JSON.stringify(deck)).digest('hex').slice(0, 10);
