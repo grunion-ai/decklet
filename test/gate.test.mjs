@@ -954,6 +954,7 @@ test('contact sheet keeps the HUD: pinned above the sheet only while it is open,
   assert.match(tpl, /#hud button:disabled\{opacity:\.35;cursor:default\}/, 'disabled, not hidden: the pill keeps its shape');
   assert.match(tpl, /function sheetUi\(on\)\{sheet\.hidden=!on;document\.body\.classList\.toggle\('sheet',on\);for\(const k of \['prev','next','fs','add-text','add-box'\]\)\$\(k\)\.disabled=on\}/, 'one switch: hidden flag, body marker and the disabled set move together');
   assert.doesNotMatch(tpl, /sheet\.hidden=(true|false)/, 'nothing flips sheet.hidden behind the switch (present mode included)');
+  assert.match(tpl, /d\.querySelectorAll\('#hud :disabled'\)\.forEach\(b=>b\.disabled=false\)/, 'saveCopy strips the sheet\'s disabled set with the rest of the chrome state');
 });
 live('live: contact sheet — the HUD stays on top with + (adds after the current slide), ⊞ (closes) and the autosave dot live; ‹ › ⛶ disabled', async () => {
   const f = path.join(tmp, 'sheet-hud.html'); fs.writeFileSync(f, create(explainer.model, {title: 'sheet-hud'}).html);
@@ -972,6 +973,9 @@ live('live: contact sheet — the HUD stays on top with + (adds after the curren
   await p.click('#addbtn'); await p.click('#sadd'); await p.waitForTimeout(100);
   const a = await ev(() => ({n: deck.slides.length, open: !document.getElementById('sheet').hidden, cells: document.querySelectorAll('#grid .cell').length, sel: [...document.querySelectorAll('#grid .cell.sel')].map(c => +c.dataset.n), i}));
   assert.deepEqual(a, {n: n0 + 1, open: true, cells: n0 + 1, sel: [2], i: 2}, '+ on the sheet appends after the selected thumbnail, re-renders, selects it');
+  // ⌘S from the sheet: the copy must not bake the sheet's disabled navigator into a deck that opens on the canvas
+  const copy = await ev(async () => { let blob; URL.createObjectURL = x => { blob = x; return 'blob:x'; }; HTMLAnchorElement.prototype.click = () => {}; saveCopy(); return blob.text(); });
+  assert.doesNotMatch(copy, /<button id="(prev|next|fs)"[^>]*\sdisabled/, 'a copy saved from the sheet opens with ‹ › ⛶ enabled'); assert.doesNotMatch(copy, /<body class="[^"]*sheet/, 'no body.sheet baked in');
   await p.click('#grid-btn'); await p.waitForTimeout(100);
   const c = await ev(() => ({open: !document.getElementById('sheet').hidden, marker: document.body.classList.contains('sheet'), disabled: ['prev', 'next', 'fs'].map(k => document.getElementById(k).disabled)}));
   assert.deepEqual(c, {open: false, marker: false, disabled: [false, false, false]}, '⊞ closes the sheet and re-enables the navigator');

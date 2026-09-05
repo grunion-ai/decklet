@@ -769,7 +769,7 @@ document.addEventListener('mousedown',e=>{if(!e.target.closest('#addwrap'))menu(
 // re-stamped — the copy opens anywhere with the edits and never depends on (or shares) browser storage. Keyboard-only, no HUD button.
 function saveCopy(){
   commitEdit();const d=document.documentElement.cloneNode(true),q=s=>d.querySelector(s);
-  d.removeAttribute('style');q('body').removeAttribute('style');q('body').className='';['#canvas','#grid','#print'].forEach(s=>q(s).innerHTML='');
+  d.removeAttribute('style');q('body').removeAttribute('style');q('body').className='';d.querySelectorAll('#hud :disabled').forEach(b=>b.disabled=false);['#canvas','#grid','#print'].forEach(s=>q(s).innerHTML='');
   q('#tb').hidden=q('#sheet').hidden=true;q('#addmenu').classList.remove('open');q('#helpmenu').classList.remove('open');
   const sc=q('script');sc.textContent=sc.textContent
     .replace(/\/\*DECK\*\/[\s\S]*?\/\*\/DECK\*\//,()=>'/*DECK*/'+JSON.stringify(deck).replace(/<\/script/gi,'<\\/script')+'/*/DECK*/')
