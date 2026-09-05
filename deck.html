@@ -161,7 +161,7 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
   <div id="helpwrap">
     <button id="help" class="mi mi-circle-question-mark" data-ms="500" aria-haspopup="true" aria-expanded="false" title="Shortcuts" aria-label="Shortcuts"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-mi="animate-icon"><circle cx="12" cy="12" r="10"/><g data-mi="animate-path"><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></g></svg></button>
     <div id="helpmenu" role="dialog" aria-label="Shortcuts">
-      <div><kbd>← → / ↑ ↓</kbd> navigate</div>
+      <div><kbd>← → / ↑ ↓</kbd> navigate · move a selection 1px (⇧ 10px)</div>
       <div><kbd>F</kbd> fullscreen (presentation)</div>
       <div><kbd>Esc · G</kbd> contact sheet (slides)</div>
       <div><kbd>⌘-click · ⇧-click</kbd> multi-select</div>
@@ -431,6 +431,9 @@ const selEl=()=>{if(sel.size!==1)return null;const k=[...sel][0];return typeof k
 // drag + resize + select + edit — listener sits on #wrap so click-off ANYWHERE outside an element
 // (canvas gaps AND the margin around the canvas) deselects; the HUD is outside #wrap
 let drag=null;
+// the ONE translation: every point of a row travels by the same delta from its resolved origin `o` — x/y AND a connector's
+// far end (line:[x2,y2], curve:[c1,c2,end]); writing x/y alone dragged the tail and left the head pinned. Drag and nudge both use it.
+const moveBy=(el,o,dx,dy)=>{el.x=(o.x||0)+dx;el.y=(o.y||0)+dy;if(o.line)el.line=[o.line[0]+dx,o.line[1]+dy];if(o.curve)el.curve=o.curve.map((v,j)=>j%2?v+dy:v+dx)};
 $('wrap').addEventListener('mousedown',e=>{
   if(!e.target.closest('[contenteditable="true"]'))commitEdit(); // flush a live text edit BEFORE any deselect/re-render destroys its node
   const scale=canvas.getBoundingClientRect().width/W;
@@ -454,7 +457,7 @@ $('wrap').addEventListener('mousedown',e=>{
   // double-click handled via e.detail — the selection re-render on click 1 destroys the
   // node, so a real dblclick event never fires on it (this was the "can't edit" bug)
   if(e.detail>=2){edit(k);return}
-  drag={mode:'move',items:[...sel].map(m=>{const el=typeof m==='number'?slide().els[m]:deck.master.find(x=>x.id===m.slice(2));const r=res(el,slide());return {k:m,el,ox:r.x||0,oy:r.y||0,ol:r.line&&r.line.slice(),oc:r.curve&&r.curve.slice()}}),
+  drag={mode:'move',items:[...sel].map(m=>{const el=typeof m==='number'?slide().els[m]:deck.master.find(x=>x.id===m.slice(2));return {k:m,el,o:res(el,slide())}}),
         sx:e.clientX/scale,sy:e.clientY/scale,moved:false};
   render();
 });
@@ -479,10 +482,7 @@ addEventListener('mousemove',e=>{
   if(!drag.moved){snap();drag.moved=true;drag.items.forEach(it=>{if(typeof it.k!=='number'){const n=fork(it.k.slice(2));sel.delete(it.k);sel.add(n);it.el=slide().els[n]}})}
   // a connector's far end is model geometry in canvas space (line:[x2,y2], curve:[c1,c2,end]) — writing x/y alone
   // dragged the tail and left the head pinned, stretching the stroke. Every point of a row travels by the same delta.
-  drag.items.forEach(it=>{const px=Math.round(it.ox+dx),py=Math.round(it.oy+dy),mx=px-it.ox,my=py-it.oy;
-    it.el.x=px;it.el.y=py;
-    if(it.ol)it.el.line=[it.ol[0]+mx,it.ol[1]+my];
-    if(it.oc)it.el.curve=it.oc.map((v,j)=>j%2?v+my:v+mx)});
+  drag.items.forEach(it=>moveBy(it.el,it.o,Math.round(dx),Math.round(dy)));
   render();
 });
 addEventListener('mouseup',()=>{if(drag){const b=drag.mode==='band';drag=null;b?render():save()}}); // a band moved nothing: clear it, never save
@@ -636,6 +636,7 @@ addEventListener('keydown',e=>{
   if(!sheet.hidden){if(sheetKey(e))e.preventDefault();return}
   if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){e.preventDefault();undo();return}
   if(e.key==='Escape'){if(helpmenu.classList.contains('open'))help(false);else if(sel.size){sel.clear();render()}else sheetOpen();return}
+  if(e.key.startsWith('Arrow')&&sel.size){e.preventDefault();nudgeSel(e.key,e.shiftKey?10:1);return} // a selection owns the arrows: nudge, never navigate
   if(e.key==='ArrowRight'||e.key==='ArrowDown'||e.key===' ')nav(1); // ↓ ≡ → (next), ↑ ≡ ← (prev); guarded above: never while editing or in the sheet
   if(e.key==='ArrowLeft'||e.key==='ArrowUp')nav(-1);
   if((e.key==='Backspace'||e.key==='Delete')&&sel.size){
@@ -645,6 +646,19 @@ addEventListener('keydown',e=>{
   if(e.key.toLowerCase()==='f')fs();
   if(e.key.toLowerCase()==='g')sheetOpen();
 });
+// arrow nudge: EVERY selected row travels by the same fixed delta (1px, ⇧ 10px) so a group stays rigid — the keyboard
+// twin of drag through moveBy: connector far ends travel too, master rows fork first. One undo snapshot per burst (an 800ms pause starts a new one).
+let nudgeAt=0;
+function nudgeSel(key,step){
+  const dx=key==='ArrowLeft'?-step:key==='ArrowRight'?step:0,dy=key==='ArrowUp'?-step:key==='ArrowDown'?step:0;
+  const t=Date.now();if(t-nudgeAt>800)snap();nudgeAt=t;
+  for(const k of [...sel]){let el;
+    if(typeof k!=='number'){const n=fork(k.slice(2));sel.delete(k);sel.add(n);el=slide().els[n]}
+    else el=slide().els[k];
+    moveBy(el,res(el,slide()),dx,dy);
+  }
+  save();render();
+}
 // native Fullscreen API — F or button toggles; fullscreen IS presentation mode (chrome hidden, slide fills the screen)
 const fs=()=>{commitEdit();return document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen()};
 document.addEventListener('fullscreenchange',()=>{document.body.classList.toggle('present',!!document.fullscreenElement);document.body.classList.remove('peek');sel.clear();sheet.hidden=true;render();fit()});

@@ -1138,3 +1138,62 @@ live('live: import-html in-page intent capture (line count, nowrap, hugging chip
   assert.ok(para._fit >= 16 && para._fit < 24, `wrapped paragraph records the largest font-size that keeps its line count (${para._fit})`);
   assert.ok(chip._fit === undefined, 'hugging chip has no width to fit into → no _fit');
 });
+
+// ── 7. keyboard: a selection owns the arrows ──
+live('live: arrows nudge a selection 1px (⇧ 10px), a connector travels whole, one undo per burst, no selection navigates', async () => {
+  const model = {w: 960, h: 540, styles: {roles: modelOf(tpl).styles.roles}, slides: [
+    {els: [{x: 100, y: 100, w: 200, text: 'moved', role: 'body'}, {x: 400, y: 200, line: [560, 260], bg: '#5B9CF6', h: 3, arrow: 'end'}]},
+    {els: [{x: 100, y: 100, w: 200, text: 'two', role: 'body'}]},
+  ]};
+  const f = path.join(tmp, 'nudge.html'); fs.writeFileSync(f, create(model).html);
+  const b = await pw.chromium.launch(); const p = await b.newPage({viewport: {width: 1280, height: 800}});
+  const errs = []; p.on('pageerror', e => errs.push(String(e)));
+  await p.goto(pathToFileURL(f).href); await p.waitForSelector('#canvas .el');
+  await p.evaluate(() => { sel.add(0); sel.add(1); render(); });
+  const h0 = await p.evaluate(() => history.length);
+  await p.keyboard.press('ArrowRight'); await p.keyboard.press('ArrowRight'); await p.keyboard.press('ArrowDown');
+  await p.keyboard.press('Shift+ArrowRight');
+  const got = await p.evaluate(() => ({i, a: [deck.slides[0].els[0].x, deck.slides[0].els[0].y], l: [deck.slides[0].els[1].x, deck.slides[0].els[1].y, ...deck.slides[0].els[1].line], h: history.length}));
+  await b.close();
+  assert.equal(got.i, 0, 'a selection owns the arrows: the deck did not navigate');
+  assert.deepEqual(got.a, [112, 101], '→ → ↓ ⇧→ = +12, +1');
+  assert.deepEqual(got.l, [412, 201, 572, 261], 'a line row travels whole: both ends move by the same delta');
+  assert.equal(got.h - h0, 1, 'one undo snapshot per burst of nudges');
+  assert.deepEqual(errs, []);
+  // no selection: arrows navigate, exactly as before
+  const b2 = await pw.chromium.launch(); const p2 = await b2.newPage({viewport: {width: 1280, height: 800}});
+  await p2.goto(pathToFileURL(f).href); await p2.waitForSelector('#canvas .el');
+  await p2.keyboard.press('ArrowRight');
+  assert.equal(await p2.evaluate(() => i), 1, 'no selection: → navigates');
+  await b2.close();
+});
+test('nudge shares the drag translation path and is named in the shortcuts popover', () => {
+  assert.match(tpl, /const moveBy=\(el,o,dx,dy\)=>/, 'one moveBy helper');
+  assert.equal((tpl.match(/moveBy\(/g) || []).length, 2, 'drag and nudge both call it — no second translation path');
+  assert.match(tpl, /navigate · move a selection 1px \(⇧ 10px\)/);
+});
+
+// ── 8. F presents in-window when fullscreen is refused ──
+live('live: fullscreen rejected or never settling → in-window present; Esc leaves it', async () => {
+  const f = path.join(tmp, 'fsfb.html'); fs.writeFileSync(f, create(explainer.model, explainer.style).html);
+  const b = await pw.chromium.launch();
+  for (const stub of ['reject', 'hang']) {
+    const p = await b.newPage({viewport: {width: 1280, height: 800}});
+    const errs = []; p.on('pageerror', e => errs.push(String(e)));
+    await p.goto(pathToFileURL(f).href); await p.waitForSelector('#canvas .el');
+    await p.evaluate(s => { Element.prototype.requestFullscreen = () => s === 'reject' ? Promise.reject(new TypeError('not allowed')) : new Promise(() => {}); }, stub);
+    await p.keyboard.press('f');
+    await p.waitForFunction(() => document.body.classList.contains('present'), null, {timeout: 1500});
+    const cls = await p.evaluate(() => [...document.body.classList]);
+    assert.ok(cls.includes('present-inline'), stub + ': marker class for the fit maths: ' + cls);
+    assert.equal(await p.evaluate(() => getComputedStyle(document.getElementById('hud')).display), 'none', stub + ': chrome hidden');
+    await p.keyboard.press('Escape');
+    assert.deepEqual(await p.evaluate(() => [document.body.classList.contains('present'), document.body.classList.contains('present-inline'), sheet.hidden]), [false, false, true], stub + ': Esc leaves in-window present without opening the sheet');
+    assert.deepEqual(errs, [], stub);
+    await p.close();
+  }
+  await b.close();
+});
+test('the F shortcut line names the in-window fallback', () => {
+  assert.match(tpl, /<kbd>F<\/kbd> fullscreen \(presentation[^<]*in-window/);
+});
