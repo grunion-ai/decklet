@@ -72,7 +72,7 @@ body.present .el a.lk{pointer-events:auto}
 /* ⓘ popover: the ONE home for shortcut hints (the HUD itself stays free of hint text); click or hover opens, click-away / Esc closes */
 #helpmenu{right:0;padding:8px 10px;line-height:1.7}#helpmenu.open{display:flex}
 #helpmenu kbd{font:inherit;color:var(--accent);display:inline-block;min-width:9em}
-/* floating mini toolbar: role segment + inline marks + promote actions. No font pickers — roles ARE the type system */
+/* floating mini toolbar: role segment + inline marks + Apply to all slides. No font pickers — roles ARE the type system */
 #tb{position:fixed;z-index:12;display:flex;flex-wrap:wrap;align-items:center;max-width:calc(100vw - 8px);gap:4px;padding:4px;background:var(--card);border:1px solid var(--line);border-radius:8px;font:12px ui-monospace,Menlo,monospace}
 #tb[hidden]{display:none}
 /* every segment is one centred line box: buttons and the 16px swatch circles share a vertical axis (symmetric margins/padding) */
@@ -137,7 +137,6 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
     <button data-link="1" title="Link (http, https or mailto)" aria-label="Link"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /> <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg></button>
   </span>
   <span class="seg" id="tb-colors"></span>
-  <button id="tb-layout" hidden title="Promote this geometry to the layout slot" aria-label="Promote this geometry to the layout slot">Apply to layout</button>
   <button id="tb-master" hidden title="Promote this slide-local override back to every slide" aria-label="Promote this slide-local override back to every slide">Apply to all slides</button>
 </div>
 <div id="hud">
@@ -504,13 +503,13 @@ function edit(k){
   getSelection().selectAllChildren(t);
   t.onblur=commitEdit;placeTb();
 }
-// ── floating mini toolbar (roles + inline marks + promote actions) ──
+// ── floating mini toolbar (roles + inline marks + Apply to all slides) ──
 const tb=$('tb');
 // color swatches = the text colors ALREADY in the deck (roles first, then first appearance in rows/runs). No picker, no hex input.
 // dedupe on the RESOLVED value (#23262C and rgb(35, 38, 44) are one swatch); the first literal spelling is kept
 const deckColors=()=>{const seen=new Map();for(const c of [...Object.values(deck.styles&&deck.styles.roles||{}).map(r=>r.color),...[...(deck.master||[]),...deck.slides.flatMap(s=>s.els||[])].flatMap(e=>[e.color,...[...(e.html||'').matchAll(/color:\s*([^;"']+)/g)].map(m=>m[1].trim())])].filter(Boolean)){canvas.style.color=c;const k=getComputedStyle(canvas).color;if(!seen.has(k))seen.set(k,c)}canvas.style.color='';return [...seen.values()]};
 const runSpan=(sr,node)=>{const a=sr.rangeCount&&sr.anchorNode,el=a&&(a.nodeType===1?a:a.parentElement).closest('[style*="color"]');return el&&node.contains(el)&&el!==node?el:null};
-// palette is TEXT color only (no box fill — retracted 2026-08-23): any painting row still gets the toolbar for the promote actions
+// palette is TEXT color only (no box fill — retracted 2026-08-23): any painting row still gets the toolbar for Apply to all slides
 function placeTb(){
   const el=selEl();const k=[...sel][0];
   if(sel.size!==1||!$('sheet').hidden){tb.hidden=true;return}
@@ -528,7 +527,6 @@ function placeTb(){
   tb.querySelectorAll('[data-cmd]').forEach(b=>{b.disabled=!editing;b.classList.toggle('on',editing&&document.queryCommandState(b.dataset.cmd))});
   const run=editing&&!sr.isCollapsed&&runSpan(sr,node),cur=run?(run.getAttribute('style').match(/color:\s*([^;]+)/)||[])[1]:res(src,s).color;
   $('tb-colors').innerHTML=deckColors().map(c=>`<button class="sw${c===(cur||'').trim()?' on':''}" data-color="${c}" style="background:${c}" title="${c}" aria-label="${c}"></button>`).join('');
-  $('tb-layout').hidden=!(el&&el.slot&&['x','y','w','h'].some(p=>el[p]!=null));
   $('tb-master').hidden=!(el&&el.override);
   tb.style.left=Math.max(4,Math.min(rect.left,innerWidth-tb.offsetWidth-4))+'px';tb.style.top=Math.max(4,rect.top-tb.offsetHeight-8)+'px';
 }
@@ -562,7 +560,6 @@ tb.addEventListener('click',e=>{
     const el=slide().els[k];el.role=b.dataset.role;['weight','color','tt','italic'].forEach(p=>delete el[p]);save();render();return;
   }
   const el=slide().els[k];
-  if(b.id==='tb-layout'){snap();const sl=LAY(slide())[el.slot];['x','y','w','h'].forEach(p=>{if(el[p]!=null){sl[p]=el[p];delete el[p]}});save();render()}
   if(b.id==='tb-master'){snap();const id=el.override,mi=deck.master.findIndex(m=>m.id===id);const m={...deck.master[mi],...el,id};delete m.override;deck.master[mi]=m;slide().els.splice(k,1);sel.clear();save();render()}
 });
 document.addEventListener('selectionchange',()=>{if(!tb.hidden||canvas.querySelector('[contenteditable="true"]'))placeTb()});

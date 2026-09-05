@@ -70,10 +70,10 @@ test('selection chrome: nib only for one painting row, never in present mode; pr
 test('master layer: partial fork on edit, hide per slide, footer carries the inline counter on the margin, on screen and in print', () => {
   for (const re of [/function fork\(id\)\{slide\(\)\.els\.push\(\{override:id\}\)/, /const MG=\(\)=>deck\.styles&&deck\.styles\.margin!=null\?deck\.styles\.margin/, /d\.style\.right=MG\(\)\+'px'/, /\(s\.hide\|\|\[\]\)\.includes\(m\.id\)/, /d\.dataset\.footer='1'/, /root\.querySelector\('\[data-footer\]'\)/, /className=f\?'num':'num pin'/, /num\(cv,n\+1\)/, /pg\.style\.background=s\.bg\|\|'var\(--card\)'/]) assert.match(tpl, re, String(re));
 });
-test('slots: deck-scope slots under per-layout slots; + Text binds a free slot; promote actions exist', () => {
+test('slots: deck-scope slots under per-layout slots; + Text binds a free slot; Apply to all slides is the only promote action (Apply to layout removed in 0.3.5)', () => {
   assert.match(tpl, /const LAY=s=>\(\{\.\.\.\(deck\.slots\|\|\{\}\),\.\.\.\(\(deck\.layouts\|\|\{\}\)\[s\.layout\]\|\|\{\}\)\}\)/);
   assert.match(tpl, /const free=Object\.keys\(LAY\(s\)\)\.find\(n=>!s\.els\.some\(e=>e\.slot===n\)\)/);
-  assert.match(tpl, /text:\{[^}]*role:'Body'/); assert.match(tpl, /id="tb-layout"/); assert.match(tpl, /id="tb-master"/);
+  assert.match(tpl, /text:\{[^}]*role:'Body'/); assert.doesNotMatch(tpl, /tb-layout|Apply to layout/); assert.match(tpl, /id="tb-master"/);
 });
 test('roles are the type system: eight complete roles in the template, locked keys, B I U S̶ only (no sub/sup buttons; existing runs still render), NO font/size/color pickers, NO box-fill', () => {
   const m = modelOf(tpl);
