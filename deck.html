@@ -89,6 +89,9 @@ body.present .el a.lk{pointer-events:auto}
 #sheet-back{display:block;margin-bottom:16px;font:12px ui-monospace,Menlo,monospace}
 body.dragging{-webkit-user-select:none;user-select:none}
 #sheet[hidden]{display:none}
+/* the contact sheet keeps the HUD: pinned above the z-20 sheet only while it is open; ‹ › ⛶ are disabled (the sheet is the navigator), + Slide, ⊞, ⤓ and the autosave dot stay live */
+body.sheet #hud{position:fixed;left:0;right:0;bottom:0;z-index:21;background:var(--bg)}body.sheet #sheet{padding-bottom:64px}
+#hud button:disabled{opacity:.35;cursor:default}
 #grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
 .cell{position:relative;aspect-ratio:var(--AR);border:2px solid var(--line);border-radius:8px;overflow:hidden;cursor:grab;background:var(--card);touch-action:none;-webkit-user-select:none;user-select:none;transition:transform .15s ease}
 .cell.sel{border-color:var(--sel);box-shadow:0 0 0 2px var(--sel)}
@@ -565,8 +568,9 @@ tb.addEventListener('click',e=>{
 document.addEventListener('selectionchange',()=>{if(!tb.hidden||canvas.querySelector('[contenteditable="true"]'))placeTb()});
 // ── contact sheet: the slide manager ──
 const sheet=$('sheet'),grid=$('grid');let gsel=new Set(),ganchor=0,clip=null,ins=null;
-function sheetOpen(){commitEdit();sel.clear();gsel=new Set([i]);ganchor=i;sheet.hidden=false;sheetRender();tb.hidden=true}
-function sheetClose(){sheet.hidden=true;render()}
+function sheetUi(on){sheet.hidden=!on;document.body.classList.toggle('sheet',on);for(const k of ['prev','next','fs','add-text','add-box'])$(k).disabled=on}
+function sheetOpen(){commitEdit();sel.clear();gsel=new Set([i]);ganchor=i;sheetUi(true);sheetRender();tb.hidden=true}
+function sheetClose(){sheetUi(false);render()}
 $('sheet-back').onclick=sheetClose; // ← Back: closes to the CURRENT slide (i untouched); Esc / dblclick-a-cell unchanged
 function sheetRender(){
   grid.innerHTML='';
@@ -661,7 +665,7 @@ function nudgeSel(key,step){
 // fit() treats the viewport as the screen). Embedded webviews (Claude's browser pane, in-app browsers) reject requestFullscreen
 // or never answer it, and a button that does nothing reads as broken — so a rejection, or 400ms of silence, opens the second door.
 const inlineP=()=>document.body.classList.contains('present-inline');
-const setPresent=(on,inl)=>{document.body.classList.toggle('present',on);document.body.classList.toggle('present-inline',!!(on&&inl));document.body.classList.remove('peek');sel.clear();sheet.hidden=true;render();fit()};
+const setPresent=(on,inl)=>{document.body.classList.toggle('present',on);document.body.classList.toggle('present-inline',!!(on&&inl));document.body.classList.remove('peek');sel.clear();sheetUi(false);render();fit()};
 const fs=()=>{commitEdit();
   if(document.fullscreenElement)return document.exitFullscreen();
   if(inlineP())return setPresent(false);
@@ -779,7 +783,7 @@ addEventListener('hashchange',()=>{if(hashPos()>=0&&hashPos()!==i){commitEdit();
 $('prev').onclick=()=>nav(-1);
 $('next').onclick=()=>nav(1);
 // + Slide: same layout as the current slide, title slot filled; deleting/reordering lives in the contact sheet
-$('sadd').onclick=()=>{commitEdit();menu(false);snap();const s=slide(),ns={els:[]};if(s.bg)ns.bg=s.bg;if(s.layout){ns.layout=s.layout;const t=Object.entries(LAY(s)).find(([,v])=>v.role==='H1');ns.els.push(t?{slot:t[0],text:'New slide'}:{x:60,y:88,w:W-120,role:'H1',text:'New slide'})}else ns.els.push({x:60,y:88,w:W-120,role:'H1',text:'New slide'});deck.slides.splice(i+1,0,ns);i++;sel.clear();save();render()};
+$('sadd').onclick=()=>{commitEdit();menu(false);snap();const s=slide(),ns={els:[]};if(s.bg)ns.bg=s.bg;if(s.layout){ns.layout=s.layout;const t=Object.entries(LAY(s)).find(([,v])=>v.role==='H1');ns.els.push(t?{slot:t[0],text:'New slide'}:{x:60,y:88,w:W-120,role:'H1',text:'New slide'})}else ns.els.push({x:60,y:88,w:W-120,role:'H1',text:'New slide'});if(!sheet.hidden){i=Math.max(...gsel,i)}deck.slides.splice(i+1,0,ns);i++;sel.clear();save();if(sheet.hidden)render();else{gsel=new Set([i]);ganchor=i;sheetRender()}};
 fit();render();autosave(store.set(KEY,JSON.stringify(deck))?'ok':'bad'); // on load: green when storage takes a write, red when the shim reports it unavailable
 
 // self-check — model round-trips through JSON and renderer draws every element (+ master rows + counter)
