@@ -8,6 +8,7 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {pathToFileURL, fileURLToPath} from 'node:url';
 import {validate, mergeStyle} from './validate.mjs';
+import {libraryFor} from '../lib/layouts.mjs';
 
 // page-size presets of ONE model space: canvas size + print page (named sizes only — Safari ignores px @page sizes)
 export const FORMAT = {
@@ -34,6 +35,7 @@ export function create(model, {style = null, format, space, title, template} = {
   if (deck.w == null || deck.h == null) { deck.w = FORMAT[fmt].w; deck.h = FORMAT[fmt].h; }
   // style.json: {tokens:{bg,fg,muted,accent,card,line,sel,box}, roles:{…}, pad:{…}} — shared with validate --style so the two never drift
   mergeStyle(deck, style);
+  deck.layouts = {...libraryFor(deck), ...(deck.layouts || {})};   // library layouts a slide names and the deck does not define
   // the deck NAMES itself: --title wins, else the model's own title, else "decklet". It is model data, never markup —
   // the runtime titles the document from it, so the tab, the ⤓ PDF filename and the ⌘S copy filename are one string.
   deck.title = title || deck.title || 'decklet';

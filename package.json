@@ -17,6 +17,7 @@
     "deck.html",
     "template.html",
     "bin",
+    "lib",
     "examples",
     "SKILL.md",
     "llms.txt",

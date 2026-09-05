@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 // decklet model-contract validator — pure Node, no browser. Agents run this before create/verify.
 // usage: node bin/validate.mjs model.json [--style style.json] [--strict]     (--strict: warnings fail too)
+//        node bin/validate.mjs --layouts                                      (print the layout library catalogue)
 //   --style: the same style.json create() will build with — text fit is only meaningful against the scale the deck will wear
 // library: import {validate, mergeStyle, ROLES} from './validate.mjs'  →  {ok, errors:[…], warnings:[…]}
 import fs from 'node:fs';
 import {pathToFileURL} from 'node:url';
+import {LIBRARY, libraryFor, catalogue} from '../lib/layouts.mjs';
 
 export const ROLES = ['Title', 'Supertitle', 'H1', 'H2', 'Body', 'Caption', 'Label', 'Stat'];
 export const ANIMS = ['rise', 'fade', 'pop', 'wipe'];   // entrance motion on slide entry — the engine ignores anything else
@@ -61,10 +63,10 @@ export function validate(deck) {
     if (!sl || typeof sl !== 'object') return E(`${where}.${name}: slot must be an object`);
     for (const p of ['x', 'y', 'w']) if (sl[p] != null && sl[p] !== 'auto' && !isNum(sl[p])) E(`${where}.${name}.${p} must be a number`);
     if (sl.role && !roleOk(sl.role)) E(`${where}.${name}: role "${sl.role}" not in styles.roles`);
-    if (!sl.role) Wn(`${where}.${name}: slot has no role — rows bound to it must carry one`);
+    if (!sl.role && sl.h == null) Wn(`${where}.${name}: slot has no role — rows bound to it must carry one`);   // a slot with h and no role is paint or media
   };
   for (const [n, sl] of Object.entries(deck.slots || {})) checkSlot('slots', n, sl);
-  const layouts = deck.layouts || {};
+  const layouts = {...libraryFor(deck), ...(deck.layouts || {})};   // a slide may name a library layout the deck does not define
   for (const [ln, lay] of Object.entries(layouts)) for (const [n, sl] of Object.entries(lay || {})) checkSlot(`layouts.${ln}`, n, sl);
   // master
   const master = deck.master || [];
@@ -162,7 +164,7 @@ export function validate(deck) {
   if (!Array.isArray(deck.slides) || !deck.slides.length) E('slides must be a non-empty array');
   else deck.slides.forEach((s, si) => {
     if (!s || typeof s !== 'object') return E(`slides[${si}]: not an object`);
-    if (s.layout && !layouts[s.layout]) E(`slides[${si}]: layout "${s.layout}" not in deck.layouts`);
+    if (s.layout && !layouts[s.layout]) E(`slides[${si}]: layout "${s.layout}" not in deck.layouts or the library (${Object.keys(LIBRARY).join(', ')})`);
     if (!Array.isArray(s.els)) return E(`slides[${si}]: els must be an array`);
     for (const id of s.hide || []) if (!mids.has(id)) E(`slides[${si}]: hide "${id}" is not a master id`);
     const used = new Set();
@@ -205,6 +207,7 @@ export function validate(deck) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const a = process.argv.slice(2), strict = a.includes('--strict'), si = a.indexOf('--style');
+  if (a.includes('--layouts')) { console.log(catalogue()); process.exit(0); }
   const file = (si < 0 ? a : a.filter((_, k) => k !== si && k !== si + 1)).find(x => !x.startsWith('--'));
   if (!file) { console.error('usage: node bin/validate.mjs model.json [--style style.json] [--strict]'); process.exit(2); }
   const deck = JSON.parse(fs.readFileSync(file, 'utf8'));

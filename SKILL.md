@@ -206,6 +206,55 @@ Resolution order for any row: slot geometry ← master row (for `override` rows)
 - `slots.<slot>` (deck scope) applies under every layout — use it for a supertitle shared by all.
 - A slotted row may carry local x/y/w/h overrides; edit the slot in the model to move every slide at once.
 - Conventional slot names: `supertitle`, `title`, `body`, `body2`. Conventional layouts: `title` (cover), `content`, `section`.
+- A slot may carry any row treatment besides geometry and role — `tile:1`, `bg`, `p:'chip'`, `align`, `nowrap`, `italic`, even `line` — and the engine spreads it onto the bound row. A roleless slot with `h` is paint or media: `{slot:'rule'}` alone draws it.
+
+## LAYOUT LIBRARY
+
+Nineteen named layouts ship with the engine (`lib/layouts.mjs`), in the same shape as a `layouts` entry. Name one on a slide the deck does not define and `create` merges it into `deck.layouts`, scaled from its 960×540 cut to the canvas (1600×900 = ×1.67). Print the catalogue — name, group, density, use, slots — with:
+```
+node bin/validate.mjs --layouts
+```
+Read that instead of inventing geometry. The library is an accelerant, never a fence: a slide may use a library layout, a deck-defined layout, or free rows, and may mix library slots with extra free rows on the same slide (`layout:'kpi-grid'` plus a caption and a rule at y 400 is a normal slide). A deck-defined layout of the same name wins. A slotted row still takes its own x/y/w/h — the `override` path — so a brand with a display role taller than the neutral scale (Title 64/68, Stat 40/44 — what the library is cut for) nudges a slot without redefining the layout. An unknown name is still an error, and the error lists the library.
+
+| group | layout | density | slots |
+|---|---|---|---|
+| openers | `cover` | speaker | supertitle · title (Title) · body · caption |
+| | `agenda` | reading | supertitle · title · n1–n5 (Label) + item1–item5 (Body) |
+| | `section` | speaker | number (Label) · title (Title) · body |
+| text | `statement` | speaker | title (Title) · caption |
+| | `fact` | speaker | stat (Stat) · label · body |
+| | `quote` | speaker | quote (H2, italic) · attribution (Caption) |
+| | `two-cols` | reading | supertitle · title · left · right (Body) |
+| | `two-cols-header` | reading | supertitle · title · header (H2) · left · right |
+| visuals | `image-left` | reading | image (400×320 media) · supertitle · title · body |
+| | `image-right` | reading | supertitle · title · body · image |
+| numbers | `kpi-grid` | reading | supertitle · title · kpi1–3 (tiles) · kpi1–3-delta (chips) · kpi1–3-label · body |
+| | `kpi-grid-4` | reading | the same with four 195px tiles |
+| | `stat` | speaker | supertitle · title · stat (the deck Stat size, centred) · caption |
+| | `chart` | reading | supertitle · title · chart (840×276 media) · takeaway (Body) · source (Caption) |
+| | `comparison` | reading | supertitle · title · left-head · right-head (H2) · left · right |
+| diagrams | `process-steps` | reading | supertitle · title · n1–n4 (Label) · step1–step4 (tiles, Body) · body |
+| plans | `timeline` | reading | supertitle · title · rule (paint) · d1–d4 (dots) · t1–t4 (Label) · e1–e4 (Body) |
+| closers | `cta` | speaker | title (Title) · body · button (paint, give it `href`) · button-label (Body, same `href`) |
+| | `end` | speaker | title (Title) · body · caption |
+
+Density is frontend-slides' rule: a **speaker**-led slide carries ≤ 3 points, a **reading**-first slide 4–8. Delta chips are `Label` on a `chip` pad in `var(--box)`, coloured `var(--ok, var(--accent))`; a falling delta sets `color:'var(--bad, var(--accent))'` on the row — the deck's `ok`/`bad` tokens if the style defines them, else the accent.
+
+Picking a layout by what the content is:
+
+| the slide's content is… | layout |
+|---|---|
+| the deck's name and promise | `cover`; `end` closes |
+| what the deck will cover | `agenda`; `section` between parts |
+| one claim | `statement`; with a number in it → `fact`; the number alone → `stat` |
+| someone's words | `quote` |
+| two bodies of text, a lede over two columns | `two-cols`, `two-cols-header` |
+| a picture and a paragraph | `image-left` / `image-right` |
+| three or four numbers with movement | `kpi-grid` / `kpi-grid-4` |
+| a series with real numbers | `chart` — no numbers, no chart layout |
+| A against B | `comparison` |
+| steps in order | `process-steps`; dated → `timeline` |
+| the ask | `cta` |
 
 ## MASTER layer
 - Drawn under every slide, in array order, identically — chrome is deck-wide and never varies per layout. Rows need a unique `id`.
