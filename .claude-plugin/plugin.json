@@ -1,7 +1,7 @@
 {
   "name": "decklet",
   "displayName": "decklet",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Turn any content into one self-contained, hand-editable HTML slide deck: brand-true type roles, drag-and-retype editor, in-file PDF, verified layout. Zero dependencies.",
   "author": { "name": "Grunion AI", "url": "https://github.com/grunion-ai" },
   "homepage": "https://grunion-ai.github.io/decklet/deck.html",

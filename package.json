@@ -1,6 +1,6 @@
 {
   "name": "@grunion/decklet",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Claude Code and Codex skill plus CLI that turns any content into one self-contained, hand-editable HTML slide deck: brand-true type roles, drag-and-retype editor, in-file PDF, verified layout, zero dependencies. Open-source alternative to PowerPoint, Gamma and PPTX-generator skills.",
   "license": "MIT",
   "type": "module",

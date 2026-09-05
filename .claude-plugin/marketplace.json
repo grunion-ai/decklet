@@ -7,7 +7,7 @@
       "name": "decklet",
       "source": "./",
       "description": "Turn any content into one self-contained, hand-editable HTML slide deck with brand-true type roles, an in-file PDF writer and a layout verifier. Zero dependencies.",
-      "version": "0.3.3",
+      "version": "0.3.4",
       "category": "productivity"
     }
   ]
