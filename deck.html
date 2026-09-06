@@ -20,9 +20,11 @@ body.present .el a.lk{pointer-events:auto}
 #savecopy{display:none}body.nostore #savecopy{display:inline-flex}
 #spell.off{opacity:.35} /* spellcheck off: the toggle dims like a disabled control; nothing else changes on screen */
 #snap[aria-pressed=false]{opacity:.35} /* guides + snap: off (the default) dims the same way */
-/* layout guides = selection chrome: one hairline per distinct slot edge of THIS slide's layout, painted by render() only — never by
-   drawEls, so print, the sheet and the PDF cannot carry them. The line a drag is holding brightens; a press passes straight through */
-#canvas .gl{position:absolute;pointer-events:none;z-index:2;background:var(--sel);opacity:.28}#canvas .gl.v{top:0;bottom:0;width:1px}#canvas .gl.h{left:0;right:0;height:1px}#canvas .gl.on{opacity:1;box-shadow:0 0 0 .5px var(--sel)}
+/* layout guides = selection chrome: one hairline per distinct slot edge of THIS slide's layout (and the canvas mid-lines), painted by
+   render() only — never by drawEls, so print, the sheet and the PDF cannot carry them. They show only while a drag is in flight, the
+   line holding the box brightens, and a press passes straight through */
+#canvas .gl{position:absolute;pointer-events:none;z-index:2;background:var(--sel);opacity:0;transition:opacity .08s}#canvas.dragging .gl{opacity:.28}#canvas .gl.v{top:0;bottom:0;width:1px}#canvas .gl.h{left:0;right:0;height:1px}#canvas.dragging .gl.on{opacity:1;box-shadow:0 0 0 .5px var(--sel)}
+@media (prefers-reduced-motion:reduce){#canvas .gl{transition:none}}
 /* rows carry their own typography: the element adds NOTHING implicit (no padding, radius or pre-wrap) — chrome lives on .box/.tile only */
 .el{position:absolute;cursor:grab;padding:0;border-radius:0;white-space:normal;line-height:normal}
 .el.box{border:1.5px solid var(--accent);background:var(--box);text-align:center;padding:6px 8px;border-radius:8px;white-space:pre-wrap}
@@ -195,7 +197,7 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
       <div><kbd>⌘B · ⌘I · ⌘U</kbd> bold · italic · underline (a selected row takes it whole)</div>
       <div><kbd>⌘P</kbd> PDF (the download button) · paper print</div>
       <div><kbd>✓ button</kbd> spellcheck (the browser's own · marks the focused row · never in present, print or PDF)</div>
-      <div><kbd>magnet button</kbd> layout guides + snap (off by default · hairlines on this slide's layout slots · a drag, a resize or a connector nib snaps within 6px · never in present, print or PDF)</div>
+      <div><kbd>magnet button</kbd> layout guides + snap (off by default · hairlines on this slide's layout slots · hairlines show while you drag · a drag, a resize or a connector nib snaps within 10px · never in present, print or PDF)</div>
     </div>
   </div>
 </div>
@@ -292,7 +294,7 @@ const SKEY=NS+':spell';let SPELL=store.get(SKEY)!=='0';
 const GKEY=NS+':snap';let SNAP=store.get(GKEY)==='1';
 // feel knobs (browser-only, not persisted): px = the reach of a line · centers = a box's centre snaps too · mid = the canvas
 // mid-lines join the guides · hyst = a held line keeps its grip this much further, so a snapped edge does not chatter at the edge of reach
-const SNAPO={px:6,centers:true,mid:false,hyst:0};
+const SNAPO={px:10,centers:true,mid:true,hyst:4}; // Kyle's pick, 2026-09-06: magnetic
 const CANSTORE=(()=>{try{localStorage.setItem(NS+':probe','1');localStorage.removeItem(NS+':probe');return true}catch{return false}})();
 const LKEY=NS+':log',VKEY=NS+':vers';
 // the browser's copy of the log and the versions: the file's own, plus what this browser added since (⌘S / write-back put them in the file)
@@ -521,6 +523,7 @@ function render(){
   sel.forEach(k=>{if(typeof k==='number'?!s.els[k]:!(deck.master||[]).some(m=>m.id===k.slice(2)))sel.delete(k)}); // stale keys (slide changed under a selection) never reach the painter
   canvas.innerHTML='';
   drawEls(s,canvas,animate);
+  canvas.classList.toggle('dragging',!!(drag&&drag.mode!=='band'));
   if(SNAP&&!present()){const g=guides(s),h=drag&&drag.hit||{};for(const x of g.x){const l=document.createElement('i');l.className='gl v'+(h.x===x?' on':'');l.style.left=x+'px';canvas.appendChild(l)}for(const y of g.y){const l=document.createElement('i');l.className='gl h'+(h.y===y?' on':'');l.style.top=y+'px';canvas.appendChild(l)}}
   const node=k=>canvas.querySelector(typeof k==='number'?`[data-n="${k}"]`:`[data-m="${k.slice(2)}"]`);
   sel.forEach(k=>{const d=node(k);d&&d.classList.add('selected')});

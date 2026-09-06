@@ -1313,14 +1313,14 @@ test('guides + snap: the HUD carries the toggle, OFF by default, per browser (lo
   assert.doesNotMatch(de, /guides\(|'gl /, 'drawEls paints no guide');
   assert.match(tpl.slice(tpl.indexOf('function render()'), tpl.indexOf('// counter:')), /if\(SNAP&&!present\(\)\)\{const g=guides\(s\)/, 'render() paints them, only when on and not presenting');
   assert.match(tpl, /body\.present \.gl,body\.present #snap\{display:none!important\}/, 'present strips them, and the toggle leaves the peek pill (it would put the pill on a 4:5 counter)'); assert.match(tpl, /@media print\{\n\s*#wrap,#hud,#tb,#sheet,\.gl\{display:none!important\}/, 'print strips them');
-  assert.match(tpl, /#canvas \.gl\{position:absolute;pointer-events:none/, 'a line never takes a press');
+  assert.match(tpl, /#canvas \.gl\{position:absolute;pointer-events:none;z-index:2;background:var\(--sel\);opacity:0/, 'a line never takes a press, and rests invisible'); assert.match(tpl, /#canvas\.dragging \.gl\{opacity:\.28\}/, 'a drag in flight shows them'); assert.match(tpl, /const SNAPO=\{px:10,centers:true,mid:true,hyst:4\}/, 'the magnetic feel Kyle picked');
   assert.match(tpl, /function snapTo\([^)]*\)\{if\(!SNAP\)return\{dx,dy,hit:null\}/, 'off = the raw delta, nothing else runs');
   assert.doesNotMatch(tpl.slice(tpl.indexOf('function nudgeSel('), tpl.indexOf('save();render();', tpl.indexOf('function nudgeSel('))), /snapTo|nearest\(/, 'the keyboard nudge never snaps: 1px is the point of it');
   assert.match(tpl, /q\('#snap'\)\.setAttribute\('aria-pressed','false'\)/, 'fileHtml() resets the toggle: a saved copy opens with guides off');
   assert.match(read('SKILL.md'), /guides/, 'SKILL.md hand-off names the toggle');
 });
 live('live: guides + snap — off paints nothing; on paints one hairline per distinct slot edge; a drag lands on a line in range, passes one out of range; off = raw delta; the resize nib and a connector nib snap too; print, the sheet and the ⤓ PDF carry none; save() writes no key; on survives a reload', async () => {
-  // margin 60 → x 60|900 ; slots add x 460|500 and y 76|160|300 ; the red box (x 300, w 100) and the line are the movers
+  // margin 60 → x 60|900 ; slots add x 460|500 and y 76|160|300 ; the canvas mid-lines add x 480, y 270 ; the red box (x 300, w 100) and the line are the movers
   const m = {w: 960, h: 540, styles: {margin: 60}, layouts: {two: {title: {x: 60, y: 76, w: 840, role: 'H1'}, left: {x: 60, y: 160, w: 400, h: 140, role: 'Body'}, right: {x: 500, y: 160, w: 400, h: 140, role: 'Body'}}},
     slides: [{layout: 'two', els: [{slot: 'title', text: 'Guides'}, {x: 300, y: 380, w: 100, h: 40, bg: '#e33'}, {x: 120, y: 470, line: [220, 470], h: 3}]}, {els: [{x: 60, y: 80, w: 800, role: 'H1', text: 'free'}]}]};
   const f = path.join(tmp, 'snap.html'); fs.writeFileSync(f, create(m, {title: 'guides'}).html);
@@ -1330,7 +1330,7 @@ live('live: guides + snap — off paints nothing; on paints one hairline per dis
   const lines = () => p.evaluate(() => [[...document.querySelectorAll('#canvas .gl.v')].map(l => parseFloat(l.style.left)), [...document.querySelectorAll('#canvas .gl.h')].map(l => parseFloat(l.style.top))]);
   assert.deepEqual(await lines(), [[], []], 'off by default: no line'); assert.equal(await p.evaluate(() => $('snap').getAttribute('aria-pressed')), 'false');
   await p.click('#snap');
-  assert.deepEqual(await lines(), [[60, 460, 500, 900], [76, 160, 300]], 'one hairline per distinct slot edge (margin 60/900 folds into the slot edges)');
+  assert.deepEqual(await lines(), [[60, 460, 480, 500, 900], [76, 160, 270, 300]], 'one hairline per distinct slot edge (margin 60/900 folds into the slot edges) plus the mid-lines'); assert.equal(await p.evaluate(() => +getComputedStyle(document.querySelector('#canvas .gl')).opacity), 0, 'at rest they are invisible');
   assert.deepEqual(await p.evaluate(() => [$('snap').title, $('snap').getAttribute('aria-pressed'), +getComputedStyle($('snap')).opacity]), ['Layout guides + snap (on)', 'true', 1]);
   const scale = await p.evaluate(() => canvas.getBoundingClientRect().width / W);
   const at = async k => p.evaluate(k => { const r = document.querySelector(`.el[data-n="${k}"]`).getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }, k);
@@ -1338,18 +1338,22 @@ live('live: guides + snap — off paints nothing; on paints one hairline per dis
   const box = () => p.evaluate(() => { const e = slide().els[1]; return [e.x, e.y]; });
   await dragBy(1, 196, 0); assert.deepEqual(await box(), [500, 380], 'left edge 4px short of x=500 → snapped onto it');
   assert.equal(await p.evaluate(() => log.filter(e => e.r === slide().els[1].id).length), 1, 'the snapped drag is one logged edit');
-  await dragBy(1, 20, 0); assert.deepEqual(await box(), [520, 380], 'no line inside 6px of 520, 620 or the centre 570 → the raw delta');
-  await dragBy(1, -95, 0); assert.deepEqual(await box(), [425, 380], 'left 425, right 525, centre 475: nothing inside 6px → the raw delta');
-  await dragBy(1, 0, -84); assert.deepEqual(await box(), [425, 300], 'top edge 4px short of y=300 → snapped (the bottom edge 336 and centre 316 sit on nothing)');
+  await dragBy(1, 20, 0); assert.deepEqual(await box(), [520, 380], 'no line inside 10px of 520, 620 or the centre 570 → the raw delta');
+  await dragBy(1, -95, 0); assert.deepEqual(await box(), [430, 380], 'left 425, right 525: nothing in reach; the centre 475 takes the mid-line 480');
+  await dragBy(1, 0, -84); assert.deepEqual(await box(), [430, 300], 'top edge 4px short of y=300 → snapped (the bottom edge 336 and centre 316 sit on nothing)');
   // the hit line brightens while the pointer is down
-  let [x, y] = await at(1); await p.mouse.move(x, y); await p.mouse.down(); await p.mouse.move(x + 30 * scale, y, {steps: 2});
+  let [x, y] = await at(1); await p.mouse.move(x, y); await p.mouse.down(); await p.mouse.move(x + 30 * scale, y, {steps: 1}); // one step: a half-way step would let the centre take 500 first and the hold would keep it
   assert.deepEqual(await p.evaluate(() => [...document.querySelectorAll('#canvas .gl.on')].map(l => l.className + ':' + (l.style.left || l.style.top))), ['gl v on:460px', 'gl h on:300px'], 'the held lines wear .on while the pointer is down');
-  await p.mouse.up(); assert.deepEqual(await box(), [460, 300], 'left 455 → 460');
+  assert.deepEqual(await p.evaluate(() => [+getComputedStyle(document.querySelector('#canvas .gl')).opacity, +getComputedStyle(document.querySelector('#canvas .gl.on')).opacity]), [0.28, 1], 'in flight: the set shows, the held line brightens');
+  // hold: 460 has the box; 12px on is past the 10px reach but inside reach + 4 hold, so 460 keeps it (a fresh search would hand it to 480); 20px on lets go
+  await p.mouse.move(x + 42 * scale, y, {steps: 2}); assert.equal(await p.evaluate(() => slide().els[1].x), 460, 'held at 12px');
+  await p.mouse.move(x + 50 * scale, y, {steps: 2}); assert.equal(await p.evaluate(() => slide().els[1].x), 480, 'released at 20px, and 480 takes it');
+  await p.mouse.up(); assert.deepEqual(await box(), [480, 300]);
   // the resize nib snaps the far edge; a connector's point nib snaps the point
   await p.evaluate(() => { sel.clear(); sel.add(1); render(); });
   [x, y] = await p.evaluate(() => { const r = document.querySelector('.el[data-n="1"] .h').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; });
-  await p.mouse.move(x, y); await p.mouse.down(); await p.mouse.move(x + (496 - 560) * scale, y, {steps: 3}); await p.mouse.up();
-  assert.equal(await p.evaluate(() => slide().els[1].w), 40, 'right edge dragged to 496 → 500 (w 40)');
+  await p.mouse.move(x, y); await p.mouse.down(); await p.mouse.move(x + (896 - 580) * scale, y, {steps: 3}); await p.mouse.up();
+  assert.equal(await p.evaluate(() => slide().els[1].w), 420, 'right edge dragged to 896 → the margin at 900 (w 420)');
   await p.evaluate(() => { sel.clear(); sel.add(2); render(); });
   [x, y] = await p.evaluate(() => { const r = document.querySelector('.h.pt[data-pt="e"]').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; });
   await p.mouse.move(x, y); await p.mouse.down(); await p.mouse.move(x + (456 - 220) * scale, y, {steps: 3}); await p.mouse.up();
@@ -1357,10 +1361,10 @@ live('live: guides + snap — off paints nothing; on paints one hairline per dis
   // off: the raw delta, no lines, dimmed
   await p.click('#snap'); assert.deepEqual(await lines(), [[], []]); assert.equal(await p.evaluate(() => +getComputedStyle($('snap')).opacity), 0.35);
   await p.evaluate(() => { sel.clear(); render(); });
-  await dragBy(1, 36, 0); assert.deepEqual(await box(), [496, 300], 'off: 460+36 = 496 stays 496, four px from a line');
-  await p.click('#snap'); assert.deepEqual(await lines(), [[60, 460, 500, 900], [76, 160, 300]]);
-  // a slide with no layout offers the margin alone
-  await p.evaluate(() => nav(1)); assert.deepEqual(await lines(), [[60, 900], []]); await p.evaluate(() => nav(-1));
+  await dragBy(1, 16, 0); assert.deepEqual(await box(), [496, 300], 'off: 480+16 = 496 stays 496, four px from a line');
+  await p.click('#snap'); assert.deepEqual(await lines(), [[60, 460, 480, 500, 900], [76, 160, 270, 300]]);
+  // a slide with no layout offers the margin and the mid-lines alone
+  await p.evaluate(() => nav(1)); assert.deepEqual(await lines(), [[60, 480, 900], [270]]); await p.evaluate(() => nav(-1));
   // never in print, the sheet, the file, or the ⤓ PDF
   await p.evaluate(() => dispatchEvent(new Event('beforeprint'))); assert.equal(await p.evaluate(() => document.querySelectorAll('#print .gl').length), 0, 'print pages carry none');
   await p.emulateMedia({media: 'print'}); assert.equal(await p.evaluate(() => getComputedStyle(document.querySelector('#canvas .gl')).display), 'none', 'and the live ones are hidden under print media'); await p.emulateMedia({media: 'screen'});
@@ -1372,6 +1376,6 @@ live('live: guides + snap — off paints nothing; on paints one hairline per dis
   // present strips them; on survives a reload
   await p.evaluate(() => { Element.prototype.requestFullscreen = () => Promise.reject(new TypeError('no')); }); await p.keyboard.press('f');
   await p.waitForFunction(() => document.body.classList.contains('present'), null, {timeout: 1500}); assert.deepEqual(await lines(), [[], []], 'present: none'); await p.keyboard.press('Escape'); await p.evaluate(() => sheetClose());
-  await p.reload(); await p.waitForSelector('#canvas .el'); assert.deepEqual(await lines(), [[60, 460, 500, 900], [76, 160, 300]], 'on persists per browser');
+  await p.reload(); await p.waitForSelector('#canvas .el'); assert.deepEqual(await lines(), [[60, 460, 480, 500, 900], [76, 160, 270, 300]], 'on persists per browser');
   assert.deepEqual(errs, []); await b.close();
 });
