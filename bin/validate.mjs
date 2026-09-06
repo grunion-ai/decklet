@@ -166,6 +166,7 @@ export function validate(deck) {
     if (r.bar && !(isNum(r.h) && r.bg)) E(`${where}: bar needs h and bg`);
     if (r.p != null && typeof r.p === 'string' && !pad[r.p] && !/px|em|%/.test(r.p)) E(`${where}: p "${r.p}" is neither a styles.pad token nor a CSS length`);
     if (r.override && !mids.has(r.override)) E(`${where}: override "${r.override}" is not a master id`);
+    if (r.group != null && typeof r.group !== 'string') E(`${where}: group must be a string — rows sharing one move as one`);
     if (r.css) Wn(`${where}: raw css escape hatch used`);
     if (r.chart != null) for (const m of checkChart(r.chart)) E(`${where}: ${m}`);   // a chart row create() could not expand
     if (r.img && !/^data:/.test(r.img)) E(`${where}: img must be a data: URI (single file, zero network)`);

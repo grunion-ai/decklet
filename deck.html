@@ -37,6 +37,8 @@ body.present .el a.lk{pointer-events:auto}
 .el.selected{outline:2px solid var(--sel);outline-offset:2px}
 /* marquee = selection chrome too: the drag window render() paints while a band is being pulled; never in present/print */
 .band{position:absolute;z-index:9;pointer-events:none;border:1px solid var(--sel);background:color-mix(in srgb,var(--sel) 14%,transparent)}
+/* group box = the union of a selected group's rows: the cue that the selection is one unit; chrome, never printed */
+.gbox{position:absolute;z-index:9;pointer-events:none;outline:1px dashed var(--sel);outline-offset:6px;border-radius:4px}
 .el[contenteditable="true"]{cursor:text;outline:2px dashed var(--sel);outline-offset:2px}
 /* resize nib = selection chrome only: drawn by render() for one selected painting row; never in present/print */
 .el .h{position:absolute;right:-7px;bottom:-7px;width:13px;height:13px;background:var(--accent);border:2px solid var(--bg);border-radius:4px;cursor:nwse-resize}
@@ -513,6 +515,12 @@ function render(){
   drawEls(s,canvas,animate);
   const node=k=>canvas.querySelector(typeof k==='number'?`[data-n="${k}"]`:`[data-m="${k.slice(2)}"]`);
   sel.forEach(k=>{const d=node(k);d&&d.classList.add('selected')});
+  // a selected group reads as one unit: one dashed box around the union of its rows' live boxes (DOM rects, so text height counts)
+  if(!present()){const cr=canvas.getBoundingClientRect(),sc=cr.width/W,ox=cr.left+canvas.clientLeft*sc,oy=cr.top+canvas.clientTop*sc,gs=new Map(); // children sit inside the canvas border
+    sel.forEach(k=>{if(typeof k!=='number')return;const g=res(s.els[k],s).group;if(g!=null)gs.set(g,[...(gs.get(g)||[]),k])});
+    if(sc>0)gs.forEach(ks=>{if(ks.length<2)return;let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+      ks.forEach(k=>{const d=node(k);if(!d)return;const q=d.getBoundingClientRect();x0=Math.min(x0,(q.left-ox)/sc);y0=Math.min(y0,(q.top-oy)/sc);x1=Math.max(x1,(q.right-ox)/sc);y1=Math.max(y1,(q.bottom-oy)/sc)});
+      if(x1>x0){const b=document.createElement('div');b.className='gbox';b.style.cssText=`left:${x0}px;top:${y0}px;width:${x1-x0}px;height:${y1-y0}px`;canvas.appendChild(b)}})}
   if(drag&&drag.mode==='band'&&drag.box){const bd=document.createElement('div');bd.className='band';const[x1,y1,x2,y2]=drag.box;bd.style.cssText=`left:${x1}px;top:${y1}px;width:${x2-x1}px;height:${y2-y1}px`;canvas.appendChild(bd)}
   // nib: one selected row that paints and has size; never in present mode (print never calls render)
   // a connector gets one point nib per endpoint (and per control point on a curve), drawn on the canvas in model space — the
@@ -543,6 +551,9 @@ let drag=null;
 // far end (line:[x2,y2], curve:[c1,c2,end]); writing x/y alone dragged the tail and left the head pinned. Drag and nudge both use it.
 // a right-anchored row keeps its anchor: the drag writes `right`, never an x that would freeze a measured width into the model
 const moveBy=(el,o,dx,dy)=>{if(o.right!=null){el.right=o.right-dx;delete el.x}else el.x=(o.x||0)+dx;el.y=(o.y||0)+dy;if(o.line)el.line=[o.line[0]+dx,o.line[1]+dy];if(o.curve)el.curve=o.curve.map((v,j)=>j%2?v+dy:v+dx)};
+// a group is one unit: rows on the slide sharing `group` (every row keeps canvas-space x/y — nothing is relative, so moveBy
+// needs no new case). Selecting a member selects the group; ⌘-click takes a member alone. Master rows never group.
+const grp=k=>{if(typeof k!=='number')return [k];const s=slide(),g=res(s.els[k],s).group;return g==null?[k]:s.els.map((el,n)=>res(el,s).group===g?n:-1).filter(n=>n>=0)};
 $('wrap').addEventListener('mousedown',e=>{
   if(!e.target.closest('[contenteditable="true"]'))commitEdit(); // flush a live text edit BEFORE any deselect/re-render destroys its node
   const scale=canvas.getBoundingClientRect().width/W;
@@ -568,7 +579,7 @@ $('wrap').addEventListener('mousedown',e=>{
   if(t.isContentEditable)return;
   const k=t.dataset.n!=null?+t.dataset.n:'m:'+t.dataset.m;
   if(e.metaKey||e.ctrlKey){sel.has(k)?sel.delete(k):sel.add(k)}
-  else if(!sel.has(k)){sel.clear();sel.add(k)}
+  else if(!sel.has(k)){sel.clear();grp(k).forEach(n=>sel.add(n))}
   // double-click handled via e.detail — the selection re-render on click 1 destroys the
   // node, so a real dblclick event never fires on it (this was the "can't edit" bug)
   if(e.detail>=2){edit(k);return}
@@ -586,6 +597,7 @@ addEventListener('mousemove',e=>{
     const[b0,b1,b2,b3]=drag.box;sel.clear();drag.base.forEach(k=>sel.add(k));
     canvas.querySelectorAll('.el').forEach(d=>{const q=d.getBoundingClientRect();
       if((q.left-cr.left)/scale>=b0&&(q.top-cr.top)/scale>=b1&&(q.right-cr.left)/scale<=b2&&(q.bottom-cr.top)/scale<=b3)sel.add(d.dataset.n!=null?+d.dataset.n:'m:'+d.dataset.m)});
+    [...sel].forEach(k=>grp(k).forEach(n=>sel.add(n))); // a band that takes any member takes the group
     render();return;
   }
   const dx=e.clientX/scale-drag.sx,dy=e.clientY/scale-drag.sy;
