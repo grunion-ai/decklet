@@ -72,9 +72,17 @@ node bin/validate.mjs model.json --style style.json --strict   # warnings fail t
 
 ### Step 4 — create
 ```
-node bin/create.mjs --model model.json [--style style.json] --out deck.html --format slides [--space 1600x900] [--title "…"]
+node bin/create.mjs --model model.json [--style style.json] --out deck.html --format slides [--space 1600x900] [--title "…"] [--from prev.html]
 ```
-Refuses an invalid model (`--force` to override while iterating). Stamps a per-deck storage namespace from the model hash, so a rebuilt deck never loads a stale local edit.
+Refuses an invalid model (`--force` to override while iterating). Stamps `deck.id` (born once, from the first model — the browser's storage namespace, stable across versions), `deck.rev` (this build's content hash), a `slide.id` on every slide and a row `id` on every row that has none — deterministic (`s1, s2… / r1, r2…`), so the same model builds byte-identically.
+
+**Revising a deck a human has touched — `--from` is mandatory.** The deck file carries the human's edits (`/*LOG*/`) and its version history (`/*VERSIONS*/`). Run, in this order:
+```
+node bin/edits.mjs deck.html                       # 1. READ what the human changed — before you touch the model
+node bin/create.mjs --model model.json --out deck.html --from deck.html   # 2. write the new version LAST
+node bin/verify.mjs deck.html                      # 3. verify the result
+```
+`--from` inherits the deck id and the slide/row ids (by content, then by position — carry ids in `model.json` to make it exact), replays every logged edit onto the new model (**human wins**; a key you also changed is reported as a conflict and the human's value stays — put yours in the log's `conflict` if it matters), and pushes the file's previous state into the version history, so nothing the human did can be lost by a rebuild. The diff-and-migrate is the last thing you do, never the first: read the log, keep their geometry and text, then regenerate.
 
 **The deck names itself.** `--title` wins, else the model's own `title`, else `decklet`; the winner is written into the model and the runtime titles the document from it. One short, human name — you are the one who writes it — becomes the browser tab, the `⤓` PDF filename and the `⌘S` save-a-copy filename.
 
@@ -97,14 +105,16 @@ Fix the model, not the output. Re-run until `VERIFY PASS`. Attach `verify-out/re
 ### Step 6 — hand-off notes for the human editor
 Say, in this order:
 1. Where the file is and that it opens from disk in any browser, no install, no network.
-2. **HUD (the full set, left to right):** prev / next (chevrons) · autosave dot · `+` (Text / Box / Slide) · contact sheet (grid icon; G or Esc) · spellcheck (spell-check icon; on by default, dims when off) · save a copy (copy icon; ⌘S — only shown when the browser blocks storage) · PDF (file-down icon) · fullscreen (maximize icon; F) · shortcuts (question mark). The icons are Lucide shapes with movingicons.dev motion — the set weave uses — each playing once on load and once per hover, never on a loop.
-   <!-- HUD: prev next autosave addbtn grid-btn spell savecopy pdf fs help -->
-   This manifest is a contract: the gate compares it against the template, so the HUD cannot gain or lose a control without this line changing. While presenting, the HUD peeks back as a centred pill above the bottom edge — never over the page counter in the corner. On the contact sheet the HUD stays, pinned above the thumbnails, with prev/next/present disabled (the sheet is the navigator) and `+` adding a slide after the current one. Drag to move (a connector travels whole — both ends and every control point), ⌘-click to multi-select, drag from empty canvas for a marquee that takes every row it wholly contains (⇧ adds to the selection), double-click to retype, corner nib to resize, ⌘Z to undo (persists across reloads). Selecting text shows a floating toolbar: role segment, **B / I / U / S̶ / link** (marks never change size; the link takes http, https or mailto — an empty field unlinks), the deck's own colours as swatches, "Apply to all slides".
+2. **HUD (the full set, left to right):** prev / next (chevrons) · autosave dot (green = the file has everything · amber = saved in this browser, N edits not in the file yet · red = nothing persists; click = ⌘S) · `+` (Text / Box / Slide) · contact sheet (grid icon; G or Esc) · spellcheck (spell-check icon; on by default, dims when off) · save a copy (copy icon — only shown when the browser blocks storage) · versions (history icon: pin this version, restore an earlier one) · PDF (file-down icon) · fullscreen (maximize icon; F) · shortcuts (question mark). The icons are Lucide shapes with movingicons.dev motion — the set weave uses — each playing once on load and once per hover, never on a loop.
+   <!-- HUD: prev next autosave addbtn grid-btn spell savecopy vers pdf fs help -->
+   This manifest is a contract: the gate compares it against the template, so the HUD cannot gain or lose a control without this line changing. While presenting, the HUD peeks back as a centred pill above the bottom edge — never over the page counter in the corner. On the contact sheet the HUD stays, pinned above the thumbnails, with prev/next/present disabled (the sheet is the navigator) and `+` adding a slide after the current one. Drag to move (a connector travels whole — both ends and every control point), ⌘-click to multi-select, drag from empty canvas for a marquee that takes every row it wholly contains (⇧ adds to the selection), double-click to retype, corner nib to resize, a connector's **point nibs** move one end (or a curve's control point) while a drag on its shaft moves it whole, ⌘Z to undo (persists across reloads), ⌘B / ⌘I / ⌘U mark a text selection or a whole selected row. Selecting text shows a floating toolbar: role segment, **B / I / U / S̶ / link** (marks never change size; the link takes http, https or mailto — an empty field unlinks), the deck's own colours as swatches, "Apply to all slides".
 3. **Contact sheet:** live thumbnails 3-across; click / ⌘ / shift select, double-click opens, grab-and-drag reorders (mouse or touch — the other cells slide aside), ⌫ deletes (never the last), ⌘C ⌘V ⌘D ⌘Z. It also opens in present mode.
 4. **PDF:** links become real `/Link` annotations, so a LinkedIn document post is clickable. the PDF button downloads a **true slide-sized PDF written inside the file** — no library, no server. Each slide is rasterised from its live DOM (SVG `foreignObject` → canvas at 2× → JPEG) onto a W×H pt page, so a 16:9 deck is a 16:9 PDF with no letterboxing; fonts must be local (they are — the deck loads none). Verified in Chromium; **Safari's `foreignObject` path is unconfirmed** — if rasterising throws or the canvas is tainted, the PDF button falls back to `print()`. **⌘P is the paper path:** one page per slide, each with its own background, on a **named** page size — Letter (A4 for `document-a4`) — because Safari ignores pixel `@page` sizes; the slide is zoomed to the printable width. Choose "Save as PDF" there for a paper-shaped file.
 5. **Presenting:** F or the fullscreen button; chrome hides, backdrop = current slide's background, HUD peeks back when the pointer rests at the bottom edge and stays pinned while the + menu, the text toolbar or the contact sheet is open. Arrow keys / space advance; Esc opens the contact sheet to jump.
-6. **Persistence, honestly:** edits autosave to the browser's local storage per deck — **except in Safari opened from `file://`, which blocks storage entirely.** The deck detects that at load: the autosave dot goes red with the reason, and a the Save-a-copy button **Save a copy** button appears next to the PDF button. In that state `⌘S` (or the Save-a-copy button) is the durable path — it downloads a self-contained `.html` with the current model baked in — or open the deck in Chrome. The session itself is never lost mid-edit; only a refresh is.
-7. To publish an edited deck, copy the model back: in the console `copy(JSON.stringify(deck))` (or read the `decklet:<hash>:model` storage key) → `model.json` → re-create. Everything a human applies in the editor — including links — round-trips that way.
+6. **Persistence, honestly.** Every edit autosaves to the browser's storage under `deck.id`, and is appended to the in-file **edit log** (slide id, row id, keys before → after). **⌘S saves the deck file itself:** in Chrome/Edge the first ⌘S asks for the file once (File System Access, remembered per browser), then every save — ⌘S and autosave alike — rewrites it in place with the model, the log and the versions inside, so an agent reading the file sees exactly what the human did. The dot is green only when the file has everything; amber counts the edits that have not reached it. Safari (and any browser without File System Access) cannot write the file: there ⌘S downloads a self-contained copy, and on `file://` Safari blocks storage entirely — the dot goes red at load and the Save-a-copy button appears. A live text edit or a drag in flight is committed when the tab hides or unloads, so a refresh mid-edit loses nothing.
+   **Position:** a new window opens on slide 1; a refresh, and a new version of the file, keep the slide you were on — by slide id, so inserting slides above does not move you. A stored working copy is trusted only on the same `rev`; a newer file wins as the base and the browser replays its own edit log onto it (human wins, conflicts flagged on the entries), so an agent's rewrite neither hides its changes nor drops the human's.
+   **Versions:** the history control lists every version in the file — one per agent write (`create --from`), one per ⌘S, one per pin — and restores any of them (the state you leave is pinned first, so a restore is reversible). Capped at 20.
+7. To revise an edited deck, run `node bin/edits.mjs deck.html` to read the log, then `create --from deck.html` (Step 4). Everything a human applies in the editor — geometry, text, links, arrows — round-trips that way; the console `copy(JSON.stringify(deck))` still works for a raw model.
 8. What you inferred (style, layout choices) and anything marked experimental.
 
 ---
@@ -119,6 +129,8 @@ Top level:
 | `page` | `letter`\|`a4` | from format | set by create |
 | `title` | string | `decklet` | `"Q3 update"` — tab title + `⤓`/`⌘S` filename; `--title` overwrites it |
 | `lang` | BCP 47 tag | `en` | `"de"` — the dictionary the browser's spellcheck uses on the canvas; optional |
+| `id` | string | content hash, by create | the deck's identity: the browser's storage namespace, kept across versions by `--from` |
+| `rev` | string | content hash, by create | this build; the browser trusts a stored working copy only when its `rev` matches the file's |
 | `styles.roles` | `{Role: treatment}` | template neutral | see STYLE CONTRACT |
 | `styles.margin` | number | `round(w × 0.06)` | content inset chrome sits on: the footer counter's right edge = `w − margin` |
 | `styles.pad` | `{token: css}` | `{chip:'3px 8px', pill:'5px 12px'}` | `p:'chip'` on a row |
@@ -129,7 +141,7 @@ Top level:
 
 Slot geometry: `{x, y, w, h?, role}`.
 
-Slide: `{name?, layout?, bg?, hide?: masterId[], els: row[]}`.
+Slide: `{id?, name?, layout?, bg?, hide?: masterId[], els: row[]}` — `id` (unique per deck; `s1, s2…` when create stamps it) is how a tab remembers the slide it was on and how the edit log addresses a slide. Rows carry `id` (unique per slide; `r1, r2…`) for the same reason and for `to:`/`from:`.
 
 Row — every prop optional; a row is whatever its props make it:
 | prop | type | default | meaning |

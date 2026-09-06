@@ -86,15 +86,17 @@ test('roles are the type system: eight complete roles in the template, locked ke
   assert.match(tpl, /\['weight','color','tt','italic'\]\.forEach\(p=>delete el\[p\]\)/, 'applying a role clears the row-level overrides');
   assert.doesNotMatch(tpl, /r\.mono\?/, 'mono is not a row prop — Label is the mono role');
 });
-test('HUD contract is a set: prev · next · autosave · + (Text/Box/Slide) · contact sheet · PDF · fullscreen · shortcuts', () => {
+test('HUD contract is a set: prev · next · autosave · + (Text/Box/Slide) · contact sheet · versions · PDF · fullscreen · shortcuts', () => {
   assert.match(tpl, /<button id="prev" [^>]*aria-label="Previous slide \(←\)"><svg [^>]*><path [^>]*\/><\/svg><\/button>/, 'prev is icon-only'); assert.match(tpl, /<button id="next" [^>]*aria-label="Next slide \(→\)"><svg [^>]*><path [^>]*\/><\/svg><\/button>/, 'next is icon-only');
   const ids = [...tpl.matchAll(/<div id="hud">[\s\S]*?<\/div>\n<div id="sheet"/g)][0][0].match(/id="([^"]+)"/g).map(s => s.slice(4, -1)).filter(s => s !== 'hud' && s !== 'sheet').sort();
-  assert.deepEqual(ids, ['add-box', 'add-text', 'addbtn', 'addmenu', 'addwrap', 'autosave', 'fs', 'grid-btn', 'help', 'helpmenu', 'helpwrap', 'next', 'pdf', 'prev', 'sadd', 'savecopy', 'spell']);
-  assert.deepEqual([...tpl.match(/<div id="hud">[\s\S]*?\n<\/div>/)[0].matchAll(/id="(prev|next|autosave|addbtn|grid-btn|pdf|fs|help)"/g)].map(m => m[1]), ['prev', 'next', 'autosave', 'addbtn', 'grid-btn', 'pdf', 'fs', 'help'], 'autosave immediately left of +, ⓘ rightmost');
+  assert.deepEqual(ids, ['add-box', 'add-text', 'addbtn', 'addmenu', 'addwrap', 'autosave', 'fs', 'grid-btn', 'help', 'helpmenu', 'helpwrap', 'next', 'pdf', 'prev', 'sadd', 'savecopy', 'spell', 'vers', 'versmenu']);
+  assert.deepEqual([...tpl.match(/<div id="hud">[\s\S]*?\n<\/div>/)[0].matchAll(/id="(prev|next|autosave|addbtn|grid-btn|vers|pdf|fs|help)"/g)].map(m => m[1]), ['prev', 'next', 'autosave', 'addbtn', 'grid-btn', 'vers', 'pdf', 'fs', 'help'], 'autosave immediately left of +, versions left of PDF, ⓘ rightmost');
   assert.match(tpl, /<button id="help" class="mi mi-circle-question-mark"[^>]*aria-label="Shortcuts"[^>]*><svg /, 'the shortcuts control is the question-mark icon'); assert.match(tpl, /<kbd>← → \/ ↑ ↓<\/kbd> navigate/, 'popover nav line'); assert.match(tpl, /<button id="sheet-back" title="Back to slide \(Esc\)" aria-label="Back to slide \(Esc\)">← Back<\/button>/, 'contact sheet ← Back');
-  assert.match(tpl, /if\(\(e\.metaKey\|\|e\.ctrlKey\)&&e\.key\.toLowerCase\(\)==='s'\)\{e\.preventDefault\(\);saveCopy\(\);return\}/, '⌘S save-a-copy, keyboard only'); assert.doesNotMatch(tpl, /id="save"/);
+  assert.match(tpl, /if\(\(e\.metaKey\|\|e\.ctrlKey\)&&e\.key\.toLowerCase\(\)==='s'\)\{e\.preventDefault\(\);saveFile\(\);return\}/, '⌘S saves THE FILE (write-back), keyboard only'); assert.doesNotMatch(tpl, /id="save"/);
+  assert.match(tpl, /if\(!FSA\)\{saveCopy\(\);return\}/, 'no File System Access → ⌘S downloads a copy'); assert.match(tpl, /showOpenFilePicker\(\{id:'decklet'/, 'the first ⌘S links the deck file once'); assert.match(tpl, /\$\('autosave'\)\.onclick=\(\)=>saveFile\(\)/, 'the dot is the other door');
   assert.match(tpl, /if\(e\.key==='ArrowRight'\|\|e\.key==='ArrowDown'\|\|e\.key===' '\)nav\(1\)/, '↓ = next'); assert.match(tpl, /if\(e\.key==='ArrowLeft'\|\|e\.key==='ArrowUp'\)nav\(-1\)/, '↑ = prev');
-  assert.match(tpl, /PKEY=NS\+':pos'/, 'position persisted'); assert.match(tpl, /if\(animate\)\{store\.set\(PKEY,i\);location\.replace\('#'\+\(i\+1\)\)\}/, 'slide change → pos + #n hash'); assert.match(tpl, /addEventListener\('hashchange'/, 'hash → slide');
+  assert.match(tpl, /if\(animate\)\{tab\.set\('slide',s\.id\);location\.replace\('#'\+\(i\+1\)\)\}/, 'slide change → this tab remembers the slide ID (sessionStorage) + #n hash'); assert.match(tpl, /addEventListener\('hashchange'/, 'hash → slide');
+  assert.match(tpl, /let i=Math\.max\(0,deck\.slides\.findIndex\(s=>s\.id===tab\.get\('slide'\)\)\)/, 'load: the tab\'s slide id first'); assert.doesNotMatch(tpl, /parseInt\(store\.get\(PKEY\)\)/, 'a fresh window never restores another window\'s slide: it opens on slide 1');
   // autosave indicator: the shim's set reports success; save() drives the dot; reduced motion kills glow + pulse
   assert.match(tpl, /set:\(k,v\)=>\{try\{localStorage\.setItem\(k,v\);lastSavedAt=new Date\(\);return true\}catch\{mem\.set\(k,v\);return false\}\}/, 'store.set returns boolean + stamps lastSavedAt on a confirmed write; a blocked write still holds the session in memory'); assert.match(tpl, /<span id="autosave" role="status"/); assert.match(tpl, /prefers-reduced-motion:reduce\)\{#autosave\{box-shadow:none;animation:none!important\}\}/);
   assert.match(tpl, /\$\('pdf'\)\.onclick=\(\)=>exportPdf\(\)\.catch\(\(\)=>print\(\)\)/, '⤓ writes a PDF in-file; print() is the fallback'); assert.match(tpl, /requestFullscreen/);
@@ -611,7 +613,8 @@ live('live: editor rules — nib, present backdrop, master fork + inline counter
     await p.mouse.up(); await p.waitForTimeout(250); assert.equal(await ev(() => document.body.classList.contains('dragging')), false, 'dragging flag cleared on drop'); await ev(() => undo()); }
   await ev(() => sheetClose());
   // autosave dot: a normal save lands green; a shim that cannot persist lands red with the warning label
-  await ev(() => save()); await p.waitForTimeout(400); assert.deepEqual(await ev(() => [document.getElementById('autosave').dataset.state, document.getElementById('autosave').getAttribute('aria-label')]), ['ok', await ev(() => document.getElementById('autosave').title)]); assert.match(await ev(() => document.getElementById('autosave').title), /^Autosaved · \d\d:\d\d:\d\d$/, 'tooltip carries the last save time');
+  await ev(() => save()); await p.waitForTimeout(400); assert.deepEqual(await ev(() => [document.getElementById('autosave').dataset.state, document.getElementById('autosave').getAttribute('aria-label')]), ['local', await ev(() => document.getElementById('autosave').title)]); assert.match(await ev(() => document.getElementById('autosave').title), /^Saved in this browser · \d+ edits? not in the file yet — ⌘S writes them$/, 'amber: the tooltip counts the edits no file has');
+  await ev(() => { unsynced = 0; save(); }); await p.waitForTimeout(400); assert.match(await ev(() => document.getElementById('autosave').title), /^Autosaved · \d\d:\d\d:\d\d$/, 'nothing pending: green, tooltip carries the last save time');
   await ev(() => { window.__set = store.set; store.set = () => false; save(); }); assert.equal(await ev(() => document.getElementById('autosave').dataset.state), 'busy', 'amber while saving'); await p.waitForTimeout(400);
   { const bad = await ev(() => [document.getElementById('autosave').dataset.state, document.getElementById('autosave').getAttribute('aria-label')]); assert.equal(bad[0], 'bad'); assert.match(bad[1], /^Not saved — edits will be lost on refresh( \(last saved \d\d:\d\d:\d\d\))?$/, 'bad tooltip names the last successful save time'); } await ev(() => { store.set = window.__set; save(); }); await p.waitForTimeout(400);
   // ⤓ PDF: in-file writer produces a real PDF with one W×H pt page per slide (Chromium rasterises foreignObject untainted)
@@ -915,6 +918,42 @@ live('live: to/from terminate a connector on the target\'s border — the arrow 
   assert.deepEqual(got.heads, ['end', 'end', 'end'], 'the head end is declared for the collision gate');
   assert.deepEqual(errs, []);
 });
+live('live: a bound connector FOLLOWS its target — moving the box re-aims the to:/from: end at the box, deselected or not', async () => {
+  // Before: `to:` clipped against the target's CURRENT box but the raw end stayed where the author aimed it, so once the
+  // box moved out from under that point edgeT found nothing inside and the stroke sprang back to its authored length —
+  // the head floating where the box used to be (Kyle, 2026-09-06: "moving a box changes the arrow even when deselected").
+  const box = {x: 500, y: 180, w: 200, h: 100, bg: '#1A1D21', bd: '1.5px solid #5B9CF6', radius: 10};
+  const model = {w: 960, h: 540, styles: {roles: modelOf(tpl).styles.roles}, slides: [{els: [
+    box,
+    {x: 200, y: 230, line: [600, 230], bg: '#5B9CF6', h: 3, arrow: 'end', to: 0},
+    {x: 200, y: 400, curve: [340, 400, 420, 230, 600, 230], bg: '#6B9E8C', h: 3, arrow: 'end', to: 0},
+    {x: 600, y: 230, line: [200, 480], bg: '#C97A54', h: 3, arrow: 'end', from: 0},
+  ]}]};
+  const f = path.join(tmp, 'follow.html'); fs.writeFileSync(f, create(model).html);
+  const b = await pw.chromium.launch(); const p = await b.newPage({viewport: {width: 1280, height: 800}});
+  const errs = []; p.on('pageerror', e => errs.push(String(e)));
+  await p.goto(pathToFileURL(f).href); await p.waitForSelector('#canvas .el');
+  const got = await p.evaluate(() => {
+    const pt = (k, start) => { const d = canvas.querySelector(`[data-n="${k}"]`);
+      if (d.dataset.seg) { const s = d.dataset.seg.split(',').map(Number); return start ? [s[0], s[1]] : [s[2], s[3]]; }
+      const c = d.dataset.cur.split(',').map(Number); return start ? [c[0], c[1]] : [c[6], c[7]]; };
+    // the box travels 250 right and 100 down with nothing selected; the raw ends (600,230) are now outside it
+    sel.clear(); slide().els[0].x = 750; slide().els[0].y = 280; render();
+    return {line: pt(1), curve: pt(2), from: pt(3, true), raw: [slide().els[1].line, slide().els[3].x, slide().els[3].y]};
+  });
+  await b.close();
+  const c = {x: 850, y: 330}, inBox = ([x, y]) => x >= 750 && x <= 950 && y >= 280 && y <= 380;
+  // the straight connector aims at the moved box's centre and stops 10px short of its border
+  const d1 = Math.hypot(got.line[0] - 200, got.line[1] - 230), dc = Math.hypot(c.x - 200, c.y - 230);
+  assert.ok(!inBox(got.line), `the head is not inside the moved box: ${got.line}`);
+  assert.ok(Math.abs((got.line[1] - 230) / (got.line[0] - 200) - (c.y - 230) / (c.x - 200)) < 0.01, `the line points at the new centre: ${got.line}`);
+  assert.ok(d1 < dc && d1 > dc - 130, `the head sits on the near side of the box, clear of it: ${got.line}`);
+  assert.ok(!inBox(got.curve) && Math.hypot(got.curve[0] - c.x, got.curve[1] - c.y) < 130, `the bezier end followed too: ${got.curve}`);
+  assert.ok(!inBox(got.from) && Math.hypot(got.from[0] - c.x, got.from[1] - c.y) < 130, `a from: start followed too: ${got.from}`);
+  assert.deepEqual(got.raw, [[600, 230], 600, 230], 'the model is untouched — following is a render-time reading of to:/from:');
+  assert.deepEqual(errs, []);
+});
+
 live('live: the page counter reads "1 / 3" when the footer row is empty, "text · 1 / 3" when it is not', async () => {
   const mk = text => ({w: 960, h: 540, styles: {roles: modelOf(tpl).styles.roles},
     master: [{id: 'foot', footer: 1, x: 60, y: 500, w: 300, role: 'Label', ...(text ? {text} : {text: ''})}],

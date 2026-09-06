@@ -79,6 +79,8 @@ Read [`SKILL.md`](SKILL.md) — it is the product. It defines the inputs, the pr
 node bin/validate.mjs model.json                                   # contract check, no browser
 node bin/create.mjs --model model.json --style style.json --out deck.html --format slides
 node bin/verify.mjs deck.html [--refs shots/]                     # layout parity always; AE diff when refs exist
+node bin/edits.mjs deck.html                                       # what the human changed in the editor (read before revising)
+node bin/create.mjs --model model.json --out deck.html --from deck.html   # revise: keep ids, replay human edits (human wins), keep versions
 node bin/import-html.mjs --w 1600 --h 900 --out model.json 'pages/*.html'   # finished HTML → model
 ```
 
@@ -88,7 +90,8 @@ node bin/import-html.mjs --w 1600 --h 900 --out model.json 'pages/*.html'   # fi
 
 - **Single file.** Model + renderer + editor in one `.html`; nothing is fetched at runtime.
 - **Zero network.** No webfonts, CDNs or remote images; images are data: URIs. The gate greps for it.
-- **Editable.** Drag, ⌘-multi-select, marquee select (drag a window on empty canvas), double-click to retype, corner-nib resize, floating role/mark/colour toolbar (B/I/U/S, sub/sup, the deck's own swatches), undo that survives reload, contact sheet with grab-and-drag reordering.
+- **Editable.** Drag, ⌘-multi-select, marquee select (drag a window on empty canvas), double-click to retype, corner-nib resize, point nibs on connectors, floating role/mark/colour toolbar (B/I/U/S, sub/sup, the deck's own swatches; ⌘B/⌘I/⌘U), undo that survives reload, contact sheet with grab-and-drag reordering.
+- **Human edits are never lost.** Every edit lands in an in-file log and, with ⌘S in Chrome/Edge, in the deck file itself (File System Access — asked for once). `create --from` replays the log onto the next version, human wins, conflicts flagged; the file keeps a version history you can restore from. `bin/edits.mjs` prints the log for an agent.
 - **Motion, honestly.** Four entrance anims — `rise`, `fade`, `pop`, `wipe` — staggered 120 ms on slide *entry* only. `prefers-reduced-motion` turns them off, and print, the contact sheet, the PDF and `verify` all draw the settled frame, so motion can never change what is measured or exported.
 - **Brand-true.** Eight text roles (Title, Supertitle, H1, H2, Body, Caption, Label, Stat) are the only source of font/size/leading; rows cannot override them. Chrome is one deck-wide master layer on a `margin` token. Tokens re-theme every deck.
 - **PDF.** `⤓` writes a true slide-sized PDF inside the file (foreignObject → canvas → JPEG → PDF, zero dependencies); `⌘P` is the paper path with named Letter/A4 pages (Safari-safe), one page per slide. Safari's in-file raster path is unconfirmed — it falls back to print.
@@ -121,7 +124,8 @@ A row is text by default; `box`, `tile`, `bar`, `line`, `donut`, `svg`, `img` ar
 | `slides` 16:9 (960×540, 1600×900) | supported | editing, contact sheet, present, PDF, verify |
 | `carousel` 1:1 / `carousel-4x5` | experimental | sizing, editing, PDF work; no per-card PNG export |
 | `document-letter` / `document-a4` | experimental | page = canvas, print zoom 1; text does not flow across pages |
-| drag / multi-select / resize / undo | supported | undo history persisted per deck |
+| drag / multi-select / resize / undo | supported | undo history persisted per deck; connectors get point nibs |
+| edit log · write-back · versions | supported | in-file `/*LOG*/` + `/*VERSIONS*/`; ⌘S writes the file (Chrome/Edge), `create --from` migrates, restore from the history popover |
 | inline text editing + B/I/U/S + colour runs | supported | stored as `html` on the row |
 | roles · slots · master layer · footer counter | supported | see SKILL.md |
 | bars, lines, donuts, tiles, boxes | supported | one row each, no SVG layer |

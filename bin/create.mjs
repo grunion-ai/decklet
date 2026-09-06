@@ -2,6 +2,8 @@
 // decklet create — headless: model.json (+ style.json) → one self-contained deck.html
 // usage: node bin/create.mjs --model model.json [--style style.json] --out deck.html
 //          [--format slides|carousel|carousel-4x5|document-letter|document-a4] [--space 960x540|1600x900] [--title "…"] [--force]
+//          [--from prev.html]   revise an existing deck: keep its id + slide/row ids, replay the human edits it carries
+//                               (human wins, conflicts reported), push its state into the version history
 // library: import {create, FORMAT} from './create.mjs'
 import fs from 'node:fs';
 import path from 'node:path';
@@ -10,6 +12,7 @@ import {pathToFileURL, fileURLToPath} from 'node:url';
 import {validate, mergeStyle, fillKpi} from './validate.mjs';
 import {libraryFor} from '../lib/layouts.mjs';
 import {expandCharts} from '../lib/chart.mjs';
+import {stampIds, diffDecks, applyLog, blockOf, putBlock, VERSION_CAP} from '../lib/edits.mjs';
 
 // page-size presets of ONE model space: canvas size + print page (named sizes only — Safari ignores px @page sizes)
 export const FORMAT = {
@@ -27,8 +30,26 @@ const put = (html, mark, to) => {
   return html.replace(re, () => `/*${mark}*/${to}/*/${mark}*/`);
 };
 
-export function create(model, {style = null, format, space, title, template} = {}) {
+// --from: ids are inherited by position — a new slide/row with no id takes the previous file's id at the same index when the
+// roles agree (a regenerated model.json rarely carries ids; text is NOT compared, because a retyped row is exactly the edit
+// to carry). Anything unmatched gets a fresh id and reads as new. Carry ids in model.json to make the match exact.
+function inheritIds(deck, prev) {
+  deck.id = deck.id || prev.id;
+  // slides: same index when the first text agrees, else any unused previous slide with that first text (an insert above shifts
+  // every index, and the deck must not renumber every slide because of it), else the same index if still free, else nothing — a fresh id says "new slide"
+  const sig = s => { const r = (s.els || []).find(e => e.text != null || e.html != null); return r ? String(r.text ?? r.html) : null; };
+  const used = new Set(deck.slides.map(s => s.id).filter(Boolean)), pairs = [];
+  const take = (s, ps) => { s.id = ps.id; used.add(ps.id); pairs.push([s, ps]); };
+  deck.slides.forEach(s => { if (s.id) { const ps = prev.slides.find(x => x.id === s.id); if (ps) pairs.push([s, ps]); } });
+  deck.slides.forEach((s, n) => { if (s.id) return; const at = prev.slides[n], ps = at && !used.has(at.id) && sig(at) != null && sig(at) === sig(s) ? at : prev.slides.find(x => !used.has(x.id) && sig(x) != null && sig(x) === sig(s)); if (ps) take(s, ps); }); // pass 1: by content
+  deck.slides.forEach((s, n) => { if (s.id) return; const at = prev.slides[n]; if (at && !used.has(at.id)) take(s, at); });                                   // pass 2: by position (a retyped title still matches its slide)
+  for (const [s, ps] of pairs) (s.els || []).forEach((r, k) => { const pr = (ps.els || [])[k]; if (!r.id && pr && pr.id && (pr.role || null) === (r.role || null) && !!(pr.line || pr.curve) === !!(r.line || r.curve) && !(s.els || []).some(x => x.id === pr.id)) r.id = pr.id; });
+}
+
+export function create(model, {style = null, format, space, title, template, from = null} = {}) {
   const deck = structuredClone(model);
+  const prevHtml = from ? fs.readFileSync(from, 'utf8') : null, prev = prevHtml ? blockOf(prevHtml, 'DECK') : null;
+  if (prev) inheritIds(deck, prev);
   const fmt = format || deck.format || 'slides';
   if (!FORMAT[fmt]) throw new Error(`unknown format ${fmt}`);
   deck.format = fmt; deck.page = FORMAT[fmt].page;
@@ -49,23 +70,37 @@ export function create(model, {style = null, format, space, title, template} = {
   expandCharts(deck);   // chart rows → the ordinary rows they stand for; the runtime draws no charts
   const tokens = {...(style && style.tokens || {})};
   if (Object.keys(tokens).length) html = put(html, 'TOKENS', Object.entries(tokens).map(([k, v]) => `--${k.replace(/^--/, '')}:${v}`).join(';'));
+  deck.id = deck.id || createHash('sha256').update(JSON.stringify(model)).digest('hex').slice(0, 10); // born once, from the first model; --from carries it
+  stampIds(deck);
+  // --from: replay the human's edits onto this version (human wins), stamp them with this rev, and keep the previous state
+  let migrate = null, log = [], versions = [];
+  if (prev) {
+    const plog = blockOf(prevHtml, 'LOG'), pvers = blockOf(prevHtml, 'VERSIONS');
+    migrate = applyLog(deck, plog);
+    versions = [...pvers, {rev: prev.rev, t: new Date().toISOString(), by: plog.some(e => !e.rev) ? 'human' : 'agent', label: 'before ' + (title || deck.title || ''), deck: prev}].slice(-VERSION_CAP);
+    log = plog;
+  }
   const hash = createHash('sha256').update(JSON.stringify(deck)).digest('hex').slice(0, 10);
+  deck.rev = hash;
+  for (const e of log) if (!e.rev) e.rev = hash;
   html = put(html, 'DECK', esc(JSON.stringify(deck)));
-  html = put(html, 'KEY', `'decklet:${hash}'`);
-  return {html, deck, hash};
+  html = putBlock(putBlock(html, 'LOG', log), 'VERSIONS', versions);
+  html = put(html, 'KEY', `'decklet:${deck.id}'`);
+  return {html, deck, hash, migrate};
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const a = process.argv.slice(2), o = {};
   for (let k = 0; k < a.length; k++) if (a[k].startsWith('--')) o[a[k].slice(2)] = a[k + 1] && !a[k + 1].startsWith('--') ? a[++k] : true;
-  if (!o.model || !o.out) { console.error('usage: node bin/create.mjs --model model.json [--style style.json] --out deck.html [--format …] [--space WxH] [--title …] [--force]'); process.exit(2); }
+  if (!o.model || !o.out) { console.error('usage: node bin/create.mjs --model model.json [--style style.json] --out deck.html [--format …] [--space WxH] [--title …] [--from prev.html] [--force]'); process.exit(2); }
   const model = JSON.parse(fs.readFileSync(o.model, 'utf8'));
   const style = o.style ? JSON.parse(fs.readFileSync(o.style, 'utf8')) : null;
-  const {html, deck, hash} = create(model, {style, format: o.format, space: o.space, title: o.title});
+  const {html, deck, hash, migrate} = create(model, {style, format: o.format, space: o.space, title: o.title, from: o.from || null});
+  if (migrate) { console.error(`migrated ${migrate.applied} human edit(s) from ${o.from} · ${migrate.conflicts.length} conflict(s) · ${migrate.orphans.length} orphan(s)`); for (const c of migrate.conflicts) console.error(`conflict ${c.s || c.m}${c.r ? '/' + c.r : ''}.${c.key}: kept human ${JSON.stringify(c.human)} over agent ${JSON.stringify(c.agent)}`); }
   const v = validate(deck);
   for (const m of v.errors) console.error('ERROR   ' + m);
   for (const m of v.warnings) console.error('warning ' + m);
   if (!v.ok && !o.force) { console.error('model invalid — fix the errors or pass --force'); process.exit(1); }
   fs.writeFileSync(o.out, html);
-  console.log(`wrote ${o.out} · ${(html.length / 1024).toFixed(0)}KB · ${deck.format} ${deck.w}×${deck.h} · ${deck.slides.length} slides · master ${(deck.master || []).length} · layouts ${Object.keys(deck.layouts || {}).join(',') || '—'} · ns ${hash}`);
+  console.log(`wrote ${o.out} · ${(html.length / 1024).toFixed(0)}KB · ${deck.format} ${deck.w}×${deck.h} · ${deck.slides.length} slides · master ${(deck.master || []).length} · layouts ${Object.keys(deck.layouts || {}).join(',') || '—'} · id ${deck.id} · rev ${hash}`);
 }

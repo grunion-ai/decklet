@@ -4,7 +4,7 @@
 
 decklet is a slide engine for agents. The deck is a JSON model; the renderer is the editor; the output is ONE self-contained .html (no dependencies, no network) a human can drag, retype, present and print. Plain Node >= 22 CLI. Playwright is optional and only used by verify/import-html.
 
-Loop: content + format + style -> model.json -> `node bin/validate.mjs model.json` -> `node bin/create.mjs --model model.json [--style style.json] --out deck.html --format slides|carousel|carousel-4x5|document-letter|document-a4` -> `node bin/verify.mjs deck.html [--refs shots/]` -> hand-off.
+Loop: content + format + style -> model.json -> `node bin/validate.mjs model.json` -> `node bin/create.mjs --model model.json [--style style.json] --out deck.html --format slides|carousel|carousel-4x5|document-letter|document-a4` -> `node bin/verify.mjs deck.html [--refs shots/]` -> hand-off. Revising a deck a human edited: `node bin/edits.mjs deck.html` (read the in-file edit log) -> `node bin/create.mjs --model model.json --out deck.html --from deck.html` (keeps deck/slide/row ids, replays the human's edits — human wins, conflicts reported — and keeps the version history) -> verify. The migrate is the LAST step, never the first.
 
 Formats: slides (960x540 or 1600x900) supported; carousel (1080x1080, 1080x1350) and document (Letter 816x1056, A4 794x1123) experimental (sizing/editing/PDF work; text does not flow across pages).
 
@@ -22,7 +22,9 @@ PDF: the ⤓ button writes a true slide-sized PDF inside the file (foreignObject
 - bin/validate.mjs: pure-Node model contract validator (exit 1 on errors; --strict for warnings)
 - bin/create.mjs: model (+style) -> deck.html with format presets
 - bin/verify.mjs: self-containment + contract + layout parity (always) + AE vs refs (optional); writes results.json
+- bin/edits.mjs: prints the human edit log + version history a deck file carries (read before revising)
+- lib/edits.mjs: node side of the in-file edit core (stampIds/diffDecks/applyLog lifted from template.html's /*EDITS*/ block; blockOf/putBlock for DECK/LOG/VERSIONS)
 - bin/import-html.mjs: HTML pages at a fixed viewport -> model.json (master/slots/roles lifted, Title detected on non-content layouts; _lines intent for parity)
 - examples/explainer, examples/quarterly-update, examples/launch-carousel, examples/one-pager: brief.md -> model.json (+ style.json)
-- test/gate.test.mjs: node --test gate (engine contract, validator, create, import, live proofs)
+- test/gate.test.mjs: node --test gate (engine contract, validator, create, import, live proofs); test/edits.test.mjs (ids, log, migrate, create --from); test/editor.test.mjs (live: nibs, PDF arrows, autosave, position, migrate on load, ⌘S write-back, versions, ⌘B)
 - CHANGELOG.md, LICENSE (MIT)
