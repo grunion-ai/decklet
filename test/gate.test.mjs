@@ -89,7 +89,7 @@ test('roles are the type system: eight complete roles in the template, locked ke
 test('HUD contract is a set: prev · next · autosave · + (Text/Box/Slide) · contact sheet · versions · PDF · fullscreen · shortcuts', () => {
   assert.match(tpl, /<button id="prev" [^>]*aria-label="Previous slide \(←\)"><svg [^>]*><path [^>]*\/><\/svg><\/button>/, 'prev is icon-only'); assert.match(tpl, /<button id="next" [^>]*aria-label="Next slide \(→\)"><svg [^>]*><path [^>]*\/><\/svg><\/button>/, 'next is icon-only');
   const ids = [...tpl.matchAll(/<div id="hud">[\s\S]*?<\/div>\n<div id="sheet"/g)][0][0].match(/id="([^"]+)"/g).map(s => s.slice(4, -1)).filter(s => s !== 'hud' && s !== 'sheet').sort();
-  assert.deepEqual(ids, ['add-box', 'add-text', 'addbtn', 'addmenu', 'addwrap', 'autosave', 'fs', 'grid-btn', 'help', 'helpmenu', 'helpwrap', 'next', 'pdf', 'prev', 'sadd', 'savecopy', 'spell', 'vers', 'versmenu']);
+  assert.deepEqual(ids, ['add-box', 'add-text', 'addbtn', 'addmenu', 'addwrap', 'autosave', 'fs', 'grid-btn', 'help', 'helpmenu', 'helpwrap', 'next', 'pdf', 'prev', 'sadd', 'savecopy', 'snap', 'spell', 'vers', 'versmenu']);
   assert.deepEqual([...tpl.match(/<div id="hud">[\s\S]*?\n<\/div>/)[0].matchAll(/id="(prev|next|autosave|addbtn|grid-btn|vers|pdf|fs|help)"/g)].map(m => m[1]), ['prev', 'next', 'autosave', 'addbtn', 'grid-btn', 'vers', 'pdf', 'fs', 'help'], 'autosave immediately left of +, versions left of PDF, ⓘ rightmost');
   assert.match(tpl, /<button id="help" class="mi mi-circle-question-mark"[^>]*aria-label="Shortcuts"[^>]*><svg /, 'the shortcuts control is the question-mark icon'); assert.match(tpl, /<kbd>← → \/ ↑ ↓<\/kbd> navigate/, 'popover nav line'); assert.match(tpl, /<button id="sheet-back" title="Back to slide \(Esc\)" aria-label="Back to slide \(Esc\)">← Back<\/button>/, 'contact sheet ← Back');
   assert.match(tpl, /if\(\(e\.metaKey\|\|e\.ctrlKey\)&&e\.key\.toLowerCase\(\)==='s'\)\{e\.preventDefault\(\);saveFile\(\);return\}/, '⌘S saves THE FILE (write-back), keyboard only'); assert.doesNotMatch(tpl, /id="save"/);
@@ -181,7 +181,7 @@ test('shortcuts popover cannot drift from the keybindings', () => {
 
 // ── 2c′. the HUD glyphs are the moving Lucide set weave uses: one svg per control, played once, never looped ──
 test('HUD icons: every control is a Lucide shape wearing its motion parts; no unicode glyph survives; nothing loops', () => {
-  for (const id of ['prev', 'next', 'addbtn', 'grid-btn', 'spell', 'savecopy', 'pdf', 'fs', 'help']) {
+  for (const id of ['prev', 'next', 'addbtn', 'grid-btn', 'spell', 'snap', 'savecopy', 'pdf', 'fs', 'help']) {
     assert.match(tpl, new RegExp(`<button id="${id}" class="mi mi-[\\w-]+" data-ms="\\d+"[^>]*><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"[^>]*>[^]*?data-mi="[^"]+"[^]*?<\\/svg><\\/button>`), `${id} draws a Lucide shape on the 24 grid with its motion parts`);
   }
   assert.doesNotMatch(tpl, /<button id="(prev|next|addbtn|grid-btn|savecopy|pdf|fs|help)"[^>]*>[‹›+⊞⤒⤓⛶ⓘ]<\/button>/, 'no control is a typed glyph any more');
@@ -1299,5 +1299,79 @@ live('live: spellcheck — rows wear the attribute, present strips it, off persi
   await p.click('#spell'); assert.deepEqual(await attrs(), ['false']); assert.deepEqual(await p.evaluate(() => [spell.title, spell.getAttribute('aria-pressed'), spell.classList.contains('off'), +getComputedStyle(spell).opacity]), ['Spellcheck (off)', 'false', true, 0.35]);
   await p.reload(); await p.waitForSelector('#canvas .el'); assert.deepEqual(await attrs(), ['false'], 'off persists per browser');
   assert.equal(await pdf(), on, '⤓ output is byte-identical with the toggle on and off');
+  assert.deepEqual(errs, []); await b.close();
+});
+
+// ── 2l. layout guides + snap: a HUD toggle, OFF by default, per browser; the guide lines are the slide's layout slots; a drag
+//        snaps inside SNAPO.px; never in present, print, the sheet, the ⤓ PDF or the saved file ──
+test('guides + snap: the HUD carries the toggle, OFF by default, per browser (localStorage under NS) — never in the model; render() alone paints the lines', () => {
+  assert.match(tpl, /<button id="snap" class="mi mi-magnet" data-ms="\d+"[^>]*aria-pressed="false"[^>]*title="Layout guides \+ snap \(off\)"[^>]*><svg aria-hidden="true" viewBox="0 0 24 24"/, 'the toggle is a Lucide magnet, pressed OFF by default');
+  assert.match(tpl, /GKEY=NS\+':snap';let SNAP=store\.get\(GKEY\)==='1'/, 'on only when THIS browser turned it on'); assert.match(tpl, /<kbd>[^<]*<\/kbd> layout guides/, 'the ⓘ popover names the toggle');
+  assert.match(tpl, /#snap\[aria-pressed=false\]\{opacity:\.35\}/, 'off = dimmed'); assert.doesNotMatch(tpl, /deck\.snap/, 'the model never carries the toggle');
+  // the lines are selection chrome: render() paints them on the live canvas; drawEls never does (print, the sheet and the ⤓ rasteriser all draw through drawEls)
+  const de = tpl.slice(tpl.indexOf('function drawEls('), tpl.indexOf('let lastAnim='));
+  assert.doesNotMatch(de, /guides\(|'gl /, 'drawEls paints no guide');
+  assert.match(tpl.slice(tpl.indexOf('function render()'), tpl.indexOf('// counter:')), /if\(SNAP&&!present\(\)\)\{const g=guides\(s\)/, 'render() paints them, only when on and not presenting');
+  assert.match(tpl, /body\.present \.gl,body\.present #snap\{display:none!important\}/, 'present strips them, and the toggle leaves the peek pill (it would put the pill on a 4:5 counter)'); assert.match(tpl, /@media print\{\n\s*#wrap,#hud,#tb,#sheet,\.gl\{display:none!important\}/, 'print strips them');
+  assert.match(tpl, /#canvas \.gl\{position:absolute;pointer-events:none/, 'a line never takes a press');
+  assert.match(tpl, /function snapTo\([^)]*\)\{if\(!SNAP\)return\{dx,dy,hit:null\}/, 'off = the raw delta, nothing else runs');
+  assert.doesNotMatch(tpl.slice(tpl.indexOf('function nudgeSel('), tpl.indexOf('save();render();', tpl.indexOf('function nudgeSel('))), /snapTo|nearest\(/, 'the keyboard nudge never snaps: 1px is the point of it');
+  assert.match(tpl, /q\('#snap'\)\.setAttribute\('aria-pressed','false'\)/, 'fileHtml() resets the toggle: a saved copy opens with guides off');
+  assert.match(read('SKILL.md'), /guides/, 'SKILL.md hand-off names the toggle');
+});
+live('live: guides + snap — off paints nothing; on paints one hairline per distinct slot edge; a drag lands on a line in range, passes one out of range; off = raw delta; the resize nib and a connector nib snap too; print, the sheet and the ⤓ PDF carry none; save() writes no key; on survives a reload', async () => {
+  // margin 60 → x 60|900 ; slots add x 460|500 and y 76|160|300 ; the red box (x 300, w 100) and the line are the movers
+  const m = {w: 960, h: 540, styles: {margin: 60}, layouts: {two: {title: {x: 60, y: 76, w: 840, role: 'H1'}, left: {x: 60, y: 160, w: 400, h: 140, role: 'Body'}, right: {x: 500, y: 160, w: 400, h: 140, role: 'Body'}}},
+    slides: [{layout: 'two', els: [{slot: 'title', text: 'Guides'}, {x: 300, y: 380, w: 100, h: 40, bg: '#e33'}, {x: 120, y: 470, line: [220, 470], h: 3}]}, {els: [{x: 60, y: 80, w: 800, role: 'H1', text: 'free'}]}]};
+  const f = path.join(tmp, 'snap.html'); fs.writeFileSync(f, create(m, {title: 'guides'}).html);
+  const b = await pw.chromium.launch(); const p = await b.newPage({viewport: {width: 1280, height: 800}});
+  const errs = []; p.on('pageerror', e => errs.push(String(e)));
+  await p.goto(pathToFileURL(f).href); await p.evaluate(() => localStorage.clear()); await p.reload(); await p.waitForSelector('#canvas .el');
+  const lines = () => p.evaluate(() => [[...document.querySelectorAll('#canvas .gl.v')].map(l => parseFloat(l.style.left)), [...document.querySelectorAll('#canvas .gl.h')].map(l => parseFloat(l.style.top))]);
+  assert.deepEqual(await lines(), [[], []], 'off by default: no line'); assert.equal(await p.evaluate(() => $('snap').getAttribute('aria-pressed')), 'false');
+  await p.click('#snap');
+  assert.deepEqual(await lines(), [[60, 460, 500, 900], [76, 160, 300]], 'one hairline per distinct slot edge (margin 60/900 folds into the slot edges)');
+  assert.deepEqual(await p.evaluate(() => [$('snap').title, $('snap').getAttribute('aria-pressed'), +getComputedStyle($('snap')).opacity]), ['Layout guides + snap (on)', 'true', 1]);
+  const scale = await p.evaluate(() => canvas.getBoundingClientRect().width / W);
+  const at = async k => p.evaluate(k => { const r = document.querySelector(`.el[data-n="${k}"]`).getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }, k);
+  const dragBy = async (k, dx, dy) => { const [x, y] = await at(k); await p.mouse.move(x, y); await p.mouse.down(); await p.mouse.move(x + dx * scale / 2, y + dy * scale / 2, {steps: 3}); await p.mouse.move(x + dx * scale, y + dy * scale, {steps: 3}); await p.mouse.up(); };
+  const box = () => p.evaluate(() => { const e = slide().els[1]; return [e.x, e.y]; });
+  await dragBy(1, 196, 0); assert.deepEqual(await box(), [500, 380], 'left edge 4px short of x=500 → snapped onto it');
+  assert.equal(await p.evaluate(() => log.filter(e => e.r === slide().els[1].id).length), 1, 'the snapped drag is one logged edit');
+  await dragBy(1, 20, 0); assert.deepEqual(await box(), [520, 380], 'no line inside 6px of 520, 620 or the centre 570 → the raw delta');
+  await dragBy(1, -95, 0); assert.deepEqual(await box(), [425, 380], 'left 425, right 525, centre 475: nothing inside 6px → the raw delta');
+  await dragBy(1, 0, -84); assert.deepEqual(await box(), [425, 300], 'top edge 4px short of y=300 → snapped (the bottom edge 336 and centre 316 sit on nothing)');
+  // the hit line brightens while the pointer is down
+  let [x, y] = await at(1); await p.mouse.move(x, y); await p.mouse.down(); await p.mouse.move(x + 30 * scale, y, {steps: 2});
+  assert.deepEqual(await p.evaluate(() => [...document.querySelectorAll('#canvas .gl.on')].map(l => l.className + ':' + (l.style.left || l.style.top))), ['gl v on:460px', 'gl h on:300px'], 'the held lines wear .on while the pointer is down');
+  await p.mouse.up(); assert.deepEqual(await box(), [460, 300], 'left 455 → 460');
+  // the resize nib snaps the far edge; a connector's point nib snaps the point
+  await p.evaluate(() => { sel.clear(); sel.add(1); render(); });
+  [x, y] = await p.evaluate(() => { const r = document.querySelector('.el[data-n="1"] .h').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; });
+  await p.mouse.move(x, y); await p.mouse.down(); await p.mouse.move(x + (496 - 560) * scale, y, {steps: 3}); await p.mouse.up();
+  assert.equal(await p.evaluate(() => slide().els[1].w), 40, 'right edge dragged to 496 → 500 (w 40)');
+  await p.evaluate(() => { sel.clear(); sel.add(2); render(); });
+  [x, y] = await p.evaluate(() => { const r = document.querySelector('.h.pt[data-pt="e"]').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; });
+  await p.mouse.move(x, y); await p.mouse.down(); await p.mouse.move(x + (456 - 220) * scale, y, {steps: 3}); await p.mouse.up();
+  assert.deepEqual(await p.evaluate(() => slide().els[2].line), [460, 470], 'the end nib at 456 → 460');
+  // off: the raw delta, no lines, dimmed
+  await p.click('#snap'); assert.deepEqual(await lines(), [[], []]); assert.equal(await p.evaluate(() => +getComputedStyle($('snap')).opacity), 0.35);
+  await p.evaluate(() => { sel.clear(); render(); });
+  await dragBy(1, 36, 0); assert.deepEqual(await box(), [496, 300], 'off: 460+36 = 496 stays 496, four px from a line');
+  await p.click('#snap'); assert.deepEqual(await lines(), [[60, 460, 500, 900], [76, 160, 300]]);
+  // a slide with no layout offers the margin alone
+  await p.evaluate(() => nav(1)); assert.deepEqual(await lines(), [[60, 900], []]); await p.evaluate(() => nav(-1));
+  // never in print, the sheet, the file, or the ⤓ PDF
+  await p.evaluate(() => dispatchEvent(new Event('beforeprint'))); assert.equal(await p.evaluate(() => document.querySelectorAll('#print .gl').length), 0, 'print pages carry none');
+  await p.emulateMedia({media: 'print'}); assert.equal(await p.evaluate(() => getComputedStyle(document.querySelector('#canvas .gl')).display), 'none', 'and the live ones are hidden under print media'); await p.emulateMedia({media: 'screen'});
+  await p.evaluate(() => sheetOpen()); assert.equal(await p.evaluate(() => document.querySelectorAll('#grid .gl').length), 0, 'thumbnails carry none'); await p.evaluate(() => sheetClose());
+  assert.doesNotMatch(await p.evaluate(() => { save(); return localStorage.getItem(KEY); }), /snap/i, 'save() writes no snap key');
+  assert.match(await p.evaluate(() => fileHtml()), /<button id="snap" class="mi mi-magnet" data-ms="\d+"[^>]*aria-pressed="false"[^>]*title="Layout guides \+ snap \(off\)"/, 'the saved file opens with the toggle off'); assert.doesNotMatch(await p.evaluate(() => fileHtml()), /class="gl /, 'and no line in it');
+  const pdf = () => p.evaluate(async () => { let blob; const o = URL.createObjectURL; URL.createObjectURL = x => { blob = x; return 'blob:x'; }; HTMLAnchorElement.prototype.click = () => {}; await exportPdf(); URL.createObjectURL = o; return [...new Uint8Array(await blob.arrayBuffer())].join(','); });
+  const on = await pdf(); await p.click('#snap'); const off = await pdf(); assert.equal(on, off, 'the ⤓ PDF is byte-identical with the toggle on or off'); await p.click('#snap');
+  // present strips them; on survives a reload
+  await p.evaluate(() => { Element.prototype.requestFullscreen = () => Promise.reject(new TypeError('no')); }); await p.keyboard.press('f');
+  await p.waitForFunction(() => document.body.classList.contains('present'), null, {timeout: 1500}); assert.deepEqual(await lines(), [[], []], 'present: none'); await p.keyboard.press('Escape'); await p.evaluate(() => sheetClose());
+  await p.reload(); await p.waitForSelector('#canvas .el'); assert.deepEqual(await lines(), [[60, 460, 500, 900], [76, 160, 300]], 'on persists per browser');
   assert.deepEqual(errs, []); await b.close();
 });
