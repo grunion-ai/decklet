@@ -78,7 +78,7 @@ export default [
 
 { id: 'team-grid', name: 'Team — faces and one line each', tier: 'standard', cat: 'Modern', note: 'Four people, one credential each. Never a paragraph of bio.', layout: 'content',
   els: [ { slot: 'supertitle', text: 'Who you work with' }, { slot: 'title', text: 'Four people, forty years of underwriting.' },
-    ...cols(4, CW, 20).flatMap((c, i) => { const s = [['A. Rivera', 'Ex-head of credit, 12 yrs'], ['Kyle A.', 'Built the parser'], ['Roshan M.', 'Forward-deployed'], ['Dana P.', 'Ops, ex-Kessler']][i];
+    ...cols(4, CW, 20).flatMap((c, i) => { const s = [['A. Rivera', 'Ex-head of credit, 12 yrs'], ['K. Adler', 'Built the parser'], ['R. Mehta', 'Forward-deployed'], ['Dana P.', 'Ops, ex-Kessler']][i];
       return [ rect(c.x, 172, c.w, c.w, { bg: 'linear-gradient(140deg,var(--box),var(--line))', radius: 10 }),
         t(c.x, 372, c.w, 'H2', s[0], { nowrap: 1 }), cap(c.x, 404, c.w, s[1]) ]; }) ] },
 ];

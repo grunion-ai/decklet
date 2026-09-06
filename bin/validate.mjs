@@ -129,7 +129,7 @@ export function validate(deck) {
     //
     // A CONNECTOR IS A STROKE WITH A HEAD. Every rule below is about a line that POINTS AT something: where it may run, how
     // it may bend, how much air it leaves at the thing it points to. A headless stroke is a rule, an underline, an
-    // annotation leader, a chart series or decoration — it has no target, so none of this applies to it. Kyle's own ruling
+    // annotation leader, a chart series or decoration — it has no target, so none of this applies to it. The ruling
     // draws the line in exactly this place (G1's 1.5px WITH a head rejected, H5's 1px hairline leader accepted), and the
     // cost of getting it wrong is a validator that flags a chart for being diagonal, which teaches agents to stop reading
     // warnings at all. Length is the second guard: under 40px a headed stroke is an icon, not a run between boxes.

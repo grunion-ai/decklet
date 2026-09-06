@@ -166,7 +166,7 @@ npm run test:live   # same, after: npm i -D playwright && npx playwright install
 
 - Document types: text flow across pages, running headers, real page numbering for `document-*`.
 - Carousel export: one PNG per card from `verify`.
-- Slide backend: each slide an entity with a revision log; decks composed from slides; published versions pin revisions (Fibery-style store).
+- Slide backend: each slide an entity with a revision log; decks composed from slides; published versions pin revisions (a revision store).
 - Presenter mode: speaker view + audience window synced over BroadcastChannel, no server.
 - Redo, URL-hash deep links (`#4`), content-anchored annotations.
 

@@ -64,7 +64,7 @@ body.present .el a.lk{pointer-events:auto}
 #hud button,#tb button,#sheet-back{background:var(--card);border:1px solid var(--line);color:var(--fg);border-radius:6px;padding:4px 10px;cursor:pointer;font:inherit}
 #hud .sep{width:1px;height:18px;background:var(--line)}
 #hud .spacer{flex:1}
-/* HUD icons: the Lucide shapes with movingicons.dev motion that weave uses (github.com/jis3r/icons, MIT). Each plays once on load, a beat apart, and once per hover — never on a loop. The unicode glyphs (⤓ ⊞) drew too small to parse. */
+/* HUD icons: the Lucide shapes with movingicons.dev motion (github.com/jis3r/icons, MIT). Each plays once on load, a beat apart, and once per hover — never on a loop. The unicode glyphs (⤓ ⊞) drew too small to parse. */
 #hud button{display:inline-flex;align-items:center;justify-content:center;min-height:26px}
 #hud button svg{display:block;width:16px;height:16px;overflow:visible}
 #tb button svg{display:block;width:13px;height:13px}
@@ -294,7 +294,7 @@ stampIds(deck);
 const hashPos=()=>parseInt(location.hash.slice(1))-1;
 const tab={get:k=>{try{return sessionStorage.getItem(NS+':'+k)}catch{return null}},set:(k,v)=>{try{sessionStorage.setItem(NS+':'+k,v)}catch{}}};
 let i=Math.max(0,deck.slides.findIndex(s=>s.id===tab.get('slide'))),sel=new Set();if(i===0&&!tab.get('slide')&&hashPos()>0)i=hashPos();
-// HUD icons move once: on load, a beat apart; then once per hover; never on a loop — the same one-run policy as weave's picker
+// HUD icons move once: on load, a beat apart; then once per hover; never on a loop — one run per trigger
 const miPlay=(h)=>{const ms=+h.dataset.ms||0;if(!ms||h.dataset.on||matchMedia('(prefers-reduced-motion: reduce)').matches)return;h.dataset.on='1';const parts=[...h.querySelectorAll('[data-mi]')];for(const p of parts)p.classList.add(...p.dataset.mi.split(' '));setTimeout(()=>{for(const p of parts)p.classList.remove(...p.dataset.mi.split(' '));delete h.dataset.on},ms)};
 document.querySelectorAll('.mi').forEach((h,i)=>{h.addEventListener('mouseenter',()=>miPlay(h));setTimeout(()=>miPlay(h),300+i*90)});
 document.title=deck.title||'decklet'; // the deck names itself: tab title, ⤓ PDF filename and ⌘S copy filename are all this one string
@@ -391,7 +391,7 @@ const tAtLen=(q,L,fromEnd)=>{const N=240;let prev=bezPt(q,fromEnd?1:0),acc=0;
 const bezPart=(p,t0,t1)=>{const cut=(q,t)=>{const a=lerp(q[0],q[1],t),b=lerp(q[1],q[2],t),c=lerp(q[2],q[3],t),d=lerp(a,b,t),e=lerp(b,c,t),f=lerp(d,e,t);return [[q[0],a,d,f],[f,e,c,q[3]]]};
   let q=p;if(t1<1)q=cut(q,t1)[0];if(t0>0)q=cut(q,(t1<1&&t1>0)?t0/t1:t0)[1];return q};
 // clip a connector row in place against whatever `from`/`to` name
-// A connector LEAVES AIR: after clipping to the target's box it backs off `gap` (10 by default — Kyle's ruling; `gap:0`
+// A connector LEAVES AIR: after clipping to the target's box it backs off `gap` (10 by default; `gap:0`
 // puts it flush). Landing on the border reads as touching, which is why D1/K1 were rejected alongside the ones inside.
 const GAP=r=>r.gap==null?10:r.gap;
 // A bound end FOLLOWS its target. The model keeps the point the author aimed at; if the target has since moved out from
