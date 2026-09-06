@@ -1045,6 +1045,34 @@ live('live: parity catches a painted row drawn THROUGH a text row (the class of 
   assert.equal(res.tile.parity[0].pass, true, 'a text row sitting inside a tile is containment, not collision');
   assert.equal(res.miss.parity[0].pass, true);
 });
+live('live: parity — a text row hidden under a later-painted opaque row is occlusion; strict fails it, non-strict reports it', async () => {
+  const kicker = {x: 60, y: 60, w: 400, role: 'Label', nowrap: 1, text: 'HTML-PPT-SKILL · SLIDEV'};
+  const box = {x: 140, y: 40, w: 300, h: 80, bg: '#333842', radius: 8};                 // a tint over the kicker's tail
+  const away = {...box, x: 600};                                                        // the same box, not touching it
+  const cases = {under: [kicker, box], over: [box, kicker], away: [kicker, away], text: [kicker, {x: 140, y: 60, w: 300, role: 'Body', text: 'a caption on the kicker'}]};
+  const res = {};
+  for (const [k, els] of Object.entries(cases)) {
+    const f = path.join(tmp, 'occl-' + k + '.html'); fs.writeFileSync(f, create({w: 960, h: 540, slides: [{els}]}).html);
+    res[k] = {strict: await verify(f, {out: path.join(tmp, 'v-occl-' + k), strict: true, log: () => {}}), lax: await verify(f, {out: path.join(tmp, 'v-occl-' + k + '-lax'), log: () => {}})};
+  }
+  assert.equal(res.under.strict.parity[0].pass, false, 'a box painted after the kicker hides its tail');
+  assert.match(JSON.stringify(res.under.strict.parity[0].rows), /"n":"0".*under row 1 \(box\)/, 'names both rows');
+  assert.match(res.under.strict.errors.join('|'), /slide 1: row 0 \(Label 'HTML-PPT-SKILL · SLIDEV'\) under row 1 \(box\)/);
+  assert.equal(res.under.lax.parity[0].pass, true, 'non-strict warns'); assert.equal(res.under.lax.parity[0].occlusion.length, 1);
+  assert.equal(res.over.strict.parity[0].pass, true, 'the same box listed BEFORE the kicker is a backdrop');
+  assert.equal(res.away.strict.parity[0].pass, true, 'a box that does not overlap is nothing');
+  assert.ok(!JSON.stringify(res.text.strict.parity[0].rows).includes('under row'), 'a text row over a text row is not occlusion');
+});
+live('live: parity — `href` + `nowrap` is one line (the inset anchor is not a text line); a wrapped linked nowrap row still fails', async () => {
+  const one = path.join(tmp, 'href-one.html'), two = path.join(tmp, 'href-two.html'), chip = path.join(tmp, 'href-chip.html');
+  fs.writeFileSync(one, create({w: 960, h: 540, slides: [{els: [{x: 60, y: 60, w: 300, role: 'Body', nowrap: 1, href: 'https://example.com', text: 'Read the report'}]}]}).html);
+  fs.writeFileSync(chip, create({w: 960, h: 540, slides: [{els: [{x: 60, y: 60, w: 'auto', role: 'Label', nowrap: 1, p: 'chip', bg: 'var(--box)', href: 'https://example.com', text: 'Read the report'}]}]}).html);
+  fs.writeFileSync(two, create({w: 960, h: 540, slides: [{els: [{x: 60, y: 60, w: 60, role: 'Body', nowrap: 1, href: 'https://example.com', text: 'Read the report'}]}]}).html);
+  const r1 = await verify(one, {out: path.join(tmp, 'v-href-one'), log: () => {}}), rc = await verify(chip, {out: path.join(tmp, 'v-href-chip'), log: () => {}}), r2 = await verify(two, {out: path.join(tmp, 'v-href-two'), log: () => {}});
+  assert.equal(r1.parity[0].pass, true, JSON.stringify(r1.parity[0].rows)); assert.equal(r1.parity[0].rows.length, 0);
+  assert.equal(rc.parity[0].pass, true, JSON.stringify(rc.parity[0].rows));
+  assert.equal(r2.parity[0].pass, false, 'a linked row that really wraps still fails'); assert.match(JSON.stringify(r2.parity[0].rows), /renders 2 lines|overflows/);
+});
 live('live: parity catches text straddling a container edge, and an arrow head landing inside a fill', async () => {
   const roles = modelOf(tpl).styles.roles;
   const tile = {x: 300, y: 200, w: 300, h: 140, tile: 1, bg: '#1A1D21', bd: '1.5px solid #2C3138', radius: 12};

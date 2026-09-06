@@ -92,12 +92,13 @@ node bin/verify.mjs deck.html [--refs shots/] [--out verify-out/] [--threshold 0
 ```
 - **Contract** — always.
 - **Layout parity** — always (needs Playwright): no text row overflows its box, every `nowrap` row renders one line, imported rows render their source line count, every element is inside the canvas, **no painted row is drawn through a text row**, zero page errors.
-  Three shapes, all measured on real geometry (glyph rects and sampled strokes, never bounding boxes):
+  Five shapes — four measured on real geometry (glyph rects and sampled strokes, never bounding boxes), the fifth asked of the compositor:
   1. **ink through text** — a line, curve or rule crossing a label's glyphs;
   2. **text straddling a container** — a label crossing a box/tile border, or hanging half out of the box meant to hold it;
   3. **an arrow head inside a fill** — a connector aimed at a target's centre instead of stopped on its edge (fix with `to:`);
-  4. **text over text** — a title landing on a caption.
-  Containment is not collision: text on a tile, a label inside a box, a slide backdrop all pass. A tint with no border is a backdrop and a circle/pill outline is decoration — neither is a container edge. A headless stroke crossing a card is routing, not a landing. `over:1` opts a row out of all three.
+  4. **text over text** — a title landing on a caption;
+  5. **text under paint** (occlusion) — a text row hidden by an opaque row painted later in `els` (a tinted box, an image, a bar). The compositor is asked, not the geometry: `elementFromPoint` at five samples per line rect. Reported as `slide 2: row 3 (Label 'kicker') under row 9 (box)` — reorder `els` (paint first) or move the box; `--strict` fails it, otherwise it is a warning.
+  Containment is not collision: text on a tile, a label inside a box, a slide backdrop all pass. A tint with no border is a backdrop and a circle/pill outline is decoration — neither is a container edge. A headless stroke crossing a card is routing, not a landing. `over:1` opts a row out of all five.
 - **AE pixel diff** — when `--refs` exists (needs ImageMagick): `< 0.5%` of pixels differ at 2% fuzz. AE alone passes wrapped labels; parity is what catches them — that is why parity is not optional.
 
 Fix the model, not the output. Re-run until `VERIFY PASS`. Attach `verify-out/results.json` to your report.
@@ -312,6 +313,7 @@ Four words, and no fifth: `rise` (text — the default), `fade` (quiet chrome), 
 | line count | `verify` parity | imported rows: rendered lines == source `_lines` |
 | bounds | `verify` parity | every element inside the canvas |
 | collision | `verify` parity | no ink through glyphs, no text straddling a container edge, no arrow head inside a fill, no text over text (`over:1` opts out) |
+| occlusion | `verify` parity | no text row under an opaque row painted later in `els` (`--strict` fails, else warns) |
 | page errors | `verify` | none |
 | AE | `verify --refs` | `< 0.5%` pixels at `-fuzz 2%` (set `--threshold`) |
 

@@ -3,7 +3,8 @@
 //   1. model contract (bin/validate.mjs)                              always, no browser
 //   2. LAYOUT PARITY in a real browser (Playwright, optional devDep)  always when Playwright is installed
 //        every text row: no overflow (scrollWidth ≤ clientWidth), nowrap rows render ONE line, rows imported from HTML render the
-//        source line count (data-lines), every element stays inside the canvas, zero page errors
+//        source line count (data-lines), every element stays inside the canvas, zero page errors, no text row hidden under a
+//        later-painted opaque row (occlusion — sampled with elementFromPoint; --strict fails it, otherwise reported)
 //   3. AE pixel diff vs reference PNGs (ImageMagick `magick`/`compare`)  only when --refs is given
 // usage: node bin/verify.mjs deck.html [--refs dir] [--out dir] [--threshold 0.5] [--fuzz 2%] [--report model.report.json] [--fonts <css url>] [--strict]
 //   --report: the importer's drift report (default: model.report.json beside the deck) — masks where the mockup drew its chrome
@@ -46,7 +47,7 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
     for (let n = 0; n < N; n++) {
       await p.evaluate(k => { i = k; sel.clear(); render(); }, n); await p.waitForTimeout(150);
       const name = deck.slides[n].name || `slide-${n + 1}`;
-      const bad = await p.evaluate(([W, H]) => {
+      let bad = await p.evaluate(([W, H]) => {
       // collision: ink drawn THROUGH a text row — the defect a human sees instantly and no other gate catches. The engine marks
       // its own ink (data-seg = a line, data-cur = a curve, data-ink = a thin rule/dot); a card, tile, bar, donut or backdrop is
       // something text sits ON, never a collision. A stroke is sampled along its real path, so a diagonal leader line is judged by
@@ -82,7 +83,11 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
       // text-over-text: the third shape. A title landing on a caption is the first thing a human sees and no other gate
       // catches it. Glyph rects again, never boxes — two rows may share a box and still not touch a letter.
       const inset = x => ({l: x.left, r: x.right, t: x.top + x.height * .15, b: x.bottom - x.height * .15});
-      const words = d => { const g = document.createRange(); g.selectNodeContents(d); return [...g.getClientRects()].filter(x => x.width > 1 && x.height > 1).map(inset); };
+      // a row's client rects are its text LINE boxes — minus the `href` overlay: the inset anchor (a.lk, inset:0) is one more rect at
+      // the row's border-box top, a half-leading above the first line, and counted as a line it made every linked nowrap row "2 lines".
+      const same = (a, b) => Math.abs(a.top - b.top) < .5 && Math.abs(a.left - b.left) < .5 && Math.abs(a.width - b.width) < .5 && Math.abs(a.height - b.height) < .5;
+      const rects = d => { const skip = [...d.querySelectorAll('a.lk')].map(a => a.getBoundingClientRect()), g = document.createRange(); g.selectNodeContents(d); return [...g.getClientRects()].filter(x => !skip.some(s => same(s, x))); };
+      const words = d => rects(d).filter(x => x.width > 1 && x.height > 1).map(inset);
       const texts = [...document.querySelectorAll('#canvas .el')]
         .filter(d => (d.textContent || '').trim() && !d.querySelector('svg,img') && d.dataset.over == null)
         .map(d => ({key: d.dataset.n ?? ('m:' + d.dataset.m), el: d, gl: words(d)}));
@@ -91,8 +96,8 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
         const o = {text: (d.textContent || '').trim().slice(0, 40), n: d.dataset.n ?? ('m:' + d.dataset.m), problems: [], ...(d.dataset.snapped ? {snapped: 1} : {})};
         const textual = !!(d.textContent || '').trim() && !d.querySelector('svg,img');
         if (textual) {
-          const rg = document.createRange(); rg.selectNodeContents(d); const tops = [];
-          for (const x of rg.getClientRects()) { if (!x.width && !x.height) continue; if (!tops.some(t => Math.abs(t - x.top) < 2)) tops.push(x.top); }
+          const rs = rects(d), tops = [];
+          for (const x of rs) { if (!x.width && !x.height) continue; if (!tops.some(t => Math.abs(t - x.top) < 2)) tops.push(x.top); }
           const lines = tops.length || 1;
           if (d.scrollWidth > d.clientWidth + 1) o.problems.push(`overflows its box (${d.scrollWidth}>${d.clientWidth})`);
           if (d.style.whiteSpace === 'nowrap' && lines > 1) o.problems.push(`nowrap row renders ${lines} lines`);
@@ -101,7 +106,7 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
           if (d.dataset.over == null && (ink.length || chrome.length || texts.length > 1)) {
             // glyph rects carry the line box's leading; inset it so a rule sitting just under a heading is not a "collision".
             // TWO samples inside = the stroke passes THROUGH the glyphs; one = it merely touches an edge (a leader pointing at a label).
-            const gl = [...rg.getClientRects()].filter(x => x.width > 1 && x.height > 1).map(x => ({l: x.left, r: x.right, t: x.top + x.height * .15, b: x.bottom - x.height * .15}));
+            const gl = rs.filter(x => x.width > 1 && x.height > 1).map(inset);
             const hit = ink.filter(q => q.pts.filter(z => gl.some(g => z.x > g.l - q.t && z.x < g.r + q.t && z.y > g.t - q.t && z.y < g.b + q.t)).length >= 2);
             if (hit.length) o.problems.push('overlapped by ' + hit.map(q => q.key).join(','));
             // …and text must be wholly inside a container or wholly outside it. Straddling an edge is the other shape a human
@@ -115,17 +120,37 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
             const onText = texts.filter(t => t.el !== d && t.gl.some(h => gl.some(g => Math.min(g.r, h.r) - Math.max(g.l, h.l) > 2 && Math.min(g.b, h.b) - Math.max(g.t, h.t) > 2)));
             if (onText.length) o.problems.push('overlaps text ' + onText.map(t => t.key).join(','));
           }
+          // occlusion: the glyphs are drawn, and something painted LATER (rows paint in `els` order; master below) is on top of them.
+          // Parity's other shapes measure geometry; this one asks the compositor — elementFromPoint at five samples per line rect
+          // (inset corners + centre) — so a tint listed after the kicker is caught and the same tint listed before it is a backdrop.
+          // Only an opaque non-text row counts: another text row is text-over-text above, a transparent box hides nothing. The
+          // anchor overlay is pointer-events:none, so a linked row's own a.lk is never the hit.
+          if (d.dataset.over == null) {
+            const hits = new Map(), opaque = h => { if ((h.textContent || '').trim() && !h.querySelector('svg,img')) return null; if (h.querySelector('img')) return 'img'; if (h.querySelector('svg')) return 'svg';
+              const cs = getComputedStyle(h); return (cs.backgroundImage !== 'none' || !/^rgba\(\d+, \d+, \d+, 0\)$|^transparent$/.test(cs.backgroundColor)) ? 'box' : null; };
+            for (const x of rs) { if (x.width <= 2 || x.height <= 2) continue; const g = inset(x), px = [g.l + 1, (g.l + g.r) / 2, g.r - 1], py = [g.t + 1, (g.t + g.b) / 2, g.b - 1];
+              for (const [sx, sy] of [[0, 0], [2, 0], [1, 1], [0, 2], [2, 2]]) { const h = document.elementFromPoint(px[sx], py[sy]), e = h && h.closest('#canvas .el');
+                if (!e || e === d || e.dataset.over != null || hits.has(e)) continue; const kind = opaque(e); if (kind) hits.set(e, kind); } }
+            o.occluded = [...hits].map(([e, kind]) => ({under: e.dataset.n ?? ('m:' + e.dataset.m), kind}));
+          }
         }
         const hh = headHits.filter(x => x.key === o.n);
         if (hh.length) o.problems.push('arrow lands inside ' + [...new Set(hh.map(x => x.on))].join(',') + ' — terminate it with to:/from:');
         if (r.right > cv.left + W + 1 || r.bottom > cv.top + H + 1 || r.left < cv.left - 1 || r.top < cv.top - 1) o.problems.push('outside the canvas');
+        if (textual) { const s = deck.slides[i], row = d.dataset.n != null ? s.els[+d.dataset.n] : (deck.master || []).find(m => m.id === d.dataset.m);
+          o.role = row && (row.role || (row.slot && (((deck.layouts || {})[s.layout] || {})[row.slot] || (deck.slots || {})[row.slot] || {}).role)) || undefined; }
         return o;
-      }).filter(o => o.problems.length); }, [W, H]);
+      }).filter(o => o.problems.length || o.occluded?.length); }, [W, H]);
+      // occlusion names both rows so the builder fixes z-order or geometry; --strict fails on it, otherwise it is reported beside the slide
+      const occl = bad.flatMap(o => (o.occluded || []).map(u => ({...u, n: o.n, role: o.role, text: o.text, msg: `slide ${n + 1}: row ${o.n} (${o.role || 'text'} '${o.text}') under row ${u.under} (${u.kind})`})));
+      for (const o of bad) { if (strict) for (const u of o.occluded || []) o.problems.push(`under row ${u.under} (${u.kind})`); delete o.occluded; }
+      bad = bad.filter(o => o.problems.length);
+      if (strict) for (const u of occl) res.errors.push('occlusion: ' + u.msg);
       // a row the type scale changed (imported with _src) may wrap or crowd differently from its source: that is a consequence of the
       // scale, not a layout fault — reported as scale crowding for a human decision, never a failure. Everything else stays hard.
       // …only when it renders FEWER lines (collapsed runs); more lines or overflow means the importer's fit cap failed — hard
       const soft = o => o.snapped && o.problems.every(x => { const m = /^source had (\d+) line\(s\), renders (\d+)/.exec(x); return m && +m[2] < +m[1]; });
-      res.parity.push({slide: n + 1, name, pass: !bad.some(o => !soft(o)), rows: bad.filter(o => !soft(o)), crowding: bad.filter(soft)});
+      res.parity.push({slide: n + 1, name, pass: !bad.some(o => !soft(o)), rows: bad.filter(o => !soft(o)), crowding: bad.filter(soft), occlusion: occl.map(u => u.msg)});
       const act = path.join(out, `${String(n + 1).padStart(2, '0')}-${name}.png`);
       await p.locator('#canvas').screenshot({path: act});
       if (hasMagick) {
@@ -175,6 +200,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   for (const m of r.contract.errors) console.error('ERROR   contract: ' + m);
   for (const m of r.contract.warnings) console.error('warning contract: ' + m);
   for (const s of r.parity) console.log(`parity  slide ${s.slide} ${s.name}: ${s.pass ? 'PASS' : 'FAIL ' + JSON.stringify(s.rows)}`);
+  for (const s of r.parity) for (const m of s.occlusion || []) console.log(`occlusion ${m}${o.strict ? '' : ' — warning; --strict fails it'}`);
   for (const s of r.parity) if (s.crowding?.length) console.log(`crowding slide ${s.slide} ${s.name}: ${s.crowding.length} row(s) the scale changed now wrap/crowd differently — ${s.crowding.map(c => JSON.stringify(c.text)).join(', ')}`);
   for (const s of r.ae) console.log(`ae      slide ${s.slide} ${s.name}: ${s.skipped ? 'skipped (' + s.skipped + ')' : (s.pass ? 'PASS' : 'FAIL') + ` raw ${s.pct}% · chrome masked ${s.pctNoChrome}% · + ${s.conflictRows} snapped rows masked ${s.pctNoChromeNoConflict}% (pass column)`}`);
   for (const m of r.skipped) console.log('skipped ' + m);
