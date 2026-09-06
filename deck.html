@@ -23,7 +23,9 @@ body.present .el a.lk{pointer-events:auto}
 /* layout guides = selection chrome: one hairline per distinct slot edge of THIS slide's layout (and the canvas mid-lines), painted by
    render() only — never by drawEls, so print, the sheet and the PDF cannot carry them. They show only while a drag is in flight, the
    line holding the box brightens, and a press passes straight through */
-#canvas .gl{position:absolute;pointer-events:none;z-index:2;background:var(--sel);opacity:0;transition:opacity .08s}#canvas.dragging .gl{opacity:.28}#canvas .gl.v{top:0;bottom:0;width:1px}#canvas .gl.h{left:0;right:0;height:1px}#canvas.dragging .gl.on{opacity:1;box-shadow:0 0 0 .5px var(--sel)}
+#canvas .gl{position:absolute;pointer-events:none;z-index:2;background:var(--sel);opacity:0;transition:opacity .08s}#canvas.dragging .gl{opacity:.28}
+/* the 16px grid: ONE node, a repeating gradient, shown whenever the toggle is on; the same chrome rules as the guides */
+#canvas .gg{position:absolute;inset:0;pointer-events:none;z-index:2;opacity:.11;background:repeating-linear-gradient(90deg,var(--sel) 0 1px,transparent 1px 16px),repeating-linear-gradient(0deg,var(--sel) 0 1px,transparent 1px 16px)}#canvas .gl.v{top:0;bottom:0;width:1px}#canvas .gl.h{left:0;right:0;height:1px}#canvas.dragging .gl.on{opacity:1;box-shadow:0 0 0 .5px var(--sel)}
 @media (prefers-reduced-motion:reduce){#canvas .gl{transition:none}}
 /* rows carry their own typography: the element adds NOTHING implicit (no padding, radius or pre-wrap) — chrome lives on .box/.tile only */
 .el{position:absolute;cursor:grab;padding:0;border-radius:0;white-space:normal;line-height:normal}
@@ -121,7 +123,7 @@ body.sheet #hud{position:fixed;left:0;right:0;bottom:0;z-index:21;background:var
    The text toolbar is NOT chrome here: editing is allowed in present mode (it floats on a selection exactly as windowed) */
 body.present #hud,body.present .h{display:none!important}
 /* guides are editing chrome: none draw while presenting, so the toggle leaves the peek pill too (one more button put the pill on a 4:5 deck's counter) */
-body.present .gl,body.present #snap{display:none!important}
+body.present .gl,body.present .gg,body.present #snap{display:none!important}
 body.present #canvas{border:0;border-radius:0}
 /* …but the HUD peeks back in while the pointer hovers the bottom twelfth (video-player controls pattern) */
 /* peek HUD: a centred pill, lifted off the bottom edge. Full-width + bottom:0 put the right-hand controls exactly on the
@@ -135,7 +137,7 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
    `zoom`ed to the printable page width (816/W for Letter, 794/W for A4 — see deck.page). Each page paints ITS slide's bg; the dark body paints the letterbox. */
 @page{size:letter;margin:0} /* deck.page==="a4" injects an overriding @page rule at load */
 @media print{
-  #wrap,#hud,#tb,#sheet,.gl{display:none!important}
+  #wrap,#hud,#tb,#sheet,.gl,.gg{display:none!important}
   body{height:auto;overflow:visible;display:block;background:var(--bg);-webkit-print-color-adjust:exact;print-color-adjust:exact}
   #print{display:block}
   #print .pg{position:relative;width:var(--W);height:var(--H);zoom:var(--Z);background:var(--card);break-after:page;break-inside:avoid}
@@ -197,7 +199,7 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
       <div><kbd>⌘B · ⌘I · ⌘U</kbd> bold · italic · underline (a selected row takes it whole)</div>
       <div><kbd>⌘P</kbd> PDF (the download button) · paper print</div>
       <div><kbd>✓ button</kbd> spellcheck (the browser's own · marks the focused row · never in present, print or PDF)</div>
-      <div><kbd>magnet button</kbd> layout guides + snap (off by default · hairlines on this slide's layout slots · hairlines show while you drag · a drag, a resize or a connector nib snaps within 10px · never in present, print or PDF)</div>
+      <div><kbd>magnet button</kbd> grid + guides + snap (off by default · a 16px grid over the slide · this slide's layout lines show while you drag · a drag, a resize or a connector nib snaps to a layout line within 10px, else to the grid · never in present, print or PDF)</div>
     </div>
   </div>
 </div>
@@ -290,11 +292,12 @@ const NS=/*KEY*/'decklet:b4094691c0'/*/KEY*/,KEY=NS+':model',HKEY=NS+':hist',PKE
 // spellcheck is the browser's own (no dictionary ships): an attribute on every row, painted only on the focused one. The toggle is
 // browser state under NS — never a model key, so it cannot reach the saved file; present/print/⤓ draw with it off (drawEls below).
 const SKEY=NS+':spell';let SPELL=store.get(SKEY)!=='0';
-// layout guides + snap: browser state under NS exactly like spellcheck — never a model key, OFF until this browser turns it on.
+// grid + layout guides + snap: browser state under NS exactly like spellcheck — never a model key, OFF until this browser turns it on.
 const GKEY=NS+':snap';let SNAP=store.get(GKEY)==='1';
 // feel knobs (browser-only, not persisted): px = the reach of a line · centers = a box's centre snaps too · mid = the canvas
 // mid-lines join the guides · hyst = a held line keeps its grip this much further, so a snapped edge does not chatter at the edge of reach
 const SNAPO={px:10,centers:true,mid:true,hyst:4}; // Kyle's pick, 2026-09-06: magnetic
+const GP=16; // the grid pitch: the overlay's lattice, the lattice every guide sits on, and the fallback snap (reach GP/2) when no guide is in reach
 const CANSTORE=(()=>{try{localStorage.setItem(NS+':probe','1');localStorage.removeItem(NS+':probe');return true}catch{return false}})();
 const LKEY=NS+':log',VKEY=NS+':vers';
 // the browser's copy of the log and the versions: the file's own, plus what this browser added since (⌘S / write-back put them in the file)
@@ -524,7 +527,7 @@ function render(){
   canvas.innerHTML='';
   drawEls(s,canvas,animate);
   canvas.classList.toggle('dragging',!!(drag&&drag.mode!=='band'));
-  if(SNAP&&!present()){const g=guides(s),h=drag&&drag.hit||{};for(const x of g.x){const l=document.createElement('i');l.className='gl v'+(h.x===x?' on':'');l.style.left=x+'px';canvas.appendChild(l)}for(const y of g.y){const l=document.createElement('i');l.className='gl h'+(h.y===y?' on':'');l.style.top=y+'px';canvas.appendChild(l)}}
+  if(SNAP&&!present()){const gg=document.createElement('i');gg.className='gg';canvas.appendChild(gg);const g=guides(s),h=drag&&drag.hit||{};for(const x of g.x){const l=document.createElement('i');l.className='gl v'+(h.x===x?' on':'');l.style.left=x+'px';canvas.appendChild(l)}for(const y of g.y){const l=document.createElement('i');l.className='gl h'+(h.y===y?' on':'');l.style.top=y+'px';canvas.appendChild(l)}}
   const node=k=>canvas.querySelector(typeof k==='number'?`[data-n="${k}"]`:`[data-m="${k.slice(2)}"]`);
   sel.forEach(k=>{const d=node(k);d&&d.classList.add('selected')});
   if(drag&&drag.mode==='band'&&drag.box){const bd=document.createElement('div');bd.className='band';const[x1,y1,x2,y2]=drag.box;bd.style.cssText=`left:${x1}px;top:${y1}px;width:${x2-x1}px;height:${y2-y1}px`;canvas.appendChild(bd)}
@@ -556,20 +559,24 @@ let drag=null;
 // the ONE translation: every point of a row travels by the same delta from its resolved origin `o` — x/y AND a connector's
 // far end (line:[x2,y2], curve:[c1,c2,end]); writing x/y alone dragged the tail and left the head pinned. Drag and nudge both use it.
 const moveBy=(el,o,dx,dy)=>{el.x=(o.x||0)+dx;el.y=(o.y||0)+dy;if(o.line)el.line=[o.line[0]+dx,o.line[1]+dy];if(o.curve)el.curve=o.curve.map((v,j)=>j%2?v+dy:v+dx)};
-// guides: the slide's slot rectangles (its layout's content slots over the deck-wide ones) and the content margin, as distinct x and
-// y lines. The layout IS the grid — nothing is invented — so a free slide with no layout offers the margin alone.
-function guides(s){const xs=new Set([MG(),W-MG()]),ys=new Set();if(SNAPO.mid){xs.add(W/2);ys.add(H/2)}
-  for(const sl of Object.values(LAY(s))){if(typeof sl.x==='number'){xs.add(sl.x);if(typeof sl.w==='number')xs.add(sl.x+sl.w)}if(typeof sl.y==='number'){ys.add(sl.y);if(typeof sl.h==='number')ys.add(sl.y+sl.h)}}
+// guides: the slide's slot rectangles (its layout's content slots over the deck-wide ones), the content margin and the canvas
+// mid-lines, as distinct x and y lines — every one seated on the GP lattice (the library is cut on it, so this is a no-op there;
+// a deck-defined layout off the lattice gets the nearest grid line). Every slide has a set: a free slide offers the margin and
+// the mid-lines. The layout IS the grid — nothing is invented.
+function guides(s){const q=v=>Math.round(v/GP)*GP,xs=new Set([q(MG()),q(W-MG())]),ys=new Set();if(SNAPO.mid){xs.add(q(W/2));ys.add(q(H/2))}
+  for(const sl of Object.values(LAY(s))){if(typeof sl.x==='number'){xs.add(q(sl.x));if(typeof sl.w==='number')xs.add(q(sl.x+sl.w))}if(typeof sl.y==='number'){ys.add(q(sl.y));if(typeof sl.h==='number')ys.add(q(sl.y+sl.h))}}
   const srt=a=>[...a].sort((p,q)=>p-q);return{x:srt(xs),y:srt(ys)}}
 // nearest: the line closest to any of the values, inside px — or null
 const nearest=(vals,lines,px)=>{let b=null;for(const v of vals)for(const l of lines){const d=l-v;if(Math.abs(d)<=px&&(!b||Math.abs(d)<Math.abs(b.d)))b={d,l}}return b};
 // snapTo: the moving box's edges (and centre) against the guides; the nearest inside SNAPO.px wins per axis, and a line already
-// held keeps its grip for hyst more. Returns the corrected delta and the lines that took it — render() brightens those. Only the
-// pointer snaps: the keyboard nudge is 1px on purpose.
+// held keeps its grip for hyst more. When no guide is in reach the grid takes the axis (reach GP/2, so it always can) — guides
+// first, grid fills in. Returns the corrected delta and the guide lines that took it — render() brightens those; a grid landing
+// brightens nothing. Only the pointer snaps: the keyboard nudge is 1px on purpose.
+const gridNear=vals=>{let b=null;for(const v of vals){const l=Math.round(v/GP)*GP,d=l-v;if(!b||Math.abs(d)<Math.abs(b.d))b={d,l}}return b};
 function snapTo(box,dx,dy,held){if(!SNAP)return{dx,dy,hit:null};const g=guides(slide()),hit={x:null,y:null};
   for(const[a,lines,lo,len]of[['x',g.x,box[0],box[2]],['y',g.y,box[1],box[3]]]){const d=a==='x'?dx:dy,v=[lo+d,lo+d+len];if(SNAPO.centers&&len)v.push(lo+d+len/2);
-    const b=(held&&held[a]!=null&&nearest(v,[held[a]],SNAPO.px+SNAPO.hyst))||nearest(v,lines,SNAPO.px);
-    if(b){hit[a]=b.l;if(a==='x')dx+=b.d;else dy+=b.d}}
+    const b=(held&&held[a]!=null&&nearest(v,[held[a]],SNAPO.px+SNAPO.hyst))||nearest(v,lines,SNAPO.px),e=b||gridNear(v);
+    if(b)hit[a]=b.l;if(a==='x')dx+=e.d;else dy+=e.d}
   return{dx:Math.round(dx),dy:Math.round(dy),hit}}
 // selBox: the selection's union rect in model space. Origins and stated sizes come from the model (exact integers — a DOM rect
 // under a fractional canvas scale lands half a pixel off); only what the model leaves unsaid (auto width, a text row's height)
