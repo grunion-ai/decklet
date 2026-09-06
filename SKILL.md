@@ -59,7 +59,7 @@ Discipline, in order of importance:
 - **Role discipline.** Every text row has a `role` (or a `slot` whose layout slot has one). A row never sets `font`, `size`, `lh`, `ls` or `mono` — the validator rejects it. Rows may set `weight`, `color`, `tt`, `italic`, `align`.
 - **Slot discipline.** Supertitle and title geometry lives in `layouts.<name>`; the slide row is `{slot:'title', text:'…'}` with no x/y/w. Define one layout per slide family (`title`, `content`; add `section`, `two-col` as needed).
 - **Master discipline.** Anything that appears on every slide (footer, rule, mark) is a `master` row, once — chrome is deck-wide and never varies per layout. Exactly one master row has `footer:1`; the engine renders the page counter inside it, with its right edge on `styles.margin`. Never type `3 / 9` into a row.
-- **Text-fit.** A label that must stay on one line gets `nowrap:1` and enough `w` (≈ 0.55 × size × chars), or `w:'auto'` to hug. Chips/pills: `w:'auto'` + `p:'chip'` (+ `bg`/`bd`/`radius`). Body copy gets a `w` that yields ≤ 3 lines at the role's size.
+- **Text-fit.** A label that must stay on one line gets `nowrap:1` and enough `w` (≈ 0.55 × size × chars), or `w:'auto'` to hug. Chips/pills: `w:'auto'` + `p:'chip'` (+ `bg`/`bd`/`radius`); one that sits on a right edge takes `right:` instead of `x`. Body copy gets a `w` that yields ≤ 3 lines at the role's size.
 - **Charts are rows.** A bar or line chart is one `chart` row (CHART ROW below) that `create` expands into bars, lines, dots and `Label` rows with the drawing rules applied — write the data, not the geometry. By hand, the same shape: bars `{x,y,w,h,bg,bar:1}` bottom-aligned on a baseline `line`; value labels as `Label` rows above, axis labels below. Donut: `{x,y,w,donut:72}` + a `Stat` row centred on it. Tiles: `{x,y,w,h,tile:1,role:'Stat',text}` + a `Label` row beneath.
 - **Colour.** Use `var(--accent)`, `var(--fg)`, `var(--muted)`, `var(--line)`, `var(--card)` so a style swap re-themes the deck; literal hex only for chart series.
 
@@ -139,7 +139,7 @@ Top level:
 | `master` | row[] with `id` | `[]` | `[{id:'foot',footer:1,…}]` |
 | `slides` | slide[] (≥1) | — | |
 
-Slot geometry: `{x, y, w, h?, role}`.
+Slot geometry: `{x, y, w, h?, role}` — or `right` in place of `x`; a slotted row's own `right` overrides the slot's `x` the way its own `x` would.
 
 Slide: `{id?, name?, layout?, bg?, hide?: masterId[], els: row[]}` — `id` (unique per deck; `s1, s2…` when create stamps it) is how a tab remembers the slide it was on and how the edit log addresses a slide. Rows carry `id` (unique per slide; `r1, r2…`) for the same reason and for `to:`/`from:`.
 
@@ -147,6 +147,7 @@ Row — every prop optional; a row is whatever its props make it:
 | prop | type | default | meaning |
 |---|---|---|---|
 | `x`,`y` | number | `0` | top-left, model px |
+| `right` | number | — | the row's right edge N px from the canvas right edge (canvas-space, like `x`); x is derived at render from the measured width, so a `w:'auto'` chip needs no guessed x. Exclusive with `x` (validate errors on both). A drag or nudge in the editor writes `right`, so the anchor survives edits |
 | `w` | number \| `'auto'` | `0` | width; `'auto'` hugs content |
 | `h` | number | content | height; required for bar/tile/box-with-height |
 | `slot` | string | — | inherit geometry + role from the layout/deck slot; own x/y/w/h are overrides |
@@ -345,6 +346,7 @@ terminator out of extra rows (they land off centre).
 - **Per-slide chrome drift.** A footer or mark redrawn on each slide with slightly different x/y. It is one master row; slides fork only when a human edits.
 - **Size overrides.** `size:18` on a Body row "because it needs to be bigger". Change the role, or use the right role (`Title` for a display headline, `H1` for a slide title). Same for `font`, `lh`, `ls`, `mono`.
 - **Wrapping labels.** Chips, axis labels, step numbers, supertitles that wrap to two lines. `nowrap:1` + width, or `w:'auto'`. Parity fails these on purpose.
+- **Guessed x for an auto-width row.** A chip on a card's right edge is `right:`, never a guessed `x` — a `w:'auto'` row has no width until it renders, and the guess runs under its neighbour.
 - **Hand-built arrow heads.** Three `line` rows and a trig helper to draw one arrow. `arrow:'end'` on a `line` or a `curve`. Stiff diagonals where the source had a spline: that is what `curve` is for.
 - **Connectors aimed at a centre.** Giving a connector the target's coordinate puts the head inside its fill, floating. Give the target itself — `to: 'grade'` — and the engine stops the tip on the border. Hand-computed standoffs ("end it 10px short") are the thing `to` exists to delete: the head no longer overshoots, so paying it back by hand now *under*-shoots.
 - **A dead CTA.** A painted button with no `href` looks like a link and is not one — no click in the deck, no annotation in the PDF, and a LinkedIn document post has nothing to follow. Put the `href` on the box **and** on its label row.

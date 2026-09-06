@@ -75,7 +75,8 @@ export function validate(deck) {
   // slots (deck scope) + layouts
   const checkSlot = (where, name, sl) => {
     if (!sl || typeof sl !== 'object') return E(`${where}.${name}: slot must be an object`);
-    for (const p of ['x', 'y', 'w']) if (sl[p] != null && sl[p] !== 'auto' && !isNum(sl[p])) E(`${where}.${name}.${p} must be a number`);
+    for (const p of ['x', 'y', 'w', 'right']) if (sl[p] != null && sl[p] !== 'auto' && !isNum(sl[p])) E(`${where}.${name}.${p} must be a number`);
+    if (sl.x != null && sl.right != null) E(`${where}.${name}: x and right are exclusive — right anchors the right edge, x the left`);
     if (sl.role && !roleOk(sl.role)) E(`${where}.${name}: role "${sl.role}" not in styles.roles`);
     if (!sl.role && sl.h == null) Wn(`${where}.${name}: slot has no role — rows bound to it must carry one`);   // a slot with h and no role is paint or media
   };
@@ -101,7 +102,10 @@ export function validate(deck) {
     for (const p of LOCKED) if (r[p] != null && textual) E(`${where}: "${plain(r).slice(0, 30)}" overrides ${p} — only a role sets font/size/lh/ls/mono`);
     if (r.html && /<script|on\w+=/i.test(r.html)) E(`${where}: html contains script/handler`);
     if (r.html && /font-size|font-family|line-height|letter-spacing/.test(r.html)) E(`${where}: html runs carry size/family/leading — runs may only carry color/weight/marks`);
-    for (const p of ['x', 'y', 'h']) if (r[p] != null && !isNum(r[p])) E(`${where}: ${p} must be a number`);
+    for (const p of ['x', 'y', 'h', 'right']) if (r[p] != null && !isNum(r[p])) E(`${where}: ${p} must be a number`);
+    // `right`: the row's right edge N px from the canvas right edge, x derived at render from the measured width — the only
+    // honest anchor for a w:'auto' chip. One edge per row: a row that states both has two answers for where it is.
+    if (r.x != null && r.right != null) E(`${where}: x and right are exclusive — right anchors the right edge, x the left`);
     if (r.w != null && r.w !== 'auto' && !isNum(r.w)) E(`${where}: w must be a number or "auto"`);
     if (r.line && !(Array.isArray(r.line) && r.line.length === 2 && r.line.every(isNum))) E(`${where}: line must be [x2,y2]`);
     if (r.curve && !(Array.isArray(r.curve) && r.curve.length === 6 && r.curve.every(isNum))) E(`${where}: curve must be [c1x,c1y,c2x,c2y,x2,y2]`);
@@ -168,7 +172,8 @@ export function validate(deck) {
     if (r.svg && /<script|href\s*=\s*["']https?:/i.test(r.svg)) E(`${where}: svg contains script or external href`);
     if (textual && /^\s*\d+\s*\/\s*\d+\s*$/.test(plain(r))) Wn(`${where}: "${plain(r).trim()}" looks like a hardcoded page counter — the footer master renders it`);
     // geometry: inside the canvas (slot geometry resolved)
-    const x = r.x ?? (slot && slot.x) ?? 0, y = r.y ?? (slot && slot.y) ?? 0, w = r.w ?? (slot && slot.w);
+    const right = r.right ?? (r.x == null && slot ? slot.right : null), y = r.y ?? (slot && slot.y) ?? 0, w = r.w ?? (slot && slot.w);
+    const x = right != null ? (isNum(w) ? W - right - w : 0) : r.x ?? (slot && slot.x) ?? 0;
     if (isNum(W) && isNum(w) && x + w > W + 0.5) Wn(`${where}: extends past the right edge (${x}+${w} > ${W})`);
     if (isNum(H) && y > H) Wn(`${where}: y ${y} is below the canvas (${H})`);
     // text-fit heuristic: a nowrap row whose text is wider than its box (0.55em per char) will overflow

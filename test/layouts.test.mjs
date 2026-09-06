@@ -46,7 +46,8 @@ test('library: every layout is complete, its slots wear a role from the scale (o
     for (const [slot, sl] of Object.entries(lay.slots)) {
       if (sl.role) assert.ok([...ROLES, 'Stat2'].includes(sl.role), `${name}.${slot}: role ${sl.role}`);
       else assert.ok(sl.h != null || sl.line, `${name}.${slot}: a roleless slot is paint or media and carries h (or a line)`);
-      for (const p of ['x', 'y']) assert.equal(typeof sl[p], 'number', `${name}.${slot}.${p}`);
+      assert.equal(typeof sl.y, 'number', `${name}.${slot}.y`);
+      assert.ok(typeof sl.x === 'number' || typeof sl.right === 'number', `${name}.${slot}: x or right`);
       assert.ok(typeof sl.w === 'number' || sl.w === 'auto', `${name}.${slot}.w`);
       if (typeof sl.w === 'number') assert.ok(sl.x + sl.w <= 900 && sl.x >= 60, `${name}.${slot} inside the 60px margins`);
     }

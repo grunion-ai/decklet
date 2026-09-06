@@ -338,6 +338,8 @@ const MG=()=>deck.styles&&deck.styles.margin!=null?deck.styles.margin:Math.round
 // left unset AND always wins the LOCKED keys: a row can never change family/size/line-height/tracking. Every consumer reads through this.
 const LOCK=['font','size','lh','ls'];
 const res=(el,s)=>{const m=el.override&&(deck.master||[]).find(x=>x.id===el.override)||{};const sl=el.slot&&LAY(s)[el.slot]||{};const r={...sl,...m,...el};
+  // one horizontal anchor: a row's own `right` retires the slot's x (and its own x retires the slot's right), so every consumer sees one edge
+  if(el.right!=null)delete r.x;else if(el.x!=null)delete r.right;
   const R=deck.styles&&deck.styles.roles||{},t=R[r.role]||((r.text!=null||r.html!=null)&&R.Body)||{};for(const k in t)if(r[k]==null||LOCK.includes(k))r[k]=t[k];return r};
 // motion vocabulary — the only four anims an element may carry; anything else is ignored (the validator rejects it upstream)
 const ANIM=['rise','fade','pop','wipe'];
@@ -435,7 +437,8 @@ function drawEls(s,root,animate){
       d.querySelectorAll('a[href]').forEach(a=>{const u=href(a.getAttribute('href'));if(u){a.setAttribute('href',u);a.target='_blank';a.rel='noopener noreferrer'}else a.removeAttribute('href')})}
     else d.textContent=r.text||'';
     const pad=r.p!=null?(deck.styles&&deck.styles.pad&&deck.styles.pad[r.p])||(typeof r.p==='number'?r.p+'px':r.p):null;
-    d.style.cssText=`left:${r.x||0}px;top:${r.y||0}px;width:${r.w==='auto'?'auto':(r.w||0)+'px'};font-size:${r.size||14}px;`+
+    // `right`: the right edge sits N px from the canvas edge and CSS derives x from the measured width — a w:'auto' chip needs no guessed x
+    d.style.cssText=`${r.right!=null?`left:auto;right:${r.right}px;`:`left:${r.x||0}px;`}top:${r.y||0}px;width:${r.w==='auto'?'auto':(r.w||0)+'px'};font-size:${r.size||14}px;`+
       (r.weight?`font-weight:${r.weight};`:'')+(r.color?`color:${r.color};`:'')+
       (r.font?`font-family:${r.font};`:'')+
       (r.ls!=null?`letter-spacing:${r.ls}px;`:'')+(r.lh!=null?`line-height:${r.lh}px;`:'')+(r.tt?`text-transform:${r.tt};`:'')+
@@ -538,7 +541,8 @@ const selEl=()=>{if(sel.size!==1)return null;const k=[...sel][0];return typeof k
 let drag=null;
 // the ONE translation: every point of a row travels by the same delta from its resolved origin `o` — x/y AND a connector's
 // far end (line:[x2,y2], curve:[c1,c2,end]); writing x/y alone dragged the tail and left the head pinned. Drag and nudge both use it.
-const moveBy=(el,o,dx,dy)=>{el.x=(o.x||0)+dx;el.y=(o.y||0)+dy;if(o.line)el.line=[o.line[0]+dx,o.line[1]+dy];if(o.curve)el.curve=o.curve.map((v,j)=>j%2?v+dy:v+dx)};
+// a right-anchored row keeps its anchor: the drag writes `right`, never an x that would freeze a measured width into the model
+const moveBy=(el,o,dx,dy)=>{if(o.right!=null){el.right=o.right-dx;delete el.x}else el.x=(o.x||0)+dx;el.y=(o.y||0)+dy;if(o.line)el.line=[o.line[0]+dx,o.line[1]+dy];if(o.curve)el.curve=o.curve.map((v,j)=>j%2?v+dy:v+dx)};
 $('wrap').addEventListener('mousedown',e=>{
   if(!e.target.closest('[contenteditable="true"]'))commitEdit(); // flush a live text edit BEFORE any deselect/re-render destroys its node
   const scale=canvas.getBoundingClientRect().width/W;
