@@ -24,6 +24,35 @@ const write = (name, html) => { const f = path.join(tmp, name); fs.writeFileSync
 const open = async (b, f, opts = {}) => { const p = await b.newPage({viewport: {width: 1280, height: 800}, ...opts}); const errs = []; p.on('pageerror', e => errs.push(String(e))); p.errs = errs; await p.goto(pathToFileURL(f).href); await p.waitForTimeout(150); return p; };
 const fresh = async (b, f) => { const p = await open(b, f); await p.evaluate(() => localStorage.clear()); await p.reload(); await p.waitForTimeout(150); return p; };
 
+live('a bound connector dragged without its anchors translates rigidly: the to:/from: ends become the human\'s', async () => {
+  // dragging a line whose ends are bound to boxes that stay put used to leave both ends re-aimed at the boxes while the
+  // shaft moved, skewing the stroke into a diagonal. The drag is a translation: shape and length are kept, the bindings drop.
+  const m = model({slides: [{els: [
+    {id: 'a', x: 60, y: 200, w: 160, h: 60, bg: 'var(--card)', bd: '1px solid var(--fg)'},
+    {id: 'b', x: 500, y: 200, w: 160, h: 60, bg: 'var(--card)', bd: '1px solid var(--fg)'},
+    {x: 220, y: 230, line: [500, 230], h: 3, arrow: 'end', from: 'a', to: 'b'}]}]});
+  const b = await pw.chromium.launch(); const p = await fresh(b, write('bound.html', create(m).html));
+  await p.evaluate(() => { sel.clear(); sel.add(2); render(); });
+  const before = await p.evaluate(() => JSON.parse(JSON.stringify(slide().els[2])));
+  const box = async s => p.evaluate(s => { const r = document.querySelector(s).getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }, s);
+  const [x, y] = await box('.el[data-seg]'); await p.mouse.move(x, y); await p.mouse.down(); await p.mouse.move(x, y + 60, {steps: 4}); await p.mouse.up();
+  const after = await p.evaluate(() => JSON.parse(JSON.stringify(slide().els[2])));
+  const scale = await p.evaluate(() => canvas.getBoundingClientRect().width / W);
+  assert.equal(after.to, undefined); assert.equal(after.from, undefined);
+  assert.ok(Math.abs(after.x - before.x) <= 1 && Math.abs(after.line[0] - before.line[0]) <= 1, `no horizontal drift: ${before.x},${before.line[0]} → ${after.x},${after.line[0]}`);
+  assert.ok(Math.abs((after.y - before.y) - 60 / scale) <= 2 && Math.abs(after.line[1] - after.y) <= 1, `both ends travelled ${60 / scale}px and stayed level: ${after.y},${after.line[1]}`);
+  // the rendered shaft is the model's: level, full length
+  const seg = await p.evaluate(() => { const r = canvas.querySelector('.el[data-seg]').getBoundingClientRect(); return [r.width, r.height]; });
+  assert.ok(seg[0] / scale > 260 && seg[1] / scale < 12, `rendered level and long: ${seg}`);
+  // a selection that carries the anchor keeps the binding: box + line move together, the line still ends on the box
+  await p.evaluate(() => { sel.clear(); sel.add(0); sel.add(1); sel.add(2); render(); });
+  await p.evaluate(() => { slide().els[2].from = 'a'; slide().els[2].to = 'b'; render(); });
+  const [x2, y2] = await box('.el[data-seg]'); await p.mouse.move(x2, y2); await p.mouse.down(); await p.mouse.move(x2 + 40, y2, {steps: 4}); await p.mouse.up();
+  const kept = await p.evaluate(() => JSON.parse(JSON.stringify(slide().els[2])));
+  assert.deepEqual([kept.from, kept.to], ['a', 'b'], 'anchors in the same drag stay bound');
+  assert.deepEqual(p.errs, []); await b.close();
+});
+
 live('connector nibs: point handles, never the corner nib; an endpoint drag moves one end; a body drag keeps the length', async () => {
   const b = await pw.chromium.launch(); const p = await fresh(b, write('nib.html', create(model()).html));
   await p.evaluate(() => { sel.clear(); sel.add(2); render(); });
