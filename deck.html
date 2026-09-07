@@ -613,6 +613,11 @@ addEventListener('mousemove',e=>{
     render();return;
   }
   if(!drag.moved){snap();drag.moved=true;drag.items.forEach(it=>{if(typeof it.k!=='number'){const n=fork(it.k.slice(2));sel.delete(it.k);sel.add(n);it.el=slide().els[n]}})}
+  // a bound connector (to:/from:) dragged WITHOUT its anchor row detaches from it on the first move: the drag is a rigid
+  // translation, and an end that kept re-aiming at a box it no longer sits beside skewed the stroke into a diagonal. Drag the
+  // box and the connector together (a group, a marquee) and the binding is kept — the box moves under the end, as before.
+  if(!drag.detached){drag.detached=true;const keys=new Set(drag.items.map(it=>it.k));
+    drag.items.forEach(it=>{for(const p of ['to','from']){const a=it.el[p];if(a==null)continue;const n=typeof a==='number'?a:slide().els.findIndex(x=>x.id===a);if(n>=0&&!keys.has(n))delete it.el[p]}})}
   // a connector's far end is model geometry in canvas space (line:[x2,y2], curve:[c1,c2,end]) — writing x/y alone
   // dragged the tail and left the head pinned, stretching the stroke. Every point of a row travels by the same delta.
   drag.items.forEach(it=>moveBy(it.el,it.o,Math.round(dx),Math.round(dy)));
