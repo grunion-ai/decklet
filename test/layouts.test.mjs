@@ -18,7 +18,7 @@ const live = pw ? test : test.skip;
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'decklet-lib-'));
 
 export const NAMES = ['cover', 'agenda', 'section', 'statement', 'fact', 'quote', 'two-cols', 'two-cols-header', 'image-left', 'image-right',
-  'kpi-grid', 'kpi-grid-4', 'stat', 'chart', 'comparison', 'process-steps', 'timeline', 'cta', 'end'];
+  'kpi-grid', 'kpi-grid-4', 'stat', 'chart', 'comparison', 'process-steps', 'diagram', 'timeline', 'cta', 'end'];
 const IMG = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 3"><rect width="4" height="3" fill="#5B9CF6"/></svg>');
 // one slide per library layout, every slot bound with plausible content
 export const fill = (name, k = 0) => {
@@ -35,6 +35,14 @@ export const fill = (name, k = 0) => {
 };
 export const everyLayout = (w = 960, h = 540) => ({w, h, title: 'library', styles: {margin: 60}, master: [{id: 'foot', footer: 1, x: 60, y: 500, w: 300, role: 'Label', text: 'library'}],
   slides: NAMES.map((n, k) => fill(n, k))});
+
+test('library: diagram — title chrome, one 840×320 figure frame, a caption that states the claim', () => {
+  const d = LIBRARY.diagram;
+  assert.equal(d.group, 'diagrams');
+  assert.deepEqual(d.slots.figure, {x: 60, y: 130, w: 840, h: 320}, 'the figure frame is media: geometry, no role, no paint — rows are placed inside it');
+  assert.deepEqual(d.slots.caption, {x: 60, y: 470, w: 840, role: 'Caption'});
+  assert.equal(d.slots.title.role, 'H1'); assert.equal(d.slots.supertitle.role, 'Supertitle');
+});
 
 test('library: every layout is complete, its slots wear a role from the scale (or carry paint), the names are the catalogue', () => {
   assert.deepEqual(Object.keys(LIBRARY), NAMES, 'the catalogue, in group order');
