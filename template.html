@@ -650,8 +650,11 @@ const deckColors=()=>{const seen=new Map();for(const c of [...Object.values(deck
 const runSpan=(sr,node)=>{const a=sr.rangeCount&&sr.anchorNode,el=a&&(a.nodeType===1?a:a.parentElement).closest('[style*="color"]');return el&&node.contains(el)&&el!==node?el:null};
 // palette is TEXT color only (no box fill — retracted 2026-08-23): any painting row still gets the toolbar for Apply to all slides
 function placeTb(){
-  const el=selEl();const k=[...sel][0];
-  if(sel.size!==1||!$('sheet').hidden){tb.hidden=true;return}
+  // the row being edited wins over the selection: a member of a group is selected WITH its group (sel.size > 1), and the
+  // toolbar used to bail on that, so a double-click into a grouped row edited the text with no roles, marks or colours
+  const ed=canvas.querySelector('.el[contenteditable="true"]');
+  const k=ed?+ed.dataset.n:[...sel][0];const el=ed?slide().els[k]:selEl();
+  if((!ed&&sel.size!==1)||!$('sheet').hidden){tb.hidden=true;return}
   const s=slide(),src=el||(typeof k==='string'&&deck.master.find(m=>m.id===k.slice(2)));
   const r=src&&res(src,s),textual=!!(r&&(r.text||r.html));
   if(!src||!(textual||paints(r))){tb.hidden=true;return}
