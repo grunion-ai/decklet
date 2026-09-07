@@ -227,7 +227,7 @@ Resolution order for any row: slot geometry ← master row (for `override` rows)
 
 ## LAYOUT LIBRARY
 
-Nineteen named layouts ship with the engine (`lib/layouts.mjs`), in the same shape as a `layouts` entry. Name one on a slide the deck does not define and `create` merges it into `deck.layouts`, scaled from its 960×540 cut to the canvas (1600×900 = ×1.67). Print the catalogue — name, group, density, use, slots — with:
+Twenty named layouts ship with the engine (`lib/layouts.mjs`), in the same shape as a `layouts` entry. Name one on a slide the deck does not define and `create` merges it into `deck.layouts`, scaled from its 960×540 cut to the canvas (1600×900 = ×1.67). Print the catalogue — name, group, density, use, slots — with:
 ```
 node bin/validate.mjs --layouts
 ```
@@ -251,6 +251,7 @@ Read that instead of inventing geometry. The library is an accelerant, never a f
 | | `chart` | reading | supertitle · title · chart (840×276 media) · takeaway (Body) · source (Caption) |
 | | `comparison` | reading | supertitle · title · left-head · right-head (H2) · left · right |
 | diagrams | `process-steps` | reading | supertitle · title · n1–n4 (Label) · step1–step4 (tiles, Body) · body |
+| | `diagram` | reading | supertitle · title · figure (840×320 media frame: place the figure's rows inside it) · caption (Caption, the claim) |
 | plans | `timeline` | reading | supertitle · title · rule (paint) · d1–d4 (dots) · t1–t4 (Label) · e1–e4 (Body) |
 | closers | `cta` | speaker | title (Title) · body · button (paint, give it `href`) · button-label (Body, same `href`) |
 | | `end` | speaker | title (Title) · body · caption |
