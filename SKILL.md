@@ -183,8 +183,8 @@ Row — every prop optional; a row is whatever its props make it:
 | `head` | `triangle`\|`chevron`\|`dot`\|`bar` | `triangle` | what is drawn at the arrow ends. `arrow` says *which* ends, `head` says *what* — centred on the stroke axis by construction |
 | `dash` | `1` \| `[on,off]` | — | dashed stroke, **quantised to the run** so it always begins and ends on a whole dash (measured along arc length on a curve). Keeps its head |
 | `waive` | 1 | — | this connector breaks a shape rule on purpose — `validate` stays quiet about it (the `over:1` of connector geometry) |
-| `href` | url | — | http/https/mailto only. One inset anchor over the whole row (a painted CTA box + its label each carry it); live in present mode, a real `/Link` annotation in the `⤓` PDF |
 | `over` | 1 | — | declares a deliberate overlay: `validate`'s gap gate and `verify`'s collision check leave this row (and what it crosses) alone |
+| `href` | url | — | http/https/mailto only. One inset anchor over the whole row (a painted CTA box + its label each carry it); presenting: a click opens it in a new tab; editing: a click selects the row, ⌘-click (Ctrl-click off Mac) opens it and the hover hint says so; a real `/Link` annotation in the `⤓` PDF and an anchor on every ⌘P page |
 | `donut` | 0–100 | — | ring, `w` = diameter, `color` = fill |
 | `svg` | string | — | inline SVG markup (no script, no external href) |
 | `icon` | name | — | a Lucide icon by name (see GRAPHICS; `--icons` lists them) — expands to an `svg` row at create, `color` paints it |
