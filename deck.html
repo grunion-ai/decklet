@@ -298,7 +298,7 @@ const SKEY=NS+':spell';let SPELL=store.get(SKEY)!=='0';
 const GKEY=NS+':snap';let SNAP=store.get(GKEY)==='1';
 // feel knobs (browser-only, not persisted): px = the reach of a line · centers = a box's centre snaps too · mid = the canvas
 // mid-lines join the guides · hyst = a held line keeps its grip this much further, so a snapped edge does not chatter at the edge of reach
-const SNAPO={px:10,centers:true,mid:true,hyst:4}; // Kyle's pick, 2026-09-06: magnetic
+const SNAPO={px:10,centers:true,mid:true,hyst:4}; // chosen 2026-09-06: magnetic
 const GP=16; // the grid pitch: the overlay's lattice, the lattice every guide sits on, and the fallback snap (reach GP/2) when no guide is in reach
 const CANSTORE=(()=>{try{localStorage.setItem(NS+':probe','1');localStorage.removeItem(NS+':probe');return true}catch{return false}})();
 const LKEY=NS+':log',VKEY=NS+':vers';

@@ -114,7 +114,8 @@ export function validate(deck) {
     const slot = r.slot && ((deck.slots || {})[r.slot] || (s && layouts[s.layout] && layouts[s.layout][r.slot]));
     if (r.slot && !slot) E(`${where}: slot "${r.slot}" not in ${s && s.layout ? `layout "${s.layout}"` : 'any layout'} or deck.slots`);
     if (r.role && !roleOk(r.role)) E(`${where}: role "${r.role}" not in styles.roles`);
-    const role = r.role || (slot && slot.role);
+    const over = r.override && (deck.master || []).find(m => m && m.id === r.override);   // a partial override reads the rest from its master row
+    const role = r.role || (slot && slot.role) || (over && over.role);
     const textual = isText(r);
     if (textual && !role) E(`${where}: text row "${plain(r).slice(0, 30)}" has no role (role or slot required)`);
     for (const p of LOCKED) if (r[p] != null && textual) E(`${where}: "${plain(r).slice(0, 30)}" overrides ${p} — only a role sets font/size/lh/ls/mono`);
