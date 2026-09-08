@@ -7,6 +7,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
-      # a real browser: layout parity, occlusion and the editor proofs run here, not only on a laptop before push
-      - run: npm i -D playwright && npx playwright install --with-deps chromium
+      # real browsers: layout parity, occlusion and the editor proofs run here, not only on a laptop before push; webkit for the Safari storage case
+      - run: npm i -D playwright && npx playwright install --with-deps chromium webkit
       - run: node --test test/**/*.test.mjs

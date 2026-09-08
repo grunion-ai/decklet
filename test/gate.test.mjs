@@ -1129,8 +1129,8 @@ live('live: parity catches text straddling a container edge, and an arrow head l
   const mk = els => ({w: 960, h: 540, styles: {roles}, slides: [{els}]});
   const cases = {
     inside:   mk([tile, {x: 320, y: 250, w: 260, role: 'Body', align: 'center', nowrap: 1, text: 'well inside'}]),
-    straddle: mk([tile, {x: 480, y: 250, w: 260, role: 'Body', nowrap: 1, text: 'half out of the tile'}]),
-    over:     mk([tile, {x: 480, y: 250, w: 260, role: 'Body', nowrap: 1, text: 'half out of the tile', over: 1}]),
+    straddle: mk([tile, {x: 560, y: 250, w: 260, role: 'Body', nowrap: 1, text: 'half out of the tile'}]),   // starts 40px inside the tile's right edge, so the glyphs cross it in any font (CI's Linux sans is narrower than macOS's)
+    over:     mk([tile, {x: 560, y: 250, w: 260, role: 'Body', nowrap: 1, text: 'half out of the tile', over: 1}]),
     ring:     mk([ring, {x: 200, y: 320, w: 500, role: 'Body', nowrap: 1, text: 'a headline across a decorative ring'}]),
     band:     mk([band, {x: 120, y: 275, w: 500, role: 'Body', nowrap: 1, text: 'a caption on the edge of a tint band'}]),
     outside:  mk([tile, {x: 60, y: 420, w: 200, role: 'Body', nowrap: 1, text: 'nowhere near'}]),
