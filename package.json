@@ -32,10 +32,18 @@
     "verify:deck": "node bin/verify.mjs deck.html"
   },
   "devDependencies": {
-    "playwright": "^1.62.1"
+    "playwright": "^1.62.1",
+    "dictionary-en": "^4.0.0",
+    "nspell": "^2.1.5"
   },
   "peerDependenciesMeta": {
     "playwright": {
+      "optional": true
+    },
+    "dictionary-en": {
+      "optional": true
+    },
+    "nspell": {
       "optional": true
     }
   },

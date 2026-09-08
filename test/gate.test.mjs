@@ -9,6 +9,7 @@ import {execFileSync, spawnSync} from 'node:child_process';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {validate, mergeStyle, ROLES, ANIMS} from '../bin/validate.mjs';
 import {create, FORMAT} from '../bin/create.mjs';
+import {loadChecker} from '../lib/spell.mjs';
 import {assemble, extract, extractInPage, classify, detectTitle} from '../bin/import-html.mjs';
 import {verify, modelOf} from '../bin/verify.mjs';
 
@@ -235,8 +236,8 @@ test('validator: anim must be one of the four', () => {
 });
 
 // ── 3. deck.html is exactly what create() produces from the explainer model (determinism + self-hosting) ──
-test('deck.html == create(examples/explainer)', () => {
-  const {html} = create(explainer.model, {title: 'decklet'});
+test('deck.html == create(examples/explainer)', async () => {
+  const {html} = create(explainer.model, {title: 'decklet', spell: await loadChecker('en')}); // the CLI builds with the dictionary when it is installed
   assert.equal(html, deck, 'rebuild with: node bin/create.mjs --model examples/explainer/model.json --out deck.html --title decklet');
   const m = modelOf(deck);
   assert.equal(m.slides.length, 12); assert.equal(m.master.filter(x => x.footer).length, 1);

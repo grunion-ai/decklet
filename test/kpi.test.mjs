@@ -8,6 +8,7 @@ import os from 'node:os';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {validate, ROLES, OPTIONAL, kpiRole} from '../bin/validate.mjs';
 import {create} from '../bin/create.mjs';
+import {loadChecker} from '../lib/spell.mjs';
 import {verify, modelOf} from '../bin/verify.mjs';
 import {LIBRARY} from '../lib/layouts.mjs';
 
@@ -40,13 +41,13 @@ test('kpi: Stat2 is optional — eight roles stay the scale, the template keeps 
   assert.deepEqual(validate({...grid, styles: {roles: modelOf(read('template.html')).styles.roles}, layouts: create(grid).deck.layouts}).errors, []);
 });
 
-test('kpi: every existing example still validates and creates byte-identically', () => {
+test('kpi: every existing example still validates and creates byte-identically', async () => {
   for (const n of ['explainer', 'quarterly-update', 'launch-carousel', 'one-pager']) {
     const model = JSON.parse(read(`examples/${n}/model.json`)), sf = path.join(root, `examples/${n}/style.json`);
     const {deck} = create(model, {style: fs.existsSync(sf) ? JSON.parse(read(`examples/${n}/style.json`)) : null});
     assert.ok(!('Stat2' in deck.styles.roles), n + ': untouched');
   }
-  assert.equal(create(JSON.parse(read('examples/explainer/model.json')), {title: 'decklet'}).html, read('deck.html'), 'deck.html needs no rebuild');
+  assert.equal(create(JSON.parse(read('examples/explainer/model.json')), {title: 'decklet', spell: await loadChecker('en')}).html, read('deck.html'), 'deck.html needs no rebuild');
 });
 
 test('kpi: SKILL.md names the allowance', () => {
