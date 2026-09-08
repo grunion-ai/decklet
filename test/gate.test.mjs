@@ -82,7 +82,7 @@ test('roles are the type system: eight complete roles in the template, locked ke
   const m = modelOf(tpl);
   assert.deepEqual(Object.keys(m.styles.roles), ROLES);
   for (const r of Object.values(m.styles.roles)) for (const p of ['font', 'size', 'weight', 'lh', 'color']) assert.ok(r[p] != null, p); // the template's own roles carry lh
-  assert.match(tpl, /data-cmd="bold"[\s\S]*data-cmd="italic"[\s\S]*data-cmd="underline"[\s\S]*data-cmd="strikeThrough"/); assert.doesNotMatch(tpl, /data-cmd="(subscript|superscript)"/, 'no sub/sup buttons'); assert.doesNotMatch(tpl, /tb-fill|dataset\.fill|data-fill|deckBgs/, 'no box-fill feature'); assert.match(tpl, /#tb \.seg\{display:inline-flex;align-items:center;gap:2px;padding:2px 4px 2px 0;/, 'segments are one centred line box with symmetric top/bottom padding'); assert.match(tpl, /#tb \.sw\{width:16px;height:16px;padding:0;margin:0;vertical-align:middle;/, 'swatches symmetric'); assert.match(tpl, /<kbd>select text<\/kbd> → roles · B I U S̶ · link · color<\/div>/, 'popover toolbar line'); assert.doesNotMatch(tpl.match(/<div id="helpmenu"[\s\S]*?<\/div>\s*<\/div>/)[0], /fill/i, 'no "fill" in the popover');
+  assert.match(tpl, /data-cmd="bold"[\s\S]*data-cmd="italic"[\s\S]*data-cmd="underline"[\s\S]*data-cmd="strikeThrough"/); assert.doesNotMatch(tpl, /data-cmd="(subscript|superscript)"/, 'no sub/sup buttons'); assert.doesNotMatch(tpl, /tb-fill|dataset\.fill|data-fill|deckBgs/, 'no box-fill feature'); assert.match(tpl, /#tb \.seg\{display:inline-flex;align-items:center;gap:2px;padding:2px 4px 2px 0;/, 'segments are one centred line box with symmetric top/bottom padding'); assert.match(tpl, /#tb \.sw\{width:16px;height:16px;padding:0;margin:0;vertical-align:middle;/, 'swatches symmetric'); assert.match(tpl, /<kbd>double-click<\/kbd> edit text · select text → roles · B I U S̶ · link · color<\/div>/, 'popover toolbar line'); assert.doesNotMatch(tpl.match(/<div id="helpmenu"[\s\S]*?<\/div>\s*<\/div>/)[0], /fill/i, 'no "fill" in the popover');
   assert.match(tpl, /\.el sub,\.el sup\{font-size:inherit;line-height:0/, 'sub/sup never change size');
   assert.match(tpl, /const LOCK=\['font','size','lh','ls'\]/); assert.match(tpl, /if\(r\[k\]==null\|\|LOCK\.includes\(k\)\)r\[k\]=t\[k\]/, 'role always wins the locked keys');
   assert.doesNotMatch(tpl, /<select|type="color"|font-picker|fontFamily|id="font|id="size|id="color/);
@@ -90,13 +90,13 @@ test('roles are the type system: eight complete roles in the template, locked ke
   assert.doesNotMatch(tpl, /r\.mono\?/, 'mono is not a row prop — Label is the mono role');
 });
 test('HUD contract is a set: prev · next · autosave · + (Text/Box/Slide) · contact sheet · versions · PDF · fullscreen · shortcuts', () => {
-  assert.match(tpl, /<button id="prev" [^>]*aria-label="Previous slide \(←\)"><svg [^>]*><path [^>]*\/><\/svg><\/button>/, 'prev is icon-only'); assert.match(tpl, /<button id="next" [^>]*aria-label="Next slide \(→\)"><svg [^>]*><path [^>]*\/><\/svg><\/button>/, 'next is icon-only');
+  assert.match(tpl, /<button id="prev" [^>]*aria-label="Previous slide · ←"><svg [^>]*><path [^>]*\/><\/svg><\/button>/, 'prev is icon-only'); assert.match(tpl, /<button id="next" [^>]*aria-label="Next slide · →"><svg [^>]*><path [^>]*\/><\/svg><\/button>/, 'next is icon-only');
   const ids = [...tpl.matchAll(/<div id="hud">[\s\S]*?<\/div>\n<div id="sheet"/g)][0][0].match(/id="([^"]+)"/g).map(s => s.slice(4, -1)).filter(s => s !== 'hud' && s !== 'sheet').sort();
-  assert.deepEqual(ids, ['add-box', 'add-text', 'addbtn', 'addmenu', 'addwrap', 'autosave', 'fs', 'grid-btn', 'help', 'helpmenu', 'helpwrap', 'next', 'pdf', 'prev', 'sadd', 'savecopy', 'snap', 'spell', 'vers', 'versmenu']);
-  assert.deepEqual([...tpl.match(/<div id="hud">[\s\S]*?\n<\/div>/)[0].matchAll(/id="(prev|next|autosave|addbtn|grid-btn|vers|pdf|fs|help)"/g)].map(m => m[1]), ['prev', 'next', 'autosave', 'addbtn', 'grid-btn', 'vers', 'pdf', 'fs', 'help'], 'autosave immediately left of +, versions left of PDF, ⓘ rightmost');
-  assert.match(tpl, /<button id="help" class="mi mi-circle-question-mark"[^>]*aria-label="Shortcuts"[^>]*><svg /, 'the shortcuts control is the question-mark icon'); assert.match(tpl, /<kbd>← → \/ ↑ ↓<\/kbd> navigate/, 'popover nav line'); assert.match(tpl, /<button id="sheet-back" title="Back to slide \(Esc\)" aria-label="Back to slide \(Esc\)">← Back<\/button>/, 'contact sheet ← Back');
+  assert.deepEqual(ids, ['add-box', 'add-text', 'addbtn', 'addmenu', 'addwrap', 'autosave', 'dup', 'fs', 'grid-btn', 'help', 'helpmenu', 'helpwrap', 'next', 'pdf', 'prev', 'sadd', 'savecopy', 'snap', 'spell', 'vers', 'versmenu', 'verswrap']);
+  assert.deepEqual([...tpl.match(/<div id="hud">[\s\S]*?\n<\/div>/)[0].matchAll(/id="(prev|next|vers|autosave|addbtn|dup|grid-btn|pdf|fs|help)"/g)].map(m => m[1]), ['prev', 'next', 'vers', 'autosave', 'addbtn', 'dup', 'pdf', 'grid-btn', 'fs', 'help'], 'save state (versions wearing the dot) leads the cluster, then edit, file, view; ⓘ rightmost');
+  assert.match(tpl, /<button id="help" class="mi mi-circle-question-mark"[^>]*aria-label="Shortcuts"[^>]*><svg /, 'the shortcuts control is the question-mark icon'); assert.match(tpl, /<kbd>← →<\/kbd> previous · next/, 'popover nav line'); assert.match(tpl, /<button id="sheet-back" title="Back to slide \(Esc\)" aria-label="Back to slide \(Esc\)">← Back<\/button>/, 'contact sheet ← Back');
   assert.match(tpl, /if\(\(e\.metaKey\|\|e\.ctrlKey\)&&e\.key\.toLowerCase\(\)==='s'\)\{e\.preventDefault\(\);saveFile\(\);return\}/, '⌘S saves THE FILE (write-back), keyboard only'); assert.doesNotMatch(tpl, /id="save"/);
-  assert.match(tpl, /if\(!FSA\)\{saveCopy\(\);return\}/, 'no File System Access → ⌘S downloads a copy'); assert.match(tpl, /showOpenFilePicker\(\{id:'decklet'/, 'the first ⌘S links the deck file once'); assert.match(tpl, /\$\('autosave'\)\.onclick=\(\)=>saveFile\(\)/, 'the dot is the other door');
+  assert.match(tpl, /if\(!FSA\)\{saveCopy\(\);return\}/, 'no File System Access → ⌘S downloads a copy'); assert.match(tpl, /showOpenFilePicker\(\{id:'decklet'/, 'the first ⌘S links the deck file once'); assert.match(tpl, /if\(b\.dataset\.save\)\{vers\(false\);saveFile\(\);return\}/, 'the Save row of the versions menu is the other door');
   assert.match(tpl, /if\(e\.key==='ArrowRight'\|\|e\.key==='ArrowDown'\|\|e\.key===' '\)nav\(1\)/, '↓ = next'); assert.match(tpl, /if\(e\.key==='ArrowLeft'\|\|e\.key==='ArrowUp'\)nav\(-1\)/, '↑ = prev');
   assert.match(tpl, /if\(animate\)\{tab\.set\('slide',s\.id\);location\.replace\('#'\+\(i\+1\)\)\}/, 'slide change → this tab remembers the slide ID (sessionStorage) + #n hash'); assert.match(tpl, /addEventListener\('hashchange'/, 'hash → slide');
   assert.match(tpl, /let i=Math\.max\(0,deck\.slides\.findIndex\(s=>s\.id===tab\.get\('slide'\)\)\)/, 'load: the tab\'s slide id first'); assert.doesNotMatch(tpl, /parseInt\(store\.get\(PKEY\)\)/, 'a fresh window never restores another window\'s slide: it opens on slide 1');
@@ -122,7 +122,7 @@ test('links: one href model — a whole-row link and an inline link mark, http/h
   // the mark sits in the inline segment, immediately after strikethrough
   assert.match(tpl, /data-cmd="strikeThrough"[^\n]*\n\s*<button data-link="1"/, 'B I U S̶ → link, in that order');
   assert.match(tpl, /document\.execCommand\('createLink',false,href\(u\)\)/); assert.match(tpl, /document\.execCommand\('unlink'\)/, 'clearing the field removes the link');
-  assert.match(tpl, /<kbd>select text<\/kbd> → roles · B I U S̶ · link · color<\/div>/, 'popover names it');
+  assert.match(tpl, /<kbd>double-click<\/kbd> edit text · select text → roles · B I U S̶ · link · color<\/div>/, 'popover names it');
 });
 test('curve + arrow: a bezier connector is a row like line/donut/bar, and either end can carry a head', () => {
   assert.match(tpl, /if\(r\.curve\)\{/); assert.match(tpl, /M\$\{P\(q\[0\]\)\}C\$\{P\(q\[1\]\)\} \$\{P\(q\[2\]\)\} \$\{P\(q\[3\]\)\}/, 'one cubic bezier, absolute canvas coords like line');
@@ -137,7 +137,7 @@ test('curve + arrow: a bezier connector is a row like line/donut/bar, and either
   assert.match(tpl, /refX="0"/, 'curve: the marker is anchored by its BASE, so it fills the gap and tips on the stated end');
   assert.doesNotMatch(tpl, /right:\$\{-hw\*2\}px/, 'the old appended-outside head is gone');
 });
-test('contact sheet: 3 across, pointer-drag reorder with FLIP (no HTML5 DnD), never deletes the last slide, ⌘C/⌘V/⌘D/⌘Z', () => {
+test('contact sheet: 3 across, pointer-drag reorder with FLIP (no HTML5 DnD), never deletes the last slide, ⌘C/⌘V/⌘Z (⌘D retired for the duplicate button)', () => {
   assert.match(tpl, /#grid\{display:grid;grid-template-columns:repeat\(3,1fr\)/);
   for (const ev of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel']) assert.match(tpl, new RegExp(`grid\\.addEventListener\\('${ev}'`), ev);
   assert.doesNotMatch(tpl, /c\.draggable=true|addEventListener\('drop'/, 'no HTML5 drag-and-drop');
@@ -146,7 +146,7 @@ test('contact sheet: 3 across, pointer-drag reorder with FLIP (no HTML5 DnD), ne
   // thumbnails are non-interactive renders: never selectable; a drag never runs native text selection alongside it
   assert.match(tpl, /#sheet\{[^}]*user-select:none/, 'sheet is user-select:none'); assert.match(tpl, /\.cell\{[^}]*user-select:none/, 'cells are user-select:none'); assert.match(tpl, /body\.dragging,#canvas\.dragging\{[^}]*user-select:none/, 'body.dragging (and the canvas in flight) is user-select:none');
   assert.match(tpl, /closest\('\.cell'\);if\(!c\)return;e\.preventDefault\(\);/, 'press on a cell preventDefaults'); assert.match(tpl, /pd\.on=true;e\.preventDefault\(\);getSelection\(\)\.removeAllRanges\(\);document\.body\.classList\.add\('dragging'\)/, 'drag start preventDefaults, clears selection, flags body');
-  for (const k of ['c', 'v', 'd', 'z']) assert.match(tpl, new RegExp(`mod&&k==='${k}'`));
+  for (const k of ['c', 'v', 'z']) assert.match(tpl, new RegExp(`mod&&k==='${k}'`)); assert.doesNotMatch(tpl, /mod&&k==='d'/, '⌘D is gone: the duplicate button is the door');
 });
 test('print: named page sizes only (Safari), per-page bg, A4 injected from deck.page', () => {
   assert.match(tpl, /@page\{size:letter;margin:0\}/); assert.doesNotMatch(tpl, /@page\{size:\d+px/);
@@ -171,20 +171,20 @@ test('toolbar: the link mark is drawn like B I U S, not an emoji', () => {
   assert.match(seg, /aria-label="Link"/);
 });
 test('shortcuts popover cannot drift from the keybindings', () => {
-  const pop = tpl.match(/<div id="helpmenu"[\s\S]*?\n\s*<\/div>/)[0];
+  const pop = tpl.slice(tpl.indexOf('<div id="helpmenu"'), tpl.indexOf('<div id="sheet"'));
   // every modifier chord the template actually handles must appear in the popover
   const chords = [...new Set([...tpl.matchAll(/mod&&k==='([a-z])'/g)].map(m => m[1])
     .concat([...tpl.matchAll(/\(e\.metaKey\|\|e\.ctrlKey\)&&e\.key\.toLowerCase\(\)==='([a-z])'/g)].map(m => m[1])))].sort();
-  assert.ok(chords.length >= 5, 'found the chord handlers: ' + chords);
+  assert.ok(chords.length >= 4, 'found the chord handlers: ' + chords);
   for (const c of chords) assert.match(pop, new RegExp('⌘' + c.toUpperCase()), `⌘${c.toUpperCase()} is handled but not in the shortcuts popover`);
   // …and every plain key the template handles
-  for (const [re, shown] of [[/e\.key==='ArrowRight'/, /← → \/ ↑ ↓/], [/e\.key\.toLowerCase\(\)==='f'/, /<kbd>F<\/kbd>/], [/e\.key\.toLowerCase\(\)==='g'/, /Esc · G/], [/e\.key==='Backspace'/, /<kbd>⌫<\/kbd>/]])
+  for (const [re, shown] of [[/e\.key==='ArrowRight'/, /<kbd>← →<\/kbd>/], [/e\.key\.toLowerCase\(\)==='f'/, /<kbd>F<\/kbd>/], [/e\.key\.toLowerCase\(\)==='g'/, /<kbd>G<\/kbd> guides/], [/e\.key\.toLowerCase\(\)==='c'\)sheetOpen/, /<kbd>C · Esc<\/kbd>/], [/e\.key==='Backspace'/, /<kbd>⌫<\/kbd>/]])
     if (re.test(tpl)) assert.match(pop, shown, `handled key missing from the popover: ${re}`);
 });
 
 // ── 2c′. the HUD glyphs are the moving Lucide set: one svg per control, played once, never looped ──
 test('HUD icons: every control is a Lucide shape wearing its motion parts; no unicode glyph survives; nothing loops', () => {
-  for (const id of ['prev', 'next', 'addbtn', 'grid-btn', 'spell', 'snap', 'savecopy', 'pdf', 'fs', 'help']) {
+  for (const id of ['prev', 'next', 'addbtn', 'dup', 'grid-btn', 'spell', 'snap', 'savecopy', 'pdf', 'fs', 'help']) {
     assert.match(tpl, new RegExp(`<button id="${id}" class="mi mi-[\\w-]+" data-ms="\\d+"[^>]*><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"[^>]*>[^]*?data-mi="[^"]+"[^]*?<\\/svg><\\/button>`), `${id} draws a Lucide shape on the 24 grid with its motion parts`);
   }
   assert.doesNotMatch(tpl, /<button id="(prev|next|addbtn|grid-btn|savecopy|pdf|fs|help)"[^>]*>[‹›+⊞⤒⤓⛶ⓘ]<\/button>/, 'no control is a typed glyph any more');
@@ -616,8 +616,8 @@ live('live: editor rules — nib, present backdrop, master fork + inline counter
     await p.mouse.up(); await p.waitForTimeout(250); assert.equal(await ev(() => document.body.classList.contains('dragging')), false, 'dragging flag cleared on drop'); await ev(() => undo()); }
   await ev(() => sheetClose());
   // autosave dot: a normal save lands green; a shim that cannot persist lands red with the warning label
-  await ev(() => save()); await p.waitForTimeout(400); assert.deepEqual(await ev(() => [document.getElementById('autosave').dataset.state, document.getElementById('autosave').getAttribute('aria-label')]), ['local', await ev(() => document.getElementById('autosave').title)]); assert.match(await ev(() => document.getElementById('autosave').title), /^Saved in this browser · \d+ edits? not in the file yet — ⌘S writes them$/, 'amber: the tooltip counts the edits no file has');
-  await ev(() => { unsynced = 0; save(); }); await p.waitForTimeout(400); assert.match(await ev(() => document.getElementById('autosave').title), /^Autosaved · \d\d:\d\d:\d\d$/, 'nothing pending: green, tooltip carries the last save time');
+  await ev(() => save()); await p.waitForTimeout(400); assert.deepEqual(await ev(() => [document.getElementById('autosave').dataset.state, document.getElementById('autosave').getAttribute('aria-label')]), ['local', await ev(() => document.getElementById('autosave').dataset.full)]); assert.match(await ev(() => document.getElementById('autosave').getAttribute('aria-label')), /^Saved in this browser · \d+ edits? not in the file yet — ⌘S writes them$/, 'amber: the tooltip counts the edits no file has');
+  await ev(() => { unsynced = 0; save(); }); await p.waitForTimeout(400); assert.match(await ev(() => document.getElementById('autosave').getAttribute('aria-label')), /^Autosaved · \d\d:\d\d:\d\d$/, 'nothing pending: green, tooltip carries the last save time');
   await ev(() => { window.__set = store.set; store.set = () => false; save(); }); assert.equal(await ev(() => document.getElementById('autosave').dataset.state), 'busy', 'amber while saving'); await p.waitForTimeout(400);
   { const bad = await ev(() => [document.getElementById('autosave').dataset.state, document.getElementById('autosave').getAttribute('aria-label')]); assert.equal(bad[0], 'bad'); assert.match(bad[1], /^Not saved — edits will be lost on refresh( \(last saved \d\d:\d\d:\d\d\))?$/, 'bad tooltip names the last successful save time'); } await ev(() => { store.set = window.__set; save(); }); await p.waitForTimeout(400);
   // ⤓ PDF: in-file writer produces a real PDF with one W×H pt page per slide (Chromium rasterises foreignObject untainted)
@@ -741,7 +741,7 @@ live('live: storage blocked (Safari on file://) — the deck says so, keeps the 
     await p.addInitScript(() => Object.defineProperty(window, 'localStorage', {get() { throw new DOMException('The operation is insecure.', 'SecurityError'); }}));
     await p.goto(pathToFileURL(f).href); await p.waitForSelector('#canvas .el');
     const s = await p.evaluate(() => { const a = document.getElementById('autosave');
-      return {nostore: document.body.classList.contains('nostore'), state: a.dataset.state, tip: a.title, button: getComputedStyle(document.getElementById('savecopy')).display}; });
+      return {nostore: document.body.classList.contains('nostore'), state: a.dataset.state, tip: a.getAttribute('aria-label'), button: getComputedStyle(document.getElementById('savecopy')).display}; });
     assert.equal(s.nostore, true, engine + ': blocked storage detected at load, before the first edit');
     assert.equal(s.state, 'bad', engine);
     assert.match(s.tip, /⌘S/, engine + ': the tooltip names the durable path');
@@ -1273,8 +1273,8 @@ live('live: arrows nudge a selection 1px (⇧ 10px), a connector travels whole, 
 });
 test('nudge shares the drag translation path and is named in the shortcuts popover', () => {
   assert.match(tpl, /const moveBy=\(el,o,dx,dy\)=>/, 'one moveBy helper');
-  assert.equal((tpl.match(/moveBy\(/g) || []).length, 2, 'drag and nudge both call it — no second translation path');
-  assert.match(tpl, /navigate · move a selection 1px \(⇧ 10px\)/);
+  assert.equal((tpl.match(/moveBy\(/g) || []).length, 3, 'drag, nudge and duplicate all call it — no second translation path');
+  assert.match(tpl, /nudge 1px · <kbd>⇧<\/kbd> 10px/);
 });
 
 // ── 8. F presents in-window when fullscreen is refused ──
@@ -1299,13 +1299,13 @@ live('live: fullscreen rejected or never settling → in-window present; Esc lea
   await b.close();
 });
 test('the F shortcut line names the in-window fallback', () => {
-  assert.match(tpl, /<kbd>F<\/kbd> fullscreen \(presentation[^<]*in-window/);
+  assert.match(tpl, /<kbd>F<\/kbd> full screen \([^<]*in-window/);
 });
 
 // ── 2k. spellcheck: the browser's own checker on the focused row; never in present, print, the ⤓ PDF or the saved file ──
 test('spellcheck: the HUD carries the toggle, on by default, per browser (localStorage under NS) — never in the model', () => {
-  assert.match(tpl, /<button id="spell" class="mi mi-spell-check" data-ms="\d+"[^>]*aria-pressed="true"[^>]*title="Spellcheck \(on\)"[^>]*><svg aria-hidden="true" viewBox="0 0 24 24"/, 'the toggle is a Lucide spell-check shape, pressed on by default');
-  assert.match(tpl, /SKEY=NS\+':spell'/, 'state is per deck, per browser'); assert.match(tpl, /<kbd>[^<]*<\/kbd> spellcheck/, 'the ⓘ popover names the toggle');
+  assert.match(tpl, /<button id="spell" class="mi mi-spell-check" data-ms="\d+"[^>]*data-tip="Spellcheck · on"[^>]*aria-pressed="true"[^>]*><svg aria-hidden="true" viewBox="0 0 24 24"/, 'the toggle is a Lucide spell-check shape, pressed on by default');
+  assert.match(tpl, /SKEY=NS\+':spell'/, 'state is per deck, per browser'); assert.match(tpl, /Buttons only:[^<]*spellcheck/, 'the ⓘ popover names the toggle');
   assert.match(tpl, /#spell\.off\{opacity:\.35\}/, 'off = dimmed');
   assert.match(tpl, /canvas\.lang=deck\.lang\|\|'en'/, 'the dictionary follows deck.lang, else en');
   assert.match(tpl, /d\.setAttribute\('spellcheck'/, 'every text row carries the attribute'); assert.doesNotMatch(tpl, /deck\.spell(?!check)/, 'the model never carries the toggle');
@@ -1327,7 +1327,7 @@ live('live: spellcheck — rows wear the attribute, present strips it, off persi
   await p.waitForFunction(() => document.body.classList.contains('present'), null, {timeout: 1500});
   assert.deepEqual(await attrs(), ['false'], 'present: no markers'); await p.keyboard.press('Escape'); assert.deepEqual(await attrs(), ['true'], 'back in the editor: restored');
   // off: attribute false everywhere, button dimmed, and it survives a reload
-  await p.click('#spell'); assert.deepEqual(await attrs(), ['false']); assert.deepEqual(await p.evaluate(() => [spell.title, spell.getAttribute('aria-pressed'), spell.classList.contains('off'), +getComputedStyle(spell).opacity]), ['Spellcheck (off)', 'false', true, 0.35]);
+  await p.click('#spell'); assert.deepEqual(await attrs(), ['false']); assert.deepEqual(await p.evaluate(() => [spell.dataset.tip, spell.getAttribute('aria-pressed'), spell.classList.contains('off'), +getComputedStyle(spell).opacity]), ['Spellcheck · off', 'false', true, 0.35]);
   await p.reload(); await p.waitForSelector('#canvas .el'); assert.deepEqual(await attrs(), ['false'], 'off persists per browser');
   assert.equal(await pdf(), on, '⤓ output is byte-identical with the toggle on and off');
   assert.deepEqual(errs, []); await b.close();
@@ -1336,8 +1336,8 @@ live('live: spellcheck — rows wear the attribute, present strips it, off persi
 // ── 2l. layout guides + snap: a HUD toggle, OFF by default, per browser; the guide lines are the slide's layout slots; a drag
 //        snaps inside SNAPO.px; never in present, print, the sheet, the ⤓ PDF or the saved file ──
 test('guides + snap: the HUD carries the toggle, OFF by default, per browser (localStorage under NS) — never in the model; render() alone paints the lines', () => {
-  assert.match(tpl, /<button id="snap" class="mi mi-grip" data-ms="\d+"[^>]*aria-pressed="false"[^>]*title="Layout guides \+ snap \(off\)"[^>]*><svg aria-hidden="true" viewBox="0 0 24 24"/, 'the toggle is a Lucide grip (3×3 dots), pressed OFF by default');
-  assert.match(tpl, /GKEY=NS\+':snap';let SNAP=store\.get\(GKEY\)==='1'/, 'on only when THIS browser turned it on'); assert.match(tpl, /<kbd>[^<]*<\/kbd> grid \+ guides \+ snap/, 'the ⓘ popover names the toggle');
+  assert.match(tpl, /<button id="snap" class="mi mi-grip" data-ms="\d+"[^>]*data-tip="Guides \+ snap · off · G"[^>]*aria-pressed="false"[^>]*><svg aria-hidden="true" viewBox="0 0 24 24"/, 'the toggle is a Lucide grip (3×3 dots), pressed OFF by default');
+  assert.match(tpl, /GKEY=NS\+':snap';let SNAP=store\.get\(GKEY\)==='1'/, 'on only when THIS browser turned it on'); assert.match(tpl, /<kbd>G<\/kbd> guides \+ snap/, 'the ⓘ popover names the toggle');
   assert.match(tpl, /#snap\[aria-pressed=false\]\{opacity:\.35\}/, 'off = dimmed'); assert.doesNotMatch(tpl, /deck\.snap/, 'the model never carries the toggle');
   // the lines are selection chrome: render() paints them on the live canvas; drawEls never does (print, the sheet and the ⤓ rasteriser all draw through drawEls)
   const de = tpl.slice(tpl.indexOf('function drawEls('), tpl.indexOf('let lastAnim='));
@@ -1375,7 +1375,7 @@ live('live: guides + snap — off paints nothing; on paints one hairline per dis
   await p.click('#snap');
   assert.deepEqual(await lines(), [[64, 464, 480, 496, 896], [80, 160, 272, 304]], 'one hairline per distinct slot edge (margin 64/896 folds into the slot edges) plus the mid-lines, every one a multiple of 16'); assert.equal(await p.evaluate(() => +getComputedStyle(document.querySelector('#canvas .gl')).opacity), 0, 'at rest they are invisible');
   assert.deepEqual(await p.evaluate(() => { const g = document.querySelector('#canvas .gg'); return [!!g, +getComputedStyle(g).opacity > 0, getComputedStyle(g).backgroundImage.startsWith('radial-gradient'), getComputedStyle(g).backgroundSize]; }), [true, true, true, '16px 16px'], 'the 16px dot grid shows at rest');
-  assert.deepEqual(await p.evaluate(() => [$('snap').title, $('snap').getAttribute('aria-pressed'), +getComputedStyle($('snap')).opacity]), ['Layout guides + snap (on)', 'true', 1]);
+  assert.deepEqual(await p.evaluate(() => [$('snap').dataset.tip, $('snap').getAttribute('aria-pressed'), +getComputedStyle($('snap')).opacity]), ['Guides + snap · on · G', 'true', 1]);
   const scale = await p.evaluate(() => canvas.getBoundingClientRect().width / W);
   const at = async k => p.evaluate(k => { const r = document.querySelector(`.el[data-n="${k}"]`).getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }, k);
   const dragBy = async (k, dx, dy) => { const [x, y] = await at(k); await p.mouse.move(x, y); await p.mouse.down(); await p.mouse.move(x + dx * scale / 2, y + dy * scale / 2, {steps: 3}); await p.mouse.move(x + dx * scale, y + dy * scale, {steps: 3}); await p.mouse.up(); };
@@ -1430,7 +1430,7 @@ live('live: guides + snap — off paints nothing; on paints one hairline per dis
   await p.emulateMedia({media: 'print'}); assert.deepEqual(await p.evaluate(() => [getComputedStyle(document.querySelector('#canvas .gl')).display, getComputedStyle(document.querySelector('#canvas .gg')).display]), ['none', 'none'], 'and the live ones are hidden under print media'); await p.emulateMedia({media: 'screen'});
   await p.evaluate(() => sheetOpen()); assert.equal(await p.evaluate(() => document.querySelectorAll('#grid .gl, #grid .gg').length), 0, 'thumbnails carry none'); await p.evaluate(() => sheetClose());
   assert.doesNotMatch(await p.evaluate(() => { save(); return localStorage.getItem(KEY); }), /snap/i, 'save() writes no snap key');
-  assert.match(await p.evaluate(() => fileHtml()), /<button id="snap" class="mi mi-grip" data-ms="\d+"[^>]*aria-pressed="false"[^>]*title="Layout guides \+ snap \(off\)"/, 'the saved file opens with the toggle off'); assert.doesNotMatch(await p.evaluate(() => fileHtml()), /class="g[lg]/, 'and no line or grid in it');
+  assert.match(await p.evaluate(() => fileHtml()), /<button id="snap" class="mi mi-grip" data-ms="\d+"[^>]*data-tip="Guides \+ snap · off · G"[^>]*aria-pressed="false"/, 'the saved file opens with the toggle off'); assert.doesNotMatch(await p.evaluate(() => fileHtml()), /class="g[lg]/, 'and no line or grid in it');
   const pdf = () => p.evaluate(async () => { let blob; const o = URL.createObjectURL; URL.createObjectURL = x => { blob = x; return 'blob:x'; }; HTMLAnchorElement.prototype.click = () => {}; await exportPdf(); URL.createObjectURL = o; return [...new Uint8Array(await blob.arrayBuffer())].join(','); });
   const on = await pdf(); await p.click('#snap'); const off = await pdf(); assert.equal(on, off, 'the ⤓ PDF is byte-identical with the toggle on or off'); await p.click('#snap');
   // present strips them; on survives a reload

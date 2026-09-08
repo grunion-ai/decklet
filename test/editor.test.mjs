@@ -188,7 +188,7 @@ live('versions: pin keeps a snapshot, restore brings it back (and pins the state
   await p.evaluate(() => pin('first')); assert.equal(await p.evaluate(() => versions.length), 1);
   await p.evaluate(() => { snap(); slide().els[0].text = 'Changed'; save(); });
   await p.evaluate(() => document.getElementById('vers').click());
-  assert.equal(await p.evaluate(() => document.querySelectorAll('#versmenu .v').length), 2, 'one version + the pin row');
+  assert.equal(await p.evaluate(() => document.querySelectorAll('#versmenu .v').length), 3, 'the save row + one version + the pin row');
   await p.evaluate(() => document.querySelector('#versmenu [data-restore="0"]').click());
   assert.equal(await p.evaluate(() => slide().els[0].text), 'One', 'restored');
   assert.deepEqual(await p.evaluate(() => versions.map(v => v.label)), ['first', 'before restore']);
