@@ -189,6 +189,7 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
     <div id="helpmenu" role="dialog" aria-label="Shortcuts">
       <div><kbd>← → / ↑ ↓</kbd> navigate · move a selection 1px (⇧ 10px)</div>
       <div><kbd>F</kbd> fullscreen (presentation · in-window when the browser refuses)</div>
+      <div><kbd>⌘ click</kbd> a link opens it in a new tab (presenting: a plain click · hover a link for its hint)</div>
       <div><kbd>Esc · G</kbd> contact sheet (slides)</div>
       <div><kbd>⌘-click · ⇧-click</kbd> multi-select</div>
       <div><kbd>drag</kbd> move · corner handle resizes · a connector's point handles move one end · drag empty canvas = marquee (⇧ adds)</div>
@@ -367,6 +368,9 @@ const paints=r=>!!(r.text||r.html||r.svg||r.img||r.bg||r.bd||r.bt||r.br||r.bb||r
 // href: navigable schemes only. ONE gate for both surfaces — a row's own href and an <a> inside an .html run — applied at
 // render as well as in validate, because a saved copy's model can be hand-edited to anything.
 const href=u=>{u=String(u==null?'':u).trim();return /^(https?:|mailto:)/i.test(u)?u:''};
+// the hover hint on a link: presenting, a click is the whole gesture, so the title is the url alone; editing, a click selects
+// and drags the row, so the title says which modifier follows the link (⌘ on Mac, Ctrl elsewhere — the same pair every shortcut here reads)
+const MOD=/Mac|iP/.test(navigator.platform)?'⌘':'Ctrl',hint=u=>document.body.classList.contains('present')?u:MOD+'-click opens '+u;
 // arrow heads: which ends of a line or a curve carry one
 const AR=r=>({start:[1,0],end:[0,1],both:[1,1]}[r.arrow]||[0,0]);
 // The head IS the terminus. Its tip lands ON the row's stated end point and the stroke is shortened to make room — the head
@@ -454,7 +458,7 @@ function drawEls(s,root,animate){
     if(r.svg)d.innerHTML=r.svg;
     else if(r.img){const im=new Image();im.src=r.img;im.style.cssText=`display:block;width:100%;height:100%;object-fit:${r.fit||'fill'};object-position:${r.pos||'50% 50%'};pointer-events:none`;d.appendChild(im)}
     else if(r.html){d.innerHTML=r.html; // rich inline runs (<b>/<i>/<u>/<s>/<span>/<a href>) — re-gate the links on the way in
-      d.querySelectorAll('a[href]').forEach(a=>{const u=href(a.getAttribute('href'));if(u){a.setAttribute('href',u);a.target='_blank';a.rel='noopener noreferrer'}else a.removeAttribute('href')})}
+      d.querySelectorAll('a[href]').forEach(a=>{const u=href(a.getAttribute('href'));if(u){a.setAttribute('href',u);a.target='_blank';a.rel='noopener noreferrer';a.title=hint(u)}else a.removeAttribute('href')})}
     else d.textContent=r.text||'';
     const pad=r.p!=null?(deck.styles&&deck.styles.pad&&deck.styles.pad[r.p])||(typeof r.p==='number'?r.p+'px':r.p):null;
     // `right`: the right edge sits N px from the canvas edge and CSS derives x from the measured width — a w:'auto' chip needs no guessed x
@@ -499,7 +503,7 @@ function drawEls(s,root,animate){
       d.style.cssText+=`left:${bx}px;top:${by}px;width:${bw}px;height:${bh}px;padding:0;background:none;border:0;`}
     if(r.donut!=null)d.style.cssText+=`width:${r.w}px;height:${r.w}px;padding:0;border-radius:50%;background:conic-gradient(${r.color||'var(--accent)'} ${r.donut}%,var(--line) 0);-webkit-mask:radial-gradient(#0000 55%,#000 56%);mask:radial-gradient(#0000 55%,#000 56%);`;
     // a row's own href: ONE inset anchor over the whole row, so a painted CTA box is clickable even though its label is a separate row
-    if(href(r.href)){const a=document.createElement('a');a.className='lk';a.href=href(r.href);a.target='_blank';a.rel='noopener noreferrer';a.setAttribute('aria-label',r.text||r.href);d.appendChild(a)}
+    if(href(r.href)){const a=document.createElement('a');a.className='lk';a.href=href(r.href);a.target='_blank';a.rel='noopener noreferrer';a.setAttribute('aria-label',r.text||r.href);d.appendChild(a);d.title=hint(a.href)}
     if(an)d.style.animationDelay=(a++*120)+'ms';
     if(el._lines)d.dataset.lines=el._lines; // extractor metadata: source line count (layout-parity proof)
     if(el.over)d.dataset.over=1; // declared overlay: verify's collision check leaves this row alone
@@ -634,6 +638,12 @@ const selBox=items=>{const sc=canvas.getBoundingClientRect().width/W;let l=1e9,t
     e.preventDefault();return;
   }
   const t=e.target.closest('.el');
+  // a link is followed, never grabbed. Presenting: the press is left alone (no select, no re-render — a re-render destroys the node
+  // under the pointer and the browser's click never reaches the anchor), so the native click opens the anchor in a new tab.
+  // Editing: a plain click selects and drags the row as always; ⌘-click (Ctrl-click off Mac) opens the link and touches nothing.
+  const lk=t&&(e.target.closest('.el a[href]')||t.querySelector(':scope>a.lk'));
+  if(lk&&present())return;
+  if(lk&&(e.metaKey||e.ctrlKey)){e.preventDefault();open(lk.href,'_blank','noopener');return}
   // click-off = deselect (nib goes with it). Hold and move, and the SAME press becomes a marquee: a drag window that
   // takes every row it wholly contains. Containment, not touch — a band pulled across a full-bleed backdrop takes the
   // rows drawn on it, never the backdrop. ⇧ (or ⌘) keeps what was already selected. Present mode is for reading: no band.
@@ -653,6 +663,8 @@ const selBox=items=>{const sc=canvas.getBoundingClientRect().width/W;let l=1e9,t
   render();drag.sb=selBox(drag.items); // after the render, so an auto-width row has a node to measure
   if(drag.items.every(i=>isDot(i.o)))drag.sb=[drag.sb[0]+drag.sb[2]/2,drag.sb[1]+drag.sb[3]/2,0,0]; // a circle snaps by its centre: its edges mean nothing on a grid
 });
+// editing, an inline run's own click never navigates (the row was selected or dragged, and the modifier path above already opened it)
+$('wrap').addEventListener('click',e=>{if(!present()&&e.target.closest('.el a[href]'))e.preventDefault()});
 addEventListener('mousemove',e=>{
   if(!drag)return;
   const scale=canvas.getBoundingClientRect().width/W;
