@@ -300,7 +300,7 @@ function applyLog(deck,log){
   return R}
 /*/EDITS*/
 // the file's own edit log and version history (create.mjs fills both; ⌘S / write-back rewrite them with the browser's)
-const LOG0=/*LOG*/[]/*/LOG*/;const VERS0=/*VERSIONS*/[]/*/VERSIONS*/;const SPELL0=/*SPELL*/[]/*/SPELL*/; // words the build's dictionary refused (lib/spell.mjs); the editor underlines them on every slide
+const LOG0=/*LOG*/[]/*/LOG*/;const VERS0=/*VERSIONS*/[]/*/VERSIONS*/;const SPELL0=/*SPELL*/["bento","caf","cta","decklet","donut","else's","funders","gantt","harvey","heatmap","kessler","kilometres","kpi","licence","marimekko","mehta","normalise","normalised","northbridge","northwind","onboarding","pareto","prescreen","programme","pts","recognised","roadmap","rollout","signups","trine","uptime","venn","workstreams"]/*/SPELL*/; // words the build's dictionary refused (lib/spell.mjs); the editor underlines them on every slide
 // storage namespace is per deck (create.mjs stamps it with deck.id — stable across versions, so a new file finds the old edits)
 const NS=/*KEY*/'decklet:01c97e7ed2'/*/KEY*/,KEY=NS+':model',HKEY=NS+':hist',PKEY=NS+':pos',canvas=document.getElementById('canvas'),$=id=>document.getElementById(id);
 // Safari refuses localStorage on file:// — the browser most people double-click a deck in. PROBE it at load rather than
