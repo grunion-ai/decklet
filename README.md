@@ -13,7 +13,9 @@ Open-source alternative to PowerPoint, Keynote, Gamma and the PPTX-generator ski
 
 ![decklet demo: drag a row, page through slides that animate in, the inlined editor clips, the four anims, contact-sheet reorder, write a PDF](docs/demo.gif)
 
-**Try it live:** https://grunion-ai.github.io/decklet/deck.html (drag, retype, ⊞ contact sheet, ⤓ PDF, F fullscreen). If decklet builds you a deck, star the repo: stars are how agents and people find it.
+**Try it live:** https://grunion-ai.github.io/decklet/deck.html (drag, retype, ⊞ contact sheet, ⤓ PDF, F fullscreen). **The template pack:** https://grunion-ai.github.io/decklet/library.html — every template and layout the engine ships (58 + 22), one per slide, grouped by the kind of slide it is. If decklet builds you a deck, star the repo: stars are how agents and people find it.
+
+**What's next:** [ROADMAP.md](ROADMAP.md) covers speaker notes, mobile, document formats and export targets, with the sequencing and the rejected options.
 
 ## Quickstart
 
@@ -158,17 +160,17 @@ test/gate.test.mjs   engine + validator + create + import + live proofs
 ## Test
 
 ```
-npm test            # node --test; live browser tests skip when Playwright is absent
+npm test            # node --test; live browser tests skip when Playwright is absent (CI installs Chromium, so they run there)
 npm run test:live   # same, after: npm i -D playwright && npx playwright install chromium
 ```
 
 ## Roadmap
 
-- Document types: text flow across pages, running headers, real page numbering for `document-*`.
-- Carousel export: one PNG per card from `verify`.
-- Slide backend: each slide an entity with a revision log; decks composed from slides; published versions pin revisions (a revision store).
-- Presenter mode: speaker view + audience window synced over BroadcastChannel, no server.
-- Redo, URL-hash deep links (`#4`), content-anchored annotations.
+Full plan, with sequencing, sizes and rejected options: **[ROADMAP.md](ROADMAP.md)**.
+
+Now: contract hygiene, the `slide.notes` and `row.alt` model fields, notes as data, phone reading, new format presets, a PNG export CLI.
+Next: presenter view, searchable PDF, aspect-aware layouts, phone presenting.
+Later: document text flow, PPTX export, touch editing, a slide revision store.
 
 ## License
 

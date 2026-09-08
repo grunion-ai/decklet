@@ -30,7 +30,7 @@ export const fill = (name, k = 0) => {
     if (!sl.role) return {slot};                              // paint slots (rule, dots, button): the slot carries the paint
     const text = {Title: 'Two lines of display headline', Supertitle: 'Kicker', H1: 'A content-slide title', H2: 'A second-level heading',
       Body: 'Body copy, two short sentences at most. Enough to wrap once.', Caption: 'Source · caption text', Label: 'Label', Stat: '63%', Stat2: '$1.2M'}[sl.role];
-    return {slot, text: /^(n\d|t\d)$/.test(slot) ? '0' + (slot.slice(1)) : /delta/.test(slot) ? '↑ 8 pts' : /label/.test(slot) ? 'Renewals' : text};
+    return {slot, text: /^(n\d|t\d)$/.test(slot) ? '0' + (slot.slice(1)) : /delta/.test(slot) ? '↑ 8 pts' : /label/.test(slot) ? 'Renewals' : /value/.test(slot) ? '$86K' : text};
   });
   return {name: `${name}-${k}`, layout: name, els, ...(name === 'image-hero-overlay' ? {hide: ['foot']} : {})};   // a full-bleed hero hides the footer
 };
