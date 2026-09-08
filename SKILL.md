@@ -161,6 +161,7 @@ Row — every prop optional; a row is whatever its props make it:
 | `tt` | css | role | `uppercase` / `none` |
 | `italic` | 1 | — | |
 | `align` | css | `left` | `center`, `right` |
+| `valign` | `middle` \| `bottom` | top | vertical seat of the text inside a row that carries `h` — a label over a painted button, a floor caption; `box`/`tile` rows centre already |
 | `nowrap` | 1 | — | single line, never wraps (parity checks it) |
 | `ws` | css | — | `pre-wrap` etc. (`\n` in text already pre-wraps) |
 | `p` | token \| css | — | padding: `'chip'`, `'pill'`, `'4px 10px'`, or a number |

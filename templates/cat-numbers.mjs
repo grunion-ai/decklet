@@ -13,7 +13,8 @@ export default [
 { id: 'stat-row-4', name: 'Metric tiles — four across', tier: 'core', cat: 'Numbers', note: 'Four filled tiles, label beneath each. The workhorse numbers slide.', layout: 'content',
   els: [ { slot: 'supertitle', text: 'Quarter in four numbers' }, { slot: 'title', text: 'Growth held. Time-to-value halved.' },
     ...cols(4).flatMap((c, i) => { const s = [['1,240', 'Signups · +18%'], ['$86K', 'MRR · +11%'], ['4.6', 'CSAT · flat'], ['12 d', 'TTV · −49%']][i];
-      return [ tile(c.x, 180, c.w, 108, 'Stat', s[0]), lab(c.x, 300, c.w, s[1], { align: 'center', nowrap: 1 }) ]; }) ] },
+      return [ tile(c.x, 190, c.w, 150, 'Stat', s[0]), lab(c.x, 356, c.w, s[1], { align: 'center', nowrap: 1 }) ]; }),
+    body(M, 410, 700, 'Signups grew on the new prescreen; time-to-value halved once statements parsed on arrival. CSAT held through both.', { color: 'var(--muted)' }) ] },
 
 { id: 'kpi-scorecard', name: 'KPI scorecard — status grid', tier: 'core', cat: 'Numbers', note: 'Six metrics with a status dot and a delta chip each.', layout: 'content',
   els: [ { slot: 'supertitle', text: 'Scorecard' }, { slot: 'title', text: 'Two amber, none red.' },
