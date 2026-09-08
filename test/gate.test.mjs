@@ -141,7 +141,7 @@ test('contact sheet: 3 across, pointer-drag reorder with FLIP (no HTML5 DnD), ne
   assert.match(tpl, /\.cell\.lift\{/); assert.match(tpl, /\.cell\.drop\{/); assert.match(tpl, /Math\.hypot\(dx,dy\)<6/); assert.match(tpl, /prefers-reduced-motion:reduce/);
   assert.match(tpl, /if\(del\.length>=deck\.slides\.length\)del\.pop\(\)/);
   // thumbnails are non-interactive renders: never selectable; a drag never runs native text selection alongside it
-  assert.match(tpl, /#sheet\{[^}]*user-select:none/, 'sheet is user-select:none'); assert.match(tpl, /\.cell\{[^}]*user-select:none/, 'cells are user-select:none'); assert.match(tpl, /body\.dragging\{[^}]*user-select:none/, 'body.dragging is user-select:none');
+  assert.match(tpl, /#sheet\{[^}]*user-select:none/, 'sheet is user-select:none'); assert.match(tpl, /\.cell\{[^}]*user-select:none/, 'cells are user-select:none'); assert.match(tpl, /body\.dragging,#canvas\.dragging\{[^}]*user-select:none/, 'body.dragging (and the canvas in flight) is user-select:none');
   assert.match(tpl, /closest\('\.cell'\);if\(!c\)return;e\.preventDefault\(\);/, 'press on a cell preventDefaults'); assert.match(tpl, /pd\.on=true;e\.preventDefault\(\);getSelection\(\)\.removeAllRanges\(\);document\.body\.classList\.add\('dragging'\)/, 'drag start preventDefaults, clears selection, flags body');
   for (const k of ['c', 'v', 'd', 'z']) assert.match(tpl, new RegExp(`mod&&k==='${k}'`));
 });
@@ -1323,6 +1323,8 @@ test('guides + snap: the HUD carries the toggle, OFF by default, per browser (lo
   assert.match(tpl, /if\(an\)\{X=an\.x-P\[0\];Y=an\.y-P\[1\];drag\.hit=\{x:an\.hx,y:an\.hy,a:an\.k,ax:A\[0\],ay:A\[1\]\}\}\s*else\{const sn=snapTo\(/, 'a ray in reach takes the point (and names the guide it slid to); else the guides and the grid');
   assert.match(tpl, /const g=guides\(slide\(\)\),ax=Math\.abs\(b\.ux\)>=Math\.abs\(b\.uy\);[\s\S]{0,400}nearest\(\[b\.x\],g\.x,SNAPO\.px\)/, 'on the ray, a guide within reach on either axis slides the point along the ray; else the grid on the longer axis');
   assert.match(tpl, /if\(h\.a!=null\)\{const l=document\.createElement\('i'\);l\.className='gl a on';l\.style\.left=h\.ax\+'px';l\.style\.top=h\.ay\+'px';l\.style\.transform='rotate\('\+h\.a\*45\+'deg\) translateX\(-2000px\)'/, 'render() paints the held ray through the anchor');
+  assert.match(tpl, /sx:e\.clientX\/scale,sy:e\.clientY\/scale,moved:false\};\s*e\.preventDefault\(\);/, 'a block grab preventDefaults: the browser never starts a text selection under the moving pointer (Kyle, 2026-09-07)'); assert.match(tpl, /body\.dragging,#canvas\.dragging\{-webkit-user-select:none;user-select:none\}/, 'and the canvas in flight is unselectable');
+  assert.match(tpl, /const isDot=o=>typeof o\.w==="number"&&o\.w===o\.h&&typeof o\.radius==="number"&&o\.radius\*2>=o\.w;/, 'a circle is a square row rounded to at least half its side'); assert.match(tpl, /if\(drag\.items\.every\(i=>isDot\(i\.o\)\)\)drag\.sb=\[drag\.sb\[0\]\+drag\.sb\[2\]\/2,drag\.sb\[1\]\+drag\.sb\[3\]\/2,0,0\];/, 'a circle snaps by its centre alone');
   assert.match(tpl, /<button id="snap" class="mi mi-grip"/, 'the toggle wears the grip (a 3×3 dot lattice: the grid itself), not the magnet'); assert.match(tpl, /@keyframes mi-grip-pop/, 'its dots pop in a beat apart'); assert.match(tpl, /const SNAPO=\{px:10,centers:true,mid:true,hyst:4\}/, 'the magnetic feel Kyle picked');
   assert.match(tpl, /function snapTo\([^)]*\)\{if\(!SNAP\)return\{dx,dy,hit:null\}/, 'off = the raw delta, nothing else runs');
   assert.doesNotMatch(tpl.slice(tpl.indexOf('function nudgeSel('), tpl.indexOf('save();render();', tpl.indexOf('function nudgeSel('))), /snapTo|nearest\(/, 'the keyboard nudge never snaps: 1px is the point of it');
@@ -1332,7 +1334,7 @@ test('guides + snap: the HUD carries the toggle, OFF by default, per browser (lo
 live('live: guides + snap — off paints nothing; on paints one hairline per distinct slot edge; a drag lands on a line in range, passes one out of range; off = raw delta; the resize nib and a connector nib snap too; print, the sheet and the ⤓ PDF carry none; save() writes no key; on survives a reload', async () => {
   // margin 64 → x 64|896 ; slots add x 464|496 and y 80|160|304 ; the canvas mid-lines add x 480 and y 272 (270 seated on the lattice) ; the red box (x 304, w 96) and the line are the movers
   const m = {w: 960, h: 540, styles: {margin: 64}, layouts: {two: {title: {x: 64, y: 80, w: 832, role: 'H1'}, left: {x: 64, y: 160, w: 400, h: 144, role: 'Body'}, right: {x: 496, y: 160, w: 400, h: 144, role: 'Body'}}},
-    slides: [{layout: 'two', els: [{slot: 'title', text: 'Guides'}, {x: 304, y: 384, w: 96, h: 32, bg: '#e33'}, {x: 128, y: 464, line: [224, 464], h: 3}]}, {els: [{x: 64, y: 80, w: 800, role: 'H1', text: 'free'}]}]};
+    slides: [{layout: 'two', els: [{slot: 'title', text: 'Guides'}, {x: 304, y: 384, w: 96, h: 32, bg: '#e33'}, {x: 128, y: 464, line: [224, 464], h: 3}, {x: 300, y: 400, w: 16, h: 16, radius: 8, bg: '#3c6'}]}, {els: [{x: 64, y: 80, w: 800, role: 'H1', text: 'free'}]}]};
   const f = path.join(tmp, 'snap.html'); fs.writeFileSync(f, create(m, {title: 'guides'}).html);
   const b = await pw.chromium.launch(); const p = await b.newPage({viewport: {width: 1280, height: 800}});
   const errs = []; p.on('pageerror', e => errs.push(String(e)));
@@ -1381,6 +1383,10 @@ live('live: guides + snap — off paints nothing; on paints one hairline per dis
   await p.mouse.move(x + (400 - 288) * scale, y + (479 - 304) * scale, {steps: 1}); assert.deepEqual(await p.evaluate(() => slide().els[2].line), [400, 480], 'let go at 15px: no ray, no guide — the grid takes 479 → 480');
   await p.mouse.up();
   await p.evaluate(() => { slide().els[2].line = [464, 464]; render(); });
+  // a circle snaps by its centre: the 16px dot at (300,400) has its centre at (308,408); +5,+5 puts the centre at (313,413) → the grid at (320,416) → x 312, y 408 (edges alone would have taken 304,400)
+  await dragBy(3, 5, 5); assert.deepEqual(await p.evaluate(() => [slide().els[3].x, slide().els[3].y]), [312, 408], 'the dot centre lands on a grid dot');
+  // a grab never selects text: press on the title row, move across it, nothing is highlighted
+  [x, y] = await at(0); await p.mouse.move(x, y); await p.mouse.down(); await p.mouse.move(x + 40 * scale, y + 3 * scale, {steps: 3}); assert.equal(await p.evaluate(() => getSelection().toString()), '', 'no text selected mid-drag'); await p.mouse.up(); await p.evaluate(() => undo());
   // off: the raw delta, no lines, dimmed
   await p.click('#snap'); assert.deepEqual(await lines(), [[], []]); assert.equal(await p.evaluate(() => document.querySelectorAll('#canvas .gg').length), 0, 'off: no grid'); assert.equal(await p.evaluate(() => +getComputedStyle($('snap')).opacity), 0.35);
   await p.evaluate(() => { sel.clear(); render(); });

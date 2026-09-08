@@ -103,7 +103,7 @@ body.present .el a.lk{pointer-events:auto}
 /* contact sheet: the slide manager — 3 across, rows scroll, live thumbnails; ← Back (top-left) closes to the current slide */
 #sheet{position:fixed;inset:0;z-index:20;background:var(--bg);overflow:auto;padding:24px;-webkit-user-select:none;user-select:none}
 #sheet-back{display:block;margin-bottom:16px;font:12px ui-monospace,Menlo,monospace}
-body.dragging{-webkit-user-select:none;user-select:none}
+body.dragging,#canvas.dragging{-webkit-user-select:none;user-select:none}
 #sheet[hidden]{display:none}
 /* the contact sheet keeps the HUD: pinned above the z-20 sheet only while it is open; ‹ › ⛶ are disabled (the sheet is the navigator), + Slide, ⊞, ⤓ and the autosave dot stay live */
 body.sheet #hud{position:fixed;left:0;right:0;bottom:0;z-index:21;background:var(--bg)}body.sheet #sheet{padding-bottom:64px}
@@ -587,6 +587,9 @@ function snapAngle(A,x,y,heldA){if(!SNAP)return null;const vx=x-A[0],vy=y-A[1],r
   if(gx&&(!gy||Math.abs(gx.d)<=Math.abs(gy.d))){const al=(gx.l-A[0])/b.ux;c={x:gx.l,y:A[1]+b.uy*al,hx:gx.l}}else if(gy){const al=(gy.l-A[1])/b.uy;c={y:gy.l,x:A[0]+b.ux*al,hy:gy.l}}
   else{const v=ax?b.x:b.y,l=Math.round(v/GP)*GP,al=ax?(l-A[0])/b.ux:(l-A[1])/b.uy;c={x:A[0]+b.ux*al,y:A[1]+b.uy*al}}
   return{k:b.k,x:Math.round(c.x),y:Math.round(c.y),hx:c.hx==null?null:c.hx,hy:c.hy==null?null:c.hy}}
+// isDot: a square row rounded to a circle (radius ≥ half its side). Such a row is a point with a size — a timeline dot, a node —
+// and what a human aligns is its centre, so the move snap collapses it to one.
+const isDot=o=>typeof o.w==="number"&&o.w===o.h&&typeof o.radius==="number"&&o.radius*2>=o.w;
 function snapTo(box,dx,dy,held){if(!SNAP)return{dx,dy,hit:null};const g=guides(slide()),hit={x:null,y:null};
   for(const[a,lines,lo,len]of[['x',g.x,box[0],box[2]],['y',g.y,box[1],box[3]]]){const d=a==='x'?dx:dy,v=[lo+d,lo+d+len];if(SNAPO.centers&&len)v.push(lo+d+len/2);
     const b=(held&&held[a]!=null&&nearest(v,[held[a]],SNAPO.px+SNAPO.hyst))||nearest(v,lines,SNAPO.px),e=b||gridNear(v);
@@ -632,7 +635,9 @@ $('wrap').addEventListener('mousedown',e=>{
   if(e.detail>=2){edit(k);return}
   drag={mode:'move',items:[...sel].map(m=>{const el=typeof m==='number'?slide().els[m]:deck.master.find(x=>x.id===m.slice(2));return {k:m,el,o:res(el,slide())}}),
         sx:e.clientX/scale,sy:e.clientY/scale,moved:false};
+  e.preventDefault(); // the press is a grab, not a text selection: without this the browser starts selecting the text under the moving pointer
   render();drag.sb=selBox(drag.items); // after the render, so an auto-width row has a node to measure
+  if(drag.items.every(i=>isDot(i.o)))drag.sb=[drag.sb[0]+drag.sb[2]/2,drag.sb[1]+drag.sb[3]/2,0,0]; // a circle snaps by its centre: its edges mean nothing on a grid
 });
 addEventListener('mousemove',e=>{
   if(!drag)return;
