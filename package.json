@@ -11,6 +11,7 @@
     "decklet-create": "bin/create.mjs",
     "decklet-validate": "bin/validate.mjs",
     "decklet-verify": "bin/verify.mjs",
+    "decklet-pdf": "bin/pdf.mjs",
     "decklet-import-html": "bin/import-html.mjs"
   },
   "files": [
