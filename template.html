@@ -19,6 +19,14 @@ body.present .el a.lk{pointer-events:auto}
 /* ⌘S is the only durable path when the browser blocks storage for local files — give it a button in exactly that state */
 #savecopy{display:none}body.nostore #savecopy{display:inline-flex}
 #spell.off{opacity:.35} /* spellcheck off: the toggle dims like a disabled control; nothing else changes on screen */
+#snap[aria-pressed=false]{opacity:.35} /* guides + snap: off (the default) dims the same way */
+/* layout guides = selection chrome: one hairline per distinct slot edge of THIS slide's layout (and the canvas mid-lines), painted by
+   render() only — never by drawEls, so print, the sheet and the PDF cannot carry them. They show only while a drag is in flight, the
+   line holding the box brightens, and a press passes straight through */
+#canvas .gl{position:absolute;pointer-events:none;z-index:2;background:var(--sel);opacity:0;transition:opacity .08s}#canvas .gl.a{width:4000px;height:1px;transform-origin:0 0}
+/* the 16px grid: ONE node, a repeating gradient, shown whenever the toggle is on; the same chrome rules as the guides */
+#canvas .gg{position:absolute;inset:0;pointer-events:none;z-index:2;opacity:.45;background:radial-gradient(circle,var(--sel) 0 .8px,transparent 1.3px) -8px -8px/16px 16px}#canvas .gl.v{top:0;bottom:0;width:1px}#canvas .gl.h{left:0;right:0;height:1px}#canvas.dragging .gl.on{opacity:1;box-shadow:0 0 0 .5px var(--sel)}
+@media (prefers-reduced-motion:reduce){#canvas .gl{transition:none}}
 /* rows carry their own typography: the element adds NOTHING implicit (no padding, radius or pre-wrap) — chrome lives on .box/.tile only */
 .el{position:absolute;cursor:grab;padding:0;border-radius:0;white-space:normal;line-height:normal}
 .el.box{border:1.5px solid var(--accent);background:var(--box);text-align:center;padding:6px 8px;border-radius:8px;white-space:pre-wrap;display:flex;flex-direction:column;justify-content:center} /* a box with a height centres its text on the box, like a tile */
@@ -70,7 +78,7 @@ body.present .el a.lk{pointer-events:auto}
 #hud button{display:inline-flex;align-items:center;justify-content:center;min-height:26px}
 #hud button svg{display:block;width:16px;height:16px;overflow:visible}
 #tb button svg{display:block;width:13px;height:13px}
-.mi-chevron-left path { transition: all 0.2s ease-in; } .mi-chevron-left .chevron { transform: translateX(-3px); }.mi-chevron-right path { transition: all 0.2s ease-in; } .mi-chevron-right .chevron { transform: translateX(3px); }.mi-plus .plus { overflow: visible; } .mi-plus .horizontal, .mi-plus .vertical { stroke-dasharray: 14; stroke-dashoffset: 0; transition: stroke-dashoffset 0.15s ease-out; } .mi-plus .plus.animate .horizontal { opacity: 0; animation: mi-plus-lineAnimation 0.3s ease-out forwards; } .mi-plus .plus.animate .vertical { opacity: 0; animation: mi-plus-lineAnimation 0.3s ease-out 0.25s forwards; /* Start shortly before horizontal ends */ } @keyframes mi-plus-lineAnimation { 0% { opacity: 0; stroke-dashoffset: 14; } 15% { opacity: 1; stroke-dashoffset: 14; } 100% { opacity: 1; stroke-dashoffset: 0; } }.mi-layout-grid .layout-grid-icon { overflow: visible; } .mi-layout-grid .layout-grid-icon.animate .top-right-panel { opacity: 0; animation: mi-layout-grid-fadeInTop 0.35s ease-out forwards; } .mi-layout-grid .layout-grid-icon.animate .bottom-right-panel { opacity: 0; animation: mi-layout-grid-fadeInRight 0.35s ease-out 0.1s forwards; } .mi-layout-grid .layout-grid-icon.animate .bottom-left-panel { opacity: 0; animation: mi-layout-grid-fadeInBottom 0.35s ease-out 0.2s forwards; } .mi-layout-grid .layout-grid-icon.animate .top-left-panel { opacity: 0; animation: mi-layout-grid-fadeInLeft 0.35s ease-out 0.3s forwards; } @keyframes mi-layout-grid-fadeInLeft { 0%, 50% { opacity: 0; transform: translateX(-10px); } 80% { opacity: 0.8; transform: translateX(2px); } 100% { opacity: 1; transform: translateX(0); } } @keyframes mi-layout-grid-fadeInRight { 0%, 50% { opacity: 0; transform: translateX(10px); } 80% { opacity: 0.8; transform: translateX(-2px); } 100% { opacity: 1; transform: translateX(0); } } @keyframes mi-layout-grid-fadeInTop { 0%, 50% { opacity: 0; transform: translateY(-10px); } 80% { opacity: 0.8; transform: translateY(2px); } 100% { opacity: 1; transform: translateY(0); } } @keyframes mi-layout-grid-fadeInBottom { 0%, 50% { opacity: 0; transform: translateY(10px); } 80% { opacity: 0.8; transform: translateY(-2px); } 100% { opacity: 1; transform: translateY(0); } }.mi-copy .copy-rect, .mi-copy .copy-path { transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1); } .mi-copy .copy-rect.animate { transform: translate(-3px, -3px); } .mi-copy .copy-path.animate { transform: translate(3px, 3px); } .mi-copy svg { overflow: visible; }.mi-file-down g.animate path { transform: translateY(2px); transition: transform 0.3s cubic-bezier(0.68, -0.6, 0.32, 1.6); } .mi-file-down g path { transform: translateY(0); transition: transform 0.3s cubic-bezier(0.68, -0.6, 0.32, 1.6); }.mi-maximize path { transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); } .mi-maximize .bottom-right { transform: translate(2px, 2px); } .mi-maximize .bottom-left { transform: translate(-2px, 2px); } .mi-maximize .top-right { transform: translate(2px, -2px); } .mi-maximize .top-left { transform: translate(-2px, -2px); } .mi-maximize svg { overflow: visible; }.mi-circle-question-mark .animate-icon { transition: transform 0.5s ease-in-out; } .mi-circle-question-mark .animate-path { transition: transform 0.5s ease-in-out; transform-origin: center; animation: mi-circle-question-mark-rotateAnimation 0.5s ease-in-out; } @keyframes mi-circle-question-mark-rotateAnimation { 0% { transform: rotate(0deg); } 20% { transform: rotate(-10deg); } 40% { transform: rotate(10deg); } 60% { transform: rotate(-10deg); } 100% { transform: rotate(0deg); } }.mi-spell-check .tick { stroke-dasharray: 10; stroke-dashoffset: 0; } .mi-spell-check .tick.animate { animation: mi-spell-check-draw 0.4s ease-out forwards; } @keyframes mi-spell-check-draw { 0% { stroke-dashoffset: 10; opacity: 0; } 20% { opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 1; } }
+.mi-chevron-left path { transition: all 0.2s ease-in; } .mi-chevron-left .chevron { transform: translateX(-3px); }.mi-chevron-right path { transition: all 0.2s ease-in; } .mi-chevron-right .chevron { transform: translateX(3px); }.mi-plus .plus { overflow: visible; } .mi-plus .horizontal, .mi-plus .vertical { stroke-dasharray: 14; stroke-dashoffset: 0; transition: stroke-dashoffset 0.15s ease-out; } .mi-plus .plus.animate .horizontal { opacity: 0; animation: mi-plus-lineAnimation 0.3s ease-out forwards; } .mi-plus .plus.animate .vertical { opacity: 0; animation: mi-plus-lineAnimation 0.3s ease-out 0.25s forwards; /* Start shortly before horizontal ends */ } @keyframes mi-plus-lineAnimation { 0% { opacity: 0; stroke-dashoffset: 14; } 15% { opacity: 1; stroke-dashoffset: 14; } 100% { opacity: 1; stroke-dashoffset: 0; } }.mi-layout-grid .layout-grid-icon { overflow: visible; } .mi-layout-grid .layout-grid-icon.animate .top-right-panel { opacity: 0; animation: mi-layout-grid-fadeInTop 0.35s ease-out forwards; } .mi-layout-grid .layout-grid-icon.animate .bottom-right-panel { opacity: 0; animation: mi-layout-grid-fadeInRight 0.35s ease-out 0.1s forwards; } .mi-layout-grid .layout-grid-icon.animate .bottom-left-panel { opacity: 0; animation: mi-layout-grid-fadeInBottom 0.35s ease-out 0.2s forwards; } .mi-layout-grid .layout-grid-icon.animate .top-left-panel { opacity: 0; animation: mi-layout-grid-fadeInLeft 0.35s ease-out 0.3s forwards; } @keyframes mi-layout-grid-fadeInLeft { 0%, 50% { opacity: 0; transform: translateX(-10px); } 80% { opacity: 0.8; transform: translateX(2px); } 100% { opacity: 1; transform: translateX(0); } } @keyframes mi-layout-grid-fadeInRight { 0%, 50% { opacity: 0; transform: translateX(10px); } 80% { opacity: 0.8; transform: translateX(-2px); } 100% { opacity: 1; transform: translateX(0); } } @keyframes mi-layout-grid-fadeInTop { 0%, 50% { opacity: 0; transform: translateY(-10px); } 80% { opacity: 0.8; transform: translateY(2px); } 100% { opacity: 1; transform: translateY(0); } } @keyframes mi-layout-grid-fadeInBottom { 0%, 50% { opacity: 0; transform: translateY(10px); } 80% { opacity: 0.8; transform: translateY(-2px); } 100% { opacity: 1; transform: translateY(0); } }.mi-copy .copy-rect, .mi-copy .copy-path { transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1); } .mi-copy .copy-rect.animate { transform: translate(-3px, -3px); } .mi-copy .copy-path.animate { transform: translate(3px, 3px); } .mi-copy svg { overflow: visible; }.mi-file-down g.animate path { transform: translateY(2px); transition: transform 0.3s cubic-bezier(0.68, -0.6, 0.32, 1.6); } .mi-file-down g path { transform: translateY(0); transition: transform 0.3s cubic-bezier(0.68, -0.6, 0.32, 1.6); }.mi-maximize path { transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); } .mi-maximize .bottom-right { transform: translate(2px, 2px); } .mi-maximize .bottom-left { transform: translate(-2px, 2px); } .mi-maximize .top-right { transform: translate(2px, -2px); } .mi-maximize .top-left { transform: translate(-2px, -2px); } .mi-maximize svg { overflow: visible; }.mi-circle-question-mark .animate-icon { transition: transform 0.5s ease-in-out; } .mi-circle-question-mark .animate-path { transition: transform 0.5s ease-in-out; transform-origin: center; animation: mi-circle-question-mark-rotateAnimation 0.5s ease-in-out; } @keyframes mi-circle-question-mark-rotateAnimation { 0% { transform: rotate(0deg); } 20% { transform: rotate(-10deg); } 40% { transform: rotate(10deg); } 60% { transform: rotate(-10deg); } 100% { transform: rotate(0deg); } }.mi-grip circle { transform-origin: center; transform-box: fill-box; } .mi-grip .dots.animate circle { animation: mi-grip-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both; } .mi-grip .dots.animate circle:nth-child(2), .mi-grip .dots.animate circle:nth-child(4) { animation-delay: 0.05s; } .mi-grip .dots.animate circle:nth-child(3), .mi-grip .dots.animate circle:nth-child(5), .mi-grip .dots.animate circle:nth-child(7) { animation-delay: 0.1s; } .mi-grip .dots.animate circle:nth-child(6), .mi-grip .dots.animate circle:nth-child(8) { animation-delay: 0.15s; } .mi-grip .dots.animate circle:nth-child(9) { animation-delay: 0.2s; } @keyframes mi-grip-pop { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }.mi-spell-check .tick { stroke-dasharray: 10; stroke-dashoffset: 0; } .mi-spell-check .tick.animate { animation: mi-spell-check-draw 0.4s ease-out forwards; } @keyframes mi-spell-check-draw { 0% { stroke-dashoffset: 10; opacity: 0; } 20% { opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 1; } }
 @media (prefers-reduced-motion:reduce){.mi svg,.mi svg *{animation:none!important;transition:none!important}}
 /* "+" micro-menu: the add controls (Text / Box / Slide) nest under one button; opens upward, click-away closes */
 #addwrap,#helpwrap{position:relative}
@@ -97,7 +105,7 @@ body.present .el a.lk{pointer-events:auto}
 /* contact sheet: the slide manager — 3 across, rows scroll, live thumbnails; ← Back (top-left) closes to the current slide */
 #sheet{position:fixed;inset:0;z-index:20;background:var(--bg);overflow:auto;padding:24px;-webkit-user-select:none;user-select:none}
 #sheet-back{display:block;margin-bottom:16px;font:12px ui-monospace,Menlo,monospace}
-body.dragging{-webkit-user-select:none;user-select:none}
+body.dragging,#canvas.dragging{-webkit-user-select:none;user-select:none}
 #sheet[hidden]{display:none}
 /* the contact sheet keeps the HUD: pinned above the z-20 sheet only while it is open; ‹ › ⛶ are disabled (the sheet is the navigator), + Slide, ⊞, ⤓ and the autosave dot stay live */
 body.sheet #hud{position:fixed;left:0;right:0;bottom:0;z-index:21;background:var(--bg)}body.sheet #sheet{padding-bottom:64px}
@@ -116,6 +124,8 @@ body.sheet #hud{position:fixed;left:0;right:0;bottom:0;z-index:21;background:var
 /* fullscreen = presentation mode: chrome hidden; body backdrop is set by render() to the CURRENT slide's bg.
    The text toolbar is NOT chrome here: editing is allowed in present mode (it floats on a selection exactly as windowed) */
 body.present #hud,body.present .h{display:none!important}
+/* guides are editing chrome: none draw while presenting, so the toggle leaves the peek pill too (one more button put the pill on a 4:5 deck's counter) */
+body.present .gl,body.present .gg,body.present #snap{display:none!important}
 body.present #canvas{border:0;border-radius:0}
 /* …but the HUD peeks back in while the pointer hovers the bottom twelfth (video-player controls pattern) */
 /* peek HUD: a centred pill, lifted off the bottom edge. Full-width + bottom:0 put the right-hand controls exactly on the
@@ -129,7 +139,7 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
    `zoom`ed to the printable page width (816/W for Letter, 794/W for A4 — see deck.page). Each page paints ITS slide's bg; the dark body paints the letterbox. */
 @page{size:letter;margin:0} /* deck.page==="a4" injects an overriding @page rule at load */
 @media print{
-  #wrap,#hud,#tb,#sheet{display:none!important}
+  #wrap,#hud,#tb,#sheet,.gl,.gg{display:none!important}
   body{height:auto;overflow:visible;display:block;background:var(--bg);-webkit-print-color-adjust:exact;print-color-adjust:exact}
   #print{display:block}
   #print .pg{position:relative;width:var(--W);height:var(--H);zoom:var(--Z);background:var(--card);break-after:page;break-inside:avoid}
@@ -167,6 +177,7 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
   </div>
   <button id="grid-btn" class="mi mi-layout-grid" data-ms="650" title="Contact sheet (G / Esc)" aria-label="Contact sheet (G / Esc)"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="layout-grid-icon" data-mi="animate"><rect width="7" height="7" x="3" y="3" rx="1" class="top-left-panel"/><rect width="7" height="7" x="14" y="3" rx="1" class="top-right-panel"/><rect width="7" height="7" x="14" y="14" rx="1" class="bottom-right-panel"/><rect width="7" height="7" x="3" y="14" rx="1" class="bottom-left-panel"/></svg></button>
   <button id="spell" class="mi mi-spell-check" data-ms="500" aria-pressed="true" title="Spellcheck (on)" aria-label="Spellcheck (on)"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 16 6-12 6 12"/><path d="M8 12h8"/><path d="m16 20 2 2 4-4" class="tick" data-mi="animate"/></svg></button>
+  <button id="snap" class="mi mi-grip" data-ms="600" aria-pressed="false" title="Layout guides + snap (off)" aria-label="Layout guides + snap (off)"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g class="dots" data-mi="animate"><circle cx="5" cy="5" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="19" cy="5" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="19" r="1"/><circle cx="12" cy="19" r="1"/><circle cx="19" cy="19" r="1"/></g></svg></button>
   <button id="savecopy" class="mi mi-copy" data-ms="900" title="Save a copy (⌘S) — this browser blocks storage, so edits only survive in a copy" aria-label="Save a copy (⌘S)"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" class="copy-rect" data-mi="animate"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" class="copy-path" data-mi="animate"/></svg></button>
   <button id="vers" class="mi mi-history" data-ms="700" aria-haspopup="true" aria-expanded="false" title="Versions (pin · restore)" aria-label="Versions (pin · restore)"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><g data-mi="animate"><path d="M12 7v5l4 2"/></g></svg></button>
   <div id="versmenu" role="dialog" aria-label="Versions"></div>
@@ -190,6 +201,7 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
       <div><kbd>⌘B · ⌘I · ⌘U</kbd> bold · italic · underline (a selected row takes it whole)</div>
       <div><kbd>⌘P</kbd> PDF (the download button) · paper print</div>
       <div><kbd>✓ button</kbd> spellcheck (the browser's own · marks the focused row · never in present, print or PDF)</div>
+      <div><kbd>grid button</kbd> grid + guides + snap (off by default · a 16px dot grid over the slide · a drag, a resize or a connector nib snaps to one of this slide's layout lines within 10px, else to the grid, and the line it holds shows · a connector end snaps to 45° steps from its other end · never in present, print or PDF)</div>
     </div>
   </div>
 </div>
@@ -213,7 +225,7 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
 //  · footer    → master flag: the page counter renders inline inside this row (same font/baseline, right edge on the margin)
 //  · nowrap / w:'auto' / p → text-fit intent: single line, shrink-to-fit, explicit padding (or a styles.pad token)
 // img (data-URI) and css (raw escape hatch) are supported but discouraged — the validator warns on css.
-const DECK=/*DECK*/{"w":960,"h":540,"styles":{"roles":{"Title":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":64,"weight":800,"lh":68,"ls":-1.5,"color":"var(--fg)","cw":0.45},"Supertitle":{"font":"ui-monospace,Menlo,Consolas,monospace","size":12,"weight":500,"lh":16,"ls":1.5,"color":"var(--accent)","tt":"uppercase","cw":0.73},"H1":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":34,"weight":800,"lh":40,"ls":-0.5,"color":"var(--fg)","cw":0.46},"H2":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":22,"weight":600,"lh":28,"ls":-0.3,"color":"var(--fg)","cw":0.44},"Body":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":16,"weight":400,"lh":24,"ls":0,"color":"var(--fg)","cw":0.46},"Caption":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":13,"weight":400,"lh":18,"ls":0,"color":"var(--muted)","cw":0.47},"Label":{"font":"ui-monospace,Menlo,Consolas,monospace","size":11,"weight":500,"lh":14,"ls":1,"color":"var(--muted)","tt":"uppercase","cw":0.69},"Stat":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":40,"weight":800,"lh":44,"ls":-1,"color":"var(--accent)","cw":0.45}},"margin":60,"pad":{"chip":"3px 8px","pill":"5px 12px"}},"slots":{},"layouts":{},"master":[],"slides":[{"els":[]}]}/*/DECK*/;
+const DECK=/*DECK*/{"w":960,"h":540,"styles":{"roles":{"Title":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":64,"weight":800,"lh":68,"ls":-1.5,"color":"var(--fg)","cw":0.45},"Supertitle":{"font":"ui-monospace,Menlo,Consolas,monospace","size":12,"weight":500,"lh":16,"ls":1.5,"color":"var(--accent)","tt":"uppercase","cw":0.73},"H1":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":34,"weight":800,"lh":40,"ls":-0.5,"color":"var(--fg)","cw":0.46},"H2":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":22,"weight":600,"lh":28,"ls":-0.3,"color":"var(--fg)","cw":0.44},"Body":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":16,"weight":400,"lh":24,"ls":0,"color":"var(--fg)","cw":0.46},"Caption":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":13,"weight":400,"lh":18,"ls":0,"color":"var(--muted)","cw":0.47},"Label":{"font":"ui-monospace,Menlo,Consolas,monospace","size":11,"weight":500,"lh":14,"ls":1,"color":"var(--muted)","tt":"uppercase","cw":0.69},"Stat":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":40,"weight":800,"lh":44,"ls":-1,"color":"var(--accent)","cw":0.45}},"margin":64,"pad":{"chip":"3px 8px","pill":"5px 12px"}},"slots":{},"layouts":{},"master":[],"slides":[{"els":[]}]}/*/DECK*/;
 
 // store shim: localStorage throws in sandboxed contexts (data:/locked-down file:) — degrade to no-persistence, never to a dead page
 // lastSavedAt = the moment of the last CONFIRMED write (set only when setItem returned) — the autosave tooltip reads it
@@ -282,6 +294,12 @@ const NS=/*KEY*/'decklet:template'/*/KEY*/,KEY=NS+':model',HKEY=NS+':hist',PKEY=
 // spellcheck is the browser's own (no dictionary ships): an attribute on every row, painted only on the focused one. The toggle is
 // browser state under NS — never a model key, so it cannot reach the saved file; present/print/⤓ draw with it off (drawEls below).
 const SKEY=NS+':spell';let SPELL=store.get(SKEY)!=='0';
+// grid + layout guides + snap: browser state under NS exactly like spellcheck — never a model key, OFF until this browser turns it on.
+const GKEY=NS+':snap';let SNAP=store.get(GKEY)==='1';
+// feel knobs (browser-only, not persisted): px = the reach of a line · centers = a box's centre snaps too · mid = the canvas
+// mid-lines join the guides · hyst = a held line keeps its grip this much further, so a snapped edge does not chatter at the edge of reach
+const SNAPO={px:10,centers:true,mid:true,hyst:4}; // Kyle's pick, 2026-09-06: magnetic
+const GP=16; // the grid pitch: the overlay's lattice, the lattice every guide sits on, and the fallback snap (reach GP/2) when no guide is in reach
 const CANSTORE=(()=>{try{localStorage.setItem(NS+':probe','1');localStorage.removeItem(NS+':probe');return true}catch{return false}})();
 const LKEY=NS+':log',VKEY=NS+':vers';
 // the browser's copy of the log and the versions: the file's own, plus what this browser added since (⌘S / write-back put them in the file)
@@ -513,6 +531,9 @@ function render(){
   sel.forEach(k=>{if(typeof k==='number'?!s.els[k]:!(deck.master||[]).some(m=>m.id===k.slice(2)))sel.delete(k)}); // stale keys (slide changed under a selection) never reach the painter
   canvas.innerHTML='';
   drawEls(s,canvas,animate);
+  canvas.classList.toggle('dragging',!!(drag&&drag.mode!=='band'));
+  if(SNAP&&!present()){const gg=document.createElement('i');gg.className='gg';canvas.appendChild(gg);const g=guides(s),h=drag&&drag.hit||{};for(const x of g.x){const l=document.createElement('i');l.className='gl v'+(h.x===x?' on':'');l.style.left=x+'px';canvas.appendChild(l)}for(const y of g.y){const l=document.createElement('i');l.className='gl h'+(h.y===y?' on':'');l.style.top=y+'px';canvas.appendChild(l)}
+    if(h.a!=null){const l=document.createElement('i');l.className='gl a on';l.style.left=h.ax+'px';l.style.top=h.ay+'px';l.style.transform='rotate('+h.a*45+'deg) translateX(-2000px)';canvas.appendChild(l)}}
   const node=k=>canvas.querySelector(typeof k==='number'?`[data-n="${k}"]`:`[data-m="${k.slice(2)}"]`);
   sel.forEach(k=>{const d=node(k);d&&d.classList.add('selected')});
   // a selected group reads as one unit: one dashed box around the union of its rows' live boxes (DOM rects, so text height counts)
@@ -554,7 +575,50 @@ const moveBy=(el,o,dx,dy)=>{if(o.right!=null){el.right=o.right-dx;delete el.x}el
 // a group is one unit: rows on the slide sharing `group` (every row keeps canvas-space x/y — nothing is relative, so moveBy
 // needs no new case). Selecting a member selects the group; ⌘-click takes a member alone. Master rows never group.
 const grp=k=>{if(typeof k!=='number')return [k];const s=slide(),g=res(s.els[k],s).group;return g==null?[k]:s.els.map((el,n)=>res(el,s).group===g?n:-1).filter(n=>n>=0)};
-$('wrap').addEventListener('mousedown',e=>{
+// guides: the slide's slot rectangles (its layout's content slots over the deck-wide ones), the content margin and the canvas
+// mid-lines, as distinct x and y lines — every one seated on the GP lattice (the library is cut on it, so this is a no-op there;
+// a deck-defined layout off the lattice gets the nearest grid line). Every slide has a set: a free slide offers the margin and
+// the mid-lines. The layout IS the grid — nothing is invented.
+function guides(s){const q=v=>Math.round(v/GP)*GP,xs=new Set([q(MG()),q(W-MG())]),ys=new Set();if(SNAPO.mid){xs.add(q(W/2));ys.add(q(H/2))}
+  for(const sl of Object.values(LAY(s))){if(typeof sl.x==='number'){xs.add(q(sl.x));if(typeof sl.w==='number')xs.add(q(sl.x+sl.w))}if(typeof sl.y==='number'){ys.add(q(sl.y));if(typeof sl.h==='number')ys.add(q(sl.y+sl.h))}}
+  const srt=a=>[...a].sort((p,q)=>p-q);return{x:srt(xs),y:srt(ys)}}
+// nearest: the line closest to any of the values, inside px — or null
+const nearest=(vals,lines,px)=>{let b=null;for(const v of vals)for(const l of lines){const d=l-v;if(Math.abs(d)<=px&&(!b||Math.abs(d)<Math.abs(b.d)))b={d,l}}return b};
+// snapTo: the moving box's edges (and centre) against the guides; the nearest inside SNAPO.px wins per axis, and a line already
+// held keeps its grip for hyst more. When no guide is in reach the grid takes the axis (reach GP/2, so it always can) — guides
+// first, grid fills in. Returns the corrected delta and the guide lines that took it — render() brightens those; a grid landing
+// brightens nothing. Only the pointer snaps: the keyboard nudge is 1px on purpose.
+const gridNear=vals=>{let b=null;for(const v of vals){const l=Math.round(v/GP)*GP,d=l-v;if(!b||Math.abs(d)<Math.abs(b.d))b={d,l}}return b};
+// snapAngle: a connector's moving end against the eight 45° rays out of its fixed end. The distance across the ray is the
+// measure (px, the same reach and hold the guides have), so a long line and a short one feel the same near a step. In reach the
+// point is projected onto the ray and rounded; the held ray keeps its grip for hyst more. Returns null out of reach (or too close
+// to the anchor to have an angle) — the caller then falls through to the guides and the grid.
+function snapAngle(A,x,y,heldA){if(!SNAP)return null;const vx=x-A[0],vy=y-A[1],r=Math.hypot(vx,vy);if(r<GP)return null;let b=null;
+  for(let k=0;k<8;k++){const t=k*Math.PI/4,ux=Math.cos(t),uy=Math.sin(t),al=vx*ux+vy*uy;if(al<=0)continue;const d=Math.abs(vx*uy-vy*ux),px=SNAPO.px+(heldA===k?SNAPO.hyst:0);if(d<=px&&(!b||d<b.d))b={d,k,ux,uy,x:A[0]+ux*al,y:A[1]+uy*al,hx:null,hy:null}}
+  if(!b)return null;
+  // along the ray: a guide within reach on either axis slides the point along it (the other coordinate follows the angle), else the grid does on the ray's longer axis
+  const g=guides(slide()),ax=Math.abs(b.ux)>=Math.abs(b.uy);
+  let c=null;const gx=Math.abs(b.ux)>1e-9?nearest([b.x],g.x,SNAPO.px):null,gy=Math.abs(b.uy)>1e-9?nearest([b.y],g.y,SNAPO.px):null;
+  if(gx&&(!gy||Math.abs(gx.d)<=Math.abs(gy.d))){const al=(gx.l-A[0])/b.ux;c={x:gx.l,y:A[1]+b.uy*al,hx:gx.l}}else if(gy){const al=(gy.l-A[1])/b.uy;c={y:gy.l,x:A[0]+b.ux*al,hy:gy.l}}
+  else{const v=ax?b.x:b.y,l=Math.round(v/GP)*GP,al=ax?(l-A[0])/b.ux:(l-A[1])/b.uy;c={x:A[0]+b.ux*al,y:A[1]+b.uy*al}}
+  return{k:b.k,x:Math.round(c.x),y:Math.round(c.y),hx:c.hx==null?null:c.hx,hy:c.hy==null?null:c.hy}}
+// isDot: a square row rounded to a circle (radius ≥ half its side). Such a row is a point with a size — a timeline dot, a node —
+// and what a human aligns is its centre, so the move snap collapses it to one.
+const isDot=o=>typeof o.w==="number"&&o.w===o.h&&typeof o.radius==="number"&&o.radius*2>=o.w;
+function snapTo(box,dx,dy,held){if(!SNAP)return{dx,dy,hit:null};const g=guides(slide()),hit={x:null,y:null};
+  for(const[a,lines,lo,len]of[['x',g.x,box[0],box[2]],['y',g.y,box[1],box[3]]]){const d=a==='x'?dx:dy,v=[lo+d,lo+d+len];if(SNAPO.centers&&len)v.push(lo+d+len/2);
+    const b=(held&&held[a]!=null&&nearest(v,[held[a]],SNAPO.px+SNAPO.hyst))||nearest(v,lines,SNAPO.px),e=b||gridNear(v);
+    if(b)hit[a]=b.l;if(a==='x')dx+=e.d;else dy+=e.d}
+  return{dx:Math.round(dx),dy:Math.round(dy),hit}}
+// selBox: the selection's union rect in model space. Origins and stated sizes come from the model (exact integers — a DOM rect
+// under a fractional canvas scale lands half a pixel off); only what the model leaves unsaid (auto width, a text row's height)
+// is measured. border-box, so a stated w IS the painted width. A connector contributes every point it has.
+const selBox=items=>{const sc=canvas.getBoundingClientRect().width/W;let l=1e9,t=1e9,r=-1e9,b=-1e9;
+  for(const{k,o}of items){const d=canvas.querySelector(typeof k==='number'?`[data-n="${k}"]`:`[data-m="${k.slice(2)}"]`),q=d?d.getBoundingClientRect():{width:0,height:0};
+    const pts=[[o.x||0,o.y||0]];if(o.line)pts.push(o.line);if(o.curve)pts.push(o.curve.slice(0,2),o.curve.slice(2,4),o.curve.slice(4));
+    if(pts.length===1)pts.push([pts[0][0]+(typeof o.w==='number'?o.w:Math.round(q.width/sc)),pts[0][1]+(typeof o.h==='number'?o.h:Math.round(q.height/sc))]);
+    for(const[x,y]of pts){l=Math.min(l,x);t=Math.min(t,y);r=Math.max(r,x);b=Math.max(b,y)}}
+  return l>r?[0,0,0,0]:[l,t,r-l,b-t]};$('wrap').addEventListener('mousedown',e=>{
   if(!e.target.closest('[contenteditable="true"]'))commitEdit(); // flush a live text edit BEFORE any deselect/re-render destroys its node
   const scale=canvas.getBoundingClientRect().width/W;
   if(e.target.dataset.pt){ // connector point nib: drag moves THAT point only; an engine-clipped end (to:/from:) becomes the human's
@@ -566,7 +630,7 @@ $('wrap').addEventListener('mousedown',e=>{
   if(e.target.className==='h'){ // SE handle: drag changes w (and h when the element has one)
     let k=[...sel][0];snap();if(typeof k!=='number'){k=fork(k.slice(2));sel.clear();sel.add(k)}
     const el=slide().els[k],r=res(el,slide());
-    drag={mode:'size',el,ow:r.w==='auto'?100:(r.w||100),oh:r.h,sx:e.clientX/scale,sy:e.clientY/scale,moved:true};
+    drag={mode:'size',el,x0:r.x||0,y0:r.y||0,ow:r.w==='auto'?100:(r.w||100),oh:r.h,sx:e.clientX/scale,sy:e.clientY/scale,moved:true};
     e.preventDefault();return;
   }
   const t=e.target.closest('.el');
@@ -585,7 +649,9 @@ $('wrap').addEventListener('mousedown',e=>{
   if(e.detail>=2){edit(k);return}
   drag={mode:'move',items:[...sel].map(m=>{const el=typeof m==='number'?slide().els[m]:deck.master.find(x=>x.id===m.slice(2));return {k:m,el,o:res(el,slide())}}),
         sx:e.clientX/scale,sy:e.clientY/scale,moved:false};
-  render();
+  e.preventDefault(); // the press is a grab, not a text selection: without this the browser starts selecting the text under the moving pointer
+  render();drag.sb=selBox(drag.items); // after the render, so an auto-width row has a node to measure
+  if(drag.items.every(i=>isDot(i.o)))drag.sb=[drag.sb[0]+drag.sb[2]/2,drag.sb[1]+drag.sb[3]/2,0,0]; // a circle snaps by its centre: its edges mean nothing on a grid
 });
 addEventListener('mousemove',e=>{
   if(!drag)return;
@@ -601,15 +667,19 @@ addEventListener('mousemove',e=>{
     render();return;
   }
   const dx=e.clientX/scale-drag.sx,dy=e.clientY/scale-drag.sy;
-  if(drag.mode==='pt'){const el=drag.el,o=drag.o,X=Math.round(dx),Y=Math.round(dy);
+  if(drag.mode==='pt'){const el=drag.el,o=drag.o,P=drag.pt==='s'?[o.x,o.y]:drag.pt==='e'?(o.line||o.curve.slice(4)):o.curve.slice(drag.pt==='c1'?0:2,drag.pt==='c1'?2:4);
+    const A=drag.pt==='s'?(o.line||o.curve.slice(4)):drag.pt==='e'?[o.x,o.y]:null,an=A&&snapAngle(A,P[0]+dx,P[1]+dy,drag.hit&&drag.hit.a); // an end's anchor is the other end; a control point has none
+    let X,Y;if(an){X=an.x-P[0];Y=an.y-P[1];drag.hit={x:an.hx,y:an.hy,a:an.k,ax:A[0],ay:A[1]}}
+    else{const sn=snapTo([P[0],P[1],0,0],Math.round(dx),Math.round(dy),drag.hit);X=sn.dx;Y=sn.dy;drag.hit=sn.hit} // a point is a zero-size box: it snaps itself
     if(drag.pt==='s'){el.x=o.x+X;el.y=o.y+Y;delete el.from}
     else if(drag.pt==='e'){if(o.line)el.line=[o.line[0]+X,o.line[1]+Y];else el.curve=[...o.curve.slice(0,4),o.curve[4]+X,o.curve[5]+Y];delete el.to}
     else{const n=drag.pt==='c1'?0:2;el.curve=[...o.curve];el.curve[n]=o.curve[n]+X;el.curve[n+1]=o.curve[n+1]+Y}
     render();return;
   }
-  if(drag.mode==='size'){
-    drag.el.w=Math.max(20,Math.round(drag.ow+dx));
-    if(drag.oh!=null)drag.el.h=Math.max(10,Math.round(drag.oh+dy));
+  if(drag.mode==='size'){ // the far edges snap: the box is anchored at its origin, so only w/h move
+    const sn=snapTo([drag.x0+drag.ow,drag.y0+(drag.oh||0),0,0],Math.round(dx),drag.oh!=null?Math.round(dy):0,drag.hit);drag.hit=sn.hit;
+    drag.el.w=Math.max(20,drag.ow+sn.dx);
+    if(drag.oh!=null)drag.el.h=Math.max(10,drag.oh+sn.dy);
     render();return;
   }
   if(!drag.moved){snap();drag.moved=true;drag.items.forEach(it=>{if(typeof it.k!=='number'){const n=fork(it.k.slice(2));sel.delete(it.k);sel.add(n);it.el=slide().els[n]}})}
@@ -620,7 +690,8 @@ addEventListener('mousemove',e=>{
     drag.items.forEach(it=>{for(const p of ['to','from']){const a=it.el[p];if(a==null)continue;const n=typeof a==='number'?a:slide().els.findIndex(x=>x.id===a);if(n>=0&&!keys.has(n))delete it.el[p]}})}
   // a connector's far end is model geometry in canvas space (line:[x2,y2], curve:[c1,c2,end]) — writing x/y alone
   // dragged the tail and left the head pinned, stretching the stroke. Every point of a row travels by the same delta.
-  drag.items.forEach(it=>moveBy(it.el,it.o,Math.round(dx),Math.round(dy)));
+  const sn=snapTo(drag.sb,Math.round(dx),Math.round(dy),drag.hit);drag.hit=sn.hit;
+  drag.items.forEach(it=>moveBy(it.el,it.o,sn.dx,sn.dy));
   render();
 });
 addEventListener('mouseup',()=>{if(drag){const b=drag.mode==='band';drag=null;b?render():save()}}); // a band moved nothing: clear it, never save
@@ -888,6 +959,8 @@ async function exportPdf(){
 $('pdf').onclick=()=>exportPdf().catch(()=>print());
 const setSpell=on=>{SPELL=on;store.set(SKEY,on?'1':'0');const b=$('spell');b.classList.toggle('off',!on);b.setAttribute('aria-pressed',on);b.title='Spellcheck ('+(on?'on':'off')+')';b.setAttribute('aria-label',b.title);render()};
 $('spell').onclick=()=>{commitEdit();setSpell(!SPELL)};if(!SPELL)setSpell(false);
+const setSnap=on=>{SNAP=on;store.set(GKEY,on?'1':'0');const b=$('snap');b.setAttribute('aria-pressed',on);b.title='Layout guides + snap ('+(on?'on':'off')+')';b.setAttribute('aria-label',b.title);render()};
+$('snap').onclick=()=>{commitEdit();setSnap(!SNAP)};if(SNAP)setSnap(true);
 canvas.lang=deck.lang||'en'; // the dictionary the browser picks; deck.lang is optional model data
 $('savecopy').onclick=()=>saveCopy(); // only visible when the browser blocks storage — then it is the only way to keep an edit
 $('grid-btn').onclick=()=>sheet.hidden?sheetOpen():sheetClose();
@@ -907,6 +980,7 @@ $('autosave').onclick=()=>saveFile(); // the dot is the other door to ⌘S: link
 function fileHtml(){
   commitEdit();const d=document.documentElement.cloneNode(true),q=s=>d.querySelector(s);
   d.removeAttribute('style');q('body').removeAttribute('style');q('body').className='';d.querySelectorAll('#hud :disabled').forEach(b=>b.disabled=false);['#canvas','#grid','#print','#versmenu'].forEach(s=>q(s).innerHTML='');
+  q('#snap').setAttribute('aria-pressed','false');q('#snap').title='Layout guides + snap (off)';q('#snap').setAttribute('aria-label',q('#snap').title); // guides are browser state: a copy opens with them off
   q('#tb').hidden=q('#sheet').hidden=true;q('#addmenu').classList.remove('open');q('#helpmenu').classList.remove('open');q('#versmenu').classList.remove('open');
   const J=v=>JSON.stringify(v).replace(/<\/script/gi,'<\\/script'),sc=q('script');
   sc.textContent=sc.textContent
