@@ -69,7 +69,7 @@ A slide engine where the deck is a JSON model and the renderer is the editor. `c
 - in: any content (outline, notes, markdown, transcript, data) + a format (`slides`, `carousel`, `document-letter`, `document-a4`) + a style (brand tokens + eight text roles, or the neutral default)
 - out: `deck.html` — one file, ~40 KB (this repo's explainer carries three inlined screen clips, so it weighs ~270 KB), editable, printable, verifiable
 
-**Zero dependencies.** The engine is plain HTML/CSS/JS in a single file. The CLI is plain Node ≥ 22. Playwright is an *optional* devDependency used only by `verify` and `import-html`; nspell + dictionary-en are *optional* devDependencies used only by `create` to flag misspellings (absent, create says so and the editor falls back to the browser's own checker).
+**Zero dependencies.** The engine is plain HTML/CSS/JS in a single file. The CLI is plain Node ≥ 22. Playwright is an *optional* devDependency used only by `verify`, `pdf` and `import-html`; nspell + dictionary-en are *optional* devDependencies used only by `create` to flag misspellings (absent, create says so and the editor falls back to the browser's own checker).
 
 **One file.** The model, the styles, the renderer and the editor ship inside the deck. Copy it, email it, commit it.
 
@@ -81,6 +81,7 @@ Read [`SKILL.md`](SKILL.md) — it is the product. It defines the inputs, the pr
 node bin/validate.mjs model.json                                   # contract check, no browser
 node bin/create.mjs --model model.json --style style.json --out deck.html --format slides
 node bin/verify.mjs deck.html [--refs shots/]                     # layout parity always; AE diff when refs exist
+node bin/pdf.mjs deck.html [out.pdf]                              # vector PDF, one slide per page at slide size; self-gating
 node bin/edits.mjs deck.html                                       # what the human changed in the editor (read before revising)
 node bin/create.mjs --model model.json --out deck.html --from deck.html   # revise: keep ids, replay human edits (human wins), keep versions
 node bin/import-html.mjs --w 1600 --h 900 --out model.json 'pages/*.html'   # finished HTML → model

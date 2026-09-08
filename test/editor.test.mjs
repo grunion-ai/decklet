@@ -100,10 +100,10 @@ live('connector nibs: point handles, never the corner nib; an endpoint drag move
 live('PDF: the arrow head and shaft survive the export (connectors are painted by the styled layer, not redrawn alone)', async () => {
   const b = await pw.chromium.launch(); const p = await fresh(b, write('pdf.html', create(model()).html));
   const px = await p.evaluate(async () => {
-    HTMLAnchorElement.prototype.click = () => {}; const cvs = []; const orig = HTMLCanvasElement.prototype.toDataURL;
-    HTMLCanvasElement.prototype.toDataURL = function (...a) { cvs.push(this); return orig.apply(this, a); };
+    HTMLAnchorElement.prototype.click = () => {}; const cvs = []; const orig = CanvasRenderingContext2D.prototype.getImageData; // the Flate path reads pixels, so hook the read
+    CanvasRenderingContext2D.prototype.getImageData = function (...a) { if (!cvs.includes(this.canvas)) cvs.push(this.canvas); return orig.apply(this, a); };
     await exportPdf();
-    const g = cvs[0].getContext('2d'), at = (x, y) => [...g.getImageData(x * 2, y * 2, 1, 1).data].slice(0, 3);
+    const g = cvs[0].getContext('2d'), at = (x, y) => [...orig.call(g, x * 3, y * 3, 1, 1).data].slice(0, 3); // 3× raster
     return {tip: at(394, 300), shaft: at(250, 300), bg: at(250, 330)}; // the shaft ends at 390.4; 394 is inside the head, short of its anti-aliased tip at 400
   });
   const accent = c => c[2] > 150 && c[2] > c[0] + 40; // #5B9CF6-ish: blue dominant
