@@ -69,7 +69,7 @@ A slide engine where the deck is a JSON model and the renderer is the editor. `c
 - in: any content (outline, notes, markdown, transcript, data) + a format (`slides`, `carousel`, `document-letter`, `document-a4`) + a style (brand tokens + eight text roles, or the neutral default)
 - out: `deck.html` — one file, ~40 KB (this repo's explainer carries three inlined screen clips, so it weighs ~270 KB), editable, printable, verifiable
 
-**Zero dependencies.** The engine is plain HTML/CSS/JS in a single file. The CLI is plain Node ≥ 22. Playwright is an *optional* devDependency used only by `verify` and `import-html`.
+**Zero dependencies.** The engine is plain HTML/CSS/JS in a single file. The CLI is plain Node ≥ 22. Playwright is an *optional* devDependency used only by `verify` and `import-html`; nspell + dictionary-en are *optional* devDependencies used only by `create` to flag misspellings (absent, create says so and the editor falls back to the browser's own checker).
 
 **One file.** The model, the styles, the renderer and the editor ship inside the deck. Copy it, email it, commit it.
 

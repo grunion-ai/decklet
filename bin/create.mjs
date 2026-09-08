@@ -14,6 +14,7 @@ import {libraryFor} from '../lib/layouts.mjs';
 import {expandCharts} from '../lib/chart.mjs';
 import {expandTemplates} from '../lib/templates.mjs';
 import {expandIcons} from '../lib/icons.mjs';
+import {flags as spellFlags, loadChecker} from '../lib/spell.mjs';
 import {stampIds, diffDecks, applyLog, blockOf, putBlock, VERSION_CAP} from '../lib/edits.mjs';
 
 // page-size presets of ONE model space: canvas size + print page (named sizes only — Safari ignores px @page sizes)
@@ -48,7 +49,7 @@ function inheritIds(deck, prev) {
   for (const [s, ps] of pairs) (s.els || []).forEach((r, k) => { const pr = (ps.els || [])[k]; if (!r.id && pr && pr.id && (pr.role || null) === (r.role || null) && !!(pr.line || pr.curve) === !!(r.line || r.curve) && !(s.els || []).some(x => x.id === pr.id)) r.id = pr.id; });
 }
 
-export function create(model, {style = null, format, space, title, template, from = null} = {}) {
+export function create(model, {style = null, format, space, title, template, from = null, spell = null} = {}) {
   const deck = structuredClone(model);
   const prevHtml = from ? fs.readFileSync(from, 'utf8') : null, prev = prevHtml ? blockOf(prevHtml, 'DECK') : null;
   if (prev) inheritIds(deck, prev);
@@ -90,6 +91,7 @@ export function create(model, {style = null, format, space, title, template, fro
   html = put(html, 'DECK', esc(JSON.stringify(deck)));
   html = putBlock(putBlock(html, 'LOG', log), 'VERSIONS', versions);
   html = put(html, 'KEY', `'decklet:${deck.id}'`);
+  html = put(html, 'SPELL', JSON.stringify(spell ? spellFlags(deck, spell) : [])); // option C: the flagged words ride in the file; the editor underlines them
   return {html, deck, hash, migrate};
 }
 
@@ -99,7 +101,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   if (!o.model || !o.out) { console.error('usage: node bin/create.mjs --model model.json [--style style.json] --out deck.html [--format …] [--space WxH] [--title …] [--from prev.html] [--force]'); process.exit(2); }
   const model = JSON.parse(fs.readFileSync(o.model, 'utf8'));
   const style = o.style ? JSON.parse(fs.readFileSync(o.style, 'utf8')) : null;
-  const {html, deck, hash, migrate} = create(model, {style, format: o.format, space: o.space, title: o.title, from: o.from || null});
+  const spell = await loadChecker(model.lang || 'en'); // optional: nspell + dictionary-en; absent → no flags, the browser's own checker only
+  const {html, deck, hash, migrate} = create(model, {style, format: o.format, space: o.space, title: o.title, from: o.from || null, spell});
+  const flagged = spell ? spellFlags(deck, spell) : null;
+  if (flagged === null) console.error('spell: nspell + dictionary-en not installed — no words flagged (npm i -D nspell dictionary-en)');
+  else if (flagged.length) console.error(`spell: ${flagged.length} word(s) flagged — ${flagged.join(', ')} (spell.ignore in the model silences a name)`);
   if (migrate) { console.error(`migrated ${migrate.applied} human edit(s) from ${o.from} · ${migrate.conflicts.length} conflict(s) · ${migrate.orphans.length} orphan(s)`); for (const c of migrate.conflicts) console.error(`conflict ${c.s || c.m}${c.r ? '/' + c.r : ''}.${c.key}: kept human ${JSON.stringify(c.human)} over agent ${JSON.stringify(c.agent)}`); }
   const v = validate(deck);
   for (const m of v.errors) console.error('ERROR   ' + m);

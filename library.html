@@ -18,7 +18,8 @@ body{background:var(--bg);color:var(--fg);font:16px/1.45 -apple-system,BlinkMacS
 body.present .el a.lk{pointer-events:auto}
 /* ⌘S is the only durable path when the browser blocks storage for local files — give it a button in exactly that state */
 #savecopy{display:none}body.nostore #savecopy{display:inline-flex}
-#spell.off{opacity:.35} /* spellcheck off: the toggle dims like a disabled control; nothing else changes on screen */
+#spell.off{opacity:.35}
+::highlight(spell){text-decoration:underline wavy #f85149;text-decoration-skip-ink:none} /* option C: the build's flagged words, on every row, every browser */ /* spellcheck off: the toggle dims like a disabled control; nothing else changes on screen */
 #snap[aria-pressed=false]{opacity:.35} /* guides + snap: off (the default) dims the same way */
 /* layout guides = selection chrome: one hairline per distinct slot edge of THIS slide's layout (and the canvas mid-lines), painted by
    render() only — never by drawEls, so print, the sheet and the PDF cannot carry them. They show only while a drag is in flight, the
@@ -144,6 +145,7 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
 @page{size:letter;margin:0} /* deck.page==="a4" injects an overriding @page rule at load */
 @media print{
   #wrap,#hud,#tb,#sheet,.gl,.gg{display:none!important}
+  ::highlight(spell){text-decoration:none} /* the build's flagged words never reach paper */
   body{height:auto;overflow:visible;display:block;background:var(--bg);-webkit-print-color-adjust:exact;print-color-adjust:exact}
   #print{display:block}
   #print .pg{position:relative;width:var(--W);height:var(--H);zoom:var(--Z);background:var(--card);break-after:page;break-inside:avoid}
@@ -213,7 +215,7 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
       </div>
       <div class="col"><div class="ph">File</div>
         <div><kbd>⌘S</kbd> save the file (asks for it once · Safari: downloads a copy)</div>
-        <div class="dim">Buttons only: add · duplicate · spellcheck · versions · PDF. Spellcheck is the browser's own: it marks the row you type in, never present, print or PDF.</div>
+        <div class="dim">Buttons only: add · duplicate · spellcheck · versions · PDF. Spellcheck underlines the words the build's dictionary refused, on every slide; the browser's own checker adds the row you type in. Never present, print or PDF.</div>
       </div>
     </div>
   </div>
@@ -298,7 +300,7 @@ function applyLog(deck,log){
   return R}
 /*/EDITS*/
 // the file's own edit log and version history (create.mjs fills both; ⌘S / write-back rewrite them with the browser's)
-const LOG0=/*LOG*/[]/*/LOG*/;const VERS0=/*VERSIONS*/[]/*/VERSIONS*/;
+const LOG0=/*LOG*/[]/*/LOG*/;const VERS0=/*VERSIONS*/[]/*/VERSIONS*/;const SPELL0=/*SPELL*/["bento","caf","cta","decklet","donut","else's","funders","gantt","harvey","heatmap","kessler","kilometres","kpi","licence","marimekko","mehta","normalise","normalised","northbridge","northwind","onboarding","pareto","prescreen","programme","pts","recognised","roadmap","rollout","signups","trine","uptime","venn","workstreams"]/*/SPELL*/; // words the build's dictionary refused (lib/spell.mjs); the editor underlines them on every slide
 // storage namespace is per deck (create.mjs stamps it with deck.id — stable across versions, so a new file finds the old edits)
 const NS=/*KEY*/'decklet:01c97e7ed2'/*/KEY*/,KEY=NS+':model',HKEY=NS+':hist',PKEY=NS+':pos',canvas=document.getElementById('canvas'),$=id=>document.getElementById(id);
 // Safari refuses localStorage on file:// — the browser most people double-click a deck in. PROBE it at load rather than
@@ -537,6 +539,7 @@ function drawEls(s,root,animate){
     d.setAttribute('spellcheck',String(SPELL&&root===canvas&&!present())); // print pages, the sheet and the ⤓ clones are never checked
     root.appendChild(d);
   });
+  if(root===canvas)paintSpell();
 }
 let lastAnim=-1; // anim replays on slide ENTRY only — drag/select re-renders of the same slide must not restagger
 const present=()=>document.body.classList.contains('present');
@@ -733,7 +736,7 @@ function commitEdit(){
 function edit(k){
   if(typeof k!=='number'){snap();k=fork(k.slice(2));sel.clear();sel.add(k);render()}else snap();
   const el=slide().els[k];if(el.svg||el.img)return; // marks and images have no text to edit
-  drag=null;const t=canvas.querySelector(`[data-n="${k}"]`);t.querySelectorAll('.h,.num').forEach(x=>x.remove());t.contentEditable=true;t.focus(); // nib + counter are chrome, not content
+  drag=null;const t=canvas.querySelector(`[data-n="${k}"]`);t.querySelectorAll('.h,.num').forEach(x=>x.remove());t.contentEditable=true;t.focus();t.oninput=()=>paintSpell(); // nib + counter are chrome, not content
   getSelection().selectAllChildren(t);
   t.onblur=commitEdit;placeTb();
 }
@@ -982,6 +985,14 @@ async function exportPdf(){
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([Uint8Array.from(out,ch=>ch.charCodeAt(0))],{type:'application/pdf'}));a.download=document.title.replace(/[\/:*?"<>|]+/g,'-')+'.pdf';a.click();
 }
 $('pdf').onclick=()=>exportPdf().catch(()=>print());
+// option C paint: every text node of every live row, each flagged word a Range in one Highlight. Off, presenting, or no
+// Highlight API (old engines) → nothing painted; the browser's own checker (the spellcheck attribute) is the second layer.
+const SPELLSET=new Set(SPELL0);
+function paintSpell(){if(!window.CSS||!CSS.highlights)return;if(!SPELL||present()||!SPELLSET.size){CSS.highlights.delete('spell');return}
+  const h=new Highlight();const it=document.createNodeIterator(canvas,NodeFilter.SHOW_TEXT);let n;
+  while(n=it.nextNode()){if(n.parentElement.closest('.h,.num,svg'))continue;const s=n.data;let m;const re=/[A-Za-z][A-Za-z']*[A-Za-z]|[A-Za-z]/g;
+    while(m=re.exec(s)){if(SPELLSET.has(m[0].toLowerCase())){const r=new Range();r.setStart(n,m.index);r.setEnd(n,m.index+m[0].length);h.add(r)}}}
+  CSS.highlights.set('spell',h)}
 const setSpell=on=>{SPELL=on;store.set(SKEY,on?'1':'0');const b=$('spell');b.classList.toggle('off',!on);b.setAttribute('aria-pressed',on);b.dataset.tip='Spellcheck · '+(on?'on':'off');b.setAttribute('aria-label',b.dataset.tip);render()};
 $('spell').onclick=()=>{commitEdit();setSpell(!SPELL)};if(!SPELL)setSpell(false);
 const setSnap=on=>{SNAP=on;store.set(GKEY,on?'1':'0');const b=$('snap');b.setAttribute('aria-pressed',on);b.dataset.tip='Guides + snap · '+(on?'on':'off')+' · G';b.setAttribute('aria-label',b.dataset.tip);render()};
