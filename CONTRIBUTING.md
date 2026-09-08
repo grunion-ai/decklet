@@ -11,7 +11,7 @@ Thanks for looking. decklet stays small on purpose: one HTML file is the engine,
 
 ```bash
 git clone https://github.com/grunion-ai/decklet && cd decklet
-npm test                       # node --test; live browser tests skip when Playwright is absent
+npm test                       # node --test; live browser tests skip when Playwright is absent — CI installs Chromium and runs them all
 npm i -D playwright && npx playwright install chromium && npm run test:live
 ```
 

@@ -48,6 +48,7 @@ export function mergeStyle(deck, style) {
   deck.styles = deck.styles || {};
   deck.styles.roles = {...(style.roles || {}), ...(deck.styles.roles || {})};
   deck.styles.pad = {...(style.pad || {}), ...(deck.styles.pad || {})};
+  if (deck.styles.gap == null && style.gap != null) deck.styles.gap = style.gap;
   return deck;
 }
 
@@ -69,13 +70,16 @@ export function validate(deck) {
       if (!ROLES.includes(name) && !OPTIONAL.includes(name)) Wn(`role "${name}" is outside the eight-role scale (${ROLES.join(', ')})`);
       for (const p of ROLE_REQ) if (t[p] == null) E(`role ${name}: missing ${p}`);
       if (t.size != null && !isNum(t.size)) E(`role ${name}: size must be a number`);
+      if (t.cw != null && !(isNum(t.cw) && t.cw > 0 && t.cw < 2)) E(`role ${name}: cw must be the measured average glyph width in em (0.4–0.75 is normal)`);
     }
     if (Object.keys(roles).filter(n => !OPTIONAL.includes(n)).length > 8) Wn(`${Object.keys(roles).length} roles — more than eight dilutes the scale`);
     if (Object.keys(roles).length && !roles.Body) Wn('no Body role — text rows without a role fall back to Body at render time');
   }
   const roleOk = n => !!(roles && (roles[n] || (n === 'Stat2' && roles.Stat)));   // Stat2 resolves from Stat when the style has none
   const roleOf = n => (roles && (roles[n] || (n === 'Stat2' && roles.Stat && kpiRole(roles.Stat)))) || null;
+  const cwOf = n => { const t = roleOf(n); return t && isNum(t.cw) ? t.cw : 0.55; };   // em per character; a measured role beats the blanket guess
   const pad = (deck.styles && deck.styles.pad) || {};
+  if (deck.styles && deck.styles.gap != null && !(isNum(deck.styles.gap) && deck.styles.gap >= 0)) E('styles.gap must be a number of px ≥ 0 — the air every row owes its neighbours');
   // slots (deck scope) + layouts
   const checkSlot = (where, name, sl) => {
     if (!sl || typeof sl !== 'object') return E(`${where}.${name}: slot must be an object`);
@@ -191,9 +195,79 @@ export function validate(deck) {
     const x = right != null ? (isNum(w) ? W - right - w : 0) : r.x ?? (slot && slot.x) ?? 0;
     if (isNum(W) && isNum(w) && x + w > W + 0.5) Wn(`${where}: extends past the right edge (${x}+${w} > ${W})`);
     if (isNum(H) && y > H) Wn(`${where}: y ${y} is below the canvas (${H})`);
-    // text-fit heuristic: a nowrap row whose text is wider than its box (0.55em per char) will overflow
-    if (textual && r.nowrap && isNum(w) && roleOf(role) && plain(r).length * roleOf(role).size * 0.55 > w) Wn(`${where}: nowrap text "${plain(r).slice(0, 30)}" likely wider than w=${w} — widen or use w:"auto"`);
-    if (textual && !r.nowrap && r.w !== 'auto' && isNum(w) && roleOf(role) && plain(r).length * roleOf(role).size * 0.55 > w * 3.5 && !/\n/.test(plain(r))) Wn(`${where}: "${plain(r).slice(0, 30)}" wraps past 3 lines at w=${w} — split it or widen`);
+    // text-fit heuristic: a nowrap row whose text is wider than its box (role.cw em per char, 0.55 unmeasured) will overflow
+    if (textual && r.nowrap && isNum(w) && roleOf(role) && plain(r).length * roleOf(role).size * cwOf(role) > w) Wn(`${where}: nowrap text "${plain(r).slice(0, 30)}" likely wider than w=${w} — widen or use w:"auto"`);
+    if (textual && !r.nowrap && r.w !== 'auto' && isNum(w) && roleOf(role) && plain(r).length * roleOf(role).size * cwOf(role) > w * 3.5 && !/\n/.test(plain(r))) Wn(`${where}: "${plain(r).slice(0, 30)}" wraps past 3 lines at w=${w} — split it or widen`);
+  };
+  // ── the GAP gate: the box a row declares, plus the air every neighbour owes it. verify measures glyphs in a browser after
+  // the deck exists; this runs on the model, at create, with no browser, and refuses the layout that WOULD collide.
+  // Two rows are legal when their declared boxes sit `styles.gap` apart (default 4px — the air the chart library itself
+  // leaves between a bar and its value), when one is wholly inside a painted row (a title on its card — containment is not
+  // collision), when they share a `group` (a card and its rows are one thing), or when either says `over:1`. Two graphics
+  // touching is layout, not collision. Two UNPAINTED text rows owe each other no air beyond their line boxes — the role's
+  // lh already carries the leading, and a kicker 2px above its title is typography — so for that pair only an overlap
+  // counts; a chip (text with bg/bd/box/tile) is a box and owes the gap. A stroke may touch a box edge-on — a rail ending
+  // on a step's dot, a leader stopped on a label — that is termination; only a stroke crossing INTO the box collides.
+  // Text wholly inside a painted box is sheltered: the box owns the air around it. Everything else that touches — a chip running
+  // under its neighbour, a label straddling a tile's border, a caption resting on the rule beneath it — is a defect a
+  // human sees first and no amount of re-verifying fixes durably. Severity follows what the model actually states: an
+  // overlap on an axis both rows DECLARE (numeric x/w, or h) is an error; one that rests on an estimate — a text row's
+  // height from its line count, a `w:'auto'` row's width from role.cw em per character — is a warning marked ~, because
+  // a guess may not block a build. A straight orthogonal `line` is a thin rect; curves and diagonals are left to verify.
+  const gap = isNum(deck.styles && deck.styles.gap) ? deck.styles.gap : 4;
+  const padPx = v => { const t = v == null ? null : (pad[v] ?? (typeof v === 'number' ? v + 'px' : v)); if (!t) return [0, 0];
+    const n = String(t).split(/\s+/).map(parseFloat).map(z => Number.isFinite(z) ? z : 0); return n.length === 1 ? [n[0] * 2, n[0] * 2] : [n[1] * 2, n[0] * 2]; };
+  const rectOf = (r, s) => {
+    if (!r || typeof r !== 'object') return null;
+    const slot = (r.slot && ((deck.slots || {})[r.slot] || (s && layouts[s.layout] && layouts[s.layout][r.slot]))) || {};
+    if (r.over ?? slot.over) return null;
+    const rn = r.role || slot.role, role = roleOf(rn), textual = isText(r);
+    const painted = !!(r.bg ?? slot.bg) || !!(r.bd ?? slot.bd) || !!(r.box ?? slot.box) || !!(r.tile ?? slot.tile), group = r.group ?? slot.group;
+    const y = r.y ?? slot.y, right = r.right ?? (r.x == null ? slot.right : null);
+    let w = r.w ?? slot.w, h = r.h ?? slot.h, estW = false, estH = false;
+    if (r.line && Array.isArray(r.line) && r.line.every(isNum) && isNum(r.x) && isNum(r.y)) {   // an orthogonal rule: a thin rect
+      const dx = Math.abs(r.line[0] - r.x), dy = Math.abs(r.line[1] - r.y), th = r.h ?? 3;
+      if (dx > 2 && dy > 2) return null;
+      const x0 = Math.min(r.x, r.line[0]), y0 = Math.min(r.y, r.line[1]);
+      return {x: dx > 2 ? x0 : x0 - th / 2, y: dy > 2 ? y0 : y0 - th / 2, w: dx > 2 ? dx : th, h: dy > 2 ? dy : th, text: false, boxy: true, group, estW, estH, r};
+    }
+    if (r.curve) return null;
+    if (textual) {
+      if (!role || !plain(r).trim()) return null;   // an empty text row paints nothing
+      const [px, py] = padPx(r.p), chars = plain(r).length + (r.footer ? 8 : 0);   // the footer grows by its counter
+      // a wrap is counted only past 12% over the box: measured against Chromium, cw estimates run up to ~11% wide on headline
+      // strings (narrow glyphs, spaces), and a guessed second line is a false collision with everything under the row
+      const lines = r.nowrap || w === 'auto' ? 1 : plain(r).split('\n').reduce((n, t) => n + Math.max(1, isNum(w) && w > px ? Math.ceil(t.length * role.size * cwOf(rn) / (w - px) - 0.12) : 1), 0);
+      if (w === 'auto' || !isNum(w)) { w = chars * role.size * cwOf(rn) + px; estW = true; }
+      if (!isNum(h)) { h = lines * (role.lh ?? role.size * 1.25) + py; estH = true; }
+    } else if (!isNum(w) || !isNum(h)) return null;
+    if (!isNum(y)) return null;
+    const x = right != null ? W - right - w : r.x ?? slot.x;
+    if (!isNum(x)) return null;
+    return {x, y, w, h, text: textual, boxy: !textual || painted, group, estW, estH, r};
+  };
+  const label = (r, i) => `${i}${isText(r) ? ` "${plain(r).replace(/\s+/g, ' ').slice(0, 24)}"` : r.line ? ' (line)' : r.svg || r.icon ? ' (svg)' : r.img ? ' (img)' : ' (box)'}`;
+  const inside = (a, b) => a.x >= b.x - 1 && a.y >= b.y - 1 && a.x + a.w <= b.x + b.w + 1 && a.y + a.h <= b.y + b.h + 1;
+  const overlap = (A, B) => Math.min(Math.min(A.x + A.w, B.x + B.w) - Math.max(A.x, B.x), Math.min(A.y + A.h, B.y + B.h) - Math.max(A.y, B.y));
+  const gapGate = (rows, where, s) => {
+    const R = rows.map(({r, i}) => ({...(rectOf(r, s) || {}), i, r})).filter(o => isNum(o.x));
+    // a text row wholly inside a painted box is SHELTERED: the box owns the air around it, so the text is judged only against
+    // what enters the box. A connector stopped on the card's edge, a neighbouring tile 4px away — those are the box's business.
+    const shelter = A => A.text && !A.boxy ? R.find(P => P !== A && P.boxy && inside(A, P)) : null;
+    for (let a = 0; a < R.length; a++) for (let b = a + 1; b < R.length; b++) {
+      const A = R[a], B = R[b];
+      if (!A.text && !B.text) continue;                                                   // two graphics touching is layout, not collision
+      if (A.group != null && A.group === B.group) continue;                                // one thing
+      if ((B.boxy && inside(A, B)) || (A.boxy && inside(B, A))) continue;                  // text on its card
+      const sa = shelter(A), sb = shelter(B);
+      if ((sa && sa !== B && overlap(sa, B) <= 0.5) || (sb && sb !== A && overlap(sb, A) <= 0.5)) continue;
+      const g = A.r.line || B.r.line ? 0 : A.boxy || B.boxy ? gap : 0;                    // a stroke may TOUCH a box (termination); two bare text rows carry their own air in their line boxes
+      const ox = Math.min(A.x + A.w, B.x + B.w) - Math.max(A.x, B.x), oy = Math.min(A.y + A.h, B.y + B.h) - Math.max(A.y, B.y);
+      if (ox + g <= 0.5 || oy + g <= 0.5) continue;                                      // half a pixel is antialiasing, not air
+      const onX = ox < oy, est = onX ? A.estW || B.estW : A.estH || B.estH, sep = -Math.min(ox, oy);   // the axis the pair nearly separates on decides
+      const how = sep >= 0 ? `is ${est ? '~' : ''}${Math.round(sep)}px from` : `overlaps by ${est ? '~' : ''}${Math.round(-sep)}px`;
+      (est ? Wn : E)(`${where}: ${label(A.r, A.i)} ${how} ${label(B.r, B.i)} — ${g ? `styles.gap is ${gap}` : 'text rows may not overlap'}${est ? ' (~ = estimated from the text; set h, or role.cw, to make it exact)' : ''}; over:1 declares an overlay, a shared group one thing`);
+    }
   };
   master.forEach((m, k) => row(m, `master[${k}]`, null));
   if (!Array.isArray(deck.slides) || !deck.slides.length) E('slides must be a non-empty array');
@@ -205,6 +279,8 @@ export function validate(deck) {
     for (const id of s.hide || []) if (!mids.has(id)) E(`slides[${si}]: hide "${id}" is not a master id`);
     const used = new Set();
     s.els.forEach((r, ei) => { row(r, `slides[${si}].els[${ei}]`, s); if (r && r.slot) { if (used.has(r.slot)) Wn(`slides[${si}]: slot "${r.slot}" bound twice`); used.add(r.slot); } });
+    // the master rows this slide shows sit in the same set — a footer chip and a slide's last row owe each other the same air
+    gapGate([...master.filter(m => !(s.hide || []).includes(m.id) && !s.els.some(e => e && e.override === m.id)).map(m => ({r: m, i: 'master ' + m.id})), ...s.els.map((r, ei) => ({r, i: 'els[' + ei + ']'}))], `slides[${si}]`, s);
     // ── connector AIR, across the slide: a connector leaves the same visible gap at both ends and never touches a
     // container. `to:`/`from:` hand that to the engine, so ends it terminates are not second-guessed here.
     // Headed strokes only — see the note above: a chart series or a decorative path has nothing to leave air FROM.
