@@ -185,6 +185,7 @@ Row — every prop optional; a row is whatever its props make it:
 | `over` | 1 | — | declares a deliberate overlay: `verify`'s collision check leaves this row (and what it crosses) alone |
 | `donut` | 0–100 | — | ring, `w` = diameter, `color` = fill |
 | `svg` | string | — | inline SVG markup (no script, no external href) |
+| `icon` | name | — | a Lucide icon by name (see GRAPHICS; `--icons` lists them) — expands to an `svg` row at create, `color` paints it |
 | `img` | data: URI | — | image; `fit`, `pos` = object-fit/position |
 | `anim` | `rise`\|`fade`\|`pop`\|`wipe` | — | entrance motion on slide entry, staggered 120 ms in model order (see MOTION) |
 | `chart` | `{mark, data, …}` | — | a bar or line chart drawn into this row's x/y/w/h at create time (CHART ROW) |
@@ -228,7 +229,7 @@ Resolution order for any row: slot geometry ← master row (for `override` rows)
 
 ## LAYOUT LIBRARY
 
-Twenty named layouts ship with the engine (`lib/layouts.mjs`), in the same shape as a `layouts` entry. Name one on a slide the deck does not define and `create` merges it into `deck.layouts`, scaled from its 960×540 cut to the canvas (1600×900 = ×1.67). Print the catalogue — name, group, density, use, slots — with:
+Twenty-two named layouts ship with the engine (`lib/layouts.mjs`), in the same shape as a `layouts` entry. Name one on a slide the deck does not define and `create` merges it into `deck.layouts`, scaled from its 960×540 cut to the canvas (1600×900 = ×1.67). Print the catalogue — name, group, density, use, slots — with:
 ```
 node bin/validate.mjs --layouts
 ```
@@ -239,6 +240,8 @@ Read that instead of inventing geometry. The library is an accelerant, never a f
 | openers | `cover` | speaker | supertitle · title (Title) · body · caption |
 | | `agenda` | reading | supertitle · title · n1–n5 (Label) + item1–item5 (Body) |
 | | `section` | speaker | number (Label) · title (Title) · body |
+| chrome | `content` | reading | supertitle · title (H1) — the template library's title chrome, the canvas free |
+| | `title` | speaker | supertitle · title (Title, lower half) — a cover or divider |
 | text | `statement` | speaker | title (Title) · caption |
 | | `fact` | speaker | stat (Stat) · label · body |
 | | `quote` | speaker | quote (H2, italic) · attribution (Caption) |
@@ -257,7 +260,7 @@ Read that instead of inventing geometry. The library is an accelerant, never a f
 | closers | `cta` | speaker | title (Title) · body · button (paint, give it `href`) · button-label (Body, same `href`) |
 | | `end` | speaker | title (Title) · body · caption |
 
-Density is frontend-slides' rule: a **speaker**-led slide carries ≤ 3 points, a **reading**-first slide 4–8. Delta chips are `Label` on a `chip` pad in `var(--box)`, coloured `var(--ok, var(--accent))`; a falling delta sets `color:'var(--bad, var(--accent))'` on the row — the deck's `ok`/`bad` tokens if the style defines them, else the accent.
+Density is defined in DENSITY below: a **speaker** (fluffy) slide carries ≤ 3 points, a **reading** (dense) slide up to 8 with its own context. Every layout with H1 title chrome also carries the four dense slots `subtitle` · `note` · `source` · `legend` (unbound they draw nothing). Delta chips are `Label` on a `chip` pad in `var(--box)`, coloured `var(--ok, var(--accent))`; a falling delta sets `color:'var(--bad, var(--accent))'` on the row — the deck's `ok`/`bad` tokens if the style defines them, else the accent.
 
 Picking a layout by what the content is:
 
@@ -275,6 +278,27 @@ Picking a layout by what the content is:
 | steps in order | `process-steps`; dated → `timeline` |
 | the ask | `cta` |
 
+## TEMPLATE LIBRARY
+Fifty-nine finished slides ship with the engine (`lib/templates.mjs`, sources in `lib/templates/cat-*.mjs`): the candidate sheet surveyed across the open-source slide catalogs and promoted whole (2026-09-07). A template is a layout PLUS sample rows — an issue tree, a Sankey, a scorecard, a bento grid — so the agent binds content instead of drawing. Print the catalogue — id · tier · density · note, then every text key with its sample — with:
+```
+node bin/validate.mjs --templates
+```
+A slide names one and fills its keys: `{template: 'logic-tree', fill: {t1: 'Diagnostic', t2: 'Why did churn rise?', t3: 'Price held', …}}`. Every text row of the template is a key, `t1`…`tn` in row order; a key left out keeps the sample text (so fill them all before shipping). `create` expands the slide into the template's rows, scaled from the 960×540 cut to the canvas, sets the slide's `layout` to the template's chrome (`content` or `title` from the library — a deck-defined layout of that name wins) and its `density`, and keeps any free `els` after the template rows. An unknown template or fill key is a validate error listing what exists. A template is an accelerant like a layout: edit the rows it produced, add rows beside them, or draw free — nothing here is a fence.
+Tiers: **core** (in 4+ surveyed catalogs), **standard** (consulting catalogs), **fringe** (dataviz literature, rare on slides). Categories: Narrative · Numbers · Comparison · Frameworks · Process · Charts · Modern.
+## DENSITY
+Two named densities, defined in `lib/layouts.mjs` (`DENSITY`) so "dense" and "fluffy" build the same deck every time. A deck says `density: 'speaker' | 'reading'`; a slide may carry its own. `validate` warns on every slide that misses its density's shape; an unknown density is an error.
+| density | aka | for | the slide carries | max |
+|---|---|---|---|---|
+| `speaker` | **fluffy** | a presented deck — the speaker carries the rest | supertitle · title · one figure, number or ≤ 3 points · a caption at most | 3 points · 40 words |
+| `reading` | **dense** | a leave-behind read without a speaker — the slide carries its own context | supertitle · title · `subtitle` (the claim in one sentence) · the figure or the points · `note` (what to make of it) · `source` · `legend` · footer naming the deck | 8 points · 140 words |
+The dense chrome is four optional slots every H1-titled library layout carries (`DENSE`): `subtitle` (H2, muted, under the title), `note` (Body, muted, above the foot), `source` (Caption, left foot), `legend` (Label, right foot via `right`). A layout that cannot seat one says so (`dense: {note: false}` on `chart`, whose `takeaway` is the note; all four on `diagram`). A reading slide binds at least one; a speaker slide leaves them alone. "Points" are the text rows that are not chrome (not supertitle/title/subtitle/note/source/legend/caption, not Label). The template library carries a density per template (`--templates` prints it): the speaker ones are covers, dividers, quotes, statements, hero numbers, the donut and gauge, the cycle and the tree; everything with a table, a grid or a series is reading.
+## GRAPHICS
+Five kinds of picture, one rule each. Colour is always a token; nothing loads from the network.
+- **Icons** — `{icon: 'shield-check', x, y, w: 24, h: 24, color: 'var(--accent)'}`. The set is Lucide (ISC), 169 names, `node bin/validate.mjs --icons` prints them; `create` inlines the svg (stroke `currentColor`, so `color` paints it) and only the icons a deck uses reach the file. One icon per point, on the 24 grid (24/32/40 px), left of its label on the label's cap line, the same weight throughout. An icon says what the label says — never decoration, never a second idea, never a filled emoji.
+- **Glyphs** — a number in a circle, a letter chip, a status dot: rows, not images. A step glyph is a `dot` (or a `radius:'50%'` box) with a `Label` centred in it (`valign:'middle'`); a status dot is a 10px `bg` circle in `var(--ok)`/`var(--bad)`. Group the glyph with its text.
+- **Images** — `img` is a data: URI, `fit:'cover'`, explicit `w`/`h`, one per slide, never stretched, never behind text unless a tint band (`bg` with `op`) sits between. Budget ≈ 100 KB an image, the file under ~1 MB. Photographs carry the `image-left`/`image-right`/`image-hero-overlay`/`image-split` layouts; a screenshot gets `annotated-shot` with callout rows.
+- **Figures** — nodes, connectors, timelines, trees as rows (the diagram helper, the `diagram` layout, the framework and process templates), so every box and edge stays editable. An `svg` row is for a fill the engine has no primitive for (a Sankey ribbon, an area band) — never for text, never for a whole figure.
+- **Clips** — a short GIF of a real interaction (`docs/record-clips.mjs`), ≤ 3 s, ≤ 48 colours, ~10 fps; the same inline rule.
 ## CHART ROW
 
 `{x, y, w, h, chart: {mark: 'bar'|'line', data: [{label, value, compare?, muted?, text?}], encoding?: {max, min}, annotations?: [{at, text}], source?}}` — or `{slot:'chart', chart:{…}}` on the `chart` library layout. `create` expands it into the ordinary rows you would otherwise hand-build (bars, `line` segments, dot rects, `Label` rows), so the deck stays hand-editable and the runtime draws no charts; `validate` refuses a chart with fewer than two points, a non-numeric value, or no numbers at all — no numbers, no chart. The drawing rules are baked in and are the rules a reviewer holds a hand-built chart to:
