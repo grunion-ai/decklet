@@ -18,6 +18,7 @@ const live = pw ? test : test.skip;
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'decklet-lib-'));
 
 export const NAMES = ['cover', 'agenda', 'section', 'content', 'title', 'statement', 'fact', 'quote', 'two-cols', 'two-cols-header', 'image-left', 'image-right',
+  'bento-grid', 'image-hero-overlay', 'image-split', 'annotated-shot', 'three-up-cards', 'dashboard-composite', 'table-insight', 'proof-strip', 'team-grid',
   'kpi-grid', 'kpi-grid-4', 'stat', 'chart', 'comparison', 'process-steps', 'diagram', 'timeline', 'cta', 'end'];
 const IMG = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 3"><rect width="4" height="3" fill="#5B9CF6"/></svg>');
 // one slide per library layout, every slot bound with plausible content
@@ -31,7 +32,7 @@ export const fill = (name, k = 0) => {
       Body: 'Body copy, two short sentences at most. Enough to wrap once.', Caption: 'Source · caption text', Label: 'Label', Stat: '63%', Stat2: '$1.2M'}[sl.role];
     return {slot, text: /^(n\d|t\d)$/.test(slot) ? '0' + (slot.slice(1)) : /delta/.test(slot) ? '↑ 8 pts' : /label/.test(slot) ? 'Renewals' : text};
   });
-  return {name: `${name}-${k}`, layout: name, els};
+  return {name: `${name}-${k}`, layout: name, els, ...(name === 'image-hero-overlay' ? {hide: ['foot']} : {})};   // a full-bleed hero hides the footer
 };
 export const everyLayout = (w = 960, h = 540) => ({w, h, title: 'library', styles: {margin: 60}, master: [{id: 'foot', footer: 1, x: 60, y: 500, w: 300, role: 'Label', text: 'library'}],
   slides: NAMES.map((n, k) => fill(n, k))});
@@ -57,7 +58,8 @@ test('library: every layout is complete, its slots wear a role from the scale (o
       assert.equal(typeof sl.y, 'number', `${name}.${slot}.y`);
       assert.ok(typeof sl.x === 'number' || typeof sl.right === 'number', `${name}.${slot}: x or right`);
       assert.ok(typeof sl.w === 'number' || sl.w === 'auto', `${name}.${slot}.w`);
-      if (typeof sl.w === 'number') assert.ok(sl.x + sl.w <= 900 && sl.x >= 60, `${name}.${slot} inside the 60px margins`);
+      if (typeof sl.w === 'number' && sl.role) assert.ok(sl.x + sl.w <= 900 && sl.x >= 60, `${name}.${slot} inside the 60px margins`);
+      else if (typeof sl.w === 'number') assert.ok(sl.x + sl.w <= 960 && sl.x >= 0, `${name}.${slot}: paint or media may bleed to the canvas edge, never past it`);
     }
   }
   assert.ok(Object.keys(LIBRARY['kpi-grid'].slots).filter(s => /^kpi\d$/.test(s)).length === 3 && Object.keys(LIBRARY['kpi-grid-4'].slots).filter(s => /^kpi\d$/.test(s)).length === 4, 'three or four tiles');
