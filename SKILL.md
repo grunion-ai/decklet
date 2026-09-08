@@ -229,7 +229,7 @@ Resolution order for any row: slot geometry ← master row (for `override` rows)
 
 ## LAYOUT LIBRARY
 
-Twenty-two named layouts ship with the engine (`lib/layouts.mjs`), in the same shape as a `layouts` entry. Name one on a slide the deck does not define and `create` merges it into `deck.layouts`, scaled from its 960×540 cut to the canvas (1600×900 = ×1.67). Print the catalogue — name, group, density, use, slots — with:
+Thirty-one named layouts ship with the engine (`lib/layouts.mjs`), in the same shape as a `layouts` entry. Name one on a slide the deck does not define and `create` merges it into `deck.layouts`, scaled from its 960×540 cut to the canvas (1600×900 = ×1.67). Print the catalogue — name, group, density, use, slots — with:
 ```
 node bin/validate.mjs --layouts
 ```
@@ -249,6 +249,15 @@ Read that instead of inventing geometry. The library is an accelerant, never a f
 | | `two-cols-header` | reading | supertitle · title · header (H2) · left · right |
 | visuals | `image-left` | reading | image (400×320 media) · supertitle · title · body |
 | | `image-right` | reading | supertitle · title · body · image |
+| modern | `bento-grid` | reading | supertitle · title · hero (paint) · hero-label · hero-value (Title) · hero-chart (376×160 media) · card1–2 (paint) + card1–2-label + card1–2-value (Stat) · action (accent paint) · action-label · action-body |
+| | `image-hero-overlay` | speaker | image (full-bleed media, give it `img`) · scrim (paint) · label · title (Title) · caption — `hide` the footer on the slide |
+| | `image-split` | speaker | image (440×540 media, right) · label · title (H1) · body · button (paint, give it `href`) · button-label (Label, same `href`) |
+| | `annotated-shot` | reading | supertitle · title · shot (520×270 media) · callout1–3 (paint) + callout1–3-text (Body) + -leader (line) + -dot |
+| | `three-up-cards` | reading | supertitle · title · card1–3 (paint) + card1–3-number (Label) + -head (H2) + -rule + -body |
+| | `dashboard-composite` | reading | supertitle · title · kpi1–4 (paint) + kpi1–4-value (Stat) + -label · chart (500×180 media) · panel (paint) · panel-label · panel-body |
+| | `table-insight` | reading | supertitle · title · table (500×210 media frame: place the table's rows inside it) · panel (paint) · panel-label · panel-body · panel-rule · panel-next (Label) |
+| | `proof-strip` | reading | supertitle · title · logo1–5 (paint, give them `img`) + logo1–5-name (Label) · rule · stat1–3 (Stat) + stat1–3-label |
+| | `team-grid` | reading | supertitle · title · photo1–4 (195×180 media, give them `img`) + name1–4 (H2) + role1–4 (Caption) |
 | numbers | `kpi-grid` | reading | supertitle · title · kpi1–3 (tiles) · kpi1–3-delta (chips) · kpi1–3-label · body |
 | | `kpi-grid-4` | reading | the same with four 195px tiles |
 | | `stat` | speaker | supertitle · title · stat (the deck Stat size, centred) · caption |
@@ -283,7 +292,7 @@ Fifty-nine finished slides ship with the engine (`lib/templates.mjs`, sources in
 ```
 node bin/validate.mjs --templates
 ```
-A slide names one and fills its keys: `{template: 'logic-tree', fill: {t1: 'Diagnostic', t2: 'Why did churn rise?', t3: 'Price held', …}}`. Every text row of the template is a key, `t1`…`tn` in row order; a key left out keeps the sample text (so fill them all before shipping). `create` expands the slide into the template's rows, scaled from the 960×540 cut to the canvas, sets the slide's `layout` to the template's chrome (`content` or `title` from the library — a deck-defined layout of that name wins) and its `density`, and keeps any free `els` after the template rows. An unknown template or fill key is a validate error listing what exists. A template is an accelerant like a layout: edit the rows it produced, add rows beside them, or draw free — nothing here is a fence.
+A slide names one and fills its keys: `{template: 'three-up-cards', fill: {t1: 'What you get', t2: 'Three things, one price.', t3: '01', …}}`. Every text row of the template is a key, `t1`…`tn` in row order; a key left out keeps the sample text (so fill them all before shipping). `create` expands the slide into the template's rows, scaled from the 960×540 cut to the canvas, sets the slide's `layout` to the template's chrome (`content` or `title` from the library — a deck-defined layout of that name wins) and its `density`, and keeps any free `els` after the template rows. An unknown template or fill key is a validate error listing what exists. A template is an accelerant like a layout: edit the rows it produced, add rows beside them, or draw free — nothing here is a fence.
 Tiers: **core** (in 4+ surveyed catalogs), **standard** (consulting catalogs), **fringe** (dataviz literature, rare on slides). Categories: Narrative · Numbers · Comparison · Frameworks · Process · Charts · Modern.
 ## DENSITY
 Two named densities, defined in `lib/layouts.mjs` (`DENSITY`) so "dense" and "fluffy" build the same deck every time. A deck says `density: 'speaker' | 'reading'`; a slide may carry its own. `validate` warns on every slide that misses its density's shape; an unknown density is an error.
