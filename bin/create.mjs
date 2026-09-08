@@ -12,6 +12,8 @@ import {pathToFileURL, fileURLToPath} from 'node:url';
 import {validate, mergeStyle, fillKpi} from './validate.mjs';
 import {libraryFor} from '../lib/layouts.mjs';
 import {expandCharts} from '../lib/chart.mjs';
+import {expandTemplates} from '../lib/templates.mjs';
+import {expandIcons} from '../lib/icons.mjs';
 import {stampIds, diffDecks, applyLog, blockOf, putBlock, VERSION_CAP} from '../lib/edits.mjs';
 
 // page-size presets of ONE model space: canvas size + print page (named sizes only — Safari ignores px @page sizes)
@@ -57,6 +59,8 @@ export function create(model, {style = null, format, space, title, template, fro
   if (deck.w == null || deck.h == null) { deck.w = FORMAT[fmt].w; deck.h = FORMAT[fmt].h; }
   // style.json: {tokens:{bg,fg,muted,accent,card,line,sel,box}, roles:{…}, pad:{…}} — shared with validate --style so the two never drift
   mergeStyle(deck, style);
+  expandTemplates(deck); // template slides → their rows (the template's chrome layout named on the slide), before the library resolves
+  expandIcons(deck);     // icon rows → inline svg rows
   deck.layouts = {...libraryFor(deck), ...(deck.layouts || {})};   // library layouts a slide names and the deck does not define
   // the deck NAMES itself: --title wins, else the model's own title, else "decklet". It is model data, never markup —
   // the runtime titles the document from it, so the tab, the ⤓ PDF filename and the ⌘S copy filename are one string.

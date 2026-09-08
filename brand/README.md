@@ -28,8 +28,8 @@ because GitHub's image proxy does not run SMIL.
 
 | # | Decision | Choice |
 | --- | --- | --- |
-| 1 | Mark | **A · stack** (Kyle, over dcard / nib / roles / peek / file) — the literal deck; dcard kept as `MARKS.dcard` |
-| 2 | Palette | grunion family: blue `#2563eb`, ink `#0c1b33`, cream `#e0dcd4`, sky `#60a5fa` (same as weave) |
+| 1 | Mark | **A · stack** (chosen over dcard / nib / roles / peek / file) — the literal deck; dcard kept as `MARKS.dcard` |
+| 2 | Palette | grunion family: blue `#2563eb`, ink `#0c1b33`, cream `#e0dcd4`, sky `#60a5fa` |
 | 3 | App-icon tile | blue squircle (rx 11), cream mark |
 | 4 | Lockup | inline, mark scaled to the wordmark's ascender height, "decklet" lowercase 600, −0.02em |
 | 5 | Wordmark font | Outfit → Inter → system-ui (no webfont; the lockup SVG uses a stack) |

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// build-review.mjs — the contact sheet Kyle marks up: survey + 59 candidate previews.
+// build-review.mjs — the contact sheet the reviewer marks up: survey + 59 candidate previews.
 import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
@@ -99,7 +99,7 @@ ${Object.entries(byCat).map(([cat, items]) => `<h2>${cat} · ${items.length}</h2
 <p class="lede">Reply with the numbers or ids to <b>drop</b> — everything else ships. Flag any you want re-cut rather than cut ("keep 47 but two rows, not three"). One known engine gap: <code>chart-flow-split</code> (49) is a straight-band stand-in because a true curved Sankey ribbon needs a fill primitive decklet does not have — say the word and it becomes an engine feature request instead of a template.</p>
 </div>`;
 
-const out = process.argv[2] || path.join(process.env.HOME, 'Documents/queue', `${stamp.slice(0, 10)}-${stamp.slice(11, 19).replace(/:/g, '')}-decklet-template-library-design-review.html`);
+const out = process.argv[2] || path.join(dir, 'review.html'); // pass a path to write elsewhere
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, html);
 console.log(out, (fs.statSync(out).size / 1e6).toFixed(2) + ' MB');

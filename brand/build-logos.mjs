@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // decklet brand asset generator — single source of truth for the logo mark.
 //
-// Family: grunion-ai (same blue as weave/kami). 48-unit grid, one colour,
+// Family: grunion-ai. 48-unit grid, one colour,
 // transparent-safe (no background-coloured "gap" paint — cuts are masks).
 // The candidates are parametric so a decision round can be re-rendered.
 // Usage: node brand/build-logos.mjs [outDir=brand/assets]
@@ -113,7 +113,7 @@ export function loaderStack({ c = PALETTE.blue, id = "ls", dur = LOADER_CYCLE_MS
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="Loading"><defs>${defs}</defs>${body}</svg>`;
 }
 
-// Favicon: the d at 16px needs a heavier stroke (optical correction, as weave).
+// Favicon: the d at 16px needs a heavier stroke (optical correction).
 export function faviconSvg() { return svgOf(MARKS.stack(PALETTE.blue, "fav", 3.5)); }
 
 export function markSvg(name, c = PALETTE.blue) { return svgOf(MARKS[name](c)); }

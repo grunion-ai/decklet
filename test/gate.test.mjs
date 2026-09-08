@@ -35,7 +35,10 @@ test('no client or brand residue in the public tree', () => {
   const files = fs.globSync('**/*.{html,mjs,md,json,txt,yml}', {cwd: root}).filter(f => !/node_modules|^\.git\/|^test\//.test(f));
   // base64 payloads (the inlined clips) are not prose — a random three-letter run inside one is not residue
   const prose = f => read(f).replace(/base64,[A-Za-z0-9+/=]+/g, 'base64,…');
-  for (const f of files) assert.doesNotMatch(prose(f), /ponytail|Approach C|deckC[0-9]|Presenton|PPTist|undersight|underchat|AFB|Sajit|grunion-internal/, `${f}: residue`);
+  // private names live in the gitignored test/residue.local (one per line) so the gate itself carries no residue
+  const local = fs.existsSync(path.join(root, 'test/residue.local')) ? fs.readFileSync(path.join(root, 'test/residue.local'), 'utf8').split('\n').map(s => s.trim()).filter(Boolean) : [];
+  const residue = new RegExp(['ponytail', 'Approach C', 'deckC[0-9]', 'Presenton', 'PPTist', 'grunion-internal', ...local].join('|'), 'i');
+  for (const f of files) assert.doesNotMatch(prose(f), residue, `${f}: residue`);
 });
 
 // ── 2. engine static contract (the rules the editor is built on) ──
@@ -57,7 +60,7 @@ test('commitEdit runs first on every path that destroys the live editor', () => 
 });
 test('renderer adds nothing implicit; chrome lives on box/tile only', () => {
   assert.match(tpl, /\.el\{position:absolute;cursor:grab;padding:0;border-radius:0;white-space:normal;line-height:normal\}/);
-  assert.match(tpl, /\.el\.box\{[^}]*padding:6px 8px;border-radius:8px;white-space:pre-wrap\}/);
+  assert.match(tpl, /\.el\.box\{[^}]*padding:6px 8px;border-radius:8px;white-space:pre-wrap;display:flex;flex-direction:column;justify-content:center\}/);
   assert.match(tpl, /\.el\.tile\{/);
   for (const re of [/r\.svg\)d\.innerHTML=r\.svg/, /else if\(r\.html\)\{d\.innerHTML=r\.html/, /s\.bg\|\|'var\(--card\)'/, /letter-spacing:\$\{r\.ls\}px/, /line-height:\$\{r\.lh\}px/, /text-transform:\$\{r\.tt\}/, /white-space:\$\{r\.ws\}/, /font-style:italic/, /opacity:\$\{r\.op\}/, /border-top:\$\{r\.bt\}/, /box-shadow:\$\{r\.shadow\}/, /r\.nowrap\?'white-space:nowrap;'/, /r\.w==='auto'\?'auto'/, /deck\.styles\.pad\[r\.p\]/, /r\.line\)/, /conic-gradient\(/, /r\.h\?/]) assert.match(tpl, re, String(re));
 });
@@ -179,7 +182,7 @@ test('shortcuts popover cannot drift from the keybindings', () => {
     if (re.test(tpl)) assert.match(pop, shown, `handled key missing from the popover: ${re}`);
 });
 
-// ── 2c′. the HUD glyphs are the moving Lucide set weave uses: one svg per control, played once, never looped ──
+// ── 2c′. the HUD glyphs are the moving Lucide set: one svg per control, played once, never looped ──
 test('HUD icons: every control is a Lucide shape wearing its motion parts; no unicode glyph survives; nothing loops', () => {
   for (const id of ['prev', 'next', 'addbtn', 'grid-btn', 'spell', 'snap', 'savecopy', 'pdf', 'fs', 'help']) {
     assert.match(tpl, new RegExp(`<button id="${id}" class="mi mi-[\\w-]+" data-ms="\\d+"[^>]*><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"[^>]*>[^]*?data-mi="[^"]+"[^]*?<\\/svg><\\/button>`), `${id} draws a Lucide shape on the 24 grid with its motion parts`);
@@ -729,7 +732,7 @@ live('live: marquee — a drag from empty canvas takes every row it fully contai
   assert.deepEqual(errs, []);
 });
 // blocked storage, driven in WebKit — Safari's engine. Playwright's WebKit does NOT enforce Safari's file:// storage ban,
-// so the ban is injected: what is being proved is that the engine reacts usefully, in the engine Kyle's browser runs.
+// so the ban is injected: what is being proved is that the engine reacts usefully, in the engine the author's browser runs.
 live('live: storage blocked (Safari on file://) — the deck says so, keeps the session, and puts ⌘S in front of you', async () => {
   const f = path.join(tmp, 'nostore.html');
   fs.writeFileSync(f, create(explainer.model, {title: 'blocked'}).html);
@@ -921,7 +924,7 @@ live('live: to/from terminate a connector on the target\'s border — the arrow 
 live('live: a bound connector FOLLOWS its target — moving the box re-aims the to:/from: end at the box, deselected or not', async () => {
   // Before: `to:` clipped against the target's CURRENT box but the raw end stayed where the author aimed it, so once the
   // box moved out from under that point edgeT found nothing inside and the stroke sprang back to its authored length —
-  // the head floating where the box used to be (Kyle, 2026-09-06: "moving a box changes the arrow even when deselected").
+  // the head floating where the box used to be (observed 2026-09-06: "moving a box changes the arrow even when deselected").
   const box = {x: 500, y: 180, w: 200, h: 100, bg: '#1A1D21', bd: '1.5px solid #5B9CF6', radius: 10};
   const model = {w: 960, h: 540, styles: {roles: modelOf(tpl).styles.roles}, slides: [{els: [
     box,
@@ -960,19 +963,19 @@ live('live: the page counter reads "1 / 3" when the footer row is empty, "text �
     slides: [{els: []}, {els: []}, {els: []}]});
   const out = [];
   const b = await pw.chromium.launch(); const p = await b.newPage({viewport: {width: 1280, height: 800}});
-  for (const t of ['', 'undersight']) {
+  for (const t of ['', 'acme']) {
     const f = path.join(tmp, 'foot-' + (t || 'empty') + '.html'); fs.writeFileSync(f, create(mk(t)).html);
     await p.goto(pathToFileURL(f).href); await p.evaluate(() => { localStorage.clear(); }); await p.reload(); await p.waitForSelector('#canvas [data-footer]');
     out.push(await p.evaluate(() => canvas.querySelector('[data-footer]').textContent));
   }
   await b.close();
-  assert.deepEqual(out, ['1 / 3', 'undersight · 1 / 3'], 'the separator only means something after preceding text');
+  assert.deepEqual(out, ['1 / 3', 'acme · 1 / 3'], 'the separator only means something after preceding text');
 });
 live('live: present-mode peek HUD clears the page counter', async () => {
   // a 4:5 carousel with a right-anchored footer on the margin — a tall deck is HEIGHT-constrained, so the canvas fills the
-  // screen top to bottom and its bottom-right counter lands exactly where the HUD peeks (what Kyle saw)
+  // screen top to bottom and its bottom-right counter lands exactly where the HUD peeks (as observed)
   const model = {w: 1080, h: 1350, format: 'carousel-4x5', styles: {roles: modelOf(tpl).styles.roles, margin: 72},
-    master: [{id: 'foot', footer: 1, x: 700, y: 1290, w: 300, role: 'Label', text: 'undersight'}], slides: [{els: []}, {els: []}]};
+    master: [{id: 'foot', footer: 1, x: 700, y: 1290, w: 300, role: 'Label', text: 'acme'}], slides: [{els: []}, {els: []}]};
   const f = path.join(tmp, 'peek.html'); fs.writeFileSync(f, create(model).html);
   const b = await pw.chromium.launch(); const p = await b.newPage({viewport: {width: 1280, height: 800}});
   await p.goto(pathToFileURL(f).href); await p.waitForSelector('#canvas [data-footer]');
@@ -1041,6 +1044,34 @@ live('live: parity catches a painted row drawn THROUGH a text row (the class of 
   assert.equal(res.over.parity[0].pass, true, 'over:1 is how a deliberate overlay is expressed');
   assert.equal(res.tile.parity[0].pass, true, 'a text row sitting inside a tile is containment, not collision');
   assert.equal(res.miss.parity[0].pass, true);
+});
+live('live: parity — a text row hidden under a later-painted opaque row is occlusion; strict fails it, non-strict reports it', async () => {
+  const kicker = {x: 60, y: 60, w: 400, role: 'Label', nowrap: 1, text: 'HTML-PPT-SKILL · SLIDEV'};
+  const box = {x: 140, y: 40, w: 300, h: 80, bg: '#333842', radius: 8};                 // a tint over the kicker's tail
+  const away = {...box, x: 600};                                                        // the same box, not touching it
+  const cases = {under: [kicker, box], over: [box, kicker], away: [kicker, away], text: [kicker, {x: 140, y: 60, w: 300, role: 'Body', text: 'a caption on the kicker'}]};
+  const res = {};
+  for (const [k, els] of Object.entries(cases)) {
+    const f = path.join(tmp, 'occl-' + k + '.html'); fs.writeFileSync(f, create({w: 960, h: 540, slides: [{els}]}).html);
+    res[k] = {strict: await verify(f, {out: path.join(tmp, 'v-occl-' + k), strict: true, log: () => {}}), lax: await verify(f, {out: path.join(tmp, 'v-occl-' + k + '-lax'), log: () => {}})};
+  }
+  assert.equal(res.under.strict.parity[0].pass, false, 'a box painted after the kicker hides its tail');
+  assert.match(JSON.stringify(res.under.strict.parity[0].rows), /"n":"0".*under row 1 \(box\)/, 'names both rows');
+  assert.match(res.under.strict.errors.join('|'), /slide 1: row 0 \(Label 'HTML-PPT-SKILL · SLIDEV'\) under row 1 \(box\)/);
+  assert.equal(res.under.lax.parity[0].pass, true, 'non-strict warns'); assert.equal(res.under.lax.parity[0].occlusion.length, 1);
+  assert.equal(res.over.strict.parity[0].pass, true, 'the same box listed BEFORE the kicker is a backdrop');
+  assert.equal(res.away.strict.parity[0].pass, true, 'a box that does not overlap is nothing');
+  assert.ok(!JSON.stringify(res.text.strict.parity[0].rows).includes('under row'), 'a text row over a text row is not occlusion');
+});
+live('live: parity — `href` + `nowrap` is one line (the inset anchor is not a text line); a wrapped linked nowrap row still fails', async () => {
+  const one = path.join(tmp, 'href-one.html'), two = path.join(tmp, 'href-two.html'), chip = path.join(tmp, 'href-chip.html');
+  fs.writeFileSync(one, create({w: 960, h: 540, slides: [{els: [{x: 60, y: 60, w: 300, role: 'Body', nowrap: 1, href: 'https://example.com', text: 'Read the report'}]}]}).html);
+  fs.writeFileSync(chip, create({w: 960, h: 540, slides: [{els: [{x: 60, y: 60, w: 'auto', role: 'Label', nowrap: 1, p: 'chip', bg: 'var(--box)', href: 'https://example.com', text: 'Read the report'}]}]}).html);
+  fs.writeFileSync(two, create({w: 960, h: 540, slides: [{els: [{x: 60, y: 60, w: 60, role: 'Body', nowrap: 1, href: 'https://example.com', text: 'Read the report'}]}]}).html);
+  const r1 = await verify(one, {out: path.join(tmp, 'v-href-one'), log: () => {}}), rc = await verify(chip, {out: path.join(tmp, 'v-href-chip'), log: () => {}}), r2 = await verify(two, {out: path.join(tmp, 'v-href-two'), log: () => {}});
+  assert.equal(r1.parity[0].pass, true, JSON.stringify(r1.parity[0].rows)); assert.equal(r1.parity[0].rows.length, 0);
+  assert.equal(rc.parity[0].pass, true, JSON.stringify(rc.parity[0].rows));
+  assert.equal(r2.parity[0].pass, false, 'a linked row that really wraps still fails'); assert.match(JSON.stringify(r2.parity[0].rows), /renders 2 lines|overflows/);
 });
 live('live: parity catches text straddling a container edge, and an arrow head landing inside a fill', async () => {
   const roles = modelOf(tpl).styles.roles;
@@ -1204,7 +1235,7 @@ live('live: import-html in-page intent capture (line count, nowrap, hugging chip
   assert.deepEqual([chip.w, chip.p, chip.bg, chip.bd, chip.radius], ['auto', '4px 10px 4px 10px', '#EEEEEE', '1px solid #999999', 999]);
   assert.ok(!rows.some(r => r.x === 20 && r.w === 300 && !r.text));
   // fixed-width table cell: the column pins the width (style.width=max-content is a no-op on a td) → a 58×40 box row + a centred text
-  // row whose y comes from the glyph line, never a w:'auto' chip (AFB grading heatmap, 2026-08-23)
+  // row whose y comes from the glyph line, never a w:'auto' chip (a grading heatmap, 2026-08-23)
   const cell = rows.find(r => r.text === '2'), cellBox = rows.find(r => r.bg === '#C97A54');
   assert.deepEqual([cell.w, cell.align, [cellBox.x, cellBox.w, cellBox.h]], [58, 'center', [cell.x, 58, 40]]);
   assert.ok(cell.y > cellBox.y + 4 && cell.y < cellBox.y + 24, `centred cell text y ${cell.y} vs box ${cellBox.y}`);

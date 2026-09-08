@@ -8,3 +8,5 @@ templates/candidates.html
 templates/candidates.model.json
 templates/candidates.index.json
 package-lock.json
+test/residue.local
+templates/review.html

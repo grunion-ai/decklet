@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { TEMPLATES } from './index.mjs';
-import { scale } from './kit.mjs';
+import { scale } from '../lib/templates/kit.mjs';
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
 const only = process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1].split(',') : null;

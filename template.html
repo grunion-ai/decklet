@@ -29,7 +29,7 @@ body.present .el a.lk{pointer-events:auto}
 @media (prefers-reduced-motion:reduce){#canvas .gl{transition:none}}
 /* rows carry their own typography: the element adds NOTHING implicit (no padding, radius or pre-wrap) — chrome lives on .box/.tile only */
 .el{position:absolute;cursor:grab;padding:0;border-radius:0;white-space:normal;line-height:normal}
-.el.box{border:1.5px solid var(--accent);background:var(--box);text-align:center;padding:6px 8px;border-radius:8px;white-space:pre-wrap}
+.el.box{border:1.5px solid var(--accent);background:var(--box);text-align:center;padding:6px 8px;border-radius:8px;white-space:pre-wrap;display:flex;flex-direction:column;justify-content:center} /* a box with a height centres its text on the box, like a tile */
 .el.tile{background:var(--card);border:1px solid var(--line);border-radius:12px;text-align:center;display:flex;flex-direction:column;justify-content:center}
 .el svg{display:block;width:100%;height:100%}
 /* motion: four entrance anims, staggered 120 ms on slide ENTRY. rise = text, fade = quiet chrome, pop = stats/tiles, wipe = bars, lines, rules */
@@ -45,6 +45,8 @@ body.present .el a.lk{pointer-events:auto}
 .el.selected{outline:2px solid var(--sel);outline-offset:2px}
 /* marquee = selection chrome too: the drag window render() paints while a band is being pulled; never in present/print */
 .band{position:absolute;z-index:9;pointer-events:none;border:1px solid var(--sel);background:color-mix(in srgb,var(--sel) 14%,transparent)}
+/* group box = the union of a selected group's rows: the cue that the selection is one unit; chrome, never printed */
+.gbox{position:absolute;z-index:9;pointer-events:none;outline:1px dashed var(--sel);outline-offset:6px;border-radius:4px}
 .el[contenteditable="true"]{cursor:text;outline:2px dashed var(--sel);outline-offset:2px}
 /* resize nib = selection chrome only: drawn by render() for one selected painting row; never in present/print */
 .el .h{position:absolute;right:-7px;bottom:-7px;width:13px;height:13px;background:var(--accent);border:2px solid var(--bg);border-radius:4px;cursor:nwse-resize}
@@ -72,7 +74,7 @@ body.present .el a.lk{pointer-events:auto}
 #hud button,#tb button,#sheet-back{background:var(--card);border:1px solid var(--line);color:var(--fg);border-radius:6px;padding:4px 10px;cursor:pointer;font:inherit}
 #hud .sep{width:1px;height:18px;background:var(--line)}
 #hud .spacer{flex:1}
-/* HUD icons: the Lucide shapes with movingicons.dev motion that weave uses (github.com/jis3r/icons, MIT). Each plays once on load, a beat apart, and once per hover — never on a loop. The unicode glyphs (⤓ ⊞) drew too small to parse. */
+/* HUD icons: the Lucide shapes with movingicons.dev motion (github.com/jis3r/icons, MIT). Each plays once on load, a beat apart, and once per hover — never on a loop. The unicode glyphs (⤓ ⊞) drew too small to parse. */
 #hud button{display:inline-flex;align-items:center;justify-content:center;min-height:26px}
 #hud button svg{display:block;width:16px;height:16px;overflow:visible}
 #tb button svg{display:block;width:13px;height:13px}
@@ -312,7 +314,7 @@ stampIds(deck);
 const hashPos=()=>parseInt(location.hash.slice(1))-1;
 const tab={get:k=>{try{return sessionStorage.getItem(NS+':'+k)}catch{return null}},set:(k,v)=>{try{sessionStorage.setItem(NS+':'+k,v)}catch{}}};
 let i=Math.max(0,deck.slides.findIndex(s=>s.id===tab.get('slide'))),sel=new Set();if(i===0&&!tab.get('slide')&&hashPos()>0)i=hashPos();
-// HUD icons move once: on load, a beat apart; then once per hover; never on a loop — the same one-run policy as weave's picker
+// HUD icons move once: on load, a beat apart; then once per hover; never on a loop — one run per trigger
 const miPlay=(h)=>{const ms=+h.dataset.ms||0;if(!ms||h.dataset.on||matchMedia('(prefers-reduced-motion: reduce)').matches)return;h.dataset.on='1';const parts=[...h.querySelectorAll('[data-mi]')];for(const p of parts)p.classList.add(...p.dataset.mi.split(' '));setTimeout(()=>{for(const p of parts)p.classList.remove(...p.dataset.mi.split(' '));delete h.dataset.on},ms)};
 document.querySelectorAll('.mi').forEach((h,i)=>{h.addEventListener('mouseenter',()=>miPlay(h));setTimeout(()=>miPlay(h),300+i*90)});
 document.title=deck.title||'decklet'; // the deck names itself: tab title, ⤓ PDF filename and ⌘S copy filename are all this one string
@@ -356,6 +358,8 @@ const MG=()=>deck.styles&&deck.styles.margin!=null?deck.styles.margin:Math.round
 // left unset AND always wins the LOCKED keys: a row can never change family/size/line-height/tracking. Every consumer reads through this.
 const LOCK=['font','size','lh','ls'];
 const res=(el,s)=>{const m=el.override&&(deck.master||[]).find(x=>x.id===el.override)||{};const sl=el.slot&&LAY(s)[el.slot]||{};const r={...sl,...m,...el};
+  // one horizontal anchor: a row's own `right` retires the slot's x (and its own x retires the slot's right), so every consumer sees one edge
+  if(el.right!=null)delete r.x;else if(el.x!=null)delete r.right;
   const R=deck.styles&&deck.styles.roles||{},t=R[r.role]||((r.text!=null||r.html!=null)&&R.Body)||{};for(const k in t)if(r[k]==null||LOCK.includes(k))r[k]=t[k];return r};
 // motion vocabulary — the only four anims an element may carry; anything else is ignored (the validator rejects it upstream)
 const ANIM=['rise','fade','pop','wipe'];
@@ -409,7 +413,7 @@ const tAtLen=(q,L,fromEnd)=>{const N=240;let prev=bezPt(q,fromEnd?1:0),acc=0;
 const bezPart=(p,t0,t1)=>{const cut=(q,t)=>{const a=lerp(q[0],q[1],t),b=lerp(q[1],q[2],t),c=lerp(q[2],q[3],t),d=lerp(a,b,t),e=lerp(b,c,t),f=lerp(d,e,t);return [[q[0],a,d,f],[f,e,c,q[3]]]};
   let q=p;if(t1<1)q=cut(q,t1)[0];if(t0>0)q=cut(q,(t1<1&&t1>0)?t0/t1:t0)[1];return q};
 // clip a connector row in place against whatever `from`/`to` name
-// A connector LEAVES AIR: after clipping to the target's box it backs off `gap` (10 by default — Kyle's ruling; `gap:0`
+// A connector LEAVES AIR: after clipping to the target's box it backs off `gap` (10 by default; `gap:0`
 // puts it flush). Landing on the border reads as touching, which is why D1/K1 were rejected alongside the ones inside.
 const GAP=r=>r.gap==null?10:r.gap;
 // A bound end FOLLOWS its target. The model keeps the point the author aimed at; if the target has since moved out from
@@ -453,7 +457,8 @@ function drawEls(s,root,animate){
       d.querySelectorAll('a[href]').forEach(a=>{const u=href(a.getAttribute('href'));if(u){a.setAttribute('href',u);a.target='_blank';a.rel='noopener noreferrer'}else a.removeAttribute('href')})}
     else d.textContent=r.text||'';
     const pad=r.p!=null?(deck.styles&&deck.styles.pad&&deck.styles.pad[r.p])||(typeof r.p==='number'?r.p+'px':r.p):null;
-    d.style.cssText=`left:${r.x||0}px;top:${r.y||0}px;width:${r.w==='auto'?'auto':(r.w||0)+'px'};font-size:${r.size||14}px;`+
+    // `right`: the right edge sits N px from the canvas edge and CSS derives x from the measured width — a w:'auto' chip needs no guessed x
+    d.style.cssText=`${r.right!=null?`left:auto;right:${r.right}px;`:`left:${r.x||0}px;`}top:${r.y||0}px;width:${r.w==='auto'?'auto':(r.w||0)+'px'};font-size:${r.size||14}px;`+
       (r.weight?`font-weight:${r.weight};`:'')+(r.color?`color:${r.color};`:'')+
       (r.font?`font-family:${r.font};`:'')+
       (r.ls!=null?`letter-spacing:${r.ls}px;`:'')+(r.lh!=null?`line-height:${r.lh}px;`:'')+(r.tt?`text-transform:${r.tt};`:'')+
@@ -461,7 +466,7 @@ function drawEls(s,root,animate){
       (pad?`padding:${pad};`:'')+(r.h?`height:${r.h}px;`:'')+(r.bg?`background:${r.bg};`:'')+
       (r.bd?`border:${r.bd};`:'')+(r.bt?`border-top:${r.bt};`:'')+(r.br?`border-right:${r.br};`:'')+(r.bb?`border-bottom:${r.bb};`:'')+(r.bl?`border-left:${r.bl};`:'')+
       (r.shadow?`box-shadow:${r.shadow};`:'')+(r.bar?'border-radius:6px 6px 0 0;':'')+
-      (r.align?`text-align:${r.align};`:'')+(r.radius!=null?`border-radius:${typeof r.radius==='number'?r.radius+'px':r.radius};`:'')+(r.img||r.svg?'overflow:hidden;':'')+(r.css?r.css+';':'');
+      (r.align?`text-align:${r.align};`:'')+(r.valign?`display:flex;flex-direction:column;justify-content:${r.valign==='bottom'?'flex-end':'center'};`:'')+(r.radius!=null?`border-radius:${typeof r.radius==='number'?r.radius+'px':r.radius};`:'')+(r.img||r.svg?'overflow:hidden;':'')+(r.css?r.css+';':'');
     // footer master: the counter is appended INSIDE this row, so anchor it to its nearer edge and let it grow away from it
     // footer master: the counter is appended INSIDE this row; the row is anchored to the content edge (styles.margin) and grows inward
     if(r.footer){d.dataset.footer='1';d.style.whiteSpace='nowrap';d.style.width='auto';if((r.x||0)+(typeof r.w==='number'?r.w:0)/2>W/2){d.style.left='auto';d.style.right=MG()+'px'}else d.style.left=MG()+'px'}
@@ -531,6 +536,12 @@ function render(){
     if(h.a!=null){const l=document.createElement('i');l.className='gl a on';l.style.left=h.ax+'px';l.style.top=h.ay+'px';l.style.transform='rotate('+h.a*45+'deg) translateX(-2000px)';canvas.appendChild(l)}}
   const node=k=>canvas.querySelector(typeof k==='number'?`[data-n="${k}"]`:`[data-m="${k.slice(2)}"]`);
   sel.forEach(k=>{const d=node(k);d&&d.classList.add('selected')});
+  // a selected group reads as one unit: one dashed box around the union of its rows' live boxes (DOM rects, so text height counts)
+  if(!present()){const cr=canvas.getBoundingClientRect(),sc=cr.width/W,ox=cr.left+canvas.clientLeft*sc,oy=cr.top+canvas.clientTop*sc,gs=new Map(); // children sit inside the canvas border
+    sel.forEach(k=>{if(typeof k!=='number')return;const g=res(s.els[k],s).group;if(g!=null)gs.set(g,[...(gs.get(g)||[]),k])});
+    if(sc>0)gs.forEach(ks=>{if(ks.length<2)return;let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+      ks.forEach(k=>{const d=node(k);if(!d)return;const q=d.getBoundingClientRect();x0=Math.min(x0,(q.left-ox)/sc);y0=Math.min(y0,(q.top-oy)/sc);x1=Math.max(x1,(q.right-ox)/sc);y1=Math.max(y1,(q.bottom-oy)/sc)});
+      if(x1>x0){const b=document.createElement('div');b.className='gbox';b.style.cssText=`left:${x0}px;top:${y0}px;width:${x1-x0}px;height:${y1-y0}px`;canvas.appendChild(b)}})}
   if(drag&&drag.mode==='band'&&drag.box){const bd=document.createElement('div');bd.className='band';const[x1,y1,x2,y2]=drag.box;bd.style.cssText=`left:${x1}px;top:${y1}px;width:${x2-x1}px;height:${y2-y1}px`;canvas.appendChild(bd)}
   // nib: one selected row that paints and has size; never in present mode (print never calls render)
   // a connector gets one point nib per endpoint (and per control point on a curve), drawn on the canvas in model space — the
@@ -559,7 +570,11 @@ const selEl=()=>{if(sel.size!==1)return null;const k=[...sel][0];return typeof k
 let drag=null;
 // the ONE translation: every point of a row travels by the same delta from its resolved origin `o` — x/y AND a connector's
 // far end (line:[x2,y2], curve:[c1,c2,end]); writing x/y alone dragged the tail and left the head pinned. Drag and nudge both use it.
-const moveBy=(el,o,dx,dy)=>{el.x=(o.x||0)+dx;el.y=(o.y||0)+dy;if(o.line)el.line=[o.line[0]+dx,o.line[1]+dy];if(o.curve)el.curve=o.curve.map((v,j)=>j%2?v+dy:v+dx)};
+// a right-anchored row keeps its anchor: the drag writes `right`, never an x that would freeze a measured width into the model
+const moveBy=(el,o,dx,dy)=>{if(o.right!=null){el.right=o.right-dx;delete el.x}else el.x=(o.x||0)+dx;el.y=(o.y||0)+dy;if(o.line)el.line=[o.line[0]+dx,o.line[1]+dy];if(o.curve)el.curve=o.curve.map((v,j)=>j%2?v+dy:v+dx)};
+// a group is one unit: rows on the slide sharing `group` (every row keeps canvas-space x/y — nothing is relative, so moveBy
+// needs no new case). Selecting a member selects the group; ⌘-click takes a member alone. Master rows never group.
+const grp=k=>{if(typeof k!=='number')return [k];const s=slide(),g=res(s.els[k],s).group;return g==null?[k]:s.els.map((el,n)=>res(el,s).group===g?n:-1).filter(n=>n>=0)};
 // guides: the slide's slot rectangles (its layout's content slots over the deck-wide ones), the content margin and the canvas
 // mid-lines, as distinct x and y lines — every one seated on the GP lattice (the library is cut on it, so this is a no-op there;
 // a deck-defined layout off the lattice gets the nearest grid line). Every slide has a set: a free slide offers the margin and
@@ -603,8 +618,7 @@ const selBox=items=>{const sc=canvas.getBoundingClientRect().width/W;let l=1e9,t
     const pts=[[o.x||0,o.y||0]];if(o.line)pts.push(o.line);if(o.curve)pts.push(o.curve.slice(0,2),o.curve.slice(2,4),o.curve.slice(4));
     if(pts.length===1)pts.push([pts[0][0]+(typeof o.w==='number'?o.w:Math.round(q.width/sc)),pts[0][1]+(typeof o.h==='number'?o.h:Math.round(q.height/sc))]);
     for(const[x,y]of pts){l=Math.min(l,x);t=Math.min(t,y);r=Math.max(r,x);b=Math.max(b,y)}}
-  return l>r?[0,0,0,0]:[l,t,r-l,b-t]};
-$('wrap').addEventListener('mousedown',e=>{
+  return l>r?[0,0,0,0]:[l,t,r-l,b-t]};$('wrap').addEventListener('mousedown',e=>{
   if(!e.target.closest('[contenteditable="true"]'))commitEdit(); // flush a live text edit BEFORE any deselect/re-render destroys its node
   const scale=canvas.getBoundingClientRect().width/W;
   if(e.target.dataset.pt){ // connector point nib: drag moves THAT point only; an engine-clipped end (to:/from:) becomes the human's
@@ -629,7 +643,7 @@ $('wrap').addEventListener('mousedown',e=>{
   if(t.isContentEditable)return;
   const k=t.dataset.n!=null?+t.dataset.n:'m:'+t.dataset.m;
   if(e.metaKey||e.ctrlKey){sel.has(k)?sel.delete(k):sel.add(k)}
-  else if(!sel.has(k)){sel.clear();sel.add(k)}
+  else if(!sel.has(k)){sel.clear();grp(k).forEach(n=>sel.add(n))}
   // double-click handled via e.detail — the selection re-render on click 1 destroys the
   // node, so a real dblclick event never fires on it (this was the "can't edit" bug)
   if(e.detail>=2){edit(k);return}
@@ -649,6 +663,7 @@ addEventListener('mousemove',e=>{
     const[b0,b1,b2,b3]=drag.box;sel.clear();drag.base.forEach(k=>sel.add(k));
     canvas.querySelectorAll('.el').forEach(d=>{const q=d.getBoundingClientRect();
       if((q.left-cr.left)/scale>=b0&&(q.top-cr.top)/scale>=b1&&(q.right-cr.left)/scale<=b2&&(q.bottom-cr.top)/scale<=b3)sel.add(d.dataset.n!=null?+d.dataset.n:'m:'+d.dataset.m)});
+    [...sel].forEach(k=>grp(k).forEach(n=>sel.add(n))); // a band that takes any member takes the group
     render();return;
   }
   const dx=e.clientX/scale-drag.sx,dy=e.clientY/scale-drag.sy;
@@ -668,6 +683,11 @@ addEventListener('mousemove',e=>{
     render();return;
   }
   if(!drag.moved){snap();drag.moved=true;drag.items.forEach(it=>{if(typeof it.k!=='number'){const n=fork(it.k.slice(2));sel.delete(it.k);sel.add(n);it.el=slide().els[n]}})}
+  // a bound connector (to:/from:) dragged WITHOUT its anchor row detaches from it on the first move: the drag is a rigid
+  // translation, and an end that kept re-aiming at a box it no longer sits beside skewed the stroke into a diagonal. Drag the
+  // box and the connector together (a group, a marquee) and the binding is kept — the box moves under the end, as before.
+  if(!drag.detached){drag.detached=true;const keys=new Set(drag.items.map(it=>it.k));
+    drag.items.forEach(it=>{for(const p of ['to','from']){const a=it.el[p];if(a==null)continue;const n=typeof a==='number'?a:slide().els.findIndex(x=>x.id===a);if(n>=0&&!keys.has(n))delete it.el[p]}})}
   // a connector's far end is model geometry in canvas space (line:[x2,y2], curve:[c1,c2,end]) — writing x/y alone
   // dragged the tail and left the head pinned, stretching the stroke. Every point of a row travels by the same delta.
   const sn=snapTo(drag.sb,Math.round(dx),Math.round(dy),drag.hit);drag.hit=sn.hit;
@@ -701,8 +721,11 @@ const deckColors=()=>{const seen=new Map();for(const c of [...Object.values(deck
 const runSpan=(sr,node)=>{const a=sr.rangeCount&&sr.anchorNode,el=a&&(a.nodeType===1?a:a.parentElement).closest('[style*="color"]');return el&&node.contains(el)&&el!==node?el:null};
 // palette is TEXT color only (no box fill — retracted 2026-08-23): any painting row still gets the toolbar for Apply to all slides
 function placeTb(){
-  const el=selEl();const k=[...sel][0];
-  if(sel.size!==1||!$('sheet').hidden){tb.hidden=true;return}
+  // the row being edited wins over the selection: a member of a group is selected WITH its group (sel.size > 1), and the
+  // toolbar used to bail on that, so a double-click into a grouped row edited the text with no roles, marks or colours
+  const ed=canvas.querySelector('.el[contenteditable="true"]');
+  const k=ed?+ed.dataset.n:[...sel][0];const el=ed?slide().els[k]:selEl();
+  if((!ed&&sel.size!==1)||!$('sheet').hidden){tb.hidden=true;return}
   const s=slide(),src=el||(typeof k==='string'&&deck.master.find(m=>m.id===k.slice(2)));
   const r=src&&res(src,s),textual=!!(r&&(r.text||r.html));
   if(!src||!(textual||paints(r))){tb.hidden=true;return}

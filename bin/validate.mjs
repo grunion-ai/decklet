@@ -2,11 +2,15 @@
 // decklet model-contract validator — pure Node, no browser. Agents run this before create/verify.
 // usage: node bin/validate.mjs model.json [--style style.json] [--strict]     (--strict: warnings fail too)
 //        node bin/validate.mjs --layouts                                      (print the layout library catalogue)
+//        node bin/validate.mjs --templates                                    (print the template library: id · keys · samples)
+//        node bin/validate.mjs --icons                                        (print the icon names)
 //   --style: the same style.json create() will build with — text fit is only meaningful against the scale the deck will wear
 // library: import {validate, mergeStyle, ROLES} from './validate.mjs'  →  {ok, errors:[…], warnings:[…]}
 import fs from 'node:fs';
 import {pathToFileURL} from 'node:url';
-import {LIBRARY, libraryFor, catalogue} from '../lib/layouts.mjs';
+import {LIBRARY, libraryFor, catalogue, DENSITY, densityReport} from '../lib/layouts.mjs';
+import {TEMPLATE, templateKeys, expandTemplates, templateCatalogue} from '../lib/templates.mjs';
+import {ICONS, iconNames, expandIcons} from '../lib/icons.mjs';
 import {checkChart, expandCharts} from '../lib/chart.mjs';
 
 export const ROLES = ['Title', 'Supertitle', 'H1', 'H2', 'Body', 'Caption', 'Label', 'Stat'];
@@ -75,11 +79,22 @@ export function validate(deck) {
   // slots (deck scope) + layouts
   const checkSlot = (where, name, sl) => {
     if (!sl || typeof sl !== 'object') return E(`${where}.${name}: slot must be an object`);
-    for (const p of ['x', 'y', 'w']) if (sl[p] != null && sl[p] !== 'auto' && !isNum(sl[p])) E(`${where}.${name}.${p} must be a number`);
+    for (const p of ['x', 'y', 'w', 'right']) if (sl[p] != null && sl[p] !== 'auto' && !isNum(sl[p])) E(`${where}.${name}.${p} must be a number`);
+    if (sl.x != null && sl.right != null) E(`${where}.${name}: x and right are exclusive — right anchors the right edge, x the left`);
     if (sl.role && !roleOk(sl.role)) E(`${where}.${name}: role "${sl.role}" not in styles.roles`);
     if (!sl.role && sl.h == null) Wn(`${where}.${name}: slot has no role — rows bound to it must carry one`);   // a slot with h and no role is paint or media
   };
   for (const [n, sl] of Object.entries(deck.slots || {})) checkSlot('slots', n, sl);
+  // template / icon rows that create() could not expand are reported here, then the valid ones expand so the same rows are judged
+  for (const [si, s] of (Array.isArray(deck.slides) ? deck.slides : []).entries()) {
+    if (!s || typeof s !== 'object') continue;
+    if (s.template != null && !TEMPLATE[s.template]) E(`slides[${si}]: template "${s.template}" not in the library (${Object.keys(TEMPLATE).join(', ')})`);
+    else if (s.template != null) for (const k of Object.keys(s.fill || {})) if (!templateKeys(s.template).some(e => e.key === k)) E(`slides[${si}]: fill key "${k}" is not a text key of ${s.template} (${templateKeys(s.template).map(e => e.key).join(' ')})`);
+    if (s.density != null && !DENSITY[s.density]) E(`slides[${si}]: density "${s.density}" not one of ${Object.keys(DENSITY).join('|')}`);
+    for (const [ri, r] of (Array.isArray(s.els) ? s.els : []).entries()) if (r && r.icon != null && !ICONS[r.icon]) E(`slides[${si}].els[${ri}]: icon "${r.icon}" not in the set (${iconNames()})`);
+  }
+  if (deck.density != null && !DENSITY[deck.density]) E(`density "${deck.density}" not one of ${Object.keys(DENSITY).join('|')}`);
+  expandTemplates(deck); expandIcons(deck);
   const layouts = {...libraryFor(deck), ...(deck.layouts || {})};   // a slide may name a library layout the deck does not define
   for (const [ln, lay] of Object.entries(layouts)) for (const [n, sl] of Object.entries(lay || {})) checkSlot(`layouts.${ln}`, n, sl);
   // master
@@ -101,7 +116,10 @@ export function validate(deck) {
     for (const p of LOCKED) if (r[p] != null && textual) E(`${where}: "${plain(r).slice(0, 30)}" overrides ${p} — only a role sets font/size/lh/ls/mono`);
     if (r.html && /<script|on\w+=/i.test(r.html)) E(`${where}: html contains script/handler`);
     if (r.html && /font-size|font-family|line-height|letter-spacing/.test(r.html)) E(`${where}: html runs carry size/family/leading — runs may only carry color/weight/marks`);
-    for (const p of ['x', 'y', 'h']) if (r[p] != null && !isNum(r[p])) E(`${where}: ${p} must be a number`);
+    for (const p of ['x', 'y', 'h', 'right']) if (r[p] != null && !isNum(r[p])) E(`${where}: ${p} must be a number`);
+    // `right`: the row's right edge N px from the canvas right edge, x derived at render from the measured width — the only
+    // honest anchor for a w:'auto' chip. One edge per row: a row that states both has two answers for where it is.
+    if (r.x != null && r.right != null) E(`${where}: x and right are exclusive — right anchors the right edge, x the left`);
     if (r.w != null && r.w !== 'auto' && !isNum(r.w)) E(`${where}: w must be a number or "auto"`);
     if (r.line && !(Array.isArray(r.line) && r.line.length === 2 && r.line.every(isNum))) E(`${where}: line must be [x2,y2]`);
     if (r.curve && !(Array.isArray(r.curve) && r.curve.length === 6 && r.curve.every(isNum))) E(`${where}: curve must be [c1x,c1y,c2x,c2y,x2,y2]`);
@@ -129,7 +147,7 @@ export function validate(deck) {
     //
     // A CONNECTOR IS A STROKE WITH A HEAD. Every rule below is about a line that POINTS AT something: where it may run, how
     // it may bend, how much air it leaves at the thing it points to. A headless stroke is a rule, an underline, an
-    // annotation leader, a chart series or decoration — it has no target, so none of this applies to it. Kyle's own ruling
+    // annotation leader, a chart series or decoration — it has no target, so none of this applies to it. The ruling
     // draws the line in exactly this place (G1's 1.5px WITH a head rejected, H5's 1px hairline leader accepted), and the
     // cost of getting it wrong is a validator that flags a chart for being diagonal, which teaches agents to stop reading
     // warnings at all. Length is the second guard: under 40px a headed stroke is an icon, not a run between boxes.
@@ -162,13 +180,15 @@ export function validate(deck) {
     if (r.bar && !(isNum(r.h) && r.bg)) E(`${where}: bar needs h and bg`);
     if (r.p != null && typeof r.p === 'string' && !pad[r.p] && !/px|em|%/.test(r.p)) E(`${where}: p "${r.p}" is neither a styles.pad token nor a CSS length`);
     if (r.override && !mids.has(r.override)) E(`${where}: override "${r.override}" is not a master id`);
+    if (r.group != null && typeof r.group !== 'string') E(`${where}: group must be a string — rows sharing one move as one`);
     if (r.css) Wn(`${where}: raw css escape hatch used`);
     if (r.chart != null) for (const m of checkChart(r.chart)) E(`${where}: ${m}`);   // a chart row create() could not expand
     if (r.img && !/^data:/.test(r.img)) E(`${where}: img must be a data: URI (single file, zero network)`);
     if (r.svg && /<script|href\s*=\s*["']https?:/i.test(r.svg)) E(`${where}: svg contains script or external href`);
     if (textual && /^\s*\d+\s*\/\s*\d+\s*$/.test(plain(r))) Wn(`${where}: "${plain(r).trim()}" looks like a hardcoded page counter — the footer master renders it`);
     // geometry: inside the canvas (slot geometry resolved)
-    const x = r.x ?? (slot && slot.x) ?? 0, y = r.y ?? (slot && slot.y) ?? 0, w = r.w ?? (slot && slot.w);
+    const right = r.right ?? (r.x == null && slot ? slot.right : null), y = r.y ?? (slot && slot.y) ?? 0, w = r.w ?? (slot && slot.w);
+    const x = right != null ? (isNum(w) ? W - right - w : 0) : r.x ?? (slot && slot.x) ?? 0;
     if (isNum(W) && isNum(w) && x + w > W + 0.5) Wn(`${where}: extends past the right edge (${x}+${w} > ${W})`);
     if (isNum(H) && y > H) Wn(`${where}: y ${y} is below the canvas (${H})`);
     // text-fit heuristic: a nowrap row whose text is wider than its box (0.55em per char) will overflow
@@ -180,6 +200,7 @@ export function validate(deck) {
   else deck.slides.forEach((s, si) => {
     if (!s || typeof s !== 'object') return E(`slides[${si}]: not an object`);
     if (s.layout && !layouts[s.layout]) E(`slides[${si}]: layout "${s.layout}" not in deck.layouts or the library (${Object.keys(LIBRARY).join(', ')})`);
+    const dm = densityReport(s, layouts, s.density || deck.density); if (dm) Wn(`slides[${si}]: ${dm}`);
     if (!Array.isArray(s.els)) return E(`slides[${si}]: els must be an array`);
     for (const id of s.hide || []) if (!mids.has(id)) E(`slides[${si}]: hide "${id}" is not a master id`);
     const used = new Set();
@@ -223,6 +244,8 @@ export function validate(deck) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const a = process.argv.slice(2), strict = a.includes('--strict'), si = a.indexOf('--style');
   if (a.includes('--layouts')) { console.log(catalogue()); process.exit(0); }
+  if (a.includes('--templates')) { console.log(templateCatalogue()); process.exit(0); }
+  if (a.includes('--icons')) { console.log(iconNames()); process.exit(0); }
   const file = (si < 0 ? a : a.filter((_, k) => k !== si && k !== si + 1)).find(x => !x.startsWith('--'));
   if (!file) { console.error('usage: node bin/validate.mjs model.json [--style style.json] [--strict]'); process.exit(2); }
   const deck = JSON.parse(fs.readFileSync(file, 'utf8'));

@@ -10,15 +10,16 @@ import {fileURLToPath} from 'node:url';
 import {validate, ROLES} from '../bin/validate.mjs';
 import {create} from '../bin/create.mjs';
 import {verify} from '../bin/verify.mjs';
-import {LIBRARY, GROUPS, GRID, libraryFor, catalogue} from '../lib/layouts.mjs';
+import {LIBRARY, GROUPS, libraryFor, catalogue} from '../lib/layouts.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 let pw = null; try { pw = await import('playwright'); } catch {}
 const live = pw ? test : test.skip;
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'decklet-lib-'));
 
-export const NAMES = ['cover', 'agenda', 'section', 'statement', 'fact', 'quote', 'two-cols', 'two-cols-header', 'image-left', 'image-right',
-  'kpi-grid', 'kpi-grid-4', 'stat', 'chart', 'comparison', 'process-steps', 'timeline', 'cta', 'end'];
+export const NAMES = ['cover', 'agenda', 'section', 'content', 'title', 'statement', 'fact', 'quote', 'two-cols', 'two-cols-header', 'image-left', 'image-right',
+  'bento-grid', 'image-hero-overlay', 'image-split', 'annotated-shot', 'three-up-cards', 'dashboard-composite', 'table-insight', 'proof-strip', 'team-grid',
+  'kpi-grid', 'kpi-grid-4', 'stat', 'chart', 'comparison', 'process-steps', 'diagram', 'timeline', 'cta', 'end'];
 const IMG = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 3"><rect width="4" height="3" fill="#5B9CF6"/></svg>');
 // one slide per library layout, every slot bound with plausible content
 export const fill = (name, k = 0) => {
@@ -31,10 +32,18 @@ export const fill = (name, k = 0) => {
       Body: 'Body copy, two short sentences at most. Enough to wrap once.', Caption: 'Source · caption text', Label: 'Label', Stat: '63%', Stat2: '$1.2M'}[sl.role];
     return {slot, text: /^(n\d|t\d)$/.test(slot) ? '0' + (slot.slice(1)) : /delta/.test(slot) ? '↑ 8 pts' : /label/.test(slot) ? 'Renewals' : text};
   });
-  return {name: `${name}-${k}`, layout: name, els};
+  return {name: `${name}-${k}`, layout: name, els, ...(name === 'image-hero-overlay' ? {hide: ['foot']} : {})};   // a full-bleed hero hides the footer
 };
 export const everyLayout = (w = 960, h = 540) => ({w, h, title: 'library', styles: {margin: 60}, master: [{id: 'foot', footer: 1, x: 60, y: 500, w: 300, role: 'Label', text: 'library'}],
   slides: NAMES.map((n, k) => fill(n, k))});
+
+test('library: diagram — title chrome, one 840×320 figure frame, a caption that states the claim', () => {
+  const d = LIBRARY.diagram;
+  assert.equal(d.group, 'diagrams');
+  assert.deepEqual(d.slots.figure, {x: 60, y: 130, w: 840, h: 320}, 'the figure frame is media: geometry, no role, no paint — rows are placed inside it');
+  assert.deepEqual(d.slots.caption, {x: 60, y: 470, w: 840, role: 'Caption'});
+  assert.equal(d.slots.title.role, 'H1'); assert.equal(d.slots.supertitle.role, 'Supertitle');
+});
 
 test('library: every layout is complete, its slots wear a role from the scale (or carry paint), the names are the catalogue', () => {
   assert.deepEqual(Object.keys(LIBRARY), NAMES, 'the catalogue, in group order');
@@ -46,12 +55,11 @@ test('library: every layout is complete, its slots wear a role from the scale (o
     for (const [slot, sl] of Object.entries(lay.slots)) {
       if (sl.role) assert.ok([...ROLES, 'Stat2'].includes(sl.role), `${name}.${slot}: role ${sl.role}`);
       else assert.ok(sl.h != null || sl.line, `${name}.${slot}: a roleless slot is paint or media and carries h (or a line)`);
-      for (const p of ['x', 'y']) assert.equal(typeof sl[p], 'number', `${name}.${slot}.${p}`);
+      assert.equal(typeof sl.y, 'number', `${name}.${slot}.y`);
+      assert.ok(typeof sl.x === 'number' || typeof sl.right === 'number', `${name}.${slot}: x or right`);
       assert.ok(typeof sl.w === 'number' || sl.w === 'auto', `${name}.${slot}.w`);
-      if (typeof sl.w === 'number') assert.ok(sl.x + sl.w <= 896 && sl.x >= 64, `${name}.${slot} inside the 64px margins`);
-      // the lattice: every edge is a grid line, so the editor's guides ARE the slots and a grid-snapped row can reach one
-      for (const [k, v] of [['x', sl.x], ['y', sl.y], ['x+w', typeof sl.w === 'number' ? sl.x + sl.w : 0], ['y+h', sl.h != null ? sl.y + sl.h : 0], ['line', sl.line ? sl.line[0] : 0], ['line-y', sl.line ? sl.line[1] : 0]])
-        if (k !== 'y+h' || sl.h >= GRID) assert.equal(v % GRID, 0, `${name}.${slot}.${k} = ${v} is off the ${GRID}px grid`);
+      if (typeof sl.w === 'number' && sl.role) assert.ok(sl.x + sl.w <= 900 && sl.x >= 60, `${name}.${slot} inside the 60px margins`);
+      else if (typeof sl.w === 'number') assert.ok(sl.x + sl.w <= 960 && sl.x >= 0, `${name}.${slot}: paint or media may bleed to the canvas edge, never past it`);
     }
   }
   assert.ok(Object.keys(LIBRARY['kpi-grid'].slots).filter(s => /^kpi\d$/.test(s)).length === 3 && Object.keys(LIBRARY['kpi-grid-4'].slots).filter(s => /^kpi\d$/.test(s)).length === 4, 'three or four tiles');
@@ -76,8 +84,7 @@ test('library: create merges only the layouts a slide references, scaled to the 
   assert.deepEqual(d.layouts['two-cols'].right, LIBRARY['two-cols'].slots.right);
   const big = create({slides: [{layout: 'two-cols', els: [{slot: 'title', text: 'x'}]}]}, {space: '1600x900'}).deck;
   const s = LIBRARY['two-cols'].slots.right, b = big.layouts['two-cols'].right;
-  assert.deepEqual([b.x, b.y, b.w], [s.x, s.y, s.w].map(v => Math.round(v * 1600 / 960 / GRID) * GRID), '1600×900 scales the geometry 1.67× and re-seats it on the 16px lattice');
-  for (const [k, v] of Object.entries(b)) if (typeof v === 'number' && k !== 'h') assert.equal(v % GRID, 0, `scaled ${k} ${v} on the lattice`);
+  assert.deepEqual([b.x, b.y, b.w], [s.x, s.y, s.w].map(v => Math.round(v * 1600 / 960)), '1600×900 scales the geometry 1.67×');
   assert.equal(b.role, s.role);
   assert.deepEqual(libraryFor({w: 960, h: 540, slides: [{els: []}]}), {}, 'nothing referenced → nothing merged');
 });
@@ -93,8 +100,8 @@ test('library: a slide mixes a library layout with free rows (and nudges a slot 
     {slot: 'title', text: 'Renewals'},
     {slot: 'kpi1', text: '63%'}, {slot: 'kpi1-label', text: 'renewed'},
     {slot: 'kpi2', text: '41'}, {slot: 'kpi2-label', text: 'days early', y: 296},
-    {x: 64, y: 400, w: 400, role: 'Caption', text: 'a free caption row beside the tiles'},
-    {x: 496, y: 400, line: [896, 400], h: 1, bg: 'var(--line)'},
+    {x: 60, y: 400, w: 400, role: 'Caption', text: 'a free caption row beside the tiles'},
+    {x: 500, y: 400, line: [900, 400], h: 1, bg: 'var(--line)'},
   ]}]};
   const v = validate(create(m).deck);
   assert.deepEqual(v.errors, []); assert.deepEqual(v.warnings, []);
