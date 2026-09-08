@@ -2,7 +2,9 @@
 
 decklet after 0.5.0: the plan, and the order it lands in.
 
-Four lanes carry new work: functional speaker notes, a deck you can read and present on a phone, more document formats, and more export targets. A fifth lane, `Platform & release`, clears the ground for them.
+**Just shipped (0.6.0, 2026-09-07):** grid + guides + snap in the editor (a HUD toggle, 16px lattice, magnetic guides), and the expanded template pack: 58 templates and 22 layouts, one per slide, grouped by kind at [library.html](https://grunion-ai.github.io/decklet/library.html). Neither is on this board any more.
+
+Five lanes carry new work: functional speaker notes, media and links, a deck you can read and present on a phone, more document formats, and more export targets. A sixth lane, `Platform & release`, clears the ground for them.
 
 The one-file rule has not moved. A deck is one self-contained HTML file: no build step, no server, no network request at open time. Every epic here therefore ships as inline JS or CSS in `template.html`, or as a build-time transform in `bin/`. The rule enforces itself, because `bin/verify.mjs:26` fails the gate on any external `src`, `href`, `@import`, `fetch` or `WebSocket`.
 
@@ -24,7 +26,7 @@ These are Jira's sizes. Read them one rung up if SAFe is your habit.
 
 Five lanes, one per product area. A lane groups epics for reading; it sets no owner and caps no work in progress.
 
-`Platform & release` · `Notes & presenting` · `Mobile & touch` · `Documents & formats` · `Export`
+`Platform & release` · `Notes & presenting` · `Media & links` · `Mobile & touch` · `Documents & formats` · `Export`
 
 ### Horizons
 
@@ -58,6 +60,7 @@ Epics rank by **ICE**: Impact x Confidence x Ease, each 1 to 10, multiplied, wit
 | --- | --- | --- | --- |
 | **Platform & release** | P1 Contract hygiene `S`<br>P2 Model foundations `S` | P3 Growth-aware parity `M` | P4 Engine-version stamp `S` |
 | **Notes & presenting** | N1 Notes as data `M` | N2 Presenter view `L` | N3 Notes to PPTX `S` |
+| **Media & links** | V1 Images in the editor `M`<br>V3 Link behaviour `S` | V2 Video and GIF rows `M` | V4 Media budget and the PDF `S` |
 | **Mobile & touch** | M1 Read it on a phone `S` | M2 Present from the phone `S` | M3 Touch editing `L` |
 | **Documents & formats** | D1 Format presets `S` | D2 Aspect-aware composition `XL` | D3 Real documents `XL` |
 | **Export** | X1 Cheap wins `S` | X2 Searchable PDF `M` | X3 PPTX export `L` |
@@ -67,6 +70,10 @@ Epics rank by **ICE**: Impact x Confidence x Ease, each 1 to 10, multiplied, wit
 | Epic | I | C | E | Score | Horizon |
 | --- | --- | --- | --- | --- | --- |
 | P2 Model foundations | 9 | 10 | 9 | **810** | Now |
+| V3 Link behaviour | 8 | 9 | 9 | **648** | Now |
+| V1 Images in the editor | 8 | 8 | 7 | **448** | Now |
+| V4 Media budget and the PDF | 5 | 8 | 8 | **320** | Later |
+| V2 Video and GIF rows | 7 | 7 | 6 | **294** | Next |
 | M1 Read it on a phone | 9 | 9 | 8 | **648** | Now |
 | D1 Format presets | 7 | 9 | 9 | **567** | Now |
 | X1 Cheap wins | 7 | 9 | 9 | **567** | Now |
@@ -267,6 +274,50 @@ The losses are real and belong in the docs rather than a footnote. PPTX referenc
 Slidev rasterises every slide for its own PPTX export and says so. Vector shapes out of the row model would be the first agent-built deck tool to do it.
 
 **Rejected.** The Google Slides API is a live authenticated REST endpoint with no offline path, valid as a separate publish integration but never as an export. `docxtemplater` needs a hand-designed template with one placeholder per slot, the opposite of a generated row model. `officegen` is Node-only and unmaintained relative to PptxGenJS.
+
+---
+
+## Media & links
+
+The model already carries an image (`img` as a data: URI with `fit`/`pos`), an animated GIF plays through the same row, and `href` is a shipped contract (`SKILL.md` § rows: one inset anchor per row, a new tab when presenting, ⌘-click when editing, a real `/Link` annotation in the ⤓ PDF). Missing: the editor side of media, a video row, and the link work still in flight.
+
+### V1. Images in the editor · `M` · Now
+
+| Story | Size | What |
+| --- | --- | --- |
+| V1.1 | S | Drop or paste an image onto the canvas: it becomes an `img` row at the drop point, sized to the image aspect at a sane width, encoded to a data: URI on the way in. |
+| V1.2 | S | Replace the image of a selected row (drop, paste, or a file picker on the mini toolbar), keeping x/y/w/h/fit/pos. |
+| V1.3 | M | Crop and position by hand: `fit` and `pos` on the mini toolbar, and a drag inside a `cover` image that moves `pos`. |
+| V1.4 | S | `row.alt` (P2) editable from the toolbar; `verify` warns on an image without one. |
+
+### V2. Video and GIF rows · `M` · Next
+
+GIF needs no new row: `img` already plays one, and its only cost is the budget (V4). Video does need one.
+
+| Story | Size | What |
+| --- | --- | --- |
+| V2.1 | M | A `video` row: data: URI (mp4/webm), `poster` (a data: URI, or the first frame captured at create), `loop`, `muted`, `autoplay`, `controls`. Presenting: plays on slide entry when `autoplay`, pauses on exit. Editing: the poster, never a playing clip. |
+| V2.2 | S | The one-file rule holds: `verify` fails any `src` that is not a data: URI, the same gate as images. |
+| V2.3 | S | Export: the poster frame in the ⤓ PDF and on every ⌘P page; PPTX (X3) embeds the clip when that lands. |
+| V2.4 | S | The contact sheet and the presenter next-slide preview show the poster, never a second playing copy. |
+
+### V3. Link behaviour · `S` · Now — in flight
+
+The outward `href` contract is shipped. The open thread is what a link can point at inside the deck, and how a human sets one without touching the model.
+
+| Story | Size | What |
+| --- | --- | --- |
+| V3.1 | S | In-deck targets: `href:'#7'` and `href:'#<slide id>'` jump to a slide when presenting, with the URL hash following, so a table of contents and a back-to-agenda button are rows, not scripts. |
+| V3.2 | S | Set or clear a link on any selected row from the mini toolbar (a URL field validated to http/https/mailto/#), and on several selected rows at once (a painted button and its label). |
+| V3.3 | XS | `verify` fails a `#` target that names no slide, and lists every outward link so a review can check them. |
+| V3.4 | S | The PDF: in-deck links become page-jump annotations; ⌘P pages carry the same anchors. |
+
+### V4. Media budget and the PDF · `S` · Later
+
+| Story | Size | What |
+| --- | --- | --- |
+| V4.1 | S | `validate` reports media bytes per slide and per deck against the SKILL.md budget (≈100 KB an image, the file under a few MB) as a warning, so a heavy deck is caught before it ships. |
+| V4.2 | S | The ⤓ PDF re-encodes images at page resolution instead of embedding the full data: URI on every page that shows one. |
 
 ---
 
