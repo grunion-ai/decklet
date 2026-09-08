@@ -228,7 +228,7 @@ test('motion: rise · fade · pop · wipe are the whole vocabulary; unknown anim
 test('validator: anim must be one of the four', () => {
   const v = validate(withRoles({w: 960, h: 540, slides: [{els: [
     {x: 0, y: 0, w: 100, role: 'Body', anim: 'rise', text: 'ok'},
-    {x: 0, y: 0, w: 100, role: 'Body', anim: 'spin', text: 'invented'},
+    {x: 0, y: 100, w: 100, role: 'Body', anim: 'spin', text: 'invented'},
   ]}]}));
   assert.equal(v.errors.length, 1); assert.match(v.errors[0], /anim "spin"/);
   assert.deepEqual(ANIMS, ['rise', 'fade', 'pop', 'wipe']);
@@ -290,24 +290,71 @@ test('validator: rejects size/font overrides, unknown roles/slots/layouts, bad m
 test('validator: warns on hardcoded counters, likely overflow, raw css, off-canvas rows', () => {
   const v = validate(withRoles({w: 960, h: 540, slides: [{els: [
     {x: 0, y: 0, w: 100, role: 'Label', text: '3 / 9'},
-    {x: 0, y: 0, w: 60, role: 'Body', nowrap: 1, text: 'this is far too long for sixty pixels'},
-    {x: 0, y: 0, w: 100, role: 'Body', css: 'transform:rotate(1deg)', text: 'css'},
+    {x: 0, y: 100, w: 60, role: 'Body', nowrap: 1, text: 'this is far too long for sixty pixels'},
+    {x: 0, y: 200, w: 100, role: 'Body', css: 'transform:rotate(1deg)', text: 'css'},
     {x: 900, y: 0, w: 200, role: 'Body', text: 'off the edge'},
   ]}]}));
   assert.equal(v.ok, true);
   for (const re of [/hardcoded page counter/, /likely wider than w=60/, /raw css/, /past the right edge/]) assert.ok(v.warnings.some(w => re.test(w)), String(re));
 });
+test('validator: the gap gate — declared boxes owe each other styles.gap; estimates warn, declarations fail', () => {
+  const deck = els => withRoles({w: 960, h: 540, slides: [{els}]});
+  const chip = (x, text, more = {}) => ({x, y: 100, w: 120, h: 24, role: 'Label', nowrap: 1, bg: 'var(--box)', text, ...more});   // painted: a box that owes the gap
+  // side by side, both widths declared: 2px is a collision, 4px (the default gap) is air, and the message names both rows and the number
+  let v = validate(deck([chip(60, 'alpha'), chip(182, 'beta')]));
+  assert.equal(v.errors.length, 1, JSON.stringify(v.errors)); assert.match(v.errors[0], /els\[0\] "alpha" is 2px from els\[1\] "beta" — styles.gap is 4/);
+  assert.deepEqual(validate(deck([chip(60, 'alpha'), chip(184, 'beta')])).errors, []);
+  // an overlap says how deep — on the shorter axis, the move that separates them (30px across, 24px tall → 24)
+  assert.match(validate(deck([chip(60, 'alpha'), chip(150, 'beta')])).errors[0], /overlaps by 24px/);
+  // the deck sets its own air
+  v = validate({...deck([chip(60, 'alpha'), chip(184, 'beta')]), styles: {...withRoles({w: 960, h: 540, slides: [{els: []}]}).styles, gap: 12}});
+  assert.match(v.errors[0], /is 4px from .* styles.gap is 12/);
+  assert.match(validate({...deck([]), styles: {...deck([]).styles, gap: -1}}).errors[0], /styles.gap must be a number/);
+  // containment is not collision: a label wholly inside a painted box; straddling its border is
+  const card = {x: 60, y: 80, w: 300, h: 120, bg: '#eee', radius: 8};
+  assert.deepEqual(validate(deck([card, chip(72, 'inside')])).errors, []);
+  assert.match(validate(deck([card, chip(300, 'straddles')])).errors[0], /els\[0\] \(box\) overlaps by 24px els\[1\] "straddles"/);
+  // a shared group is one thing; over:1 is a declared overlay; two graphics touching is layout
+  assert.deepEqual(validate(deck([chip(60, 'a', {group: 'g'}), chip(170, 'b', {group: 'g'})])).errors, []);
+  assert.deepEqual(validate(deck([chip(60, 'a'), chip(170, 'b', {over: 1})])).errors, []);
+  assert.deepEqual(validate(deck([card, {...card, x: 362}])).errors, []);
+  // two bare text rows owe each other no air — a kicker 2px above its title is typography — but they may not overlap;
+  // a text row with no h is estimated from its lines, so a collision on that axis is a ~warning, never an error
+  assert.deepEqual(validate(deck([{x: 60, y: 100, w: 400, role: 'Label', nowrap: 1, text: 'KICKER'}, {x: 60, y: 114, w: 400, role: 'H1', nowrap: 1, text: 'Title'}])).warnings, [], 'Label lh 14 ends at 114; the title starts there');
+  v = validate(deck([{x: 60, y: 100, w: 400, role: 'Body', text: 'a paragraph with no height stated'}, {x: 60, y: 110, w: 400, role: 'Caption', text: 'a caption 10px under its top'}]));
+  assert.deepEqual(v.errors, []); assert.equal(v.warnings.length, 1, JSON.stringify(v.warnings)); assert.match(v.warnings[0], /overlaps by ~\d+px[^~]*text rows may not overlap/); assert.ok(v.warnings[0].includes('~ = estimated'), 'marked as an estimate');
+  // a slot's group and over reach the rows bound to it — the library's kpi tile, chip and label are one card
+  const lay = {tile: {x: 60, y: 160, w: 260, h: 120, tile: 1, role: 'Stat2', align: 'center', group: 'k1'}, delta: {right: 960 - 320 + 12, y: 172, w: 'auto', role: 'Label', p: 'chip', nowrap: 1, bg: 'var(--box)', group: 'k1'}};
+  assert.deepEqual(validate(withRoles({w: 960, h: 540, layouts: {k: lay}, slides: [{layout: 'k', els: [{slot: 'tile', text: '63%'}, {slot: 'delta', text: '↑ 8 pts'}]}]})).warnings, []);
+  // …and the estimate uses the role's measured cw, so a mono chip (0.69em) is judged wider than the blanket 0.55 would
+  const wide = {x: 60, y: 100, w: 'auto', p: 'chip', role: 'Label', nowrap: 1, text: 'TWENTY-FOUR CHARACTERS!!'};   // 24 × 11 × .69 + 16 ≈ 198px
+  v = validate(deck([wide, chip(220, 'next')]));   // at 0.55 the chip would end at 221 and the pair would be judged nearly clear
+  assert.equal(v.warnings.length, 1, JSON.stringify(v.warnings)); assert.match(v.warnings[0], /overlaps by ~\d+px/);
+  assert.deepEqual(validate(deck([wide, chip(300, 'next')])).warnings, []);
+  // the master rows a slide shows are in the set; hidden ones are not
+  const foot = {id: 'foot', footer: 1, x: 660, y: 500, w: 240, h: 14, role: 'Label', text: 'deck'};   // h stated, so the overlap is exact and an error
+  const base = withRoles({w: 960, h: 540, master: [foot], slides: [{els: [chip(700, 'late', {y: 502})]}, {hide: ['foot'], els: [chip(700, 'late', {y: 502})]}]});
+  v = validate(base); assert.equal(v.errors.length, 1, JSON.stringify(v.errors)); assert.match(v.errors[0], /slides\[0\]: master foot "deck" overlaps by \d+px els\[0\] "late"/);
+  // a role's cw is validated, and mergeStyle carries gap the way it carries pad
+  assert.match(validate({...deck([]), styles: {...deck([]).styles, roles: {...deck([]).styles.roles, Body: {...deck([]).styles.roles.Body, cw: 'wide'}}}}).errors[0], /role Body: cw must be/);
+  const merged = mergeStyle({styles: {roles: {}}}, {gap: 10, pad: {chip: '1px 2px'}}); assert.equal(merged.styles.gap, 10);
+  assert.equal(mergeStyle({styles: {roles: {}, gap: 2}}, {gap: 10}).styles.gap, 2, 'the model wins');
+  // the template's neutral roles carry measured cw, so a fresh deck is judged against real glyph widths
+  const roles = JSON.parse(tpl.match(/\/\*DECK\*\/([\s\S]*?)\/\*\/DECK\*\//)[1]).styles.roles;
+  for (const n of ROLES) assert.ok(roles[n].cw > 0.4 && roles[n].cw < 0.8, n + ' has a measured cw');
+  assert.ok(roles.Label.cw > roles.Body.cw, 'mono uppercase is wider than sans');
+});
 test('validator: href is model content — http/https/mailto only, on a row and inside an inline run', () => {
   const ok = validate(withRoles({w: 960, h: 540, slides: [{els: [
     {x: 0, y: 0, w: 200, h: 40, bg: '#000', href: 'https://example.com/x?a=1'},
-    {x: 0, y: 0, w: 200, role: 'Body', text: 'mail', href: 'mailto:hi@example.com'},
-    {x: 0, y: 0, w: 200, role: 'Body', html: 'read <a href="http://example.com">the note</a>'},
+    {x: 0, y: 100, w: 200, role: 'Body', text: 'mail', href: 'mailto:hi@example.com'},
+    {x: 0, y: 200, w: 200, role: 'Body', html: 'read <a href="http://example.com">the note</a>'},
   ]}]}));
   assert.deepEqual(ok.errors, []);
   const bad = validate(withRoles({w: 960, h: 540, slides: [{els: [
-    {x: 0, y: 0, w: 200, h: 40, bg: '#000', href: 'javascript:alert(1)'},
-    {x: 0, y: 0, w: 200, role: 'Body', html: 'x <a href="JavaScript:alert(1)">y</a>'},
-    {x: 0, y: 0, w: 200, role: 'Body', html: 'x <a href="data:text/html,z">y</a>'},
+    {x: 0, y: 300, w: 200, h: 40, bg: '#000', href: 'javascript:alert(1)'},
+    {x: 0, y: 400, w: 200, role: 'Body', html: 'x <a href="JavaScript:alert(1)">y</a>'},
+    {x: 0, y: 500, w: 200, role: 'Body', html: 'x <a href="data:text/html,z">y</a>'},
   ]}]}));
   assert.equal(bad.errors.length, 3, JSON.stringify(bad.errors));
   for (const e of bad.errors) assert.match(e, /href .* must be http/);
@@ -331,7 +378,7 @@ test('validator: to/from terminate a connector against a row that exists', () =>
     {x: 200, y: 30, curve: [250, 30, 300, 90, 400, 90], bg: '#fff', arrow: 'end', to: 'card'},
     {x: 200, y: 30, curve: [250, 30, 300, 90, 400, 90], bg: '#fff', arrow: 'end', to: 9},
     {x: 200, y: 30, line: [400, 30], bg: '#fff', to: 'ghost'},
-    {x: 0, y: 0, w: 100, role: 'Body', text: 'plain', to: 0},
+    {x: 0, y: 100, w: 100, role: 'Body', text: 'plain', to: 0},
   ]}]}));
   for (const re of [/to "9" is not a row id on this slide, a master id, or a row index/, /to "ghost" is not a row/, /to needs a line or a curve/]) assert.ok(v.errors.some(e => re.test(e)), String(re));
   assert.equal(v.errors.length, 3, JSON.stringify(v.errors));
@@ -471,7 +518,7 @@ test('validate --style: text fit is measured against the scale create() will bui
 test('import-html assemble: master from recurring chrome, footer, layout slots, roles seeded from signatures, nowrap intent', () => {
   const logo = '<svg viewBox="0 0 10 10"><rect width="10" height="10"/></svg>';
   const mk = (name, bg, extra = []) => ({name, bg, els: [
-    {x: 10, y: 10, w: 100, h: 20, svg: logo},
+    {x: 10, y: 4, w: 100, h: 20, svg: logo},
     {x: 0, y: 0, w: 800, h: 450},
     {x: 20, y: 30, w: 600, font: 'Inter', size: 14, weight: 600, color: '#C97A54', tt: 'uppercase', ls: 1, text: 'KICKER ' + name, _lines: 1, nowrap: 1},
     {x: 20, y: 60, w: 600, font: 'Inter', size: 44, weight: 700, color: '#23262C', text: name + ' title', _lines: 1, nowrap: 1},
@@ -1045,7 +1092,7 @@ live('live: parity catches a painted row drawn THROUGH a text row (the class of 
   assert.equal(res.tile.parity[0].pass, true, 'a text row sitting inside a tile is containment, not collision');
   assert.equal(res.miss.parity[0].pass, true);
 });
-live('live: parity — a text row hidden under a later-painted opaque row is occlusion; strict fails it, non-strict reports it', async () => {
+live('live: parity — a text row hidden under a later-painted opaque row is occlusion, and it fails with or without --strict', async () => {
   const kicker = {x: 60, y: 60, w: 400, role: 'Label', nowrap: 1, text: 'HTML-PPT-SKILL · SLIDEV'};
   const box = {x: 140, y: 40, w: 300, h: 80, bg: '#333842', radius: 8};                 // a tint over the kicker's tail
   const away = {...box, x: 600};                                                        // the same box, not touching it
@@ -1058,7 +1105,8 @@ live('live: parity — a text row hidden under a later-painted opaque row is occ
   assert.equal(res.under.strict.parity[0].pass, false, 'a box painted after the kicker hides its tail');
   assert.match(JSON.stringify(res.under.strict.parity[0].rows), /"n":"0".*under row 1 \(box\)/, 'names both rows');
   assert.match(res.under.strict.errors.join('|'), /slide 1: row 0 \(Label 'HTML-PPT-SKILL · SLIDEV'\) under row 1 \(box\)/);
-  assert.equal(res.under.lax.parity[0].pass, true, 'non-strict warns'); assert.equal(res.under.lax.parity[0].occlusion.length, 1);
+  assert.equal(res.under.lax.parity[0].pass, false, 'non-strict fails it too — a hidden row is never a warning'); assert.equal(res.under.lax.parity[0].occlusion.length, 1);
+  assert.match(res.under.lax.errors.join('|'), /occlusion: slide 1: row 0/);
   assert.equal(res.over.strict.parity[0].pass, true, 'the same box listed BEFORE the kicker is a backdrop');
   assert.equal(res.away.strict.parity[0].pass, true, 'a box that does not overlap is nothing');
   assert.ok(!JSON.stringify(res.text.strict.parity[0].rows).includes('under row'), 'a text row over a text row is not occlusion');
@@ -1081,8 +1129,8 @@ live('live: parity catches text straddling a container edge, and an arrow head l
   const mk = els => ({w: 960, h: 540, styles: {roles}, slides: [{els}]});
   const cases = {
     inside:   mk([tile, {x: 320, y: 250, w: 260, role: 'Body', align: 'center', nowrap: 1, text: 'well inside'}]),
-    straddle: mk([tile, {x: 480, y: 250, w: 260, role: 'Body', nowrap: 1, text: 'half out of the tile'}]),
-    over:     mk([tile, {x: 480, y: 250, w: 260, role: 'Body', nowrap: 1, text: 'half out of the tile', over: 1}]),
+    straddle: mk([tile, {x: 560, y: 250, w: 260, role: 'Body', nowrap: 1, text: 'half out of the tile'}]),   // starts 40px inside the tile's right edge, so the glyphs cross it in any font (CI's Linux sans is narrower than macOS's)
+    over:     mk([tile, {x: 560, y: 250, w: 260, role: 'Body', nowrap: 1, text: 'half out of the tile', over: 1}]),
     ring:     mk([ring, {x: 200, y: 320, w: 500, role: 'Body', nowrap: 1, text: 'a headline across a decorative ring'}]),
     band:     mk([band, {x: 120, y: 275, w: 500, role: 'Body', nowrap: 1, text: 'a caption on the edge of a tint band'}]),
     outside:  mk([tile, {x: 60, y: 420, w: 200, role: 'Body', nowrap: 1, text: 'nowhere near'}]),

@@ -160,7 +160,7 @@ test/gate.test.mjs   engine + validator + create + import + live proofs
 ## Test
 
 ```
-npm test            # node --test; live browser tests skip when Playwright is absent
+npm test            # node --test; live browser tests skip when Playwright is absent (CI installs Chromium, so they run there)
 npm run test:live   # same, after: npm i -D playwright && npx playwright install chromium
 ```
 

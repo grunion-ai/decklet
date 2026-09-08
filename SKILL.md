@@ -59,7 +59,7 @@ Discipline, in order of importance:
 - **Role discipline.** Every text row has a `role` (or a `slot` whose layout slot has one). A row never sets `font`, `size`, `lh`, `ls` or `mono` — the validator rejects it. Rows may set `weight`, `color`, `tt`, `italic`, `align`.
 - **Slot discipline.** Supertitle and title geometry lives in `layouts.<name>`; the slide row is `{slot:'title', text:'…'}` with no x/y/w. Define one layout per slide family (`title`, `content`; add `section`, `two-col` as needed).
 - **Master discipline.** Anything that appears on every slide (footer, rule, mark) is a `master` row, once — chrome is deck-wide and never varies per layout. Exactly one master row has `footer:1`; the engine renders the page counter inside it, with its right edge on `styles.margin`. Never type `3 / 9` into a row.
-- **Text-fit.** A label that must stay on one line gets `nowrap:1` and enough `w` (≈ 0.55 × size × chars), or `w:'auto'` to hug. Chips/pills: `w:'auto'` + `p:'chip'` (+ `bg`/`bd`/`radius`); one that sits on a right edge takes `right:` instead of `x`. Body copy gets a `w` that yields ≤ 3 lines at the role's size.
+- **Text-fit.** A label that must stay on one line gets `nowrap:1` and enough `w` (≈ `cw` × size × chars — the role's measured glyph width, 0.46 for the neutral sans, 0.69 for the mono Label), or `w:'auto'` to hug. Chips/pills: `w:'auto'` + `p:'chip'` (+ `bg`/`bd`/`radius`); one that sits on a right edge takes `right:` instead of `x`. Body copy gets a `w` that yields ≤ 3 lines at the role's size.
 - **Charts are rows.** A bar or line chart is one `chart` row (CHART ROW below) that `create` expands into bars, lines, dots and `Label` rows with the drawing rules applied — write the data, not the geometry. By hand, the same shape: bars `{x,y,w,h,bg,bar:1}` bottom-aligned on a baseline `line`; value labels as `Label` rows above, axis labels below. Donut: `{x,y,w,donut:72}` + a `Stat` row centred on it. Tiles: `{x,y,w,h,tile:1,role:'Stat',text}` + a `Label` row beneath.
 - **Cards are groups.** There is no container row: a card is a tile plus its rows sharing one `group` — `{x,y,w,h,bg,bd,radius,group:'card1'}` and each text row inside it with `group:'card1'`, every row at its own canvas x/y. The human drags the card and the rows come along; you still position each row, once.
 - **Colour.** Use `var(--accent)`, `var(--fg)`, `var(--muted)`, `var(--line)`, `var(--card)` so a style swap re-themes the deck; literal hex only for chart series.
@@ -92,13 +92,14 @@ node bin/verify.mjs deck.html                      # 3. verify the result
 node bin/verify.mjs deck.html [--refs shots/] [--out verify-out/] [--threshold 0.5] [--strict]
 ```
 - **Contract** — always.
+- **Air** — always, in `validate`, with no browser: every row's declared box owes its neighbours `styles.gap` (default 4px). Two boxes closer than that, or overlapping, fail the contract unless one is wholly inside a painted box (containment), they share a `group`, or one says `over:1`. A text row with no `h` is estimated from its line count and a `w:'auto'` row from `cw` × chars — a collision resting on an estimate is a `~` warning, not an error. This is the gate that refuses the layout before it exists; parity below measures what actually rendered.
 - **Layout parity** — always (needs Playwright): no text row overflows its box, every `nowrap` row renders one line, imported rows render their source line count, every element is inside the canvas, **no painted row is drawn through a text row**, zero page errors.
   Five shapes — four measured on real geometry (glyph rects and sampled strokes, never bounding boxes), the fifth asked of the compositor:
   1. **ink through text** — a line, curve or rule crossing a label's glyphs;
   2. **text straddling a container** — a label crossing a box/tile border, or hanging half out of the box meant to hold it;
   3. **an arrow head inside a fill** — a connector aimed at a target's centre instead of stopped on its edge (fix with `to:`);
   4. **text over text** — a title landing on a caption;
-  5. **text under paint** (occlusion) — a text row hidden by an opaque row painted later in `els` (a tinted box, an image, a bar). The compositor is asked, not the geometry: `elementFromPoint` at five samples per line rect. Reported as `slide 2: row 3 (Label 'kicker') under row 9 (box)` — reorder `els` (paint first) or move the box; `--strict` fails it, otherwise it is a warning.
+  5. **text under paint** (occlusion) — a text row hidden by an opaque row painted later in `els` (a tinted box, an image, a bar). The compositor is asked, not the geometry: `elementFromPoint` at five samples per line rect. Reported as `slide 2: row 3 (Label 'kicker') under row 9 (box)` — reorder `els` (paint first) or move the box. It fails like the other four; a hidden row is never a warning.
   Containment is not collision: text on a tile, a label inside a box, a slide backdrop all pass. A tint with no border is a backdrop and a circle/pill outline is decoration — neither is a container edge. A headless stroke crossing a card is routing, not a landing. `over:1` opts a row out of all five.
 - **AE pixel diff** — when `--refs` exists (needs ImageMagick): `< 0.5%` of pixels differ at 2% fuzz. AE alone passes wrapped labels; parity is what catches them — that is why parity is not optional.
 
@@ -136,6 +137,7 @@ Top level:
 | `styles.roles` | `{Role: treatment}` | template neutral | see STYLE CONTRACT |
 | `styles.margin` | number | `round(w × 0.06)` | content inset chrome sits on: the footer counter's right edge = `w − margin` |
 | `styles.pad` | `{token: css}` | `{chip:'3px 8px', pill:'5px 12px'}` | `p:'chip'` on a row |
+| `styles.gap` | number | `4` | the air every row owes its neighbours, in px; `validate` fails two declared boxes closer than this (see VERIFY → Air) |
 | `slots` | `{slot: geometry}` | `{}` | deck-scope slots under every layout (`{supertitle:{x:60,y:52,w:840,role:'Supertitle'}}`) |
 | `layouts` | `{name: {slot: geometry}}` | `{}` | `{content:{title:{x:60,y:76,w:840,role:'H1'}}}` |
 | `master` | row[] with `id` | `[]` | `[{id:'foot',footer:1,…}]` |
@@ -182,7 +184,7 @@ Row — every prop optional; a row is whatever its props make it:
 | `dash` | `1` \| `[on,off]` | — | dashed stroke, **quantised to the run** so it always begins and ends on a whole dash (measured along arc length on a curve). Keeps its head |
 | `waive` | 1 | — | this connector breaks a shape rule on purpose — `validate` stays quiet about it (the `over:1` of connector geometry) |
 | `href` | url | — | http/https/mailto only. One inset anchor over the whole row (a painted CTA box + its label each carry it); live in present mode, a real `/Link` annotation in the `⤓` PDF |
-| `over` | 1 | — | declares a deliberate overlay: `verify`'s collision check leaves this row (and what it crosses) alone |
+| `over` | 1 | — | declares a deliberate overlay: `validate`'s gap gate and `verify`'s collision check leave this row (and what it crosses) alone |
 | `donut` | 0–100 | — | ring, `w` = diameter, `color` = fill |
 | `svg` | string | — | inline SVG markup (no script, no external href) |
 | `icon` | name | — | a Lucide icon by name (see GRAPHICS; `--icons` lists them) — expands to an `svg` row at create, `color` paints it |
@@ -212,12 +214,15 @@ Resolution order for any row: slot geometry ← master row (for `override` rows)
     "Stat":  { "font": "…", "size": 40, "weight": 800, "lh": 44, "ls": -1, "color": "var(--accent)" }
   },
   "pad": { "chip": "3px 8px", "pill": "5px 12px" },
-  "margin": 60
+  "margin": 60,
+  "gap": 4
 }
 ```
 - `tokens` → CSS custom properties on `:root`. `bg` is the editor chrome behind the slide; `card` is the slide surface; `box` the outlined-box fill; `sel` the selection colour.
 - The eight roles are the whole type system — exactly these names: `Title` (display headline for cover/closing slides), `Supertitle` (kicker), `H1` (content-slide title), `H2`, `Body`, `Caption`, `Label` (mono, uppercase — chips, axis labels, footer), `Stat`. No H3, no Subtitle. One allowance: **`Stat2`**, an optional ninth role for the KPI tile — a hero "63%" and a card "$1.2M" cannot share one size. A style may define it; when it does not, `create` derives it from `Stat` at **0.6** (size, line height, tracking) and only when a row or slot asks for it, so a deck that never uses `Stat2` never carries it. The `kpi-grid` tiles wear it; the hero `stat` layout keeps `Stat`. A role is a complete treatment: `font`, `size`, `weight`, `lh`, `ls`, `color`, optional `tt`. One font and one size per role — never two sizes of "Body". A row may add `weight`, `color`, `tt`, `italic`; it can never carry `font`, `size`, `lh`, `ls` or `mono` (the validator rejects it, the engine ignores it).
 - `margin` is the content inset the chrome sits on (footer counter's right edge, default 6% of `w`). Set it to match your layouts' left edge.
+- `gap` is the air every row owes its neighbours (default 4px, the offset the chart library itself uses between a bar and its value). Raise it for a roomier deck; `validate` enforces it on declared boxes.
+- `cw` on a role is the measured average glyph width in em (`width / chars / size` of a representative sentence in that font, weight and case). `validate` sizes `w:'auto'` rows and line counts with it; without it the blanket 0.55 stands, which runs ~20% wide on a sans and ~20% narrow on an uppercase mono. Measure once per brand font in Chromium and put it in `style.json`; the neutral roles carry theirs.
 - The model's own `styles.roles` win over `style.json` per role; a model with no roles inherits the template's neutral scale.
 
 ## LAYOUTS (slots)
@@ -350,7 +355,8 @@ Four words, and no fifth: `rise` (text — the default), `fade` (quiet chrome), 
 | line count | `verify` parity | imported rows: rendered lines == source `_lines` |
 | bounds | `verify` parity | every element inside the canvas |
 | collision | `verify` parity | no ink through glyphs, no text straddling a container edge, no arrow head inside a fill, no text over text (`over:1` opts out) |
-| occlusion | `verify` parity | no text row under an opaque row painted later in `els` (`--strict` fails, else warns) |
+| air | `validate` | no two declared boxes closer than `styles.gap` (default 4) unless contained, grouped or `over:1`; estimates warn with `~` |
+| occlusion | `verify` parity | no text row under an opaque row painted later in `els` |
 | page errors | `verify` | none |
 | AE | `verify --refs` | `< 0.5%` pixels at `-fuzz 2%` (set `--threshold`) |
 
@@ -385,6 +391,7 @@ terminator out of extra rows (they land off centre).
 - **Per-slide chrome drift.** A footer or mark redrawn on each slide with slightly different x/y. It is one master row; slides fork only when a human edits.
 - **Size overrides.** `size:18` on a Body row "because it needs to be bigger". Change the role, or use the right role (`Title` for a display headline, `H1` for a slide title). Same for `font`, `lh`, `ls`, `mono`.
 - **Wrapping labels.** Chips, axis labels, step numbers, supertitles that wrap to two lines. `nowrap:1` + width, or `w:'auto'`. Parity fails these on purpose.
+- **Touching boxes.** A chip 2px from the next chip, a caption resting on the rule under it, a value label on its bar's top edge. `validate` names the pair and the distance; give it `styles.gap` of air, or state the relationship (`group`, containment, `over:1`).
 - **Guessed x for an auto-width row.** A chip on a card's right edge is `right:`, never a guessed `x` — a `w:'auto'` row has no width until it renders, and the guess runs under its neighbour.
 - **Hand-built arrow heads.** Three `line` rows and a trig helper to draw one arrow. `arrow:'end'` on a `line` or a `curve`. Stiff diagonals where the source had a spline: that is what `curve` is for.
 - **Connectors aimed at a centre.** Giving a connector the target's coordinate puts the head inside its fill, floating. Give the target itself — `to: 'grade'` — and the engine stops the tip on the border. Hand-computed standoffs ("end it 10px short") are the thing `to` exists to delete: the head no longer overshoots, so paying it back by hand now *under*-shoots.

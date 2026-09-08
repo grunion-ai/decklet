@@ -4,7 +4,7 @@
 //   2. LAYOUT PARITY in a real browser (Playwright, optional devDep)  always when Playwright is installed
 //        every text row: no overflow (scrollWidth ≤ clientWidth), nowrap rows render ONE line, rows imported from HTML render the
 //        source line count (data-lines), every element stays inside the canvas, zero page errors, no text row hidden under a
-//        later-painted opaque row (occlusion — sampled with elementFromPoint; --strict fails it, otherwise reported)
+//        later-painted opaque row (occlusion — sampled with elementFromPoint; fails like every other parity shape)
 //   3. AE pixel diff vs reference PNGs (ImageMagick `magick`/`compare`)  only when --refs is given
 // usage: node bin/verify.mjs deck.html [--refs dir] [--out dir] [--threshold 0.5] [--fuzz 2%] [--report model.report.json] [--fonts <css url>] [--strict]
 //   --report: the importer's drift report (default: model.report.json beside the deck) — masks where the mockup drew its chrome
@@ -141,11 +141,11 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
           o.role = row && (row.role || (row.slot && (((deck.layouts || {})[s.layout] || {})[row.slot] || (deck.slots || {})[row.slot] || {}).role)) || undefined; }
         return o;
       }).filter(o => o.problems.length || o.occluded?.length); }, [W, H]);
-      // occlusion names both rows so the builder fixes z-order or geometry; --strict fails on it, otherwise it is reported beside the slide
+      // occlusion names both rows so the builder fixes z-order or geometry. It fails — a hidden text row is never a warning
       const occl = bad.flatMap(o => (o.occluded || []).map(u => ({...u, n: o.n, role: o.role, text: o.text, msg: `slide ${n + 1}: row ${o.n} (${o.role || 'text'} '${o.text}') under row ${u.under} (${u.kind})`})));
-      for (const o of bad) { if (strict) for (const u of o.occluded || []) o.problems.push(`under row ${u.under} (${u.kind})`); delete o.occluded; }
+      for (const o of bad) { for (const u of o.occluded || []) o.problems.push(`under row ${u.under} (${u.kind})`); delete o.occluded; }
       bad = bad.filter(o => o.problems.length);
-      if (strict) for (const u of occl) res.errors.push('occlusion: ' + u.msg);
+      for (const u of occl) res.errors.push('occlusion: ' + u.msg);
       // a row the type scale changed (imported with _src) may wrap or crowd differently from its source: that is a consequence of the
       // scale, not a layout fault — reported as scale crowding for a human decision, never a failure. Everything else stays hard.
       // …only when it renders FEWER lines (collapsed runs); more lines or overflow means the importer's fit cap failed — hard
@@ -200,7 +200,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   for (const m of r.contract.errors) console.error('ERROR   contract: ' + m);
   for (const m of r.contract.warnings) console.error('warning contract: ' + m);
   for (const s of r.parity) console.log(`parity  slide ${s.slide} ${s.name}: ${s.pass ? 'PASS' : 'FAIL ' + JSON.stringify(s.rows)}`);
-  for (const s of r.parity) for (const m of s.occlusion || []) console.log(`occlusion ${m}${o.strict ? '' : ' — warning; --strict fails it'}`);
+  for (const s of r.parity) for (const m of s.occlusion || []) console.log(`occlusion ${m}`);
   for (const s of r.parity) if (s.crowding?.length) console.log(`crowding slide ${s.slide} ${s.name}: ${s.crowding.length} row(s) the scale changed now wrap/crowd differently — ${s.crowding.map(c => JSON.stringify(c.text)).join(', ')}`);
   for (const s of r.ae) console.log(`ae      slide ${s.slide} ${s.name}: ${s.skipped ? 'skipped (' + s.skipped + ')' : (s.pass ? 'PASS' : 'FAIL') + ` raw ${s.pct}% · chrome masked ${s.pctNoChrome}% · + ${s.conflictRows} snapped rows masked ${s.pctNoChromeNoConflict}% (pass column)`}`);
   for (const m of r.skipped) console.log('skipped ' + m);
