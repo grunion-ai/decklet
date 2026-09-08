@@ -39,36 +39,51 @@ for (const n of placedL) if (!LIBRARY[n]) throw new Error(`kind names unknown la
 
 // ── sample content for the library layouts: one bound row per slot, by slot name, then by role
 const IMG = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 3"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5B9CF6"/><stop offset="1" stop-color="#1E3A8A"/></linearGradient></defs><rect width="4" height="3" fill="url(#g)"/></svg>');
-const CHART = { mark: 'bar', data: [{ label: 'Q1', value: 62 }, { label: 'Q2', value: 71 }, { label: 'Q3', value: 78 }, { label: 'Q4', value: 92 }], source: 'Ledger, FY26' };
-const TEXT = {   // by slot name; the layout id can override with `id.slot`
+const CHART = { mark: 'bar', data: [{ label: 'Mon', value: 48 }, { label: 'Tue', value: 61 }, { label: 'Wed', value: 57 }, { label: 'Thu', value: 74 }], source: 'Front-desk log, one week' };
+// sample content for the library layouts, by `layout.slot`, then by slot name, then by role. Every layout speaks
+// about a different everyday subject, so the sheet reads as twenty-two slides rather than one slide repeated.
+const TEXT = {
+  // role / slot defaults (a layout below overrides them)
   supertitle: 'Section', title: 'A title that states the claim', body: 'Two sentences of body copy at most: what the reader should take from this slide, and why it matters now.',
-  caption: 'Source · one line', label: 'the label', stat: '63%', quote: 'We stopped reconciling by hand in week two. That was the whole business case.', attribution: 'Head of Ops · 40-truck fleet',
-  header: 'One spanning lede above two columns.', left: 'The left column: three short lines that hold up the claim on their own.', right: 'The right column: the counterpoint, or the second half of the argument.',
-  'left-head': 'Option A', 'right-head': 'Option B', takeaway: 'Every quarter beat the one before it; the Q4 step is the pricing change.', source: 'Source · ledger, FY26',
-  number: '02', 'button-label': 'Book the pilot',
-  subtitle: 'The claim in one line under the title.', note: 'What to make of it: the note a reader gets without a speaker in the room.', legend: '● plan  ● actual',
-  'cover.supertitle': 'decklet · library', 'cover.title': 'Every slide the engine knows', 'cover.body': 'Fifty-eight templates and twenty-two layouts, one per slide, grouped by the kind of slide it is.', 'cover.caption': 'Grunion · September 2026',
-  'title.supertitle': 'Chapter two', 'title.title': 'Display-title chrome',
-  'section.title': 'Where the money goes', 'section.body': 'Unit economics, channel by channel.',
-  'content.title': 'Title chrome, the canvas free', 'content.supertitle': 'Content',
-  'statement.title': 'Every deck is a spreadsheet that gave up.', 'statement.caption': 'the thesis',
-  'fact.label': 'of renewals close before the deadline', 'fact.body': 'Retention is worth 3.4× a new logo at current CAC.',
-  'stat.title': 'Renewals decide the year', 'stat.caption': 'renewed before the deadline, FY26',
-  'cta.title': 'Ready when you are.', 'cta.body': 'Reply to this thread and we start on a Monday.',
-  'end.title': 'Thank you', 'end.body': 'hello@grunion.ai · grunion.ai', 'end.caption': 'decklet is MIT — github.com/grunion-ai/decklet',
-  'agenda.title': 'Four things, twenty minutes.', 'kpi-grid.title': 'Three numbers that moved', 'kpi-grid-4.title': 'Four numbers that moved',
-  'chart.title': 'Revenue stepped up every quarter', 'comparison.title': 'Build or buy', 'two-cols.title': 'Two columns, one title', 'two-cols-header.title': 'A lede over two columns',
-  'process-steps.title': 'Four steps from packet to terms', 'diagram.title': 'One figure, one claim', 'diagram.caption': 'The parser feeds the grader; the grader feeds the terms.',
-  'timeline.title': 'The year in four dates', 'image-left.title': 'The product, in one screen', 'image-right.title': 'What the reviewer sees',
+  caption: 'Source · one line', label: 'the label', stat: '63%', number: '02',
+  subtitle: 'One line under the title that says what the slide shows.', note: 'A note for the reader who has no speaker in the room.', source: 'Source · where the numbers came from', legend: '● this year  ● last year',
+  // openers
+  'cover.supertitle': 'Spring programme', 'cover.title': 'A season at the community garden', 'cover.body': 'Forty plots, a new tool shed, and the first Saturday market in June.', 'cover.caption': 'Volunteer briefing · April',
+  'title.supertitle': 'Part three', 'title.title': 'The kitchen, rebuilt',
+  'section.number': '04', 'section.title': 'Getting around', 'section.body': 'Trains, bikes and the three streets worth walking.',
+  'content.supertitle': 'Field notes', 'content.title': 'A title over an empty canvas', 'content.subtitle': 'The rows of the slide go here; this chrome is all the layout gives.', 'content.note': 'Bind only the chrome you need.', 'content.source': 'Source · your own', 'content.legend': '',
+  'agenda.supertitle': 'Today', 'agenda.title': 'Five things in thirty minutes', 'agenda.subtitle': 'Questions at the end, or in the thread afterwards.', 'agenda.note': 'Times are a guide; the third item usually runs long.', 'agenda.source': 'Agenda · team meeting, week 12', 'agenda.legend': '',
+  // text
+  'statement.title': 'Every long meeting is a short memo nobody wrote.', 'statement.caption': 'the thesis',
+  'quote.quote': 'We planted in March, harvested in July, and ate the first tomatoes on the steps of the shed.', 'quote.attribution': 'Plot 17 · second season',
+  'two-cols.supertitle': 'Housing', 'two-cols.title': 'Renting against buying in a small city', 'two-cols.subtitle': 'Ten years, one household, the same street.', 'two-cols.left': 'Renting keeps the deposit liquid and moves are cheap. The rent rises with the market and the landlord decides on the kitchen.', 'two-cols.right': 'Buying fixes the monthly cost and every repair is yours. The deposit is gone for a decade and a move costs a year of savings.', 'two-cols.note': 'Both columns assume the same commute and the same school.', 'two-cols.source': 'Source · city rent index, 2016–2026', 'two-cols.legend': '',
+  'two-cols-header.supertitle': 'Sleep', 'two-cols-header.title': 'What changed when the lights went down at ten', 'two-cols-header.subtitle': 'A four-week household experiment.', 'two-cols-header.header': 'Bedtime moved an hour earlier; nothing else did.', 'two-cols-header.left': 'Mornings got easier within a week. Breakfast happened, the bus was caught, and the first hour at work stopped being lost.', 'two-cols-header.right': 'Evenings got shorter. Television dropped to one episode, reading came back, and the dishwasher ran before dinner instead of after.', 'two-cols-header.note': 'Weekends kept the old schedule and the difference showed by Monday.', 'two-cols-header.source': 'Source · a paper diary, 28 nights', 'two-cols-header.legend': '',
+  'comparison.supertitle': 'Commute', 'comparison.title': 'Bike or bus for six kilometres', 'comparison.subtitle': 'Door to desk, measured over a month.', 'comparison.left-head': 'Bike', 'comparison.right-head': 'Bus', 'comparison.left': 'Twenty-two minutes, the same every day. Rain three mornings a month. Arrive awake.', 'comparison.right': 'Eighteen to forty minutes, most of it waiting. Dry. Arrive having read twelve pages.', 'comparison.note': 'The bike wins on time; the bus wins on the book.', 'comparison.source': 'Source · phone timer, 20 working days', 'comparison.legend': '',
+  // numbers
+  'fact.stat': '11 min', 'fact.label': 'saved on the school run by leaving at 7:50 instead of 8:00', 'fact.body': 'The lights on the ring road change at eight. Ten minutes earlier and the whole run is green.',
+  'stat.supertitle': 'Library', 'stat.title': 'Most borrowed books are picked up on a Saturday', 'stat.subtitle': 'Weekend loans against the whole week.', 'stat.stat': '58%', 'stat.caption': 'of loans, Saturdays, last twelve months', 'stat.note': 'Opening on Sunday would spread the queue, not grow it.', 'stat.source': 'Source · loan desk counts, twelve months', 'stat.legend': '',
+  'kpi-grid.supertitle': 'Bakery', 'kpi-grid.title': 'The first month with the second oven', 'kpi-grid.subtitle': 'Three numbers, against the month before.', 'kpi-grid.body': 'More loaves before nine, fewer sold out by noon, and the Saturday queue is gone.', 'kpi-grid.note': 'Flour cost rose in the same month and is not in these numbers.', 'kpi-grid.source': 'Source · till and oven log, March', 'kpi-grid.legend': '● March  ● February',
+  'kpi-grid-4.supertitle': 'Swimming pool', 'kpi-grid-4.title': 'Summer opening, in four numbers', 'kpi-grid-4.subtitle': 'June to August, against last summer.', 'kpi-grid-4.body': 'Attendance rose with the early lane sessions; lessons filled a week after booking opened.', 'kpi-grid-4.note': 'The heatwave week is in the attendance figure.', 'kpi-grid-4.source': 'Source · turnstile counts, June–August', 'kpi-grid-4.legend': '● this summer  ● last summer',
+  'chart.supertitle': 'Clinic', 'chart.title': 'Walk-in visits climb through the week', 'chart.subtitle': 'Front-desk count, Monday to Thursday.', 'chart.takeaway': 'Thursday carries half again what Monday does; the second nurse belongs on Thursday, not Monday.', 'chart.source': 'Source · front-desk log, one week', 'chart.legend': '● walk-ins',
+  // diagrams
+  'process-steps.supertitle': 'Recipe', 'process-steps.title': 'Sourdough in four steps and two days', 'process-steps.subtitle': 'Mix on Friday night, bake on Sunday morning.', 'process-steps.body': 'Every step is a wait; the work itself is twenty minutes across the weekend.', 'process-steps.note': 'A colder kitchen adds a few hours to the second step.', 'process-steps.source': 'Source · a well-thumbed notebook', 'process-steps.legend': '',
+  'diagram.supertitle': 'Rainwater', 'diagram.title': 'From the roof to the beds', 'diagram.subtitle': 'Three parts, two hoses, no pump.', 'diagram.caption': 'The roof fills the butt; the butt feeds the beds by gravity, so the butt sits higher than the beds.', 'diagram.note': '', 'diagram.source': 'Source · the garden plan', 'diagram.legend': '',
+  'timeline.supertitle': 'Renovation', 'timeline.title': 'One kitchen, four dates', 'timeline.subtitle': 'Order placed to first dinner.', 'timeline.note': 'The gap between the second and third dates is the plasterer.', 'timeline.source': 'Source · the builder\'s schedule', 'timeline.legend': '',
+  // images
+  'image-left.supertitle': 'Museum', 'image-left.title': 'The east gallery, reopened', 'image-left.subtitle': 'Daylight through the new roof.', 'image-left.body': 'Twelve rooms, one route, benches in every third room. The café moved to the courtyard.', 'image-left.note': 'Photographed on the opening morning.', 'image-left.source': 'Source · the museum', 'image-left.legend': '',
+  'image-right.supertitle': 'Trail', 'image-right.title': 'The ridge path in October', 'image-right.subtitle': 'Eleven kilometres, one climb, one pub.', 'image-right.body': 'Start at the station, finish at the other station. The climb is in the first hour; the rest is along the top.', 'image-right.note': 'Boots, not trainers, after rain.', 'image-right.source': 'Source · a walking club', 'image-right.legend': '',
+  // closers
+  'cta.title': 'Come on Saturday.', 'cta.body': 'Ten till two, bring gloves. Tea is provided, cake is negotiable.', 'cta.button-label': 'Sign up for a plot',
+  'end.title': 'Thank you', 'end.body': 'hello@example.org · the shed, plot 1', 'end.caption': 'Slides made with decklet · MIT',
 };
-const ITEMS = ['Where we are', 'What broke', 'The fix', 'What we need', 'Questions'];
-const STEPS = ['Drop the packet', 'Parse every statement', 'Grade the terms', 'Send the offer'];
-const EVENTS = ['Pilot signed', 'First packet', 'Ten funders live', 'Renewal'];
-const DATES = ['Jan', 'Apr', 'Jul', 'Oct'];
-const KPIS = [['63%', 'renewed'], ['41', 'days early'], ['$1.2M', 'retained ARR'], ['2.4%', 'churn']];
+const ITEMS = ['Where we are', 'What changed', 'What it cost', 'What is next', 'Questions'];
+const STEPS = ['Mix the starter', 'Fold and rest', 'Shape and prove', 'Bake hot'];
+const EVENTS = ['Order placed', 'Old kitchen out', 'Plaster dry', 'First dinner'];
+const DATES = ['Mar', 'May', 'Jun', 'Jul'];
+const KPIS = [['640', 'loaves a week'], ['3', 'sell-outs'], ['12 min', 'longest queue'], ['9', 'lane sessions']];
 const fill = (name) => {
   const lay = LIBRARY[name];
-  const els = Object.entries(lay.slots).map(([slot, sl]) => {
+  const els = Object.entries(lay.slots).filter(([slot]) => TEXT[`${name}.${slot}`] !== '').map(([slot, sl]) => {
     if (slot === 'image') return { slot, img: IMG, fit: 'cover' };
     if (slot === 'chart') return { slot, chart: CHART };
     if (!sl.role) return { slot };                                        // paint: the slot carries it
@@ -78,14 +93,14 @@ const fill = (name) => {
     if ((m = /^step(\d)$/.exec(slot))) return { slot, text: STEPS[m[1] - 1] };
     if ((m = /^t(\d)$/.exec(slot))) return { slot, text: DATES[m[1] - 1] };
     if ((m = /^e(\d)$/.exec(slot))) return { slot, text: EVENTS[m[1] - 1] };
-    if ((m = /^kpi(\d)-delta$/.exec(slot))) return { slot, text: '↑ ' + (m[1] * 3) + ' pts' };
+    if ((m = /^kpi(\d)-delta$/.exec(slot))) return { slot, text: ['↑ 12%', '↓ 2', '↑ 4 min', 'new'][m[1] - 1] };
     if ((m = /^kpi(\d)-label$/.exec(slot))) return { slot, text: KPIS[m[1] - 1][1] };
     if ((m = /^kpi(\d)$/.exec(slot))) return { slot, text: KPIS[m[1] - 1][0] };
     return { slot, text: TEXT[`${name}.${slot}`] ?? TEXT[slot] ?? slot };
   });
   if (name === 'diagram') {   // a figure inside the frame: three boxes, two connectors
     const box = (x, t) => ({ x, y: 250, w: 200, h: 72, box: 1, role: 'H2', text: t });
-    els.push(box(80, 'Packet'), { x: 280, y: 286, line: [340, 286], h: 2.5, bg: 'var(--fg)', arrow: 'end', head: 'triangle' }, box(340, 'Parser'), { x: 540, y: 286, line: [600, 286], h: 2.5, bg: 'var(--fg)', arrow: 'end', head: 'triangle' }, box(600, 'Terms'));
+    els.push(box(80, 'Roof'), { x: 280, y: 286, line: [340, 286], h: 2.5, bg: 'var(--fg)', arrow: 'end', head: 'triangle' }, box(340, 'Water butt'), { x: 540, y: 286, line: [600, 286], h: 2.5, bg: 'var(--fg)', arrow: 'end', head: 'triangle' }, box(600, 'Beds'));
   }
   if (name === 'cta') for (const e of els) if (e.slot === 'button' || e.slot === 'button-label') e.href = 'https://example.com';
   return els;
