@@ -21,7 +21,7 @@ body.present .el a.lk{pointer-events:auto}
 #spell.off{opacity:.35} /* spellcheck off: the toggle dims like a disabled control; nothing else changes on screen */
 /* rows carry their own typography: the element adds NOTHING implicit (no padding, radius or pre-wrap) — chrome lives on .box/.tile only */
 .el{position:absolute;cursor:grab;padding:0;border-radius:0;white-space:normal;line-height:normal}
-.el.box{border:1.5px solid var(--accent);background:var(--box);text-align:center;padding:6px 8px;border-radius:8px;white-space:pre-wrap}
+.el.box{border:1.5px solid var(--accent);background:var(--box);text-align:center;padding:6px 8px;border-radius:8px;white-space:pre-wrap;display:flex;flex-direction:column;justify-content:center} /* a box with a height centres its text on the box, like a tile */
 .el.tile{background:var(--card);border:1px solid var(--line);border-radius:12px;text-align:center;display:flex;flex-direction:column;justify-content:center}
 .el svg{display:block;width:100%;height:100%}
 /* motion: four entrance anims, staggered 120 ms on slide ENTRY. rise = text, fade = quiet chrome, pop = stats/tiles, wipe = bars, lines, rules */
@@ -448,7 +448,7 @@ function drawEls(s,root,animate){
       (pad?`padding:${pad};`:'')+(r.h?`height:${r.h}px;`:'')+(r.bg?`background:${r.bg};`:'')+
       (r.bd?`border:${r.bd};`:'')+(r.bt?`border-top:${r.bt};`:'')+(r.br?`border-right:${r.br};`:'')+(r.bb?`border-bottom:${r.bb};`:'')+(r.bl?`border-left:${r.bl};`:'')+
       (r.shadow?`box-shadow:${r.shadow};`:'')+(r.bar?'border-radius:6px 6px 0 0;':'')+
-      (r.align?`text-align:${r.align};`:'')+(r.radius!=null?`border-radius:${typeof r.radius==='number'?r.radius+'px':r.radius};`:'')+(r.img||r.svg?'overflow:hidden;':'')+(r.css?r.css+';':'');
+      (r.align?`text-align:${r.align};`:'')+(r.valign?`display:flex;flex-direction:column;justify-content:${r.valign==='bottom'?'flex-end':'center'};`:'')+(r.radius!=null?`border-radius:${typeof r.radius==='number'?r.radius+'px':r.radius};`:'')+(r.img||r.svg?'overflow:hidden;':'')+(r.css?r.css+';':'');
     // footer master: the counter is appended INSIDE this row, so anchor it to its nearer edge and let it grow away from it
     // footer master: the counter is appended INSIDE this row; the row is anchored to the content edge (styles.margin) and grows inward
     if(r.footer){d.dataset.footer='1';d.style.whiteSpace='nowrap';d.style.width='auto';if((r.x||0)+(typeof r.w==='number'?r.w:0)/2>W/2){d.style.left='auto';d.style.right=MG()+'px'}else d.style.left=MG()+'px'}

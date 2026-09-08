@@ -42,6 +42,6 @@ export default [
 { id: 'closing-cta', name: 'Closing — live CTA', tier: 'core', cat: 'Narrative', note: 'Headline, painted button carrying a real href, contact line.', layout: null,
   els: [ t(M, 180, 640, 'Title', 'Ready when you are.'),
     rect(M, 320, 220, 52, { bg: 'var(--accent)', radius: 8, href: 'https://example.com' }),
-    t(M, 336, 220, 'H2', 'Book the pilot', { align: 'center', color: 'var(--card)', href: 'https://example.com', nowrap: 1 }),
+    t(M, 320, 220, 'H2', 'Book the pilot', { h: 52, valign: 'middle', align: 'center', color: 'var(--card)', href: 'https://example.com', nowrap: 1 }),
     cap(M + 250, 336, 380, 'or reply to this thread — we start on a Monday.') ] },
 ];
