@@ -132,6 +132,7 @@ Top level:
 | `page` | `letter`\|`a4` | from format | set by create |
 | `title` | string | `decklet` | `"Q3 update"` — tab title + `⤓`/`⌘S` filename; `--title` overwrites it |
 | `spell` | `{ignore: ["decklet", …]}` | none | words the build's dictionary must not flag (a product, a name); case-blind. The build (nspell + dictionary-en, optional) writes every refused word into the file and the editor underlines them on every slide — see HUD · spellcheck |
+| `counter` | `0` | on | `0` draws no page counter anywhere — canvas, print, PDF. For a letter or a one-page document, where `1 / 1` is noise |
 | `lang` | BCP 47 tag | `en` | `"de"` — the dictionary the browser's spellcheck uses on the canvas; optional |
 | `id` | string | content hash, by create | the deck's identity: the browser's storage namespace, kept across versions by `--from` |
 | `rev` | string | content hash, by create | this build; the browser trusts a stored working copy only when its `rev` matches the file's |
