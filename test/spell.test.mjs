@@ -61,3 +61,37 @@ live('spell: the editor underlines every flagged word on the live canvas, the to
   assert.deepEqual(errs, []);
   } finally { await b.close(); }
 });
+
+test('spell: the toggle wears a count badge, every contact-sheet cell carries one, and the HUD manifest names it', () => {
+  assert.match(tpl, /<button id="spell"[\s\S]*?<span id="spellbad" role="status" hidden><\/span><\/button>/, 'the badge lives inside the spellcheck button, as the autosave dot lives inside its button');
+  assert.match(tpl, /\.cell \.spellbad\{[^}]*right:8px/, 'the cell badge sits top-right, clear of the slide number at the left');
+  assert.match(tpl, /\.cell \.n\{[^}]*left:8px/, 'the slide number stays at the left');
+  assert.match(fs.readFileSync(path.join(root, 'SKILL.md'), 'utf8'), /<!-- HUD: [^>]* spell spellbad /, 'the manifest names the badge after its button');
+});
+
+live('spell: the badge counts this slide, follows typing and the toggle, and every sheet cell wears its own count', async () => {
+  const f = path.join(tmp, 'badge.html'); fs.writeFileSync(f, create(model(), {spell: correct}).html);
+  const b = await pw.chromium.launch(); try {
+  const p = await b.newPage({viewport: {width: 1280, height: 800}}); const errs = []; p.on('pageerror', e => errs.push(String(e)));
+  await p.goto(pathToFileURL(f).href); await p.evaluate(() => localStorage.clear()); await p.reload(); await p.waitForTimeout(150);
+  const badge = () => p.evaluate(() => { const b = $('spellbad'); return b.hidden ? null : +b.textContent; });
+  assert.equal(await badge(), 3, 'slide 1: three flagged words');
+  assert.equal(await p.getAttribute('#spell', 'data-tip'), 'Spellcheck · on · 3 flagged on this slide');
+  assert.equal(await p.getAttribute('#spellbad', 'aria-label'), '3 flagged words on this slide');
+  await p.evaluate(() => nav(1)); await p.waitForTimeout(50); assert.equal(await badge(), 1, 'slide 2: the master row alone');
+  await p.evaluate(() => nav(-1)); await p.evaluate(() => { sel.clear(); sel.add(0); render(); edit(0); }); await p.keyboard.press('End'); await p.keyboard.type(' renewls'); await p.waitForTimeout(250);
+  assert.equal(await badge(), 4, 'a flagged word typed into a row counts at once'); await p.evaluate(() => commitEdit());
+  await p.click('#spell'); assert.equal(await badge(), null, 'off hides the badge'); assert.equal(await p.getAttribute('#spell', 'data-tip'), 'Spellcheck · off');
+  await p.click('#spell'); assert.equal(await badge(), 4);
+  await p.evaluate(() => setPresent(true)); await p.waitForTimeout(50); assert.equal(await badge(), null, 'presenting shows no badge'); await p.evaluate(() => setPresent(false));
+  await p.keyboard.press('c'); await p.waitForTimeout(100);
+  const cells = () => p.evaluate(() => [...document.querySelectorAll('#grid .cell')].map(c => { const s = c.querySelector('.spellbad'); return s.hidden ? null : +s.textContent; }));
+  assert.deepEqual(await cells(), [4, 1], 'each thumbnail carries its own count');
+  assert.equal(await p.getAttribute('#grid .cell .spellbad', 'aria-label'), '4 flagged words on slide 1');
+  const [num, bad] = await p.evaluate(() => { const c = document.querySelector('#grid .cell'); return [c.querySelector('.n').getBoundingClientRect(), c.querySelector('.spellbad').getBoundingClientRect()].map(r => [r.left, r.right]); });
+  assert.ok(num[1] < bad[0], 'the slide number and the badge never overlap');
+  await p.evaluate(() => setSpell(false)); assert.deepEqual(await cells(), [null, null], 'off clears the cells too');
+  await p.evaluate(() => setSpell(true)); assert.deepEqual(await cells(), [4, 1]);
+  assert.deepEqual(errs, []);
+  } finally { await b.close(); }
+});

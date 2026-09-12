@@ -19,6 +19,10 @@ body.present .el a.lk{pointer-events:auto}
 /* ⌘S is the only durable path when the browser blocks storage for local files — give it a button in exactly that state */
 #savecopy{display:none}body.nostore #savecopy{display:inline-flex}
 #spell.off{opacity:.35}
+/* spell badge: how many flagged words this slide carries (on the toggle) and each thumbnail carries (on the sheet); one per token */
+#spellbad,.spellbad{position:absolute;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#f85149;color:#fff;font:bold 10px/16px ui-monospace,Menlo,monospace;text-align:center;box-shadow:0 0 0 2px var(--bg);pointer-events:none}
+#spellbad{top:-6px;right:-6px}#spellbad[hidden],.spellbad[hidden]{display:none}
+.cell .spellbad{top:6px;right:8px;z-index:1;height:18px;line-height:18px;border-radius:9px;font-size:11px;box-shadow:none}
 ::highlight(spell){text-decoration:underline wavy #f85149;text-decoration-skip-ink:none} /* option C: the build's flagged words, on every row, every browser */ /* spellcheck off: the toggle dims like a disabled control; nothing else changes on screen */
 #snap[aria-pressed=false]{opacity:.35} /* guides + snap: off (the default) dims the same way */
 /* layout guides = selection chrome: one hairline per distinct slot edge of THIS slide's layout (and the canvas mid-lines), painted by
@@ -197,7 +201,7 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
   </div>
   <button id="dup" class="mi mi-copy" data-ms="900" data-tip="Duplicate selection or slide" aria-label="Duplicate selection or slide"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" class="copy-rect" data-mi="animate"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" class="copy-path" data-mi="animate"/><path d="M12 15h6"/><path d="M15 12v6"/></svg></button>
   <button id="snap" class="mi mi-grip" data-ms="600" data-tip="Guides + snap · off · G" aria-label="Guides + snap · off · G" aria-pressed="false"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g class="dots" data-mi="animate"><circle cx="5" cy="5" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="19" cy="5" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="19" r="1"/><circle cx="12" cy="19" r="1"/><circle cx="19" cy="19" r="1"/></g></svg></button>
-  <button id="spell" class="mi mi-spell-check" data-ms="500" data-tip="Spellcheck · on" aria-label="Spellcheck · on" aria-pressed="true"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 16 6-12 6 12"/><path d="M8 12h8"/><path d="m16 20 2 2 4-4" class="tick" data-mi="animate"/></svg></button>
+  <button id="spell" class="mi mi-spell-check" data-ms="500" data-tip="Spellcheck · on" aria-label="Spellcheck · on" aria-pressed="true"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 16 6-12 6 12"/><path d="M8 12h8"/><path d="m16 20 2 2 4-4" class="tick" data-mi="animate"/></svg><span id="spellbad" role="status" hidden></span></button>
   <div class="sep"></div>
   <button id="savecopy" class="mi mi-copy" data-ms="900" data-tip="Save a copy · ⌘S — this browser blocks storage, so edits only survive in a copy" aria-label="Save a copy · ⌘S — this browser blocks storage, so edits only survive in a copy"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" class="copy-rect" data-mi="animate"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" class="copy-path" data-mi="animate"/></svg></button>
   <button id="pdf" class="mi mi-file-down" data-ms="900" data-tip="Download PDF" aria-label="Download PDF"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><g data-mi="animate"><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></g></svg></button>
@@ -226,7 +230,7 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
       </div>
       <div class="col"><div class="ph">File</div>
         <div><kbd>⌘S</kbd> save the file now (asks for it once, then every edit writes itself · Safari: downloads a copy)</div>
-        <div class="dim">Buttons only: add · duplicate · spellcheck · PDF. Spellcheck underlines the words the build's dictionary refused, on every slide; the browser's own checker adds the row you type in. Never present, print or PDF.</div>
+        <div class="dim">Buttons only: add · duplicate · spellcheck · PDF. Spellcheck underlines the words the build's dictionary refused, on every slide, and its badge counts them on this slide; every contact-sheet thumbnail wears its own count. The browser's own checker adds the row you type in. Never present, print or PDF.</div>
       </div>
     </div>
   </div>
@@ -949,8 +953,8 @@ function sheetRender(){
   const cells=deck.slides.map((s,n)=>{
     let c=cellOf.get(s);
     if(c)c.querySelector('.num')?.remove();
-    else{c=document.createElement('div');c.className='cell';const cv=document.createElement('div');cv.className='cv';drawEls(s,cv,false);const lb=document.createElement('span');lb.className='n';c.append(cv,lb);cellOf.set(s,c)}
-    c.classList.toggle('sel',gsel.has(n));c.classList.remove('lift','drop');c.style.transform='';c.dataset.n=n;num(c.firstChild,n+1);c.lastChild.textContent=n+1;
+    else{c=document.createElement('div');c.className='cell';const cv=document.createElement('div');cv.className='cv';drawEls(s,cv,false);const lb=document.createElement('span');lb.className='n';const sb=document.createElement('span');sb.className='spellbad';sb.setAttribute('role','status');c.append(cv,sb,lb);c._spell=spellHits(cv).length;cellOf.set(s,c)}
+    c.classList.toggle('sel',gsel.has(n));c.classList.remove('lift','drop');c.style.transform='';c.dataset.n=n;num(c.firstChild,n+1);c.lastChild.textContent=n+1;spellBadge(c.querySelector('.spellbad'),c._spell,' on slide '+(n+1));
     return c;
   });
   grid.replaceChildren(...cells);
@@ -1150,12 +1154,18 @@ $('pdf').onclick=()=>CHROMIUM?printPdf():exportPdf().catch(()=>print());
 // option C paint: every text node of every live row, each flagged word a Range in one Highlight. Off, presenting, or no
 // Highlight API (old engines) → nothing painted; the browser's own checker (the spellcheck attribute) is the second layer.
 const SPELLSET=new Set(SPELL0);
-function paintSpell(){if(!window.CSS||!CSS.highlights)return;if(!SPELL||present()||!SPELLSET.size){CSS.highlights.delete('spell');return}
-  const h=new Highlight();const it=document.createNodeIterator(canvas,NodeFilter.SHOW_TEXT);let n;
+// spellHits(root) → every flagged token under root as [textNode, index, length]; the canvas paints them, the sheet counts them
+const spellHits=root=>{const out=[];if(!SPELLSET.size)return out;const it=document.createNodeIterator(root,NodeFilter.SHOW_TEXT);let n;
   while(n=it.nextNode()){if(n.parentElement.closest('.h,.num,svg'))continue;const s=n.data;let m;const re=/[A-Za-z][A-Za-z']*[A-Za-z]|[A-Za-z]/g;
-    while(m=re.exec(s)){if(SPELLSET.has(m[0].toLowerCase())){const r=new Range();r.setStart(n,m.index);r.setEnd(n,m.index+m[0].length);h.add(r)}}}
-  CSS.highlights.set('spell',h)}
-const setSpell=on=>{SPELL=on;store.set(SKEY,on?'1':'0');const b=$('spell');b.classList.toggle('off',!on);b.setAttribute('aria-pressed',on);b.dataset.tip='Spellcheck · '+(on?'on':'off');b.setAttribute('aria-label',b.dataset.tip);render()};
+    while(m=re.exec(s)){if(SPELLSET.has(m[0].toLowerCase()))out.push([n,m.index,m[0].length])}}
+  return out};
+// the badge: a red count, one per token (a word twice counts twice); hidden at zero, off, or while presenting
+const spellBadge=(b,k,where)=>{b.hidden=!(SPELL&&!present()&&k>0);b.textContent=k;b.setAttribute('aria-label',k+' flagged word'+(k===1?'':'s')+where)};
+function paintSpell(){const hits=SPELL&&!present()?spellHits(canvas):[];spellBadge($('spellbad'),hits.length,' on this slide');
+  const b=$('spell');b.dataset.tip='Spellcheck · '+(SPELL?'on':'off')+(hits.length?' · '+hits.length+' flagged on this slide':'');b.setAttribute('aria-label',b.dataset.tip);
+  if(!window.CSS||!CSS.highlights)return;if(!hits.length){CSS.highlights.delete('spell');return}
+  const h=new Highlight();for(const [n,a,l] of hits){const r=new Range();r.setStart(n,a);r.setEnd(n,a+l);h.add(r)}CSS.highlights.set('spell',h)}
+const setSpell=on=>{SPELL=on;store.set(SKEY,on?'1':'0');const b=$('spell');b.classList.toggle('off',!on);b.setAttribute('aria-pressed',on);render()};
 $('spell').onclick=()=>{commitEdit();setSpell(!SPELL)};if(!SPELL)setSpell(false);
 const setSnap=on=>{SNAP=on;store.set(GKEY,on?'1':'0');const b=$('snap');b.setAttribute('aria-pressed',on);b.dataset.tip='Guides + snap · '+(on?'on':'off')+' · G';b.setAttribute('aria-label',b.dataset.tip);render()};
 $('snap').onclick=()=>{commitEdit();setSnap(!SNAP)};if(SNAP)setSnap(true);
