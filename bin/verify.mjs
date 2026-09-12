@@ -42,7 +42,9 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
     const repFile = report || path.join(path.dirname(path.resolve(file)), 'model.report.json');
     const rep = fs.existsSync(repFile) ? JSON.parse(fs.readFileSync(repFile, 'utf8')) : null; // importer's drift report: where the mockup drew its chrome
     if (fonts) { await p.addStyleTag({url: fonts}); await p.evaluate(() => document.fonts.ready); await p.waitForTimeout(1200); } // TEST-TIME only: pin the AE shot to the reference's webfont build
-    await p.addStyleTag({content: '#canvas .num{visibility:hidden}'}); // the counter is engine chrome the mockups never had; parity still measures it
+    // the counter STAYS VISIBLE: the per-slide PNG is what a builder looks at, and hiding it deck-wide meant parity measured a box
+    // no artifact contained (ROADMAP U6). It is still engine chrome the mockups never had, so the AE diff masks its box on both
+    // images instead — see `geo.chrome` below.
     const hasMagick = !!refs && (() => { try { execFileSync('magick', ['-version'], {stdio: 'pipe'}); return true; } catch { return false; } })();
     if (refs && !hasMagick) res.skipped.push('AE: ImageMagick `magick` not on PATH');
     for (let n = 0; n < N; n++) {
@@ -151,9 +153,11 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
       // scale, not a layout fault — reported as scale crowding for a human decision, never a failure. Everything else stays hard.
       // …only when it renders FEWER lines (collapsed runs); more lines or overflow means the importer's fit cap failed — hard
       const soft = o => o.snapped && o.problems.every(x => { const m = /^source had (\d+) line\(s\), renders (\d+)/.exec(x); return m && +m[2] < +m[1]; });
-      // the counter's box — right edge, top, height (its width follows the digits) — in canvas px, for the corner check below
-      const counter = await p.evaluate(() => { const c = document.querySelector('#canvas .num'); if (!c) return null; const r = c.getBoundingClientRect(), cv = canvas.getBoundingClientRect();
-        return {right: +(r.right - cv.left).toFixed(1), top: +(r.top - cv.top).toFixed(1), h: +r.height.toFixed(1)}; });
+      // the counter's box — right edge, top, height (its width follows the digits) — in canvas px, for the corner check below.
+      // `box` is the same rect as [x, y, w, h], for the AE mask.
+      const cm = await p.evaluate(() => { const c = document.querySelector('#canvas .num'); if (!c) return null; const r = c.getBoundingClientRect(), cv = canvas.getBoundingClientRect();
+        return {right: +(r.right - cv.left).toFixed(1), top: +(r.top - cv.top).toFixed(1), h: +r.height.toFixed(1), box: [r.left - cv.left, r.top - cv.top, r.width, r.height]}; });
+      const counter = cm && {right: cm.right, top: cm.top, h: cm.h};
       res.parity.push({slide: n + 1, name, pass: !bad.some(o => !soft(o)), rows: bad.filter(o => !soft(o)), crowding: bad.filter(soft), occlusion: occl.map(u => u.msg), counter});
       const act = path.join(out, `${String(n + 1).padStart(2, '0')}-${name}.png`);
       await p.locator('#canvas').screenshot({path: act});
@@ -176,6 +180,7 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
           return {chrome, conflicts};
         });
         for (const x of (rep?.normalised || [])) if (x.slide === name && x.what === 'rect') geo.chrome.push([x.from[0], x.from[1], x.from[2] === 'auto' ? 400 : x.from[2], x.from[3] || 24]);
+        if (cm) geo.chrome.push(cm.box);   // the page counter is engine chrome no mockup drew: mask it on BOTH images, not hide it on the artifact
         const masked = geo.chrome.length || geo.conflicts.length, stem = path.join(out, `${String(n + 1).padStart(2, '0')}-${name}`);
         let noChrome = raw, noBoth = raw;
         if (masked) {
@@ -190,6 +195,11 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
     // the counter owns the corner: the same box on every slide that shows the footer. A slide that hides the footer (`hide`) draws
     // the pin and is exempt; `counter:0` draws none. A moved counter — a footer override with its own y, a slide-local nudge — fails parity.
     const fid = ((deck.master || []).find(m => m && m.footer) || {}).id;
+    // …and the corner it owns is the MARGIN corner. Slide-to-slide agreement alone passed a deck whose counter sat mid-canvas on
+    // every slide (the stretched right-anchored footer above), so the right edge is checked against `w − styles.margin` too.
+    const MGN = typeof (deck.styles || {}).margin === 'number' ? deck.styles.margin : Math.round(W * 0.06);
+    for (const q of res.parity) if (q.counter && Math.abs(q.counter.right - (W - MGN)) > 1) {
+      q.rows.push({n: 'counter', text: `${q.slide} / ${N}`, problems: [`counter right edge ${q.counter.right} is not on the margin (${W - MGN} = w − styles.margin) — the corner is the counter's on every slide`]}); q.pass = false; }
     const shown = res.parity.filter((q, k) => q.counter && !(deck.slides[k].hide || []).includes(fid)), ref = shown[0];
     for (const q of shown.slice(1)) if (['right', 'top', 'h'].some(k => q.counter[k] !== ref.counter[k])) {
       q.rows.push({n: 'counter', text: `${q.slide} / ${N}`, problems: [`counter box (right ${q.counter.right}, top ${q.counter.top}, h ${q.counter.h}) differs from slide ${ref.slide} (right ${ref.counter.right}, top ${ref.counter.top}, h ${ref.counter.h}) — the corner is the counter's on every slide`]}); q.pass = false; }

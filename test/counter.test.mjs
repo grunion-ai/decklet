@@ -87,3 +87,63 @@ test('validate: the gap gate knows the corner — a row in the counter\'s box co
   const clear = at(474); assert.deepEqual(clear.errors, []); assert.deepEqual(clear.warnings.filter(w => /counter/.test(w)), []);
   const inline = validate(create(corner({x: 660, w: 240, align: 'right'})).deck); assert.deepEqual(inline.warnings.filter(w => /counter/.test(w)), [], 'a right-anchored footer carries the counter inline: no second box');
 });
+
+// ── U6: the anchoring SKILL.md recommends — `right:` with no `x` — is right-anchored everywhere (ROADMAP U6)
+// The reading-density subject wrote {right: 60, w: 'auto'} and got a counter warning per slide, a footer rendered bottom-LEFT,
+// and no counter in any screenshot. Both `footRight` tests read `x` and `w` only, so a row with no `x` read as left-anchored.
+const RIGHTFOOT = {id: 'foot', footer: 1, right: 60, y: 506, w: 'auto', role: 'Label', text: 'deck name', nowrap: 1};
+const rightAnchored = (extra = {}) => ({w: 960, h: 540, title: 'u6', styles: {margin: 60}, master: [{...RIGHTFOOT, ...extra}],
+  slides: [{name: 'one', els: [H1('One')]}, {name: 'two', els: [H1('Two')]}]});
+
+live('U6: a footer master anchored with `right:` renders at the RIGHT and carries the counter inline — Chromium and WebKit', async () => {
+  for (const eng of ['chromium', 'webkit']) {
+    const b = await pw[eng].launch();
+    const [one] = await boxes(b, rightAnchored(), `u6-right-${eng}.html`);
+    assert.equal(one.inFoot, true, eng + ': a right-anchored footer carries the counter inline');
+    assert.equal(one.cls, 'num', eng + ': inline, not detached');
+    assert.match(one.footText, /^deck name · 1 \/ 2$/);
+    assert.equal(Math.round(one.foot.right), 900, eng + ': the footer row ends on the margin');
+    assert.ok(one.foot.left > 600, eng + `: the footer hugs the right edge, not the left (left ${one.foot.left})`);
+    assert.equal(Math.round(one.num.right), 900, eng + ': the counter\'s right edge is on the margin');
+    await b.close();
+  }
+});
+test('U6: `right:` on the footer master raises no counter warning — the counter is that row\'s own inline child', () => {
+  for (const text of ['deck name', 'Coilworks · Flux Bar build review']) {
+    const v = validate(create(rightAnchored({text})).deck);
+    assert.deepEqual(v.errors, []);
+    assert.deepEqual(v.warnings.filter(w => /counter/.test(w)), [], `"${text}": a right-anchored footer adds no second counter box`);
+  }
+});
+
+// the shot the builder looks at must contain what the parity check measures: decode the PNG on a canvas (no image dep) and
+// count the pixels in the right foot that differ from the corner's own background.
+const footInk = async (b, png) => { const p = await b.newPage();
+  const n = await p.evaluate(async src => await new Promise(res => { const im = new Image(); im.onload = () => {
+    const cv = document.createElement('canvas'); cv.width = im.width; cv.height = im.height; const g = cv.getContext('2d'); g.drawImage(im, 0, 0);
+    const d = g.getImageData(Math.round(im.width * 840 / 960), Math.round(im.height * 495 / 540), Math.round(im.width * 80 / 960), Math.round(im.height * 30 / 540)).data;
+    let diff = 0; for (let k = 0; k < d.length; k += 4) if (Math.abs(d[k] - d[0]) + Math.abs(d[k + 1] - d[1]) + Math.abs(d[k + 2] - d[2]) > 30) diff++;
+    res(diff); }; im.src = src; }), 'data:image/png;base64,' + fs.readFileSync(png).toString('base64'));
+  await p.close(); return n; };
+
+live('U6: verify\'s screenshots carry the counter — in both anchorings, the artifact shows what parity measures', async () => {
+  const b = await pw.chromium.launch();
+  const leftFoot = (() => { const m = {...RIGHTFOOT, x: 60}; delete m.right; return m; })();
+  for (const [label, m] of [['right-anchored', rightAnchored()], ['left-anchored', {...rightAnchored(), master: [leftFoot]}]]) {
+    const f = path.join(tmp, `u6-shot-${label}.html`); fs.writeFileSync(f, create(m).html);
+    const out = path.join(tmp, `u6-shot-${label}-out`);
+    const r = await verify(f, {out, log: () => {}});
+    assert.deepEqual(r.errors, [], `${label}: ${JSON.stringify(r.parity)}`);
+    assert.equal(r.parity[0].counter.right, 900, `${label}: the counter's right edge is on the margin`);
+    assert.ok(await footInk(b, path.join(out, '01-one.png')) > 0, `${label}: the counter is painted into 01-one.png`);
+  }
+  await b.close();
+});
+live('U6: a counter off the margin fails parity even when every slide agrees', async () => {
+  // both slides put the counter in the same wrong place, so the slide-to-slide check alone would pass it
+  const m = {...rightAnchored(), master: [(() => { const x = {...RIGHTFOOT, x: 60}; delete x.right; return x; })()]};
+  const f = path.join(tmp, 'u6-offmargin.html'); fs.writeFileSync(f, create(m).html.replace("c.style.right=MG()+'px'", "c.style.right='200px'"));
+  const r = await verify(f, {out: path.join(tmp, 'u6-offmargin-out'), log: () => {}});
+  assert.ok(r.errors.some(e => /layout parity failed/.test(e)), r.errors.join(' | '));
+  assert.ok(r.parity.some(q => q.rows.some(x => x.n === 'counter' && /margin/.test(x.problems[0]))), JSON.stringify(r.parity));
+});
