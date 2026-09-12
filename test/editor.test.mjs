@@ -208,3 +208,28 @@ live('⌘B / ⌘I / ⌘U mark the selection while editing, and take the whole ro
   assert.match(await p.evaluate(() => deck.slides[0].els[0].html), /<u>One<\/u>/);
   await b.close();
 });
+
+// L1.1 — the contact sheet keeps its scroll: every sheet action rebuilt the grid from innerHTML='', so #sheet's scroll
+// height collapsed for that frame and the viewport snapped to the top. #sheet (position:fixed; overflow:auto) is the
+// scroller, not the window. Both engines: the clamp-on-collapse is per engine.
+const sheetDeck = () => model({slides: Array.from({length: 40}, (_, n) => ({els: [{x: 60, y: 80, w: 800, role: 'H1', text: 'Slide ' + (n + 1)}]}))});
+const pick = (p, n) => p.evaluate(n => grid.children[n].dispatchEvent(new MouseEvent('mousedown', {bubbles: true})), n);
+for (const bn of ['chromium', 'webkit']) live(`the contact sheet keeps its scroll through a duplicate, and pulls an off-screen new cell into view (${bn})`, async () => {
+  const b = await pw[bn].launch(); try { const p = await fresh(b, write(`sheetscroll-${bn}.html`, create(sheetDeck()).html));
+  await p.keyboard.press('c'); assert.equal(await p.evaluate(() => sheet.hidden), false, 'C opens the sheet');
+  const cellH = await p.evaluate(() => grid.children[3].getBoundingClientRect().top - grid.children[0].getBoundingClientRect().top);
+  await p.evaluate(() => { sheet.scrollTop = 1500; });
+  const before = await p.evaluate(() => sheet.scrollTop);
+  assert.ok(before >= 1000, `the sheet scrolled (${before})`);
+  await pick(p, 20); await p.evaluate(() => $('dup').click()); await p.waitForTimeout(60);
+  assert.equal(await p.evaluate(() => deck.slides.length), 41, 'duplicate added a slide');
+  const after = await p.evaluate(() => sheet.scrollTop);
+  assert.ok(Math.abs(after - before) <= cellH, `scrollTop stays put: ${before} → ${after} (one cell row is ${cellH})`);
+  // the acted-on cell off screen: duplicating slide 1 from row 7 brings the new cell 2 into the viewport, and no further
+  await pick(p, 0); await p.evaluate(() => $('dup').click()); await p.waitForTimeout(60);
+  const r = await p.evaluate(() => { const r = grid.children[1].getBoundingClientRect(); return {top: r.top, bottom: r.bottom, sel: grid.children[1].classList.contains('sel'), top0: sheet.scrollTop}; });
+  assert.ok(r.top >= 0 && r.bottom <= 800, `the new cell is in view (${r.top}..${r.bottom})`);
+  assert.ok(r.sel, 'the new cell is the selection');
+  assert.ok(r.top0 <= cellH, `scrolled just far enough (${r.top0})`);
+  assert.deepEqual(p.errs, []); } finally { await b.close(); }
+});
