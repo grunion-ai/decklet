@@ -11,3 +11,4 @@ templates/candidates.style.json
 package-lock.json
 test/residue.local
 templates/review.html
+*-png/
