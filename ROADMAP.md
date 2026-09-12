@@ -26,9 +26,9 @@ These are Jira's sizes. Read them one rung up if SAFe is your habit.
 
 ### Lanes
 
-Seven lanes, one per product area. A lane groups epics for reading; it sets no owner and caps no work in progress.
+Eight lanes, one per product area. A lane groups epics for reading; it sets no owner and caps no work in progress.
 
-`Platform & release` · `Notes & presenting` · `Media & links` · `Mobile & touch` · `Documents & formats` · `Export` · `Library & editor`
+`Platform & release` · `Notes & presenting` · `Media & links` · `Mobile & touch` · `Documents & formats` · `Export` · `Library & editor` · `Usability`
 
 ### Horizons
 
@@ -67,6 +67,7 @@ Epics rank by **ICE**: Impact x Confidence x Ease, each 1 to 10, multiplied, wit
 | **Documents & formats** | D1 Format presets `S` | D2 Aspect-aware composition `XL` | D3 Real documents `XL` |
 | **Export** | X1 Cheap wins `S` | X2 Searchable PDF `M` | X3 PPTX export `L` |
 | **Library & editor** | L7 Spellcheck, the rest `M`<br>L8 Versions, the rest `M`<br>L11 Type on the sheet `S` | | |
+| **Usability** | U1 `w`/`h` default in validate `XS`<br>U2 The catalogue says what fills `S`<br>U3 A width warning is a failure `XS`<br>U4 Ratings are fill keys `S`<br>U5 The missing starting rungs `M`<br>U6 Counter regression `S`<br>U7 SKILL.md: authoring and editor apart `M` | U8 Two axes on the sheet: look × ladder `L` | |
 
 ### ICE scores
 
@@ -95,6 +96,14 @@ Epics rank by **ICE**: Impact x Confidence x Ease, each 1 to 10, multiplied, wit
 | L7 Spellcheck, the rest | 8 | 7 | 6 | **336** | Now |
 | L8 Versions, the rest | 8 | 7 | 6 | **336** | Now |
 | L11 Type on the sheet | 7 | 8 | 7 | **392** | Now |
+| U1 `w`/`h` default in validate | 8 | 10 | 10 | **800** | Now |
+| U6 Counter regression | 9 | 9 | 9 | **729** | Now |
+| U3 A width warning is a failure | 7 | 10 | 10 | **700** | Now |
+| U2 The catalogue says what fills | 8 | 9 | 8 | **576** | Now |
+| U4 Ratings are fill keys | 8 | 9 | 7 | **504** | Now |
+| U5 The missing starting rungs | 9 | 9 | 6 | **486** | Now |
+| U7 SKILL.md: authoring and editor apart | 8 | 8 | 7 | **448** | Now |
+| U8 Two axes on the sheet | 8 | 7 | 4 | **224** | Next |
 
 Three epics sit off their score.
 
@@ -201,16 +210,16 @@ Each `slideN.xml` relates to a `notesSlideN.xml` whose root is a shape tree stru
 
 The rendered slide already scales correctly. `fit()` (`template.html:314`) is a uniform scale-to-fit, so a slide looks right at any size. The gaps are in the chrome and the input layer.
 
-### M1. Read it on a phone · `S` · Now → supported
+### M1. Read it on a phone · `S` · Now → supported · M1.1 + M1.4 done (#49)
 
-M1 is the cheapest work in this lane: four small PRs, no new subsystem.
+M1 is the cheapest work in this lane: four small PRs, no new subsystem. M1.1 and M1.4 landed together in #49: `fit()` reads the layout viewport, `svh` + `viewport-fit=cover` + safe-area insets on the shell, and `test/touch.test.mjs` is the phone lane every later story proves itself in.
 
 | Story | Size | What |
 | --- | --- | --- |
-| M1.1 | S | `body{height:100vh}` has no `dvh` fallback and the file uses no `env(safe-area-inset-*)`. On iOS Safari the flex column `fit()` measures into is wrong before any interaction happens. Use `svh` for the shell, add `viewport-fit=cover` and safe-area padding. |
+| M1.1 | S | **Done (#49).** `body{height:100vh}` has no `dvh` fallback and the file uses no `env(safe-area-inset-*)`. On iOS Safari the flex column `fit()` measures into is wrong before any interaction happens. Use `svh` for the shell, add `viewport-fit=cover` and safe-area padding. |
 | M1.2 | S | Present mode has no touch navigation at all. The HUD reappears only on `mousemove` hover-peek (`:811`), which never fires from a finger, and no swipe or tap-to-advance handler exists. A phone in fullscreen present mode currently cannot change slides. |
 | M1.3 | S | Hit targets under a `pointer: coarse` query. Resize and connector nibs are 13x13px; HUD buttons are 26px tall. WCAG 2.2 AA floors at 24x24 CSS px and Apple recommends 44. Chrome drawn inside the scaled canvas shrinks below the floor as the canvas scales down, so render it outside the transform, or divide by the live scale. |
-| M1.4 | S | A touch test lane. Every live test today opens 1280x800 and drives `page.mouse.*`; nothing uses `hasTouch` or a phone-width viewport. |
+| M1.4 | S | **Done (#49).** A touch test lane. Every live test today opens 1280x800 and drives `page.mouse.*`; nothing uses `hasTouch` or a phone-width viewport. |
 
 ### M2. Present from the phone · `S` · Next
 
@@ -377,6 +386,85 @@ L10 shows each kit's palette and weights, but a decklet style is deck-wide (role
 | L11.1 | S | A per-slide `styleRef` (or a slot-level role override) the engine honours for `font` and `lh` only, so a Styles slide can wear its kit's family without a second deck. Parity and the gap gate measure with the override's `cw`. |
 | L11.2 | XS | The Styles section binds each kit's family through it; the montage shows Georgia, Helvetica Neue, Palatino, Avenir Next side by side. |
 
+
+## Usability
+
+Filed 2026-09-12 from a four-subject study: two Opus and two Sonnet agents, each handed only the skill and a nine-rung brief (title → bullet page → image + bullets → stats → block-arrow process → branching diagram → three-tier architecture → six-node architecture with zones → scorecard), one density and one style kit each. All four finished 9/9 `VERIFY PASS` in 60 to 80 minutes and 50 to 62 tool calls. The tools are usable. The same edges cut all four, and three rungs cost more than the advanced diagram did. Reports and decks: harness `scratchpad/usability/<subject>/REPORT.md` (copied into the findings artifact).
+
+### U1. `w`/`h` default in validate · `XS` · Now
+
+MODEL CONTRACT says `w`/`h` come "from format"; `create` applies that default, `validate` does not, so every subject's first run died on `deck.w must be a positive number`. Four of four.
+
+| Story | Size | What |
+| --- | --- | --- |
+| U1.1 | XS | `validate` resolves `w`/`h` from `format` the way `create` does; one gate case with a model that names only `format`. |
+
+### U2. The catalogue says what fills · `S` · Now
+
+`--templates` prints text keys only, so 67 templates read as fully fillable when charts, timelines and rating rings are literals in `els`. `--layouts` prints slot names and roles with no geometry, under the sentence "read that instead of inventing geometry"; every subject who placed free rows read `lib/layouts.mjs` to find where the title ends. Four of four.
+
+| Story | Size | What |
+| --- | --- | --- |
+| U2.1 | XS | `--templates` prints, per template, the rows `fill` cannot reach (`fixed: 12 ratings`, `fixed: chart series`). |
+| U2.2 | S | `--layouts` prints each slot's box (`x y w h`) and the free area left under the chrome. |
+
+### U3. A width warning is a failure · `XS` · Now
+
+`validate` warns `nowrap … likely wider than w=168`; `verify` fails the same row as `overflows its box`. Nothing says the warning class is blocking. Two of four shipped the warning and lost a verify cycle.
+
+| Story | Size | What |
+| --- | --- | --- |
+| U3.1 | XS | The nowrap-width warning becomes an error in `validate` (the estimate is the same one verify measures against), or `--strict` is the documented pre-hand-off gate and the text says so in PROCESS. |
+
+### U4. Ratings are fill keys · `S` · Now
+
+`harvey-balls` is the one options × criteria template; its twelve ratings are literals, `fill` only reaches text, and verify says PASS on a slide whose scores are the sample's. Three of four hit it; one shipped it unknowingly, two abandoned it and hand-built a donut grid. The same holds for `progress-tracker`, the gauge and every chart template.
+
+| Story | Size | What |
+| --- | --- | --- |
+| U4.1 | S | Rating, progress and gauge templates expose their values as fill keys (`r1c1 … r3c4`, `p1 … p4`), with a range check in `validate`. |
+| U4.2 | S | Chart templates take `data` through fill (the `chart` row already accepts it; the template binds it). |
+
+### U5. The missing starting rungs · `M` · Now
+
+Four of four hand-built the two most common business slides. Missing from 67 templates and 31 layouts:
+
+| Story | Size | What |
+| --- | --- | --- |
+| U5.1 | S | `bullets` layout and `bullet-page` template: a title and four to six bullets (`b1 … b6` slots, an engine-drawn dot), at speaker and reading density. |
+| U5.2 | S | `image-left` / `image-right` gain `b1 … b4` bullet slots beside the image; an `image-bullets` template binds them. |
+| U5.3 | S | `process-flow-3` and `process-flow-5`, or `process-flow` takes the step count from the keys bound. |
+| U5.4 | XS | A stats page at speaker density: `stat-row-3` with Stat-role numbers (every numbers layout today is reading). |
+| U5.5 | S | `scorecard-grid`: criteria × options with fillable cells (text or a 0–4 rating), the rows-based scorecard two subjects built by hand. |
+| U5.6 | M | `figure-boundaries-6` (three zones, six to eight nodes, labelled edges) and a documented spec path for a figure the templates do not cover: three sentences on where group labels and edge labels land (`X(g.x)+12, Y(g.y)+6`; a label that does not fit its run lifts to `Y(tops)−22`). |
+
+### U6. Counter regression · `S` · Now
+
+Reported by the reading-density Opus subject on the #43 engine: a right-anchored footer master warns `master foot overlaps by ~14px counter` on every slide regardless of text, so `--strict` cannot pass with the anchoring the docs recommend; `right:` on the footer master renders bottom-left anyway; and the counter appears in no verify screenshot in either anchoring while a DOM probe finds `.num.corner` live, so the L3 counter-parity check compares a box no artifact contains. Reproduce first, then fix; L3's gate said PASS on all of this.
+
+| Story | Size | What |
+| --- | --- | --- |
+| U6.1 | S | Reproduce the three symptoms on a two-slide deck in Chromium and WebKit; a live test for each; fix the footer `right:` anchoring, the gap-gate double count, and make verify's screenshots carry the counter (or make the parity check read the DOM it actually compares). |
+
+### U7. SKILL.md: authoring and editor apart · `M` · Now
+
+11,100 words. Every subject named the HUD paragraph in hand-off note 2 (about 1,100 words in one sentence: every control, icon, key, the bug dialog's payload) as the worst thing in the file, and MOTION, GIFS AND IMAGES (a duplicate of GRAPHICS), CONNECTORS (unused once `diagramRows` routes), the eight experimental format rows and worked example D as never opened. Re-read three times: the row prop table (earns it), DENSITY (because the fact that a template overrides the deck's density sits in one clause under TEMPLATE LIBRARY), and the LAYOUT LIBRARY table (no geometry, see U2).
+
+| Story | Size | What |
+| --- | --- | --- |
+| U7.1 | S | The HUD, persistence, PDF, versions and bug-reporting text moves to `docs/editor.md`; SKILL.md keeps a two-line pointer. The `<!-- HUD -->` manifest gate follows the text. |
+| U7.2 | XS | DENSITY states that a template carries its own density and overrides the deck's; TEMPLATE LIBRARY says which are reading. |
+| U7.3 | S | CONNECTORS and CHART ROW become `docs/` references linked from GRAPHICS; MOTION shrinks to the four words; GIFS AND IMAGES folds into GRAPHICS; the formats table shows `slides` and one line naming the experimental rest. Target: SKILL.md under 7,000 words with no rule lost (the gate tests that read SKILL.md move with the text). |
+
+### U8. Two axes on the sheet: look × ladder · `L` · Next
+
+Kyle's ask: the library should read as two axes. **Look**: basic or dense spacing (two spacing scales, not only two chrome sets), and the type, colour and tone of a kit. **Ladder**: the same content climbing from a section opener and a bullet page, to an image with bullets and a few stats, to a block-arrow process, to a diagram, to a simple and then an advanced architecture, to a scorecard. Today the sheet is grouped by slide kind and shows kits only in a closing section.
+
+| Story | Size | What |
+| --- | --- | --- |
+| U8.1 | S | A `spacing` style token (`basic` / `dense`) that scales margin, gap and role line-heights together; the two sheets built from one model. |
+| U8.2 | M | The sheet opens with the ladder: one fictional company climbing all nine rungs at basic spacing in the neutral kit, then the same nine at dense spacing, then the nine under two kits. The kind-grouped catalogue follows as the reference half. |
+| U8.3 | M | `README` and the Pages index lead with the ladder sheet; the catalogue sheet is linked from it. Depends on U5 (the rungs must exist as templates) and L11 (type per kit). |
 
 ## Carried forward
 

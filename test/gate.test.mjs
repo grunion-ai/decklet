@@ -209,7 +209,7 @@ test('HUD contract does not drift: SKILL.md names exactly the controls the templ
 });
 test('present mode: the peek HUD is a centred pill, so it cannot sit on the page counter', () => {
   assert.match(tpl, /body\.present\.peek #hud\{[^}]*left:50%[^}]*transform:translateX\(-50%\)/, 'centred, not full-width');
-  assert.match(tpl, /body\.present\.peek #hud\{[^}]*bottom:12px/, 'lifted off the bottom edge');
+  assert.match(tpl, /body\.present\.peek #hud\{[^}]*bottom:calc\(12px \+ env\(safe-area-inset-bottom\)\)/, 'lifted off the bottom edge, and off the home indicator');
   assert.match(tpl, /body\.present\.peek #hud \.spacer\{display:none\}/, 'the spacer must not stretch the pill back across the slide');
 });
 
