@@ -11,6 +11,7 @@ import {spawnSync} from 'node:child_process';
 import {validate} from '../bin/validate.mjs';
 import {create} from '../bin/create.mjs';
 import {TEMPLATES, TEMPLATE, templateKeys, templateFixed, expandTemplates, templateCatalogue} from '../lib/templates.mjs';
+import {RING} from '../lib/templates/kit.mjs';
 import {LIBRARY} from '../lib/layouts.mjs';
 import {diagramLayout} from '../lib/diagram.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -46,7 +47,8 @@ test('templates: keys — every text row gets t1..tn in row order; the catalogue
 
 // U2.1 — a template reads as fully fillable until the catalogue says which rows carry the sample's values
 test('templates: the catalogue names the rows fill cannot reach, per template', () => {
-  assert.deepEqual(templateFixed('harvey-balls'), ['12 rings', '4 rules'], 'twelve rating rings are literals in els');
+  assert.deepEqual(templateFixed('harvey-balls'), ['4 rules'], 'the twelve balls are value keys since U4.1 — only the rules are fixed');
+  assert.deepEqual(templateFixed('progress-tracker'), ['4 shapes'], 'the bar fills follow p1…p4; the tracks behind them are fixed');
   assert.deepEqual(templateFixed('statement'), [], 'a text-only template has nothing fixed');
   assert.ok(templateFixed('chart-column').some(s => /bars?$/.test(s)), 'a chart template names its bars');
   assert.equal(templateFixed('no-such'), null);
@@ -54,7 +56,9 @@ test('templates: the catalogue names the rows fill cannot reach, per template', 
   const cat = templateCatalogue();
   for (const t of TEMPLATES) {
     const fixed = templateFixed(t.id);
-    assert.equal(fixed.reduce((n, s) => n + Number(s.split(' ')[0]), 0), t.els.length - templateKeys(t.id).length, t.id + ': every row a key does not reach is counted');
+    const counted = fixed.reduce((n, s) => n + Number(s.split(' ')[0]), 0), unkeyed = t.els.length - templateKeys(t.id).length;
+    if (t.vals) assert.ok(counted < unkeyed, t.id + ': the rows a value key drives are not counted as fixed');   // U4
+    else assert.equal(counted, unkeyed, t.id + ': every row a key does not reach is counted');
     assert.ok(cat.includes('    fixed: ' + (fixed.length ? fixed.join(' · ') : 'none — every row fills')), t.id + ' fixed line');
   }
   assert.match(cat, /^ {4}fixed: none — every row fills$/m, 'a fully fillable template says so');
@@ -204,15 +208,15 @@ test('templates: scorecard-grid — twelve cells, each a fill key; a number draw
   const ring = cells.find(k => /^rating /.test(k.text)), txt = cells.find(k => !/^rating /.test(k.text));
   assert.ok(ring && txt, 'the sample shows both cell forms: ' + cells.map(k => k.text).join(' | '));
   const sample = t.els.filter(e => e.donut != null);
-  assert.ok(sample.length && sample.every(e => e.w === 36 && /^var\(--/.test(e.color)), 'the sample rings are the harvey-balls shape');
+  assert.ok(sample.length && sample.every(e => e.w === RING && e.hole === 0 && /^var\(--/.test(e.color)), 'the sample balls are the harvey-balls shape');
   const d = deck([{template: 'scorecard-grid', fill: {[ring.key]: 'n/a', [txt.key]: 1}}]);
   expandTemplates(d);
   const els = d.slides[0].els;
   assert.ok(els.some(e => e.text === 'n/a' && e.role === 'Label' && !e.donut), 'a string on a rating cell writes text');
   const filled = els.find(e => e.donut === 25);   // no sample cell scores 1, so this ring is the one the fill drew
-  assert.ok(filled && filled.w === 36, 'a 1 on a text cell draws a quarter ring the harvey-balls way');
+  assert.ok(filled && filled.w === RING && filled.hole === 0, 'a 1 on a text cell draws a quarter ball the harvey-balls way');
   const box = filled.cell;   // the cell keeps its column box, so the ring centres in the column it replaced
-  assert.equal(filled.x, box[0] + (box[2] - 36) / 2);
+  assert.equal(filled.x, box[0] + (box[2] - RING) / 2);
   assert.ok(!els.some(e => e.text === txt.text), 'the sample text is gone: ' + txt.text);
 });
 

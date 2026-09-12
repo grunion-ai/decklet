@@ -644,7 +644,9 @@ function drawEls(s,root,animate){
         (as||ae?`<defs>${mk}</defs>`:'')+
         `<path d="M${P(q[0])}C${P(q[1])} ${P(q[2])} ${P(q[3])}" stroke="${c}" stroke-width="${sw}" stroke-linecap="butt"${dp?` stroke-dasharray="${dp.on.toFixed(2)} ${dp.off.toFixed(2)}"`:''}${ae?` marker-end="url(#${id})"`:''}${as?` marker-start="url(#${id})"`:''}/></svg>`;
       d.style.cssText+=`left:${bx}px;top:${by}px;width:${bw}px;height:${bh}px;padding:0;background:none;border:0;`}
-    if(r.donut!=null)d.style.cssText+=`width:${r.w}px;height:${r.w}px;padding:0;border-radius:50%;background:conic-gradient(${r.color||'var(--accent)'} ${r.donut}%,var(--line) 0);-webkit-mask:radial-gradient(#0000 55%,#000 56%);mask:radial-gradient(#0000 55%,#000 56%);`;
+    // donut = one conic-gradient disc; `hole` (percent of the radius, default 55) masks the middle out. hole:0 leaves it
+    // filled — a Harvey ball, which reads at a size where a hairline ring does not.
+    if(r.donut!=null){const ho=r.hole??55;d.style.cssText+=`width:${r.w}px;height:${r.w}px;padding:0;border-radius:50%;background:conic-gradient(${r.color||'var(--accent)'} ${r.donut}%,var(--line) 0);`+(ho>0?`-webkit-mask:radial-gradient(#0000 ${ho}%,#000 ${ho+1}%);mask:radial-gradient(#0000 ${ho}%,#000 ${ho+1}%);`:'')}
     // a row's own href: ONE inset anchor over the whole row, so a painted CTA box is clickable even though its label is a separate row
     if(href(r.href)){const u=href(r.href),a=document.createElement('a');a.className='lk';a.href=u;if(u[0]!=='#'){a.target='_blank';a.rel='noopener noreferrer'}a.setAttribute('aria-label',r.text||lbl(u));d.appendChild(a);d.title=hint(u)}
     if(an)d.style.animationDelay=(a++*120)+'ms';

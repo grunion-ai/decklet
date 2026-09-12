@@ -245,6 +245,12 @@ export function validate(deck) {
     if (r.html) for (const u of runHrefs(r.html)) { const m = hrefErr(deck, u); if (m) E(`${where}: link run href "${u.slice(0, 40)}" ${m}`); }
     if (r.anim && !ANIMS.includes(r.anim)) E(`${where}: anim "${r.anim}" not one of ${ANIMS.join('|')}`);
     if (r.donut != null && !(isNum(r.donut) && r.donut >= 0 && r.donut <= 100)) E(`${where}: donut must be 0..100`);
+    // `hole` is the ring's hollow as a percent of the radius (default 55). 0 is a filled pie — the Harvey-ball convention,
+    // which reads at a size where a hairline ring does not.
+    if (r.hole != null) {
+      if (!(isNum(r.hole) && r.hole >= 0 && r.hole < 100)) E(`${where}: hole must be 0..99 — the percent of the radius left hollow (0 = a filled ball)`);
+      else if (r.donut == null) E(`${where}: hole needs a donut to make a hole in`);
+    }
     if (r.bar && !(isNum(r.h) && r.bg)) E(`${where}: bar needs h and bg`);
     if (r.p != null && typeof r.p === 'string' && !pad[r.p] && !/px|em|%/.test(r.p)) E(`${where}: p "${r.p}" is neither a styles.pad token nor a CSS length`);
     if (r.override && !mids.has(r.override)) E(`${where}: override "${r.override}" is not a master id`);
