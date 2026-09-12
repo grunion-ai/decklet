@@ -10,7 +10,7 @@ import {fileURLToPath} from 'node:url';
 import {validate, ROLES} from '../bin/validate.mjs';
 import {create} from '../bin/create.mjs';
 import {verify} from '../bin/verify.mjs';
-import {LIBRARY, GROUPS, libraryFor, catalogue} from '../lib/layouts.mjs';
+import {LIBRARY, GROUPS, DENSE, COUNTER, libraryFor, catalogue} from '../lib/layouts.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 let pw = null; try { pw = await import('playwright'); } catch {}
@@ -116,6 +116,20 @@ test('library: the catalogue printer lists every layout with its group, use and 
   }
   const r = spawnSync(process.execPath, [path.join(root, 'bin/validate.mjs'), '--layouts'], {encoding: 'utf8'});
   assert.equal(r.status, 0, r.stderr); assert.equal(r.stdout, c + '\n');
+});
+
+test('library: the counter owns the corner — COUNTER is the reserve, and no dense or right-anchored slot enters it on any layout', () => {
+  assert.deepEqual(COUNTER, {right: 60, y: 466, w: 96, h: 74}, 'the bottom-right corner of the 960×540 cut: the right foot from y 466 down');
+  assert.equal(DENSE.legend.right, COUNTER.right + COUNTER.w + 12, 'the legend keeps its right alignment, left of the reserve plus a 12px gap');
+  const LH = {Title: 68, Supertitle: 16, H1: 40, H2: 28, Body: 24, Caption: 18, Label: 14, Stat: 44, Stat2: 44};   // the neutral scale, one line
+  const cx = 960 - COUNTER.right - COUNTER.w;
+  for (const [name, lay] of Object.entries(LIBRARY)) for (const [slot, sl] of Object.entries(lay.slots)) {
+    if (!(slot in DENSE) && sl.right == null) continue;
+    const x1 = sl.right != null ? 960 - sl.right : sl.x + sl.w, y1 = sl.y + (sl.h ?? LH[sl.role] ?? 0);
+    assert.ok(x1 <= cx || y1 <= COUNTER.y || sl.y >= COUNTER.y + COUNTER.h, `${name}.${slot} enters the counter reserve (ends x ${x1}, y ${y1})`);
+  }
+  const doc = fs.readFileSync(path.join(root, 'SKILL.md'), 'utf8');
+  assert.match(doc.slice(doc.indexOf('## LAYOUT LIBRARY')), /`COUNTER`/, 'the layout contract names the reserve');
 });
 
 test('library: SKILL.md documents the catalogue and the mixing rule', () => {

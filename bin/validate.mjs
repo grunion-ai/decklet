@@ -239,6 +239,13 @@ export function validate(deck) {
   // height from its line count, a `w:'auto'` row's width from role.cw em per character — is a warning marked ~, because
   // a guess may not block a build. A straight orthogonal `line` is a thin rect; curves and diagonals are left to verify.
   const gap = isNum(deck.styles && deck.styles.gap) ? deck.styles.gap : 4;
+  // the counter owns the corner (as the engine draws it): a right-anchored footer carries it inline, a left-anchored one leaves
+  // its text at the left and the counter lands at the margin on the footer's top — so THAT slide's set gains a counter box there
+  const MGN = deck.styles && isNum(deck.styles.margin) ? deck.styles.margin : Math.round(W * 0.06);
+  const footRight = f => (f.x || 0) + (isNum(f.w) ? f.w : 0) / 2 > W / 2;
+  const counterRow = s => { const m = master.find(x => x && x.footer); if (!m || (s.hide || []).includes(m.id)) return [];
+    const f = {...m, ...(s.els.find(e => e && e.override === m.id) || {})}; if (footRight(f)) return [];
+    return [{r: {right: MGN, y: f.y, w: 'auto', role: f.role, p: f.p, nowrap: 1, text: `${deck.slides.length} / ${deck.slides.length}`}, i: 'counter'}]; };
   const padPx = v => { const t = v == null ? null : (pad[v] ?? (typeof v === 'number' ? v + 'px' : v)); if (!t) return [0, 0];
     const n = String(t).split(/\s+/).map(parseFloat).map(z => Number.isFinite(z) ? z : 0); return n.length === 1 ? [n[0] * 2, n[0] * 2] : [n[1] * 2, n[0] * 2]; };
   const rectOf = (r, s) => {
@@ -258,7 +265,7 @@ export function validate(deck) {
     if (r.curve) return null;
     if (textual) {
       if (!role || !plain(r).trim()) return null;   // an empty text row paints nothing
-      const [px, py] = padPx(r.p), chars = plain(r).length + (r.footer ? 8 : 0);   // the footer grows by its counter
+      const [px, py] = padPx(r.p), chars = plain(r).length + (r.footer && footRight(r) ? 8 : 0);   // a right-anchored footer grows by its inline counter
       // a wrap is counted only past 12% over the box: measured against Chromium, cw estimates run up to ~11% wide on headline
       // strings (narrow glyphs, spaces), and a guessed second line is a false collision with everything under the row
       const lines = r.nowrap || w === 'auto' ? 1 : plain(r).split('\n').reduce((n, t) => n + Math.max(1, isNum(w) && w > px ? Math.ceil(t.length * role.size * cwOf(rn) / (w - px) - 0.12) : 1), 0);
@@ -304,7 +311,7 @@ export function validate(deck) {
     const used = new Set();
     s.els.forEach((r, ei) => { row(r, `slides[${si}].els[${ei}]`, s); if (r && r.slot) { if (used.has(r.slot)) Wn(`slides[${si}]: slot "${r.slot}" bound twice`); used.add(r.slot); } });
     // the master rows this slide shows sit in the same set — a footer chip and a slide's last row owe each other the same air
-    gapGate([...master.filter(m => !(s.hide || []).includes(m.id) && !s.els.some(e => e && e.override === m.id)).map(m => ({r: m, i: 'master ' + m.id})), ...s.els.map((r, ei) => ({r, i: 'els[' + ei + ']'}))], `slides[${si}]`, s);
+    gapGate([...master.filter(m => !(s.hide || []).includes(m.id) && !s.els.some(e => e && e.override === m.id)).map(m => ({r: m, i: 'master ' + m.id})), ...counterRow(s), ...s.els.map((r, ei) => ({r, i: 'els[' + ei + ']'}))], `slides[${si}]`, s);
     // ── connector AIR, across the slide: a connector leaves the same visible gap at both ends and never touches a
     // container. `to:`/`from:` hand that to the engine, so ends it terminates are not second-guessed here.
     // Headed strokes only — see the note above: a chart series or a decorative path has nothing to leave air FROM.

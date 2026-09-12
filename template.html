@@ -58,6 +58,7 @@ body.present .el a.lk{pointer-events:auto}
 /* counter: inline inside the footer master element (inherits its font/baseline) — or the generic pin when no footer exists */
 .num{pointer-events:none}
 .el .num{white-space:nowrap}
+.num.corner{position:absolute;white-space:nowrap}
 .pin{position:absolute;bottom:10px;font:12px ui-monospace,Menlo,monospace;color:var(--muted);letter-spacing:.08em}
 /* inline marks change weight/style/position/colour — never size: sub/sup shift the baseline only */
 .el sub,.el sup{font-size:inherit;line-height:0;vertical-align:sub}.el sup{vertical-align:super}
@@ -240,7 +241,8 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
 //  · master    → chrome, deck-wide: drawn identically under every slide. An edit forks {override:<id>,…changed props only};
 //                hide:[id] suppresses one. Chrome never varies per layout.
 //  · margin    → styles.margin: the content inset chrome sits on; the counter's right edge = W - margin, never the canvas edge
-//  · footer    → master flag: the page counter renders inline inside this row (same font/baseline, right edge on the margin)
+//  · footer    → master flag: the page counter renders with this row (inline when it is right-anchored, else detached to the corner
+//                on the same top and font); its right edge is always on the margin
 //  · nowrap / w:'auto' / p → text-fit intent: single line, shrink-to-fit, explicit padding (or a styles.pad token)
 // img (data-URI) and css (raw escape hatch) are supported but discouraged — the validator warns on css.
 const DECK=/*DECK*/{"w":960,"h":540,"styles":{"roles":{"Title":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":64,"weight":800,"lh":68,"ls":-1.5,"color":"var(--fg)","cw":0.45},"Supertitle":{"font":"ui-monospace,Menlo,Consolas,monospace","size":12,"weight":500,"lh":16,"ls":1.5,"color":"var(--accent)","tt":"uppercase","cw":0.73},"H1":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":34,"weight":800,"lh":40,"ls":-0.5,"color":"var(--fg)","cw":0.46},"H2":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":22,"weight":600,"lh":28,"ls":-0.3,"color":"var(--fg)","cw":0.44},"Body":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":16,"weight":400,"lh":24,"ls":0,"color":"var(--fg)","cw":0.46},"Caption":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":13,"weight":400,"lh":18,"ls":0,"color":"var(--muted)","cw":0.47},"Label":{"font":"ui-monospace,Menlo,Consolas,monospace","size":11,"weight":500,"lh":14,"ls":1,"color":"var(--muted)","tt":"uppercase","cw":0.69},"Stat":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":40,"weight":800,"lh":44,"ls":-1,"color":"var(--accent)","cw":0.45}},"margin":64,"pad":{"chip":"3px 8px","pill":"5px 12px"}},"slots":{},"layouts":{},"master":[],"slides":[{"els":[]}]}/*/DECK*/;
@@ -607,8 +609,11 @@ function render(){
   if(!$('sheet').hidden)sheetRender();
   placeTb();
 }
-// counter: inside the footer master row when one exists (inherits its font/baseline/padding); else the generic pin; deck.counter===0 draws none (a letter, a one-page document)
-const num=(root,n)=>{if(deck.counter===0)return;const f=root.querySelector('[data-footer]');const c=document.createElement(f?'span':'div');c.className=f?'num':'num pin';c.textContent=(f&&f.textContent.trim()?' · ':'')+n+' / '+deck.slides.length;if(!f)c.style.right=MG()+'px';(f||root).appendChild(c)};
+// counter: the corner is the counter's — its right edge sits on the margin on EVERY slide. A right-anchored footer master carries it
+// inline (inherits its font/baseline/padding); a left-anchored footer keeps its text at the left and the counter detaches to the corner
+// on the same top, wearing the footer's font (`corner`); no footer → the generic pin; deck.counter===0 draws none (a letter, a one-page document)
+const num=(root,n)=>{if(deck.counter===0)return;const f=root.querySelector('[data-footer]'),inl=f&&f.style.right!=='',c=document.createElement(inl?'span':'div');c.className=inl?'num':f?'num corner':'num pin';c.textContent=(inl&&f.textContent.trim()?' · ':'')+n+' / '+deck.slides.length;
+  if(f&&!inl){c.style.cssText=f.style.cssText;c.style.left='auto';c.style.width='auto';c.style.background='none';c.style.border='0'}if(!inl)c.style.right=MG()+'px';(inl?f:root).appendChild(c)};
 // print: every slide becomes one page painted with its own bg — same drawEls, no handlers needed
 addEventListener('beforeprint',()=>{commitEdit();const p=$('print');p.innerHTML='';deck.slides.forEach((s,n)=>{const pg=document.createElement('div');pg.className='pg';pg.style.background=s.bg||'var(--card)';const cv=document.createElement('div');cv.className='cv';drawEls(s,cv,false);num(cv,n+1);pg.appendChild(cv);p.appendChild(pg)})});
 addEventListener('afterprint',()=>{$('print').innerHTML=''});

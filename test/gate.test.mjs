@@ -72,7 +72,7 @@ test('selection chrome: nib only for one painting row, never in present mode; pr
   assert.match(tpl, /document\.body\.style\.background=present\(\)\?\(s\.bg\|\|'var\(--card\)'\):''/);
 });
 test('master layer: partial fork on edit, hide per slide, footer carries the inline counter on the margin, on screen and in print', () => {
-  for (const re of [/function fork\(id\)\{slide\(\)\.els\.push\(\{override:id\}\)/, /const MG=\(\)=>deck\.styles&&deck\.styles\.margin!=null\?deck\.styles\.margin/, /d\.style\.right=MG\(\)\+'px'/, /\(s\.hide\|\|\[\]\)\.includes\(m\.id\)/, /d\.dataset\.footer='1'/, /root\.querySelector\('\[data-footer\]'\)/, /className=f\?'num':'num pin'/, /num\(cv,n\+1\)/, /pg\.style\.background=s\.bg\|\|'var\(--card\)'/]) assert.match(tpl, re, String(re));
+  for (const re of [/function fork\(id\)\{slide\(\)\.els\.push\(\{override:id\}\)/, /const MG=\(\)=>deck\.styles&&deck\.styles\.margin!=null\?deck\.styles\.margin/, /d\.style\.right=MG\(\)\+'px'/, /\(s\.hide\|\|\[\]\)\.includes\(m\.id\)/, /d\.dataset\.footer='1'/, /root\.querySelector\('\[data-footer\]'\)/, /className=inl\?'num':f\?'num corner':'num pin'/, /c\.style\.cssText=f\.style\.cssText/, /num\(cv,n\+1\)/, /pg\.style\.background=s\.bg\|\|'var\(--card\)'/]) assert.match(tpl, re, String(re));
 });
 test('slots: deck-scope slots under per-layout slots; + Text binds a free slot; Apply to all slides is the only promote action (Apply to layout removed in 0.3.5)', () => {
   assert.match(tpl, /const LAY=s=>\(\{\.\.\.\(deck\.slots\|\|\{\}\),\.\.\.\(\(deck\.layouts\|\|\{\}\)\[s\.layout\]\|\|\{\}\)\}\)/);
@@ -1068,9 +1068,9 @@ live('live: a bound connector FOLLOWS its target — moving the box re-aims the 
   assert.deepEqual(errs, []);
 });
 
-live('live: the page counter reads "1 / 3" when the footer row is empty, "text · 1 / 3" when it is not', async () => {
-  const mk = text => ({w: 960, h: 540, styles: {roles: modelOf(tpl).styles.roles},
-    master: [{id: 'foot', footer: 1, x: 60, y: 500, w: 300, role: 'Label', ...(text ? {text} : {text: ''})}],
+live('live: the page counter reads "1 / 3" when a right-anchored footer row is empty, "text · 1 / 3" when it is not; a left-anchored one leaves the counter to the corner', async () => {
+  const mk = (text, x = 660) => ({w: 960, h: 540, styles: {roles: modelOf(tpl).styles.roles},
+    master: [{id: 'foot', footer: 1, x, y: 500, w: 240, role: 'Label', ...(text ? {text} : {text: ''})}],
     slides: [{els: []}, {els: []}, {els: []}]});
   const out = [];
   const b = await pw.chromium.launch(); const p = await b.newPage({viewport: {width: 1280, height: 800}});
@@ -1079,8 +1079,11 @@ live('live: the page counter reads "1 / 3" when the footer row is empty, "text �
     await p.goto(pathToFileURL(f).href); await p.evaluate(() => { localStorage.clear(); }); await p.reload(); await p.waitForSelector('#canvas [data-footer]');
     out.push(await p.evaluate(() => canvas.querySelector('[data-footer]').textContent));
   }
+  const f = path.join(tmp, 'foot-left.html'); fs.writeFileSync(f, create(mk('acme', 60)).html);   // left-anchored: the text stays, the counter detaches
+  await p.goto(pathToFileURL(f).href); await p.evaluate(() => { localStorage.clear(); }); await p.reload(); await p.waitForSelector('#canvas .num.corner');
+  out.push(await p.evaluate(() => canvas.querySelector('[data-footer]').textContent + ' | ' + canvas.querySelector('.num.corner').textContent));
   await b.close();
-  assert.deepEqual(out, ['1 / 3', 'acme · 1 / 3'], 'the separator only means something after preceding text');
+  assert.deepEqual(out, ['1 / 3', 'acme · 1 / 3', 'acme | 1 / 3'], 'the separator only means something after preceding text, and only inline');
 });
 live('live: present-mode peek HUD clears the page counter', async () => {
   // a 4:5 carousel with a right-anchored footer on the margin — a tall deck is HEIGHT-constrained, so the canvas fills the
