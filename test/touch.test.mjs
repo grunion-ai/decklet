@@ -109,3 +109,36 @@ test('coarse pointer: fit() publishes the live scale as --S and the coarse block
   assert.match(coarse, /#hud button\{[^}]*min-height:44px/, 'HUD buttons: 44');
   assert.match(coarse, /#tb button\{[^}]*min-height:44px/, 'toolbar buttons: 44');
 });
+
+// ROADMAP M1.2: a phone in present mode could not change slides — no swipe, no tap, and the HUD peeked only on mousemove
+live('presenting on a phone: swipe turns the page, a tap advances (left fifth goes back), a tap on a link follows it, a tap at the bottom peeks the HUD and its buttons still work', async () => {
+  const {b, p} = await launch(); await p.evaluate(() => setPresent(true, true));
+  const W = 390, H = 664;
+  await p.swipe(300, 300, 80, 310); assert.equal(await at(p), 1, 'swipe left → next');
+  await p.swipe(300, 300, 80, 310); assert.equal(await at(p), 2, 'again');
+  await p.swipe(300, 300, 80, 310); assert.equal(await at(p), 2, 'the last slide holds');
+  await p.swipe(80, 300, 300, 290); assert.equal(await at(p), 1, 'swipe right → previous');
+  await p.swipe(200, 200, 210, 420); assert.equal(await at(p), 1, 'a vertical swipe is not a page turn');
+  await p.tap(W * 0.7, H / 2); assert.equal(await at(p), 2, 'tap on the right → next');
+  await p.tap(W * 0.1, H / 2); assert.equal(await at(p), 1, 'tap in the left fifth → previous');
+  await p.tap(W * 0.1, H / 2); assert.equal(await at(p), 0);
+  // the link: the CTA box on slide 1 points at slide 3 — the anchor is the gesture, not the tap-to-advance
+  const box = await p.$eval('.el[data-n="1"]', d => { const r = d.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; });
+  await p.tap(box[0], box[1]); await p.waitForTimeout(150); assert.equal(await at(p), 2, 'the tap followed the link to slide 3'); assert.match(p.url(), /#3$/);
+  // the HUD: a tap in the bottom twelfth peeks it; a tap on its prev button works and does not un-peek
+  assert.equal(await p.evaluate(() => document.body.classList.contains('peek')), false);
+  await p.tap(W / 2, H - 10); assert.equal(await p.evaluate(() => document.body.classList.contains('peek')), true, 'peeked');
+  const prev = await p.$eval('#prev', d => { const r = d.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; });
+  await p.tap(prev[0], prev[1]); assert.equal(await at(p), 1, 'the HUD prev button turned the page');
+  assert.equal(await p.evaluate(() => document.body.classList.contains('peek')), true, 'and the HUD stayed');
+  await p.tap(W / 2, H / 2); assert.equal(await at(p), 2); assert.equal(await p.evaluate(() => document.body.classList.contains('peek')), false, 'a tap on the slide advances and lets the HUD go');
+  assert.equal(await p.evaluate(() => present()), true, 'still presenting');
+  assert.deepEqual(p.errs, []); await b.close();
+});
+
+live('editing on a phone: a swipe or a tap never turns the page (that is the present-mode gesture)', async () => {
+  const {b, p} = await launch();
+  await p.swipe(300, 300, 80, 310); assert.equal(await at(p), 0);
+  await p.tap(300, 200); assert.equal(await at(p), 0);
+  assert.deepEqual(p.errs, []); await b.close();
+});
