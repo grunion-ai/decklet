@@ -15,7 +15,7 @@ import {expandCharts} from '../lib/chart.mjs';
 import {expandTemplates} from '../lib/templates.mjs';
 import {expandIcons} from '../lib/icons.mjs';
 import {flags as spellFlags, loadChecker} from '../lib/spell.mjs';
-import {stampIds, diffDecks, applyLog, blockOf, putBlock, VERSION_CAP} from '../lib/edits.mjs';
+import {stampIds, diffDecks, applyLog, blockOf, hasBlock, putBlock, VERSION_CAP} from '../lib/edits.mjs';
 
 // page-size presets of ONE model space: canvas size + print page (named sizes only — Safari ignores px @page sizes)
 export const FORMAT = {
@@ -80,8 +80,9 @@ export function create(model, {style = null, format, space, title, template, fro
   // --from: replay the human's edits onto this version (human wins), stamp them with this rev, and keep the previous state
   let migrate = null, log = [], versions = [];
   if (prev) {
-    const plog = blockOf(prevHtml, 'LOG'), pvers = blockOf(prevHtml, 'VERSIONS');
-    migrate = applyLog(deck, plog);
+    const predates = !hasBlock(prevHtml, 'LOG');   // built before 0.5.0: no edit log to replay, the state still goes into VERSIONS
+    const plog = blockOf(prevHtml, 'LOG', []), pvers = blockOf(prevHtml, 'VERSIONS', []);
+    migrate = applyLog(deck, plog); if (predates) migrate.predates = true;
     versions = [...pvers, {rev: prev.rev, t: new Date().toISOString(), by: plog.some(e => !e.rev) ? 'human' : 'agent', label: 'before ' + (title || deck.title || ''), deck: prev}].slice(-VERSION_CAP);
     log = plog;
   }
@@ -106,6 +107,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const flagged = spell ? spellFlags(deck, spell) : null;
   if (flagged === null) console.error('spell: nspell + dictionary-en not installed — no words flagged (npm i -D nspell dictionary-en)');
   else if (flagged.length) console.error(`spell: ${flagged.length} word(s) flagged — ${flagged.join(', ')} (spell.ignore in the model silences a name)`);
+  if (migrate?.predates) console.error(`${o.from} predates the edit log (built before decklet 0.5.0): id and state carried, nothing to replay`);
   if (migrate) { console.error(`migrated ${migrate.applied} human edit(s) from ${o.from} · ${migrate.conflicts.length} conflict(s) · ${migrate.orphans.length} orphan(s)`); for (const c of migrate.conflicts) console.error(`conflict ${c.s || c.m}${c.r ? '/' + c.r : ''}.${c.key}: kept human ${JSON.stringify(c.human)} over agent ${JSON.stringify(c.agent)}`); }
   const v = validate(deck);
   for (const m of v.errors) console.error('ERROR   ' + m);
