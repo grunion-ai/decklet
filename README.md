@@ -126,7 +126,7 @@ A row is text by default; `box`, `tile`, `bar`, `line`, `donut`, `svg`, `img` ar
 | capability | status | notes |
 |---|---|---|
 | `slides` 16:9 (960×540, 1600×900) | supported | editing, contact sheet, present, PDF, verify |
-| `carousel` 1:1 / `carousel-4x5` | experimental | sizing, editing, PDF work; no per-card PNG export |
+| `carousel` 1:1 / `carousel-4x5` | experimental | sizing, editing, PDF work; per-card PNG export via `bin/export.mjs --png` |
 | `document-letter` / `document-a4` | experimental | page = canvas, print zoom 1; text does not flow across pages |
 | `slides-4x3` · `story` 9:16 · `document-letter-landscape` · `document-a4-landscape` · `poster-a3` | experimental | sizing, editing, PDF work; **library layouts and templates are cut for 16:9 and stretch here** — `validate` warns per slide; draw free rows until aspect-aware composition (ROADMAP D2) |
 | drag / multi-select / resize / undo | supported | undo history persisted per deck; connectors get point nibs |

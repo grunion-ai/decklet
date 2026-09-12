@@ -24,6 +24,7 @@ PDF: the ⤓ button writes a true slide-sized PDF inside the file (foreignObject
 - bin/verify.mjs: self-containment + contract + layout parity (always) + AE vs refs (optional); writes results.json
 - bin/pdf.mjs: deck.html -> vector PDF via Chromium print engine + px @page (one slide per page, text stays text, hrefs are /Link annotations, HUD hidden by the deck's @media print); gates pages/ratio/HUD/links, exit 1 on failure. The ONLY way an agent makes a PDF — never screenshots stitched by ImageMagick
 - bin/edits.mjs: prints the human edit log a deck file carries (read before revising)
+- bin/export.mjs: deck.html --png -> one PNG per slide at native W×H (--scale 2 for retina; --out dir; 01-<slide name or slide-N>.png), HUD hidden, selection cleared, animations off, spell marks off, page counter kept; gates HUD/count/dimensions, exit 1 on failure. The way an agent makes per-card carousel images — never screenshot stitching
 - lib/bug.mjs: node side of the bug-report builder (bugReport/bugFacts/scrub lifted from template.html's /*BUG*/ block; engineOf reads a deck's ENGINE literal)
 - bin/bug.mjs: decklet bug — prints a prefilled mailto to decklet@grunion.ai ([ISSUE] subject with --category and --desc; engine version, format, size, slide count, node + OS, a scrubbed --log snippet); never the deck's words
 - lib/edits.mjs: node side of the in-file edit core (stampIds/diffDecks/applyLog lifted from template.html's /*EDITS*/ block; blockOf/putBlock for DECK/LOG)
