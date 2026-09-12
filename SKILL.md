@@ -147,7 +147,7 @@ Top level:
 
 Slot geometry: `{x, y, w, h?, role}` — or `right` in place of `x`; a slotted row's own `right` overrides the slot's `x` the way its own `x` would.
 
-Slide: `{id?, name?, layout?, bg?, hide?: masterId[], els: row[]}` — `id` (unique per deck; `s1, s2…` when create stamps it) is how a tab remembers the slide it was on and how the edit log addresses a slide. Rows carry `id` (unique per slide; `r1, r2…`) for the same reason and for `to:`/`from:`.
+Slide: `{id?, name?, layout?, bg?, hide?: masterId[], notes?: string, els: row[]}` — `notes` is the speaker's text for the slide, one string, kept in the file and in the edit log like any slide key (no panel renders it yet; `bin/edits.mjs` and the model carry it). `id` (unique per deck; `s1, s2…` when create stamps it) is how a tab remembers the slide it was on and how the edit log addresses a slide. Rows carry `id` (unique per slide; `r1, r2…`) for the same reason and for `to:`/`from:`.
 
 Row — every prop optional; a row is whatever its props make it:
 | prop | type | default | meaning |
@@ -191,6 +191,7 @@ Row — every prop optional; a row is whatever its props make it:
 | `svg` | string | — | inline SVG markup (no script, no external href) |
 | `icon` | name | — | a Lucide icon by name (see GRAPHICS; `--icons` lists them) — expands to an `svg` row at create, `color` paints it |
 | `img` | data: URI | — | image; `fit`, `pos` = object-fit/position |
+| `alt` | string | — | what the row shows, for a reader who cannot see it — an `img`, an `svg`, a chart's rows. Model-only today: nothing renders it yet; the editor field and the tagged-PDF export read it later |
 | `anim` | `rise`\|`fade`\|`pop`\|`wipe` | — | entrance motion on slide entry, staggered 120 ms in model order (see MOTION) |
 | `chart` | `{mark, data, …}` | — | a bar or line chart drawn into this row's x/y/w/h at create time (CHART ROW) |
 | `css` | string | — | raw CSS escape hatch — validator warns |

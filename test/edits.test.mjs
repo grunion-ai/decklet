@@ -199,3 +199,21 @@ test('create --from: a deck built before 0.5.0 (no edit log) carries its id and 
   assert.equal(vers.length, 1); assert.equal(vers[0].rev, v1.deck.rev); assert.equal(vers[0].by, 'agent');
   assert.deepEqual(blockOf(v2.html, 'LOG'), []);
 });
+
+// ROADMAP P2: notes and alt round-trip — through create, the edit log, and create --from (human wins)
+test('slide.notes and row.alt: create keeps them, diffDecks logs a change to either, create --from carries the human\'s notes', () => {
+  const m = mk(); m.slides[0].notes = 'open with the number'; m.slides[0].els[0].alt = 'the headline';
+  const v1 = create(m, {});
+  assert.equal(v1.deck.slides[0].notes, 'open with the number'); assert.equal(v1.deck.slides[0].els[0].alt, 'the headline');
+  assert.equal(blockOf(v1.html, 'DECK').slides[0].notes, 'open with the number', 'notes are in the file');
+  const edited = clone(v1.deck); edited.slides[0].notes = 'open with the story'; edited.slides[0].els[0].alt = 'the title';
+  const log = diffDecks(v1.deck, edited);
+  assert.deepEqual(log, [
+    {s: v1.deck.slides[0].id, k: {notes: ['open with the number', 'open with the story']}},
+    {s: v1.deck.slides[0].id, r: v1.deck.slides[0].els[0].id, k: {alt: ['the headline', 'the title']}},
+  ]);
+  const f1 = path.join(tmp, 'notes.html'); fs.writeFileSync(f1, putBlock(putBlock(v1.html, 'DECK', edited), 'LOG', log.map(e => ({...e, t: '2026-09-12T10:00:00Z'}))));
+  const v2 = create(m, {from: f1});
+  assert.equal(v2.deck.slides[0].notes, 'open with the story', 'human notes win'); assert.equal(v2.deck.slides[0].els[0].alt, 'the title', 'human alt wins');
+  assert.equal(v2.migrate.applied, 2);
+});
