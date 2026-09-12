@@ -25,7 +25,7 @@ const open = async (b) => {
 
 test('hud: the buttons run navigate · save state · edit · file · view, in that order, with a divider between groups', () => {
   const ids = [...hud.matchAll(/<button id="([^"]+)"/g)].map(m => m[1]).filter(id => !['add-text', 'add-box', 'sadd'].includes(id));
-  assert.deepEqual(ids, ['prev', 'next', 'vers', 'addbtn', 'dup', 'snap', 'spell', 'savecopy', 'pdf', 'grid-btn', 'fs', 'help']);
+  assert.deepEqual(ids, ['prev', 'next', 'vers', 'addbtn', 'dup', 'snap', 'spell', 'savecopy', 'pdf', 'grid-btn', 'fs', 'help', 'bug']);
   assert.equal((hud.match(/class="sep"/g) || []).length, 3, 'three dividers = four groups after the spacer');
   assert.ok(hud.indexOf('class="spacer"') < hud.indexOf('id="vers"'), 'the save-state button leads the right-hand cluster');
 });

@@ -17,4 +17,4 @@ Use GitHub's private vulnerability reporting on this repo (Security tab, "Report
 
 ## Bugs that are not vulnerabilities
 
-A wrong layout, a broken control, a PDF that does not match the slide: those go to **decklet@grunion.ai** — from a deck, ⓘ → Report a bug; from a terminal, `node bin/bug.mjs deck.html`. The mail is prefilled with the engine version and the deck's shape only, never its content, and you send it yourself. The address is receive-only; a person answers from their own mailbox. Anything that could expose a reader's data or run code takes the private route above, not this one.
+A wrong layout, a broken control, a PDF that does not match the slide: those go to **decklet@grunion.ai** — from a deck, the bug button in the HUD; from a terminal, `node bin/bug.mjs deck.html`. The mail is prefilled with the engine version and the deck's shape only, never its content, and you send it yourself. The address is receive-only; a person answers from their own mailbox. Anything that could expose a reader's data or run code takes the private route above, not this one.

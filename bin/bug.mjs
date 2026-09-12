@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 // decklet bug — a prefilled bug report for decklet@grunion.ai (receive-only; a person answers from their own mailbox).
-// usage: node bin/bug.mjs [deck.html] [--tool verify|validate|create] [--log out.txt] [--open]
+// usage: node bin/bug.mjs [deck.html] [--category looks|respond|save|crash] [--desc "what happened"] [--tool verify|validate|create] [--log out.txt] [--open]
 //   deck.html   adds the deck's shape (format, size, slide count, id) and the version it was built with — never its words
+//   --category  one of the four fixed categories (subject: [ISSUE] decklet · <category> · <desc>)
+//   --desc      the reporter's words, first 70 characters into the subject, whole into the body
 //   --log FILE  a tool's captured output, scrubbed (quotes, JSON, directories stripped) and cut to fit, as the snippet
 //   --open      hands the mailto to the OS (open / xdg-open / start) — otherwise it is printed to paste
 // Prints the body (to read and edit) and, last, the mailto line. Nothing is sent by this command.
@@ -16,8 +18,8 @@ import {blockOf} from '../lib/edits.mjs';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(fs.readFileSync(path.join(here, '..', 'package.json'), 'utf8')).version;
 
-export function report({deck = null, tool = null, log = null} = {}) {
-  const o = {engine: pkg, mode: 'cli', client: `node ${process.version} · ${os.platform()} ${os.release()}`, tool, output: log};
+export function report({deck = null, tool = null, log = null, cat = null, desc = ''} = {}) {
+  const o = {engine: pkg, mode: 'cli', client: `node ${process.version} · ${os.platform()} ${os.release()}`, tool, output: log, cat, desc};
   if (deck) { const html = fs.readFileSync(deck, 'utf8'); Object.assign(o, bugFacts(blockOf(html, 'DECK')), {built: engineOf(html) || 'a version before 0.7.1'}); }
   return bugReport(o);
 }
@@ -25,8 +27,8 @@ export function report({deck = null, tool = null, log = null} = {}) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const a = process.argv.slice(2), o = {}; let deck = null;
   for (let n = 0; n < a.length; n++) { if (a[n] === '--open') o.open = true; else if (a[n].startsWith('--')) o[a[n].slice(2)] = a[++n]; else deck = a[n]; }
-  if (o.help) { console.error('usage: node bin/bug.mjs [deck.html] [--tool verify|validate|create] [--log out.txt] [--open]'); process.exit(2); }
-  const r = report({deck, tool: o.tool || null, log: o.log ? fs.readFileSync(o.log, 'utf8') : null});
+  if (o.help) { console.error('usage: node bin/bug.mjs [deck.html] [--category looks|respond|save|crash] [--desc "…"] [--tool verify|validate|create] [--log out.txt] [--open]'); process.exit(2); }
+  let r; try { r = report({deck, tool: o.tool || null, log: o.log ? fs.readFileSync(o.log, 'utf8') : null, cat: o.category || null, desc: o.desc || ''}); } catch (e) { console.error(e.message); process.exit(2); }
   console.log(`Subject: ${r.subject}\n\n${r.body}\n\n${r.mailto}`);
   if (o.open) { const cmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open'; spawn(cmd, [r.mailto], {stdio: 'ignore', detached: true, shell: process.platform === 'win32'}).unref(); }
 }

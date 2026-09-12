@@ -83,7 +83,19 @@ body.present .el a.lk{pointer-events:auto}
 #hud button svg{display:block;width:16px;height:16px;overflow:visible}
 #tb button svg{display:block;width:13px;height:13px}
 .mi-chevron-left path { transition: all 0.2s ease-in; } .mi-chevron-left .chevron { transform: translateX(-3px); }.mi-chevron-right path { transition: all 0.2s ease-in; } .mi-chevron-right .chevron { transform: translateX(3px); }.mi-plus .plus { overflow: visible; } .mi-plus .horizontal, .mi-plus .vertical { stroke-dasharray: 14; stroke-dashoffset: 0; transition: stroke-dashoffset 0.15s ease-out; } .mi-plus .plus.animate .horizontal { opacity: 0; animation: mi-plus-lineAnimation 0.3s ease-out forwards; } .mi-plus .plus.animate .vertical { opacity: 0; animation: mi-plus-lineAnimation 0.3s ease-out 0.25s forwards; /* Start shortly before horizontal ends */ } @keyframes mi-plus-lineAnimation { 0% { opacity: 0; stroke-dashoffset: 14; } 15% { opacity: 1; stroke-dashoffset: 14; } 100% { opacity: 1; stroke-dashoffset: 0; } }.mi-layout-grid .layout-grid-icon { overflow: visible; } .mi-layout-grid .layout-grid-icon.animate .top-right-panel { opacity: 0; animation: mi-layout-grid-fadeInTop 0.35s ease-out forwards; } .mi-layout-grid .layout-grid-icon.animate .bottom-right-panel { opacity: 0; animation: mi-layout-grid-fadeInRight 0.35s ease-out 0.1s forwards; } .mi-layout-grid .layout-grid-icon.animate .bottom-left-panel { opacity: 0; animation: mi-layout-grid-fadeInBottom 0.35s ease-out 0.2s forwards; } .mi-layout-grid .layout-grid-icon.animate .top-left-panel { opacity: 0; animation: mi-layout-grid-fadeInLeft 0.35s ease-out 0.3s forwards; } @keyframes mi-layout-grid-fadeInLeft { 0%, 50% { opacity: 0; transform: translateX(-10px); } 80% { opacity: 0.8; transform: translateX(2px); } 100% { opacity: 1; transform: translateX(0); } } @keyframes mi-layout-grid-fadeInRight { 0%, 50% { opacity: 0; transform: translateX(10px); } 80% { opacity: 0.8; transform: translateX(-2px); } 100% { opacity: 1; transform: translateX(0); } } @keyframes mi-layout-grid-fadeInTop { 0%, 50% { opacity: 0; transform: translateY(-10px); } 80% { opacity: 0.8; transform: translateY(2px); } 100% { opacity: 1; transform: translateY(0); } } @keyframes mi-layout-grid-fadeInBottom { 0%, 50% { opacity: 0; transform: translateY(10px); } 80% { opacity: 0.8; transform: translateY(-2px); } 100% { opacity: 1; transform: translateY(0); } }.mi-copy .copy-rect, .mi-copy .copy-path { transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1); } .mi-copy .copy-rect.animate { transform: translate(-3px, -3px); } .mi-copy .copy-path.animate { transform: translate(3px, 3px); } .mi-copy svg { overflow: visible; }.mi-file-down g.animate path { transform: translateY(2px); transition: transform 0.3s cubic-bezier(0.68, -0.6, 0.32, 1.6); } .mi-file-down g path { transform: translateY(0); transition: transform 0.3s cubic-bezier(0.68, -0.6, 0.32, 1.6); }.mi-maximize path { transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); } .mi-maximize .bottom-right { transform: translate(2px, 2px); } .mi-maximize .bottom-left { transform: translate(-2px, 2px); } .mi-maximize .top-right { transform: translate(2px, -2px); } .mi-maximize .top-left { transform: translate(-2px, -2px); } .mi-maximize svg { overflow: visible; }.mi-circle-question-mark .animate-icon { transition: transform 0.5s ease-in-out; } .mi-circle-question-mark .animate-path { transition: transform 0.5s ease-in-out; transform-origin: center; animation: mi-circle-question-mark-rotateAnimation 0.5s ease-in-out; } @keyframes mi-circle-question-mark-rotateAnimation { 0% { transform: rotate(0deg); } 20% { transform: rotate(-10deg); } 40% { transform: rotate(10deg); } 60% { transform: rotate(-10deg); } 100% { transform: rotate(0deg); } }.mi-grip circle { transform-origin: center; transform-box: fill-box; } .mi-grip .dots.animate circle { animation: mi-grip-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both; } .mi-grip .dots.animate circle:nth-child(2), .mi-grip .dots.animate circle:nth-child(4) { animation-delay: 0.05s; } .mi-grip .dots.animate circle:nth-child(3), .mi-grip .dots.animate circle:nth-child(5), .mi-grip .dots.animate circle:nth-child(7) { animation-delay: 0.1s; } .mi-grip .dots.animate circle:nth-child(6), .mi-grip .dots.animate circle:nth-child(8) { animation-delay: 0.15s; } .mi-grip .dots.animate circle:nth-child(9) { animation-delay: 0.2s; } @keyframes mi-grip-pop { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }.mi-spell-check .tick { stroke-dasharray: 10; stroke-dashoffset: 0; } .mi-spell-check .tick.animate { animation: mi-spell-check-draw 0.4s ease-out forwards; } @keyframes mi-spell-check-draw { 0% { stroke-dashoffset: 10; opacity: 0; } 20% { opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 1; } }
+#hud .mi-bug svg{transform-origin:50% 60%}#hud .mi-bug svg.animate{animation:mi-bug-wiggle .6s ease-in-out}@keyframes mi-bug-wiggle{25%{transform:rotate(-10deg)}75%{transform:rotate(10deg)}}
 @media (prefers-reduced-motion:reduce){.mi svg,.mi svg *{animation:none!important;transition:none!important}}
+/* Report a bug dialog: the deck's own chrome tokens; tiles are labels around hidden radios so the keyboard walks them as a group */
+#bugdlg{border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--fg);padding:0;width:min(560px,calc(100vw - 32px));font:13px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;box-shadow:0 12px 40px #0008}
+#bugdlg::backdrop{background:#0c101499}
+#bugdlg form{display:flex;flex-direction:column;gap:12px;padding:14px 16px;margin:0}
+#bugdlg .dh{display:flex;align-items:center;gap:8px}#bugdlg .dh svg{width:18px;height:18px}#bugdlg h2{font-size:15px;font-weight:600;margin:0}#bugdlg .x{margin-left:auto;background:none;border:0;color:var(--muted);font-size:18px;line-height:1;cursor:pointer;padding:2px 6px;border-radius:6px}#bugdlg .x:hover{color:var(--fg)}
+#bugdlg .cats{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+#bugdlg .cat{position:relative;display:block;border:1px solid var(--line);border-radius:8px;padding:8px 10px;cursor:pointer}#bugdlg .cat input{position:absolute;opacity:0;width:0;height:0}#bugdlg .cat b{display:block;font-weight:600}#bugdlg .cat span{color:var(--muted);font-size:12px;line-height:1.35}
+#bugdlg .cat:hover{background:var(--box)}#bugdlg .cat:has(:checked){border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--card))}#bugdlg .cat:has(:focus-visible){outline:2px solid var(--accent);outline-offset:1px}
+#bugdlg .desc{display:flex;flex-direction:column;gap:4px;font-weight:600}#bugdlg textarea{font:13px/1.45 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-weight:400;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;resize:vertical}
+#bugdlg .df{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font:12px ui-monospace,Menlo,monospace;color:var(--muted)}#bugdlg .df a.primary{background:var(--accent);color:var(--bg);border-radius:6px;padding:6px 12px;text-decoration:none;font-weight:500}#bugdlg .df button{background:var(--card);border:1px solid var(--line);color:var(--fg);border-radius:6px;padding:5px 10px;cursor:pointer;font:inherit}#bugdlg .hint{margin-left:auto}
+@media (max-width:520px){#bugdlg .cats{grid-template-columns:1fr}}
 /* "+" micro-menu: the add controls (Text / Box / Slide) nest under one button; opens upward, click-away closes */
 #addwrap,#helpwrap,#verswrap{position:relative}
 #addmenu,#helpmenu{display:none;position:absolute;bottom:calc(100% + 6px);flex-direction:column;gap:4px;padding:6px;background:var(--card);border:1px solid var(--line);border-radius:8px;z-index:11;white-space:nowrap}
@@ -136,7 +148,7 @@ body.present #canvas{border:0;border-radius:0}
 /* peek HUD: a centred pill, lifted off the bottom edge. Full-width + bottom:0 put the right-hand controls exactly on the
    deck's own page counter (bottom-right, on styles.margin) whenever the canvas fills the screen — a tall 4:5 deck always. */
 body.present.peek #hud{display:flex!important;position:fixed;left:50%;right:auto;transform:translateX(-50%);bottom:12px;width:auto;max-width:calc(100vw - 24px);flex-wrap:nowrap;z-index:10;background:var(--card);border:1px solid var(--line);border-top:1px solid var(--line);border-radius:10px}
-body.present.peek #hud .spacer{display:none}
+body.present.peek #hud .spacer{display:none}body.present.peek #hud #bug{display:none} /* the peek pill stays narrow enough to clear a carousel's page counter; a report waits for the editor */
 /* the peek pill must clear a 4:5 deck's bottom-right counter: icon buttons are wider than typed glyphs, so the pill tightens */
 body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{padding:3px 6px}
 /* print: Safari forces US Letter PORTRAIT — it ignores px @page sizes AND the landscape keyword (margin:0 is honored).
@@ -216,13 +228,29 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
       </div>
       <div class="col"><div class="ph">File</div>
         <div><kbd>⌘S</kbd> save the file (asks for it once · Safari: downloads a copy)</div>
-        <div><a id="bug" href="#" title="Opens your mail app with the engine version, format and mode filled in — nothing is sent until you do">Report a bug</a> · opens your mail app · nothing is sent until you do</div>
         <div class="dim">Buttons only: add · duplicate · spellcheck · versions · PDF. Spellcheck underlines the words the build's dictionary refused, on every slide; the browser's own checker adds the row you type in. Never present, print or PDF.</div>
       </div>
     </div>
   </div>
+  <button id="bug" class="mi mi-bug" data-ms="600" data-tip="Report a bug" aria-label="Report a bug" aria-haspopup="dialog"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-mi="animate"><path d="m8 2 1.88 1.88"/><path d="M14.12 3.88 16 2"/><path d="M9 7.13v-1a3.003 3.003 0 1 1 6 0v1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6"/><path d="M12 20v-9"/><path d="M6.53 9C4.6 8.8 3 7.1 3 5"/><path d="M6 13H2"/><path d="M3 21c0-2.1 1.7-3.9 3.8-4"/><path d="M20.97 5c0 2.1-1.6 3.8-3.5 4"/><path d="M22 13h-4"/><path d="M17.2 17c2.1.1 3.8 1.9 3.8 4"/></svg></button>
 </div>
 <div id="sheet" hidden><button id="sheet-back" title="Back to slide (Esc)" aria-label="Back to slide (Esc)">← Back</button><div id="grid"></div></div>
+<!-- Report a bug: a native dialog (showModal traps focus, Esc closes, the backdrop is free). Four tiles, a short description; the
+     primary action is an anchor whose href is the mailto, rebuilt on every change. Nothing here reads the deck's words: bugProbe()
+     returns counts and fixed vocabulary, bugFacts() the deck's shape, and the address is receive-only. -->
+<dialog id="bugdlg" aria-labelledby="bugdlg-title">
+  <form method="dialog" id="bugform">
+    <div class="dh"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 2 1.88 1.88"/><path d="M14.12 3.88 16 2"/><path d="M9 7.13v-1a3.003 3.003 0 1 1 6 0v1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6"/><path d="M12 20v-9"/><path d="M6.53 9C4.6 8.8 3 7.1 3 5"/><path d="M6 13H2"/><path d="M3 21c0-2.1 1.7-3.9 3.8-4"/><path d="M20.97 5c0 2.1-1.6 3.8-3.5 4"/><path d="M22 13h-4"/><path d="M17.2 17c2.1.1 3.8 1.9 3.8 4"/></svg><h2 id="bugdlg-title">Report a bug</h2><button type="submit" class="x" aria-label="Close">×</button></div>
+    <div class="cats" role="radiogroup" aria-label="What went wrong">
+      <label class="cat"><input type="radio" name="cat" value="looks" checked><b>Looks wrong</b><span>Clipped text, overlap, wrong size or colour</span></label>
+      <label class="cat"><input type="radio" name="cat" value="respond"><b>Won't respond</b><span>A click, drag, key or undo did nothing, or the wrong thing</span></label>
+      <label class="cat"><input type="radio" name="cat" value="save"><b>Save or PDF</b><span>⌘S, versions, autosave or the PDF button lost or refused something</span></label>
+      <label class="cat"><input type="radio" name="cat" value="crash"><b>Crashed</b><span>A blank deck, a freeze, or the slide stopped drawing</span></label>
+    </div>
+    <label class="desc">What happened<textarea id="bugdesc" rows="3" maxlength="300" placeholder="A few words: what you did, what you saw. The engine version, format, slide and browser are added for you."></textarea></label>
+    <div class="df"><a id="bugsend" class="primary" href="#">Open mail app</a><button type="button" id="bugcopy">Copy report</button><span class="hint">to decklet@grunion.ai · nothing is sent until you do</span></div>
+  </form>
+</dialog>
 <div id="print"></div>
 
 <script>
@@ -305,25 +333,37 @@ function applyLog(deck,log){
 // A report is a mailto the reporter opens, reads and sends. The address is receive-only. bugFacts() is the CLOSED set of
 // what a deck contributes: its shape (format, size, slide count) and its id (10 hex chars of a sha256 over the model — one
 // way) — never text, notes, alt, role names, tokens, fonts, images, links, the title, a path, the log or the versions.
+// BUG_CATS are the four fixed categories (a fifth throws); probes are [key, value] pairs the caller measured — counts and
+// fixed words, never DOM reads inside this block. Subject: [ISSUE] decklet · <category> · <first 70 chars of the description>.
 // scrub() strips quoted strings, JSON payloads and directory parts from tool output so a verify line keeps its shape and
 // loses its words. The whole URL stays under BUG_CAP: Windows mailto handlers cut near 2083 characters.
 /*BUG*/
-const BUG_TO='decklet@grunion.ai',BUG_CAP=2000;
+const BUG_TO='decklet@grunion.ai',BUG_CAP=2000,BUG_CATS={looks:{label:'Looks wrong'},respond:{label:"Won't respond"},save:{label:'Save or PDF'},crash:{label:'Crashed'}};
 const scrub=s=>String(s).split('\n').map(l=>l.replace(/\{.*\}/,'{…}').replace(/(["'`]).*?\1/g,'…').replace(/(?:[A-Za-z]:[\\/]|~?\/)[^\s"'`:]*[\\/]/g,'').replace(/ slide (\d+) [^:\n]+:/,' slide $1:').replace(/(— )(?:…|[^\s,(]+)(?:, (?:…|[^\s,(]+))* \(/,'$1… (')).join('\n');
 function bugFacts(deck){return {format:deck.format||'slides',w:deck.w,h:deck.h,slides:deck.slides.length,id:deck.id}}
 function bugReport(o){
+  if(o.cat&&!BUG_CATS[o.cat])throw new Error('unknown category '+o.cat+' — one of '+Object.keys(BUG_CATS).join('|'));
+  const label=o.cat?BUG_CATS[o.cat].label:'',desc=String(o.desc||'').trim(),first=desc.split('\n')[0].replace(/\s+/g,' ').trim();
+  const subject=['[ISSUE] decklet',label,first?first.slice(0,70):''].filter(Boolean).join(' · ');
   const line=['decklet '+o.engine+(o.built&&o.built!==o.engine?' (this deck was built with '+o.built+')':''),o.format&&o.w?o.format+' '+o.w+'×'+o.h:'',o.slides?o.slides+' slides':'',o.at?'on slide '+o.at:'',o.mode].filter(Boolean).join(' · ');
   const cut=(s,n)=>s.length>n?s.slice(0,Math.max(0,n-6))+' [cut]':s;
-  const head=[line,'',... (o.id?['deck '+o.id]:[]),'','What I did','1. ','','What I expected','','','What happened instead','',''];
+  const pad=k=>k+' '.repeat(Math.max(1,11-k.length)); // aligned key/value lines; a long key still keeps one space
+  const probes=label?[label,...(o.probes||[]).map(([k,v])=>pad(k)+v),'']:[];
   const tail=['A screenshot helps. Replies come from a person\'s mailbox, not from this address.'];
   const snip=o.output?['Tool output ('+(o.tool||'cli')+')',scrub(o.output).trim(),'']:[];
-  const subject='[decklet] <what you saw, in a few words>';
-  const url=(client,out)=>{head[1]=client;const body=[...head,...(out.length?out:[]),...tail].join('\n');return {body,mailto:'mailto:'+BUG_TO+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body)}};
-  let client=String(o.client||''),out=snip,r=url(client,out),g=0; // over the cap: shrink the snippet by the excess until it fits, then the client string
+  const deckLine=o.id?['deck '+o.id,o.cat,o.env].filter(Boolean).join(' · '):'';
+  const url=(client,out)=>{const body=[line,client,...(deckLine?[deckLine]:[]),'',...probes,'What happened',desc,'','Steps to reproduce, if you can','1. ','',...out,...tail].join('\n');
+    return {body,mailto:'mailto:'+BUG_TO+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body)}};
+  let client=String(o.client||''),out=snip,r=url(client,out),g=0; // over the cap: shrink the snippet by the excess until it fits, then the client string; the reporter's words are never cut
   while(r.mailto.length>BUG_CAP&&out.length&&out[1].length>6&&g++<40){out=[out[0],cut(out[1],Math.max(6,out[1].length-(r.mailto.length-BUG_CAP))),out[2]];r=url(client,out)}
   while(r.mailto.length>BUG_CAP&&client.length>6&&g++<80){client=cut(client,Math.max(6,client.length-(r.mailto.length-BUG_CAP)));r=url(client,out)}
   return {subject,body:r.body,mailto:r.mailto}}
 /*/BUG*/
+// the error ring: the last three uncaught errors and rejections, scrubbed on arrival (quotes, parentheses, paths), so Crashed has
+// something to say even when the dialog opens after the fact. Installed here, before the engine, to catch its own load errors.
+const ERRS=[],errPush=m=>{ERRS.push(scrub(String(m).replace(/\([^)]*\)/g,'(…)')));if(ERRS.length>3)ERRS.shift()};
+window.addEventListener('error',e=>errPush((e.message||'error')+' · '+(e.lineno||0)+':'+(e.colno||0)));
+window.addEventListener('unhandledrejection',e=>errPush('rejection: '+String(e.reason&&e.reason.message||e.reason)));
 // the file's own edit log and version history (create.mjs fills both; ⌘S / write-back rewrite them with the browser's)
 const ENGINE=/*ENGINE*/'0.7.0'/*/ENGINE*/; // the package version that built this file (create.mjs); the bug report leads with it
 const LOG0=/*LOG*/[]/*/LOG*/;const VERS0=/*VERSIONS*/[]/*/VERSIONS*/;const SPELL0=/*SPELL*/["anim","anims","colours","decklet","donut","draggable","els","esc","fullscreen","github","hardcoded","html","inlined","json","mjs","rasterised","reflows","renderer","restaggers","retheme","supertitle","svg","validator"]/*/SPELL*/; // words the build's dictionary refused (lib/spell.mjs); the editor underlines them on every slide
@@ -908,6 +948,7 @@ function sheetKey(e){
   return false;
 }
 addEventListener('keydown',e=>{
+  if($('bugdlg').open)return; // the dialog owns the keyboard: arrows type, Esc closes it (never the sheet)
   if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='s'){e.preventDefault();saveFile();return} // ⌘S never reaches the browser's Save Page As
   if((e.metaKey||e.ctrlKey)&&['b','i','u'].includes(e.key.toLowerCase())&&(e.target.isContentEditable||selEl())){ // ⌘B ⌘I ⌘U = the toolbar marks; on a selected row they take the whole row
     e.preventDefault();if(!e.target.isContentEditable)edit([...sel][0]);document.execCommand({b:'bold',i:'italic',u:'underline'}[e.key.toLowerCase()]);placeTb();return}
@@ -1059,8 +1100,27 @@ const menu=open=>{addmenu.classList.toggle('open',open);addbtn.setAttribute('ari
 addbtn.onclick=()=>menu(!addmenu.classList.contains('open'));
 // ⓘ popover: click toggles, hover opens after a short delay; click-away (below) or Esc closes
 const helpmenu=$('helpmenu'),helpbtn=$('help');let helpT;
-const bugHref=()=>bugReport({...bugFacts(deck),engine:ENGINE,at:i+1,mode:document.body.classList.contains('present')?'presenting':document.body.classList.contains('sheet')?'contact sheet':'editing',client:navigator.userAgent}).mailto;
-const help=open=>{helpmenu.classList.toggle('open',open);helpbtn.setAttribute('aria-expanded',open);if(open)$('bug').href=bugHref()};
+const help=open=>{helpmenu.classList.toggle('open',open);helpbtn.setAttribute('aria-expanded',open)};
+// Report a bug: bugProbe(cat) measures this slide and this browser — counts, fixed words, the scrubbed error ring — and only the
+// keys its category lists; bugReport() (the shared block) shapes the mail. The primary action is an anchor: its href IS the mailto.
+function bugProbe(cat){
+  const els=(deck.slides[i]||{}).els||[],kind=e=>e.to?'connector':e.text!=null?'text':'box',n=k=>els.filter(e=>kind(e)===k).length;
+  const drawn=canvas.querySelectorAll('.el'),clipped=[...drawn].filter(e=>e.scrollHeight>e.clientHeight+1).length;
+  const a=($('autosave').dataset.state||'ok'),errs=ERRS.length?ERRS.join('\n           '):'none';
+  const env='viewport '+innerWidth+'×'+innerHeight+' · dpr '+devicePixelRatio+' · '+(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
+  const P={looks:[['rows',els.length+' ('+n('text')+' text · '+n('box')+' box · '+n('connector')+' connector)'],['clipped',String(clipped)],['guides',SNAP?'on':'off']],
+    respond:[['pointer',matchMedia('(pointer: coarse)').matches?'touch':'mouse'],['selection',sel.size+(sel.size===1?' row':' rows')],['autosave',a+' · '+unsynced+' edits not in the file'],['errors',errs]],
+    save:[['autosave',a],['file access',FSA?'yes':'no'],['versions',versions.length+' · '+unsynced+' edits not in the file'],['pdf route',CHROMIUM?'print':'raster'],['errors',errs]],
+    crash:[['errors',errs],['uptime',Math.round(performance.now()/1000)+' s'],['drawn',drawn.length+' of '+els.length+' rows']]};
+  return {env,probes:P[cat]}}
+const bugdlg=$('bugdlg'),bugdesc=$('bugdesc');
+const bugBuild=()=>{const cat=bugdlg.querySelector('input[name=cat]:checked').value,pr=bugProbe(cat);
+  return bugReport({...bugFacts(deck),engine:ENGINE,at:i+1,mode:document.body.classList.contains('present')?'presenting':document.body.classList.contains('sheet')?'contact sheet':'editing',client:navigator.userAgent,cat,desc:bugdesc.value,env:pr.env,probes:pr.probes})};
+const bugRender=()=>{$('bugsend').href=bugBuild().mailto};
+function bugOpen(){bugRender();bugdlg.showModal()}
+$('bug').onclick=bugOpen;bugdlg.addEventListener('input',bugRender);bugdlg.addEventListener('change',bugRender);
+$('bugsend').onclick=()=>setTimeout(()=>bugdlg.close(),80); // the browser hands the mailto to the mail app; the dialog steps aside
+$('bugcopy').onclick=async()=>{const r=bugBuild(),b=$('bugcopy');try{await navigator.clipboard.writeText('To: '+BUG_TO+'\nSubject: '+r.subject+'\n\n'+r.body);b.textContent='Copied'}catch{b.textContent='Copy failed'}setTimeout(()=>b.textContent='Copy report',1500)};
 helpbtn.onclick=()=>help(!helpmenu.classList.contains('open'));
 helpbtn.onmouseenter=()=>{helpT=setTimeout(()=>help(true),350)};helpbtn.onmouseleave=()=>clearTimeout(helpT);
 document.addEventListener('mousedown',e=>{if(!e.target.closest('#addwrap'))menu(false);if(!e.target.closest('#helpwrap'))help(false);if(!e.target.closest('#versmenu,#vers'))vers(false)});
