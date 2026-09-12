@@ -153,7 +153,7 @@ test('contact sheet: 3 across, pointer-drag reorder with FLIP (no HTML5 DnD), ne
 });
 test('print: named page sizes only (Safari), per-page bg, A4 injected from deck.page', () => {
   assert.match(tpl, /@page\{size:letter;margin:0\}/); assert.doesNotMatch(tpl, /@page\{size:\d+px/);
-  assert.match(tpl, /PW=PAGE==='a4'\?794:816/); assert.match(tpl, /st\.textContent='@page\{size:a4;margin:0\}'/);
+  assert.match(tpl, /const PAGES=\{letter:\[816,'letter'\],a4:\[794,'a4'\],'letter-landscape':\[1056,'letter landscape'\],'a4-landscape':\[1123,'a4 landscape'\],a3:\[1123,'a3'\]\}/, 'one page table: printable width in px, named @page size'); assert.match(tpl, /if\(PAGE!=='letter'\)\{const st=document\.createElement\('style'\);st\.textContent=`@page\{size:\$\{PAGES\[PAGE\]\[1\]\};margin:0\}`/, 'any page but the default injects its @page rule');
 });
 
 // ── 2a. storage that is honest about being blocked (Safari refuses localStorage on file:// — the browser decks open in) ──
@@ -515,6 +515,21 @@ test('create: format presets set canvas + page; --space overrides; model w/h win
   assert.deepEqual((d => [d.w, d.h])(create(m, {format: 'slides', space: '1600x900'}).deck), [1600, 900]);
   assert.deepEqual((d => [d.w, d.h])(create({...m, w: 1200, h: 700}, {format: 'slides'}).deck), [1200, 700]);
   assert.throws(() => create(m, {format: 'poster'}), /unknown format/);
+  // ROADMAP D1: the presets, and the pages they print on
+  assert.deepEqual(Object.fromEntries(Object.entries(FORMAT).map(([f, p]) => [f, [p.w, p.h, p.page]])), {
+    'slides': [960, 540, 'letter'], 'slides-4x3': [960, 720, 'letter'], 'story': [1080, 1920, 'letter'],
+    'carousel': [1080, 1080, 'letter'], 'carousel-4x5': [1080, 1350, 'letter'],
+    'document-letter': [816, 1056, 'letter'], 'document-a4': [794, 1123, 'a4'],
+    'document-letter-landscape': [1056, 816, 'letter-landscape'], 'document-a4-landscape': [1123, 794, 'a4-landscape'],
+    'poster-a3': [1123, 1587, 'a3'],
+  });
+  for (const p of ['letter', 'a4', 'letter-landscape', 'a4-landscape', 'a3']) assert.deepEqual(validate({...m, w: 1, h: 1, page: p}).errors.filter(e => /page/.test(e)), [], p);
+  assert.ok(validate({...m, w: 1, h: 1, page: 'tabloid'}).errors.some(e => /page "tabloid" must be letter\|a4\|letter-landscape\|a4-landscape\|a3/.test(e)));
+  // a library layout or a template is cut for 16:9: on any other canvas validate says it will stretch (until D2), once per slide
+  const wide = validate(withRoles({...m, w: 1600, h: 900, slides: [{layout: 'kpi-grid', els: []}]}));
+  assert.deepEqual(wide.warnings.filter(w => /stretch/.test(w)), [], '16:9 at any size is what the library is cut for');
+  const sq = validate({...withRoles({...m, w: 1080, h: 1080}), slides: [{layout: 'kpi-grid', els: []}, {template: 'three-up-cards', els: []}, {layout: 'mine', els: []}], layouts: {mine: {}}});
+  assert.deepEqual(sq.warnings.filter(w => /stretch/.test(w)).map(w => w.slice(0, 22)), ['slides[0]: layout "kpi', 'slides[1]: template "t'], 'a deck-defined layout is the author\'s own cut: no warning');
 });
 test('create: style.json tokens land in :root, roles merge (model wins per role), no roles anywhere → template neutral scale', () => {
   const style = {tokens: {accent: '#FF0000', bg: '#000'}, roles: {H1: {font: 'Georgia', size: 50, weight: 700, lh: 56, color: '#fff'}}};
@@ -718,6 +733,13 @@ live('live: editor rules — nib, present backdrop, master fork + inline counter
   await p.goto(pathToFileURL(a4).href); await p.waitForTimeout(200);
   assert.equal(await ev(() => [...document.styleSheets].some(s => { try { return [...s.cssRules].some(r => r.cssText.includes('a4')); } catch { return false; } })), true);
   assert.equal(await ev(() => document.documentElement.style.getPropertyValue('--Z')), '1.0000', 'A4 document prints at zoom 1');
+  // ROADMAP D1: a landscape document and an A3 poster inject their own named @page and print at zoom 1 too
+  for (const [f, size] of [['document-letter-landscape', 'letter landscape'], ['document-a4-landscape', 'a4 landscape'], ['poster-a3', 'a3']]) {
+    const g = path.join(tmp, f + '.html'); fs.writeFileSync(g, create({styles: {roles: modelOf(tpl).styles.roles}, slides: [{els: []}]}, {format: f}).html); // no w/h: the preset's canvas
+    await p.goto(pathToFileURL(g).href); await p.waitForTimeout(200);
+    assert.equal(await ev(() => document.documentElement.style.getPropertyValue('--Z')), '1.0000', f + ' prints at zoom 1');
+    assert.equal(await p.evaluate(sz => [...document.querySelectorAll('style')].some(st => st.textContent.includes('@page{size:' + sz + ';margin:0}')), size), true, f + ' injects @page ' + size);
+  }
   await b.close();
 });
 // ── 2d-bis. a move moves ALL of a row: a connector's far end is model geometry, not a rendered consequence ──

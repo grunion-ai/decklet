@@ -154,7 +154,7 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
 /* print: Safari forces US Letter PORTRAIT — it ignores px @page sizes AND the landscape keyword (margin:0 is honored).
    Layout is page-size-independent: each page is the model space at true size (absolute px, no clamps),
    `zoom`ed to the printable page width (816/W for Letter, 794/W for A4 — see deck.page). Each page paints ITS slide's bg; the dark body paints the letterbox. */
-@page{size:letter;margin:0} /* deck.page==="a4" injects an overriding @page rule at load */
+@page{size:letter;margin:0} /* any other deck.page injects its overriding @page rule at load — see PAGES */
 @media print{
   #wrap,#hud,#tb,#sheet,.gl,.gg{display:none!important}
   ::highlight(spell){text-decoration:none} /* the build's flagged words never reach paper */
@@ -400,9 +400,12 @@ const miPlay=(h)=>{const ms=+h.dataset.ms||0;if(!ms||h.dataset.on||matchMedia('(
 document.querySelectorAll('.mi').forEach((h,i)=>{h.addEventListener('mouseenter',()=>miPlay(h));setTimeout(()=>miPlay(h),300+i*90)});
 document.title=deck.title||'decklet'; // the deck names itself: tab title, ⤓ PDF filename and ⌘S copy filename are all this one string
 const W=deck.w||960,H=deck.h||540;
-const PAGE=deck.page==='a4'?'a4':'letter',PW=PAGE==='a4'?794:816;
+// print pages: printable width in px at 96dpi, and the named @page size (Safari honours names only — and ignores `landscape`,
+// so a landscape or A3 deck prints right from Chromium / bin/pdf.mjs and Letter-portrait-clipped from Safari)
+const PAGES={letter:[816,'letter'],a4:[794,'a4'],'letter-landscape':[1056,'letter landscape'],'a4-landscape':[1123,'a4 landscape'],a3:[1123,'a3']};
+const PAGE=PAGES[deck.page]?deck.page:'letter',PW=PAGES[PAGE][0];
 document.documentElement.style.cssText=`--W:${W}px;--H:${H}px;--Z:${(PW/W).toFixed(4)};--AR:${(W/H).toFixed(4)}`;
-if(PAGE==='a4'){const st=document.createElement('style');st.textContent='@page{size:a4;margin:0}';document.head.appendChild(st)}
+if(PAGE!=='letter'){const st=document.createElement('style');st.textContent=`@page{size:${PAGES[PAGE][1]};margin:0}`;document.head.appendChild(st)}
 // undo = snapshot stack; snap() BEFORE each mutation; persisted so ⌘Z survives refresh. no redo yet
 let history=JSON.parse(store.get(HKEY)||'[]');
 const hsave=()=>store.set(HKEY,JSON.stringify(history));
@@ -889,7 +892,11 @@ function sheetUi(on){sheet.hidden=!on;document.body.classList.toggle('sheet',on)
 function sheetOpen(){commitEdit();sel.clear();gsel=new Set([i]);ganchor=i;sheetUi(true);sheetRender();tb.hidden=true}
 function sheetClose(){sheetUi(false);render()}
 $('sheet-back').onclick=sheetClose; // ← Back: closes to the CURRENT slide (i untouched); Esc / dblclick-a-cell unchanged
+// #sheet (fixed, overflow:auto) is the scroller, not the window: emptying the grid collapses its scroll height and the browser
+// clamps scrollTop to 0, so every action snapped the sheet to the top. Keep the offset across the rebuild; then the acted-on
+// slide (i) comes into view only if it is off screen (block:'nearest' is a no-op for a visible cell).
 function sheetRender(){
+  const top=sheet.scrollTop;
   grid.innerHTML='';
   deck.slides.forEach((s,n)=>{
     const c=document.createElement('div');c.className='cell'+(gsel.has(n)?' sel':'');c.dataset.n=n;
@@ -898,6 +905,8 @@ function sheetRender(){
     c.append(cv,lb);grid.appendChild(c);
     cv.style.transform=`scale(${(c.clientWidth/W).toFixed(4)})`;
   });
+  sheet.scrollTop=top;
+  const c=grid.children[i];if(c)c.scrollIntoView({block:'nearest'});
 }
 grid.addEventListener('mousedown',e=>{
   const c=e.target.closest('.cell');if(!c)return;e.preventDefault();const n=+c.dataset.n; // preventDefault: thumbnails are renders, never text — no native selection/focus on press

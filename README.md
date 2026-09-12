@@ -67,7 +67,7 @@ A slide engine where the deck is a JSON model and the renderer is the editor. `c
 **Who it is for.** Agents (Claude Code, Codex, Cursor, any tool-using model) that must turn content into a deck a human will then edit. Humans get a file they can open and change; agents get a contract they can validate before a browser is involved.
 
 **Inputs → outputs.**
-- in: any content (outline, notes, markdown, transcript, data) + a format (`slides`, `carousel`, `document-letter`, `document-a4`) + a style (brand tokens + eight text roles, or the neutral default)
+- in: any content (outline, notes, markdown, transcript, data) + a format (`slides`, `carousel`, `document-letter`, `document-a4`, and the 4:3 / story / landscape / A3 presets) + a style (brand tokens + eight text roles, or the neutral default)
 - out: `deck.html` — one file, ~40 KB (this repo's explainer carries three inlined screen clips, so it weighs ~270 KB), editable, printable, verifiable
 
 **Zero dependencies.** The engine is plain HTML/CSS/JS in a single file. The CLI is plain Node ≥ 22. Playwright is an *optional* devDependency used only by `verify`, `pdf` and `import-html`; nspell + dictionary-en are *optional* devDependencies used only by `create` to flag misspellings (absent, create says so and the editor falls back to the browser's own checker).
@@ -128,6 +128,7 @@ A row is text by default; `box`, `tile`, `bar`, `line`, `donut`, `svg`, `img` ar
 | `slides` 16:9 (960×540, 1600×900) | supported | editing, contact sheet, present, PDF, verify |
 | `carousel` 1:1 / `carousel-4x5` | experimental | sizing, editing, PDF work; no per-card PNG export |
 | `document-letter` / `document-a4` | experimental | page = canvas, print zoom 1; text does not flow across pages |
+| `slides-4x3` · `story` 9:16 · `document-letter-landscape` · `document-a4-landscape` · `poster-a3` | experimental | sizing, editing, PDF work; **library layouts and templates are cut for 16:9 and stretch here** — `validate` warns per slide; draw free rows until aspect-aware composition (ROADMAP D2) |
 | drag / multi-select / resize / undo | supported | undo history persisted per deck; connectors get point nibs |
 | edit log · write-back · versions | supported | in-file `/*LOG*/` + `/*VERSIONS*/`; ⌘S writes the file (Chrome/Edge), `create --from` migrates, restore from the history popover |
 | inline text editing + B/I/U/S + colour runs | supported | stored as `html` on the row |

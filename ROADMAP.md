@@ -24,9 +24,9 @@ These are Jira's sizes. Read them one rung up if SAFe is your habit.
 
 ### Lanes
 
-Five lanes, one per product area. A lane groups epics for reading; it sets no owner and caps no work in progress.
+Seven lanes, one per product area. A lane groups epics for reading; it sets no owner and caps no work in progress.
 
-`Platform & release` · `Notes & presenting` · `Media & links` · `Mobile & touch` · `Documents & formats` · `Export`
+`Platform & release` · `Notes & presenting` · `Media & links` · `Mobile & touch` · `Documents & formats` · `Export` · `Library & editor`
 
 ### Horizons
 
@@ -64,6 +64,7 @@ Epics rank by **ICE**: Impact x Confidence x Ease, each 1 to 10, multiplied, wit
 | **Mobile & touch** | M1 Read it on a phone `S` | M2 Present from the phone `S` | M3 Touch editing `L` |
 | **Documents & formats** | D1 Format presets `S` | D2 Aspect-aware composition `XL` | D3 Real documents `XL` |
 | **Export** | X1 Cheap wins `S` | X2 Searchable PDF `M` | X3 PPTX export `L` |
+| **Library & editor** | L1 Sheet keeps its scroll `XS`<br>L2 PDF export shows progress `S`<br>L3 Counter owns the corner `S`<br>L4 One foot band on the sheet `S`<br>L5 Sample media on the sheet `S`<br>L6 Generic placeholder copy `M`<br>L7 Spellcheck, the rest `M`<br>L8 Versions, the rest `M` | L9 Figures in the library `M`<br>L10 Styles on the sheet `M` | |
 
 ### ICE scores
 
@@ -89,6 +90,16 @@ Epics rank by **ICE**: Impact x Confidence x Ease, each 1 to 10, multiplied, wit
 | D2 Aspect-aware composition | 7 | 6 | 2 | **84** | Next |
 | D3 Real documents | 8 | 5 | 2 | **80** | Later |
 | M3 Touch editing | 6 | 5 | 3 | **90** | Later |
+| L1 Sheet keeps its scroll | 7 | 10 | 10 | **700** | Now |
+| L2 PDF export shows progress | 8 | 10 | 8 | **640** | Now |
+| L3 Counter owns the corner | 6 | 9 | 8 | **432** | Now |
+| L4 One foot band on the sheet | 6 | 9 | 8 | **432** | Now |
+| L5 Sample media on the sheet | 6 | 9 | 8 | **432** | Now |
+| L6 Generic placeholder copy | 7 | 9 | 6 | **378** | Now |
+| L7 Spellcheck, the rest | 8 | 7 | 6 | **336** | Now |
+| L8 Versions, the rest | 8 | 7 | 6 | **336** | Now |
+| L9 Figures in the library | 9 | 8 | 5 | **360** | Next |
+| L10 Styles on the sheet | 7 | 8 | 5 | **280** | Next |
 
 Three epics sit off their score.
 
@@ -320,6 +331,109 @@ The outward `href` contract is shipped. The open thread is what a link can point
 | V4.2 | S | The ⤓ PDF re-encodes images at page resolution instead of embedding the full data: URI on every page that shows one. |
 
 ---
+
+## Library & editor
+
+Filed 2026-09-12 from Kyle's review of the rebuilt library deck (89 slides, decklet 0.7.0 at `ea265cc`, opened in Safari). Nine observations, one epic each; L7 and L8 reopen two features the changelog lists as shipped, because the implementation is not done from the user's chair. Each story is one PR; none touches this file (the review closes the row after the merge).
+
+### L1. Sheet keeps its scroll · `XS` · Now
+
+Every contact-sheet action (add, duplicate, delete, reorder, selection keys) re-runs `sheetRender()`, which does `grid.innerHTML = ''` and rebuilds every cell. The page's scroll height collapses for that frame, so the viewport snaps to the top and the grid refills under it. On an 89-slide deck it also redraws 89 thumbnails per keystroke.
+
+| Story | Size | What |
+| --- | --- | --- |
+| L1.1 | XS | Capture `scrollY` before the rebuild, restore it after, and scroll the acted-on cell into view when it left the viewport. |
+| L1.2 | S | Patch cells in place: rebuild only the changed slides, FLIP the rest, so the sheet stops redrawing the whole deck per action. |
+
+**Gate:** a live test in `editor.test.mjs` that scrolls the sheet, duplicates a slide, and asserts `scrollY` within one cell height of where it was.
+
+### L2. PDF export shows progress · `S` · Now
+
+In WebKit the ⤓ button runs the in-file rasteriser: per slide a foreignObject render at 3× (2880×1620), a 14 MB RGB read, deflate through CompressionStream and a latin-1 append, all serial on the main thread. The only signal is `aria-busy` on the button, which has no CSS. On 89 slides the page looks frozen. Chromium takes the print dialog and is exempt.
+
+| Story | Size | What |
+| --- | --- | --- |
+| L2.1 | S | The button becomes an `n / N` counter with a thin bar while exporting; the loop yields to the event loop after each page so the bar paints. |
+| L2.2 | XS | Scale drops to 2× above 40 slides; at slide size 3× buys nothing a reader sees. |
+| L2.3 | M | Deflate moves into a Worker if L2.1 still feels sluggish. |
+
+**Gate:** a WebKit live test that exports a 12-slide deck and sees the counter reach `12 / 12` before the blob exists.
+
+### L3. Counter owns the corner · `S` · Now
+
+The page counter paints inside the one `footer:1` master row with its right edge on `styles.margin`, so it should be bottom-right on every slide. Two things break that: the `legend` dense slot is also right-anchored at the foot (y 474/476, directly above the counter), so on reading slides the legend reads as the corner element; and `image-hero-overlay` hides the footer outright.
+
+| Story | Size | What |
+| --- | --- | --- |
+| L3.1 | S | A `counter` geometry in the layout contract that every layout honours (the corner is reserved); `legend` moves left of it. |
+| L3.2 | XS | `verify` checks that the counter box is identical on every slide except a declared `hide`. |
+
+### L4. One foot band on the sheet · `S` · Now
+
+The sheet's master foot ("decklet library" + counter, y 506) sits under whatever each slide brings: templates carry their own sample `source`/`legend`/`caption`, layouts get sheet-supplied ones, some slides none. The foot band reads differently slide to slide.
+
+| Story | Size | What |
+| --- | --- | --- |
+| L4.1 | S | One foot convention for the sheet: source-id line left, counter right; template foot chrome moves to the dense slots or is dropped. |
+| L4.2 | XS | A sheet test asserting the foot band's rows are the same set on every slide. |
+
+### L5. Sample media on the sheet · `S` · Now
+
+The image templates and layouts bind one blue gradient SVG placeholder. `img` rows take any data: URI and an animated GIF plays today with no engine change, so the sheet shows nothing of the image tool.
+
+| Story | Size | What |
+| --- | --- | --- |
+| L5.1 | S | A bundled sample set under `templates/samples/`: two photos, one product screenshot, one short GIF, all small and licence-clean, bound to the image templates and layouts the way `cta` gets its `href`. |
+| L5.2 | XS | The residue gate keeps stripping `base64,` payloads; the sample set has a size budget in the test. |
+
+### L6. Generic placeholder copy · `M` · Now
+
+Template and sheet sample copy is specific and homely: a community garden, a rebuilt kitchen, a sleep experiment, rainwater butts. It should read as varied business, startup and product placeholder content a buyer can picture swapping for their own, across fictional companies (no client residue; the gate greps for it).
+
+| Story | Size | What |
+| --- | --- | --- |
+| L6.1 | M | Rewrite the samples in `lib/templates/cat-*.mjs` and the `TEXT` map in `templates/build-sheet.mjs`: a handful of fictional companies and products, each template speaking about a different one so the sheet still reads as many slides rather than one repeated. |
+| L6.2 | S | Word counts and line counts stay inside each layout's budget; parity on the whole sheet stays PASS. |
+
+### L7. Spellcheck, the rest · `M` · Now
+
+0.7.0 shipped option C (build-time dictionary, painted through the Highlight API) and it works where it paints. Reopened: the feature is not done from the chair.
+
+| Story | Size | What |
+| --- | --- | --- |
+| L7.1 | S | A typo typed after the build is only flagged by the browser layer until the next `create`; the editor re-checks the row it just committed. |
+| L7.2 | M | Suggestions and correct-in-place from the painted layer (right-click or a toolbar chip), not only the browser's own menu. |
+| L7.3 | XS | Whatever Kyle hit first goes here as the leading story once named. |
+
+### L8. Versions, the rest · `M` · Now
+
+0.5.0 shipped the in-file version history, the edit log and `create --from`. Reopened for the same reason.
+
+| Story | Size | What |
+| --- | --- | --- |
+| L8.1 | S | A diff view between two versions (which slides, which rows, which keys). |
+| L8.2 | S | Safari ⌘S still downloads instead of saving; a clear path or a clear message. |
+| L8.3 | S | N2.2's storage isolation: a second window must be a reader, never a writer. |
+| L8.4 | XS | Whatever Kyle hit first goes here as the leading story once named. |
+
+### L9. Figures in the library · `M` · Next
+
+The nine figure kinds (decision, flow, before/after, data model, states, release, boundaries, tree, layers) exist only as specs in the harness helper `scripts/decklet-diagram.mjs`; the engine's catalogue has four process templates and the bare `diagram` layout with a three-box sample.
+
+| Story | Size | What |
+| --- | --- | --- |
+| L9.1 | M | Vendor the helper as `lib/diagram.mjs` (nodes, edges, groups, timeline → native rows; the same router and label rules). |
+| L9.2 | S | `lib/templates/cat-figures.mjs`: the nine as templates with sample rows, seated in a new "Figures" kind on the sheet. |
+| L9.3 | XS | `--templates` prints them; the harness helper becomes a thin import. |
+
+### L10. Styles on the sheet · `M` · Next
+
+The sheet builds once in the neutral style (`styles: {margin: 60}` and nothing else), so it shows no variation in type or palette.
+
+| Story | Size | What |
+| --- | --- | --- |
+| L10.1 | M | A closing "Styles" section that repeats six slides (cover, statement, table, chart, figure, end) under five kits: serif + terracotta (the warm example), dark, graphite + amber, deep navy + blue, one display-face pairing. The palette section of the harness diagram showcase is the pattern. |
+| L10.2 | S | Each kit is a `style.json` under `examples/styles/` a user can copy. |
 
 ## Carried forward
 
