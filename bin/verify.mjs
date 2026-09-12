@@ -4,7 +4,8 @@
 //   2. LAYOUT PARITY in a real browser (Playwright, optional devDep)  always when Playwright is installed
 //        every text row: no overflow (scrollWidth ≤ clientWidth), nowrap rows render ONE line, rows imported from HTML render the
 //        source line count (data-lines), every element stays inside the canvas, zero page errors, no text row hidden under a
-//        later-painted opaque row (occlusion — sampled with elementFromPoint; fails like every other parity shape)
+//        later-painted opaque row (occlusion — sampled with elementFromPoint; fails like every other parity shape), and the page
+//        counter's box is the same on every slide that shows the footer (the corner is the counter's; a `hide` of the footer is exempt)
 //   3. AE pixel diff vs reference PNGs (ImageMagick `magick`/`compare`)  only when --refs is given
 // usage: node bin/verify.mjs deck.html [--refs dir] [--out dir] [--threshold 0.5] [--fuzz 2%] [--report model.report.json] [--fonts <css url>] [--strict]
 //   --report: the importer's drift report (default: model.report.json beside the deck) — masks where the mockup drew its chrome
@@ -150,7 +151,10 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
       // scale, not a layout fault — reported as scale crowding for a human decision, never a failure. Everything else stays hard.
       // …only when it renders FEWER lines (collapsed runs); more lines or overflow means the importer's fit cap failed — hard
       const soft = o => o.snapped && o.problems.every(x => { const m = /^source had (\d+) line\(s\), renders (\d+)/.exec(x); return m && +m[2] < +m[1]; });
-      res.parity.push({slide: n + 1, name, pass: !bad.some(o => !soft(o)), rows: bad.filter(o => !soft(o)), crowding: bad.filter(soft), occlusion: occl.map(u => u.msg)});
+      // the counter's box — right edge, top, height (its width follows the digits) — in canvas px, for the corner check below
+      const counter = await p.evaluate(() => { const c = document.querySelector('#canvas .num'); if (!c) return null; const r = c.getBoundingClientRect(), cv = canvas.getBoundingClientRect();
+        return {right: +(r.right - cv.left).toFixed(1), top: +(r.top - cv.top).toFixed(1), h: +r.height.toFixed(1)}; });
+      res.parity.push({slide: n + 1, name, pass: !bad.some(o => !soft(o)), rows: bad.filter(o => !soft(o)), crowding: bad.filter(soft), occlusion: occl.map(u => u.msg), counter});
       const act = path.join(out, `${String(n + 1).padStart(2, '0')}-${name}.png`);
       await p.locator('#canvas').screenshot({path: act});
       if (hasMagick) {
@@ -183,6 +187,12 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
       }
     }
     await b.close();
+    // the counter owns the corner: the same box on every slide that shows the footer. A slide that hides the footer (`hide`) draws
+    // the pin and is exempt; `counter:0` draws none. A moved counter — a footer override with its own y, a slide-local nudge — fails parity.
+    const fid = ((deck.master || []).find(m => m && m.footer) || {}).id;
+    const shown = res.parity.filter((q, k) => q.counter && !(deck.slides[k].hide || []).includes(fid)), ref = shown[0];
+    for (const q of shown.slice(1)) if (['right', 'top', 'h'].some(k => q.counter[k] !== ref.counter[k])) {
+      q.rows.push({n: 'counter', text: `${q.slide} / ${N}`, problems: [`counter box (right ${q.counter.right}, top ${q.counter.top}, h ${q.counter.h}) differs from slide ${ref.slide} (right ${ref.counter.right}, top ${ref.counter.top}, h ${ref.counter.h}) — the corner is the counter's on every slide`]}); q.pass = false; }
     if (pageErrors.length) res.errors.push('page errors: ' + pageErrors.join(' | '));
     fs.writeFileSync(path.join(out, 'results.json'), JSON.stringify(res, null, 1));
   }
