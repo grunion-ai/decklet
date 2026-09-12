@@ -4,7 +4,7 @@
 
 decklet is a slide engine for agents. The deck is a JSON model; the renderer is the editor; the output is ONE self-contained .html (no dependencies, no network) a human can drag, retype, present and print. Plain Node >= 22 CLI. Playwright is optional and only used by verify/pdf/import-html.
 
-Loop: content + format + style -> model.json -> `node bin/validate.mjs model.json` -> `node bin/create.mjs --model model.json [--style style.json] --out deck.html --format slides|carousel|carousel-4x5|document-letter|document-a4` -> `node bin/verify.mjs deck.html [--refs shots/]` -> hand-off. Revising a deck a human edited: `node bin/edits.mjs deck.html` (read the in-file edit log) -> `node bin/create.mjs --model model.json --out deck.html --from deck.html` (keeps deck/slide/row ids, replays the human's edits — human wins, conflicts reported — and keeps the version history) -> verify. The migrate is the LAST step, never the first.
+Loop: content + format + style -> model.json -> `node bin/validate.mjs model.json` -> `node bin/create.mjs --model model.json [--style style.json] --out deck.html --format slides|carousel|carousel-4x5|document-letter|document-a4` -> `node bin/verify.mjs deck.html [--refs shots/]` -> hand-off. Revising a deck a human edited: `node bin/edits.mjs deck.html` (read the in-file edit log) -> `node bin/create.mjs --model model.json --out deck.html --from deck.html` (keeps deck/slide/row ids, replays the human's edits — human wins, conflicts reported) -> verify. The migrate is the LAST step, never the first.
 
 Formats: slides (960x540 or 1600x900) supported; carousel (1080x1080, 1080x1350) and document (Letter 816x1056, A4 794x1123) experimental (sizing/editing/PDF work; text does not flow across pages).
 
@@ -18,16 +18,16 @@ PDF: the ⤓ button writes a true slide-sized PDF inside the file (foreignObject
 - deck.html: the engine with its own explainer deck (12 slides, incl. the motion vocabulary and three inlined GIF clips of the editor) — live at https://grunion-ai.github.io/decklet/deck.html
 - docs/demo.gif, docs/demo-poster.png: README demo recording, a build product of deck.html via docs/record-demo.mjs (Playwright + ffmpeg)
 - docs/record-clips.mjs: films the three editor clips on the explainer's "filmed" slide from deck.html and writes them into examples/explainer/model.json as data: URIs (Playwright + ffmpeg)
-- template.html: the engine with an empty model; create.mjs fills the /*DECK*/ /*TOKENS*/ /*KEY*/ /*ENGINE*/ /*LOG*/ /*VERSIONS*/ /*SPELL*/ markers (the /*EDITS*/ block is the in-file edit core, shared with lib/edits.mjs; the /*BUG*/ block is the bug-report builder, shared with lib/bug.mjs)
+- template.html: the engine with an empty model; create.mjs fills the /*DECK*/ /*TOKENS*/ /*KEY*/ /*ENGINE*/ /*LOG*/ /*SPELL*/ markers (the /*EDITS*/ block is the in-file edit core, shared with lib/edits.mjs; the /*BUG*/ block is the bug-report builder, shared with lib/bug.mjs)
 - bin/validate.mjs: pure-Node model contract validator (exit 1 on errors; --strict for warnings); includes the gap gate — declared boxes owe neighbours styles.gap (4px), estimates warn with ~
 - bin/create.mjs: model (+style) -> deck.html with format presets
 - bin/verify.mjs: self-containment + contract + layout parity (always) + AE vs refs (optional); writes results.json
 - bin/pdf.mjs: deck.html -> vector PDF via Chromium print engine + px @page (one slide per page, text stays text, hrefs are /Link annotations, HUD hidden by the deck's @media print); gates pages/ratio/HUD/links, exit 1 on failure. The ONLY way an agent makes a PDF — never screenshots stitched by ImageMagick
-- bin/edits.mjs: prints the human edit log + version history a deck file carries (read before revising)
+- bin/edits.mjs: prints the human edit log a deck file carries (read before revising)
 - lib/bug.mjs: node side of the bug-report builder (bugReport/bugFacts/scrub lifted from template.html's /*BUG*/ block; engineOf reads a deck's ENGINE literal)
 - bin/bug.mjs: decklet bug — prints a prefilled mailto to decklet@grunion.ai ([ISSUE] subject with --category and --desc; engine version, format, size, slide count, node + OS, a scrubbed --log snippet); never the deck's words
-- lib/edits.mjs: node side of the in-file edit core (stampIds/diffDecks/applyLog lifted from template.html's /*EDITS*/ block; blockOf/putBlock for DECK/LOG/VERSIONS)
+- lib/edits.mjs: node side of the in-file edit core (stampIds/diffDecks/applyLog lifted from template.html's /*EDITS*/ block; blockOf/putBlock for DECK/LOG)
 - bin/import-html.mjs: HTML pages at a fixed viewport -> model.json (master/slots/roles lifted, Title detected on non-content layouts; _lines intent for parity)
 - examples/explainer, examples/quarterly-update, examples/launch-carousel, examples/one-pager: brief.md -> model.json (+ style.json)
-- test/gate.test.mjs: node --test gate (engine contract, validator, create, import, live proofs); test/edits.test.mjs (ids, log, migrate, create --from); test/editor.test.mjs (live: nibs, PDF arrows, autosave, position, migrate on load, ⌘S write-back, versions, ⌘B)
+- test/gate.test.mjs: node --test gate (engine contract, validator, create, import, live proofs); test/edits.test.mjs (ids, log, migrate, create --from); test/editor.test.mjs (live: nibs, PDF arrows, autosave, position, migrate on load, ⌘S write-back, ⌘B); test/autosave.test.mjs (continuous write-back, the storage tier chain, two windows converging); test/mobile.test.mjs (Pixel 7 / iPhone 14 emulation: touch edits persist, an app switch commits); test/embed.test.mjs (same-origin, cross-site and srcdoc iframes)
 - CHANGELOG.md, LICENSE (MIT)

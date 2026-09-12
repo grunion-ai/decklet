@@ -100,7 +100,7 @@ test('scrub: quoted strings, JSON payloads and directory paths leave a tool line
 });
 
 // ── the guard: nothing a deck says can reach the mail ──
-test('bugFacts: reads only the shape of a deck — format, size, slide count, id — never its words, tokens, assets, log or versions', () => {
+test('bugFacts: reads only the shape of a deck — format, size, slide count, id — never its words, tokens, assets or log', () => {
   const deck = leakyDeck();
   const f = bugFacts(deck, {log: leakyLog, versions: [{at: 1, deck}], title: SENTINEL.title, file: SENTINEL.path});
   assert.deepEqual(Object.keys(f).sort(), ['format', 'h', 'id', 'slides', 'w'], 'the fact set is closed: a new key is a new leak review');
@@ -178,7 +178,7 @@ live('live: opening ⓘ fills the anchor with a mailto that names the engine, th
   noLeak(decodeURIComponent(href), 'live mailto (crash)');
   await p.click('label:has(input[name=cat][value=save])'); // the radio is visually hidden; the tile is the label
   body = new URL(await p.getAttribute('#bugsend', 'href')).searchParams.get('body');
-  assert.match(body, /\nSave or PDF\nautosave   (ok|local|bad)\nfile access (yes|no)\nversions   \d+ · \d+ edits not in the file\npdf route  (print|raster)\n/, body);
+  assert.match(body, /\nSave or PDF\nautosave   (ok|local|bad)\nfile access (yes|no)\nstore      (local|idb|mem)\npending    \d+ edits not in the file\npdf route  (print|raster)\n/, body);
   await p.click('label:has(input[name=cat][value=respond])'); // the radio is visually hidden; the tile is the label
   body = new URL(await p.getAttribute('#bugsend', 'href')).searchParams.get('body');
   assert.match(body, /\nWon't respond\npointer    (mouse|touch)\nselection  \d+ rows?\nautosave   (ok|local|bad) · \d+ edits not in the file\n/, body);
