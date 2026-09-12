@@ -23,8 +23,8 @@ export const KINDS = [
     templates: ['cover-hero', 'cover-split', 'section-numeral'], layouts: ['cover', 'title', 'section', 'content'] },
   { id: 'agenda', name: 'Agenda', note: 'What the deck covers.', templates: ['agenda-ruled'], layouts: ['agenda'] },
   { id: 'concept', name: 'Concept', note: 'Claims, comparisons, frameworks, cards: the slide that carries an argument.',
-    templates: ['exec-summary', 'statement', 'three-up-cards', 'bento-grid', 'two-col-compare', 'pros-cons', 'benchmark-table', 'harvey-balls', 'scorecard-grid', 'two-by-two', 'swot', 'temple', 'venn-3', 'pyramid-layers', 'value-chain', 'table-insight', 'proof-strip', 'team-grid'],
-    layouts: ['statement', 'two-cols', 'two-cols-header', 'comparison'] },
+    templates: ['bullet-page', 'exec-summary', 'statement', 'three-up-cards', 'bento-grid', 'two-col-compare', 'pros-cons', 'benchmark-table', 'harvey-balls', 'scorecard-grid', 'two-by-two', 'swot', 'temple', 'venn-3', 'pyramid-layers', 'value-chain', 'table-insight', 'proof-strip', 'team-grid'],
+    layouts: ['bullets', 'statement', 'two-cols', 'two-cols-header', 'comparison'] },
   { id: 'quote', name: 'Quote', note: 'Someone else\'s words at display size.', templates: ['quote-pull'], layouts: ['quote'] },
   { id: 'data', name: 'Data', note: 'Numbers, KPIs and every chart.',
     templates: ['stat-hero', 'stat-row-4', 'kpi-scorecard', 'stat-plus-chart', 'delta-pair', 'progress-tracker', 'dashboard-composite',
@@ -35,7 +35,7 @@ export const KINDS = [
   { id: 'figures', name: 'Figures', note: 'The figure kinds as rows — decision, flow, before / after, data model, states, release, boundaries (five nodes, then seven across three zones), tree, layers — and the bare frame.',
     templates: ['figure-decision', 'figure-flow', 'figure-before-after', 'figure-data-model', 'figure-states', 'figure-release', 'figure-boundaries', 'figure-boundaries-6', 'figure-tree', 'figure-layers'], layouts: ['diagram'] },
   { id: 'timeline', name: 'Timeline', note: 'Dated events on a spine, lanes on a month grid.', templates: ['timeline-horizontal', 'gantt-lanes'], layouts: ['timeline'] },
-  { id: 'image', name: 'Image', note: 'A photo or a screenshot carries the slide.', templates: ['image-hero-overlay', 'image-split', 'annotated-shot'], layouts: ['image-left', 'image-right'] },
+  { id: 'image', name: 'Image', note: 'A photo or a screenshot carries the slide.', templates: ['image-hero-overlay', 'image-split', 'image-bullets', 'annotated-shot'], layouts: ['image-left', 'image-right'] },
   { id: 'end', name: 'End', note: 'The ask, then thanks.', templates: ['closing-cta'], layouts: ['cta', 'end'] },
 ];
 // every template and every layout is placed exactly once
@@ -55,6 +55,7 @@ export const MEDIA = {   // slide id → [sample, alt, object-position]
   'image-hero-overlay': ['photo-1.jpg', 'A hillside at dusk under a low sun', 'center'],
   'image-split': ['photo-2.jpg', 'A harbour skyline at night, lights on the water', '60% 50%'],
   'annotated-shot': ['clip.gif', 'The events screen: a failed delivery retried and going green', 'left top'],
+  'image-bullets': ['photo-2.jpg', 'A harbour skyline at night, lights on the water', '60% 50%'],
   'image-left': ['ui-shot.png', 'The events screen of an event-delivery dashboard', 'left top'],
   'image-right': ['photo-1.jpg', 'A hillside at dusk under a low sun', 'center'],
 };
@@ -84,6 +85,11 @@ const TEXT = {
   'quote.quote': 'We cut our produce bill by a fifth and the kitchen stopped calling six suppliers every morning.', 'quote.attribution': 'Head chef · Harbor Hotels',
   'two-cols.supertitle': 'Pricing', 'two-cols.title': 'Usage pricing against a flat seat', 'two-cols.subtitle': 'Two years, one account, the same product.', 'two-cols.left': 'Usage pricing keeps the entry cheap and small teams sign up on a card. The bill rises with traffic and finance cannot forecast it.', 'two-cols.right': 'A flat seat fixes the monthly cost and every spike is free. Small teams balk at the floor and a quiet quarter is paid for anyway.', 'two-cols.note': 'Both columns assume the same support tier and the same contract term.', 'two-cols.source': 'Source · billing data, 2024–2026', 'two-cols.legend': '',
   'two-cols-header.supertitle': 'Retention', 'two-cols-header.title': 'What changed when the reminder moved to 7 pm', 'two-cols-header.subtitle': 'A four-week product experiment.', 'two-cols-header.header': 'The reminder moved from 7 am to 7 pm; nothing else did.', 'two-cols-header.left': 'Morning runs held. The runners who left were the ones who never ran before work, and they now plan the night before.', 'two-cols-header.right': 'Evening runs rose within a week. Second-week retention climbed four points and the support inbox lost its notifications thread.', 'two-cols-header.note': 'The control group kept the morning reminder and the gap held through week four.', 'two-cols-header.source': 'Source · product analytics, 28 days', 'two-cols-header.legend': '',
+  'bullets.supertitle': 'The close', 'bullets.title': 'Six things the month-end close waits on', 'bullets.subtitle': 'Every one of them is a person waiting for a file.',
+  'bullets.b1': 'The bank feed posts overnight and is matched by nine.', 'bullets.b2': 'Card statements arrive on the third working day.',
+  'bullets.b3': 'Two subsidiaries send their ledgers as spreadsheets.', 'bullets.b4': 'Balances between the two entities are agreed on a call, not in the ledger.',
+  'bullets.b5': 'The accrual list is rebuilt by hand every month.', 'bullets.b6': 'Sign-off needs two directors and one of them travels.',
+  'bullets.note': 'Four of the six are waits, not work: the close is a queue before it is a ledger.', 'bullets.source': 'Source · Tallyline close log, six months', 'bullets.legend': '',
   'comparison.supertitle': 'Connectivity', 'comparison.title': 'Cellular or radio for the field', 'comparison.subtitle': 'Sensor to dashboard, measured over a month.', 'comparison.left-head': 'Cellular', 'comparison.right-head': 'Radio', 'comparison.left': 'Two-minute readings, the same every day. Dead zones on three farms in ten. A SIM fee per unit.', 'comparison.right': 'Fifteen-minute readings, most of the delay at the gateway. No dead zones. One gateway per site.', 'comparison.note': 'Cellular wins on cadence; radio wins on cost.', 'comparison.source': 'Source · field trial, 20 sites', 'comparison.legend': '',
   // numbers
   'fact.stat': '4 days', 'fact.label': 'saved on the month-end close by matching payments on arrival', 'fact.body': 'The bank feed posts overnight. Matching it the same morning clears the queue before the close begins.',
@@ -113,7 +119,9 @@ const KPIS = {   // per layout, so the two grids speak for two companies
 const DELTAS = { 'kpi-grid': ['↑ 12%', '↓ 2', '↑ 4 min', 'new'], 'kpi-grid-4': ['↑ 12%', '↑ 0.01', '↓ 6 ms', '+1'] };
 const fill = (name) => {
   const lay = LIBRARY[name];
-  const els = Object.entries(lay.slots).filter(([slot]) => TEXT[`${name}.${slot}`] !== '').map(([slot, sl]) => {
+  // `body` and b1…bn are alternatives (validate errors on the pair): the image layouts review as their paragraph, and the
+  // `bullets` layout — which has no `body` — reviews as its six points. The `image-bullets` template shows the other half.
+  const els = Object.entries(lay.slots).filter(([slot]) => TEXT[`${name}.${slot}`] !== '' && !(/^b\d$/.test(slot) && lay.slots.body)).map(([slot, sl]) => {
     if (slot === 'image') return media(name, { slot });
     if (slot === 'chart') return { slot, chart: CHART };
     if (!sl.role) return { slot };                                        // paint: the slot carries it

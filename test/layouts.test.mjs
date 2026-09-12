@@ -6,25 +6,27 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import {spawnSync} from 'node:child_process';
-import {fileURLToPath} from 'node:url';
+import {fileURLToPath, pathToFileURL} from 'node:url';
 import {validate, ROLES} from '../bin/validate.mjs';
 import {create} from '../bin/create.mjs';
 import {verify} from '../bin/verify.mjs';
-import {LIBRARY, GROUPS, DENSE, COUNTER, NEUTRAL_LH, libraryFor, catalogue, freeArea} from '../lib/layouts.mjs';
+import {LIBRARY, GROUPS, DENSE, COUNTER, NEUTRAL_LH, libraryFor, catalogue, densityReport, freeArea} from '../lib/layouts.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 let pw = null; try { pw = await import('playwright'); } catch {}
 const live = pw ? test : test.skip;
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'decklet-lib-'));
 
-export const NAMES = ['cover', 'agenda', 'section', 'content', 'title', 'statement', 'fact', 'quote', 'two-cols', 'two-cols-header', 'image-left', 'image-right',
+export const NAMES = ['cover', 'agenda', 'section', 'content', 'title', 'statement', 'fact', 'quote', 'two-cols', 'two-cols-header', 'bullets', 'image-left', 'image-right',
   'bento-grid', 'image-hero-overlay', 'image-split', 'annotated-shot', 'three-up-cards', 'dashboard-composite', 'table-insight', 'proof-strip', 'team-grid',
   'kpi-grid', 'kpi-grid-4', 'stat', 'chart', 'comparison', 'process-steps', 'diagram', 'timeline', 'cta', 'end'];
 const IMG = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 3"><rect width="4" height="3" fill="#5B9CF6"/></svg>');
 // one slide per library layout, every slot bound with plausible content
 export const fill = (name, k = 0) => {
   const lay = LIBRARY[name];
-  const els = Object.entries(lay.slots).map(([slot, sl]) => {
+  // `body` and b1…bn are alternatives — a column carries the paragraph or the points, and validate errors on the pair, so the
+  // image layouts fill as their paragraph here; the bullets-beside-an-image slide is its own test below.
+  const els = Object.entries(lay.slots).filter(([slot]) => !(/^b\d$/.test(slot) && lay.slots.body)).map(([slot, sl]) => {
     if (slot === 'image') return {slot, img: IMG, fit: 'cover'};
     if (slot === 'chart') return {slot, bg: 'var(--box)'};   // a painted stand-in until the chart row lands
     if (!sl.role) return {slot};                              // paint slots (rule, dots, button): the slot carries the paint
@@ -66,6 +68,87 @@ test('library: every layout is complete, its slots wear a role from the scale (o
   for (const n of ['kpi-grid', 'kpi-grid-4']) for (const k of [1, 2, 3]) for (const s of [`kpi${k}`, `kpi${k}-label`, `kpi${k}-delta`]) assert.ok(LIBRARY[n].slots[s], `${n}.${s}: value + label + delta`);
   for (const s of ['supertitle', 'title', 'chart', 'takeaway', 'source']) assert.ok(LIBRARY.chart.slots[s], 'chart: ' + s);
   assert.equal(LIBRARY.stat.slots.stat.role, 'Stat', 'stat is the hero number');
+});
+
+// ── U5.1 / U5.2: the missing starting rungs — a plain bullet page, and points beside an image
+const LH = NEUTRAL_LH;   // the neutral scale, one line of each role
+
+test('library: bullets — six Body slots down the left, one line apart, each carrying the engine\'s dot', () => {
+  const b = LIBRARY.bullets;
+  assert.equal(b.group, 'text'); assert.equal(b.density, 'reading');
+  assert.equal(b.slots.title.role, 'H1'); assert.equal(b.slots.supertitle.role, 'Supertitle');
+  const keys = Object.keys(b.slots).filter(k => /^b\d$/.test(k));
+  assert.deepEqual(keys, ['b1', 'b2', 'b3', 'b4', 'b5', 'b6'], 'four to six points, six slots');
+  for (const k of keys) {
+    const sl = b.slots[k];
+    assert.equal(sl.role, 'Body', k); assert.equal(sl.bullet, 1, k + ': the engine draws its dot');
+    assert.equal(sl.x, 96, k + ': indented 36px so the dot (1.25em) clears the margin');
+    assert.equal(sl.w, 780, k);
+  }
+  const ys = keys.map(k => b.slots[k].y);
+  assert.deepEqual(ys, [160, 204, 248, 292, 336, 380], 'a 44px pitch: one line of Body and 20px of air');
+  assert.ok(ys.at(-1) + LH.Body + 4 <= b.slots.note.y, 'the last point clears the note');
+  for (const n of ['image-left', 'image-right']) {
+    const lay = LIBRARY[n];
+    assert.deepEqual(Object.keys(lay.slots).filter(k => /^b\d$/.test(k)), ['b1', 'b2', 'b3', 'b4'], n + ': four points beside the image');
+    assert.ok(lay.slots.body, n + ': the paragraph slot stays');
+    for (const k of ['b1', 'b2', 'b3', 'b4']) assert.equal(lay.slots[k].bullet, 1, `${n}.${k}`);
+    assert.equal(lay.slots.b1.x, lay.slots.body.x + 36, n + ': the points are indented from the paragraph column');
+    assert.ok(lay.slots.b4.y + LH.Body + 4 <= lay.slots.note.y, n + ': four points and a note both fit the panel');
+  }
+});
+
+test('library: no dense slot collides — subtitle · note · source · legend clear every other slot of their layout', () => {
+  const box = sl => {
+    if (sl.w === 'auto' || (sl.x == null && sl.right == null)) return null;   // a w:auto slot has no declared width to compare
+    const w = sl.w, x = sl.right != null ? 960 - sl.right - w : sl.x;
+    return {x, y: sl.y, w, h: sl.h ?? LH[sl.role] ?? 0};
+  };
+  const hits = (A, B) => Math.min(A.x + A.w, B.x + B.w) - Math.max(A.x, B.x) > 0.5 && Math.min(A.y + A.h, B.y + B.h) - Math.max(A.y, B.y) > 0.5;
+  for (const [name, lay] of Object.entries(LIBRARY)) for (const k of Object.keys(DENSE)) {
+    const A = lay.slots[k] && box(lay.slots[k]); if (!A) continue;
+    for (const [n2, sl2] of Object.entries(lay.slots)) {
+      if (n2 === k || (lay.slots[k].group != null && lay.slots[k].group === sl2.group)) continue;
+      const B = box(sl2); if (!B) continue;
+      assert.ok(!hits(A, B), `${name}: dense slot ${k} (${A.x},${A.y} ${A.w}×${A.h}) collides with ${n2} (${B.x},${B.y} ${B.w}×${B.h})`);
+    }
+  }
+});
+
+test('library: a bullet page binds only the points it has — four bullets, four dot-bearing rows, no fifth', () => {
+  const m = {w: 960, h: 540, slides: [{layout: 'bullets', els: [{slot: 'supertitle', text: 'The close'}, {slot: 'title', text: 'Four things the close waits on'},
+    {slot: 'subtitle', text: 'Each one is a person waiting for a file.'},
+    {slot: 'b1', text: 'The bank feed posts overnight.'}, {slot: 'b2', text: 'Card statements land on the third day.'},
+    {slot: 'b3', text: 'Two subsidiaries send spreadsheets.'}, {slot: 'b4', text: 'Sign-off needs two directors.'},
+    {slot: 'source', text: 'Source · close log, six months'}]}]};
+  const {deck: d} = create(m);
+  const v = validate(d);
+  assert.deepEqual(v.errors, []); assert.deepEqual(v.warnings, []);
+  const rows = d.slides[0].els.filter(r => /^b\d$/.test(r.slot || ''));
+  assert.equal(rows.length, 4, 'four bound bullets');
+  assert.ok(!d.slides[0].els.some(r => r.slot === 'b5' || r.slot === 'b6'), 'no fifth or sixth row exists to carry a fifth dot');
+  for (const r of rows) assert.equal(d.layouts.bullets[r.slot].bullet, 1, r.slot + ': the slot carries the marker');
+  assert.equal(d.layouts.bullets.b5.bullet, 1, 'b5 still declares its marker — unbound, it draws nothing at all');
+});
+
+test('library: a column carries the paragraph or the points — binding both is an error', () => {
+  const both = {w: 960, h: 540, slides: [{layout: 'image-left', els: [{slot: 'title', text: 'Built for the hour before work.'},
+    {slot: 'body', text: 'A paragraph beside the photo.'}, {slot: 'b1', text: 'And a point beside it too.'}]}]};
+  const v = validate(create(both).deck);
+  assert.ok(v.errors.some(m => /binds "body" and b1/.test(m)), v.errors.join(' | '));
+  const points = {w: 960, h: 540, slides: [{layout: 'image-left', els: [{slot: 'title', text: 'Built for the hour before work.'},
+    {slot: 'b1', text: 'Most runs start before half past six.'}, {slot: 'b2', text: 'A median run is thirty-four minutes.'},
+    {slot: 'b3', text: 'One buzz a kilometre, no screen.'}, {slot: 'source', text: 'Source · activity log'}]}]};
+  assert.deepEqual(validate(create(points).deck).errors, []);
+});
+
+test('library: the bullets layout answers to both densities — three points at speaker, six at reading', () => {
+  const slide = n => ({layout: 'bullets', els: [{slot: 'supertitle', text: 'The close'}, {slot: 'title', text: 'What the close waits on'},
+    ...Array.from({length: n}, (_, i) => ({slot: `b${i + 1}`, text: `A wait on somebody else, number ${i + 1}.`}))]});
+  assert.equal(densityReport(slide(3), LIBRARY, 'speaker'), null, 'three points is a speaker slide');
+  assert.ok(densityReport(slide(4), LIBRARY, 'speaker'), 'four points is not');
+  const dense = slide(6); dense.els.push({slot: 'source', text: 'Source · close log'});
+  assert.equal(densityReport(dense, LIBRARY, 'reading'), null, 'six points with a source is a reading slide');
 });
 
 test('library: a deck using every layout validates clean — and a deck-defined layout of the same name wins', () => {
@@ -169,6 +252,27 @@ test('library: SKILL.md documents the catalogue and the mixing rule', () => {
   assert.ok(sec.length > 500, 'a LAYOUT LIBRARY section');
   for (const n of NAMES) assert.ok(new RegExp('`' + n + '`').test(sec), n + ' in the catalogue table');
   assert.match(sec, /validate\.mjs --layouts/); assert.match(sec, /free rows/); assert.match(sec, /override/);
+});
+
+live('live: four bullets draw four dots and no fifth — in chromium and in webkit, the dot outside the row\'s own box', async () => {
+  const m = {w: 960, h: 540, title: 'dots', slides: [{layout: 'bullets', els: [{slot: 'title', text: 'Four things the close waits on'},
+    ...[1, 2, 3, 4].map(n => ({slot: `b${n}`, text: `A wait on somebody else, number ${n}.`}))]}]};
+  const f = path.join(tmp, 'dots.html'); fs.writeFileSync(f, create(m).html);
+  for (const name of ['chromium', 'webkit']) {
+    const b = await pw[name].launch(); const p = await b.newPage({viewport: {width: 1280, height: 800}});
+    const errs = []; p.on('pageerror', e => errs.push(String(e)));
+    await p.goto(pathToFileURL(f).href); await p.waitForTimeout(200);
+    const seen = await p.evaluate(() => [...document.querySelectorAll('#canvas .el.bul')].map(el => {
+      const m = getComputedStyle(el, '::before');
+      return {w: parseFloat(m.width), h: parseFloat(m.height), left: parseFloat(m.left), paints: m.content === '""' && m.position === 'absolute'};
+    }));
+    assert.equal(seen.length, 4, name + ': one dot-bearing row per bound bullet');
+    for (const d of seen) { assert.ok(d.paints, name + ': the marker is drawn'); assert.ok(Math.abs(d.w - 8) < 1 && Math.abs(d.h - 8) < 1, `${name}: an 8px dot at Body, got ${d.w}×${d.h}`); assert.ok(Math.abs(d.left + 20) < 1, `${name}: 20px left of the row box, got ${d.left}`); }
+    assert.deepEqual(errs, [], name + ': zero page errors');
+    await b.close();
+  }
+  const r = await verify(f, {out: path.join(tmp, 'v-dots'), strict: true, log: () => {}});
+  assert.deepEqual(r.errors, [], JSON.stringify(r.parity.filter(x => !x.pass)));
 });
 
 live('live: a deck using every library layout renders — parity holds, zero page errors; so does the mixed slide', async () => {
