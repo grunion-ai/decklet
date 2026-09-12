@@ -2,12 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>decklet</title>
 <style>
 :root{/*TOKENS*/--bg:#111315;--fg:#F3F4F6;--muted:#9CA3AF;--accent:#5B9CF6;--card:#1A1D21;--line:#2C3138;--sel:#5B9CF6;--box:#20262E;--warm-fg:#1B1B1F;--warm-muted:#6B6F76;--warm-accent:#C2410C;--warm-card:#F4F1EA;--warm-box:#FBE9DF;--warm-line:#D6D1C4;--dark-fg:#F3F4F6;--dark-muted:#9CA3AF;--dark-accent:#5B9CF6;--dark-card:#1A1D21;--dark-box:#20262E;--dark-line:#2C3138;--graphite-amber-fg:#FFFFFF;--graphite-amber-muted:#B4B8C4;--graphite-amber-accent:#C97A54;--graphite-amber-card:#23262C;--graphite-amber-box:#3A3F47;--graphite-amber-line:#3A3F47;--navy-blue-fg:#E0DCD4;--navy-blue-muted:#B4B8C4;--navy-blue-accent:#60A5FA;--navy-blue-card:#0C1B33;--navy-blue-box:#132444;--navy-blue-line:#1A2D54;--display-fg:#14121F;--display-muted:#625E75;--display-accent:#6D28D9;--display-card:#FFFFFF;--display-box:#EFE9FB;--display-line:#DCD9E6/*/TOKENS*/;--W:960px;--H:540px;--Z:0.85;--AR:1.7778}
 *{box-sizing:border-box;margin:0}
-body{background:var(--bg);color:var(--fg);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+body{background:var(--bg);color:var(--fg);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;height:100vh;height:100svh;display:flex;flex-direction:column;overflow:hidden}
 #wrap{flex:1;display:flex;align-items:center;justify-content:center;min-height:0}
 #canvas{position:relative;width:var(--W);height:var(--H);background:var(--card);border:1px solid var(--line);border-radius:12px;transform-origin:center;flex:none;overflow:hidden}
 /* href is one model prop with two surfaces: an inset anchor over a whole row (a CTA box), and anchor runs inside .html.
@@ -75,7 +75,7 @@ body.present .el a.lk{pointer-events:auto}
 #autosave[data-state=busy]{background:#d29922;box-shadow:0 0 6px #d2992288;animation:asave .6s ease-in-out infinite alternate}#autosave[data-state=busy]::after{content:''}
 @keyframes asave{from{opacity:.5}to{opacity:1}}
 @media (prefers-reduced-motion:reduce){#autosave{box-shadow:none;animation:none!important}}
-#hud{position:relative;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 16px;border-top:1px solid var(--line);font:12px ui-monospace,Menlo,monospace;color:var(--muted)}
+#hud{position:relative;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 16px calc(8px + env(safe-area-inset-bottom));border-top:1px solid var(--line);font:12px ui-monospace,Menlo,monospace;color:var(--muted)}
 #hud button,#tb button,#sheet-back{background:var(--card);border:1px solid var(--line);color:var(--fg);border-radius:6px;padding:4px 10px;cursor:pointer;font:inherit}
 #hud .sep{width:1px;height:18px;background:var(--line)}
 #hud .spacer{flex:1}
@@ -149,7 +149,7 @@ body.present #canvas{border:0;border-radius:0}
 /* …but the HUD peeks back in while the pointer hovers the bottom twelfth (video-player controls pattern) */
 /* peek HUD: a centred pill, lifted off the bottom edge. Full-width + bottom:0 put the right-hand controls exactly on the
    deck's own page counter (bottom-right, on styles.margin) whenever the canvas fills the screen — a tall 4:5 deck always. */
-body.present.peek #hud{display:flex!important;position:fixed;left:50%;right:auto;transform:translateX(-50%);bottom:12px;width:auto;max-width:calc(100vw - 24px);flex-wrap:nowrap;z-index:10;background:var(--card);border:1px solid var(--line);border-top:1px solid var(--line);border-radius:10px}
+body.present.peek #hud{display:flex!important;position:fixed;left:50%;right:auto;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom));width:auto;max-width:calc(100vw - 24px);flex-wrap:nowrap;z-index:10;background:var(--card);border:1px solid var(--line);border-top:1px solid var(--line);border-radius:10px}
 body.present.peek #hud .spacer{display:none}body.present.peek #hud #bug{display:none} /* the peek pill stays narrow enough to clear a carousel's page counter; a report waits for the editor */
 /* the peek pill must clear a 4:5 deck's bottom-right counter: icon buttons are wider than typed glyphs, so the pill tightens */
 body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{padding:3px 6px}
@@ -416,7 +416,9 @@ const snap=()=>{history.push(JSON.stringify(deck));if(history.length>50)history.
 function undo(){if(!history.length)return;deck=JSON.parse(history.pop());hsave();sel.clear();save();render()}
 
 // windowed = maximal slide: scale up as well as down (no 1-cap); reserve only real chrome (few px sides, HUD below)
-function fit(){const s=document.fullscreenElement||document.body.classList.contains('present-inline')?Math.min(innerWidth/W,innerHeight/H):Math.min((innerWidth-12)/W,(innerHeight-52)/H);canvas.style.transform=`scale(${s})`;placeTb()}
+// fit() reads the LAYOUT viewport (documentElement.client*), never innerWidth/innerHeight: a phone's layout viewport inflates
+// to the canvas's own overflow, so measuring innerWidth made the slide too wide before any interaction (ROADMAP M1.1)
+function fit(){const vw=document.documentElement.clientWidth,vh=document.documentElement.clientHeight,s=document.fullscreenElement||document.body.classList.contains('present-inline')?Math.min(vw/W,vh/H):Math.min((vw-12)/W,(vh-52)/H);canvas.style.transform=`scale(${s})`;placeTb()}
 addEventListener('resize',fit);
 
 // autosave indicator: amber pulse while saving → green ✓ when the shim persisted → red when edits would be lost on refresh.
