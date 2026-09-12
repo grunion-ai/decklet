@@ -7,7 +7,7 @@ import path from 'node:path';
 import os from 'node:os';
 import {execFileSync, spawnSync} from 'node:child_process';
 import {fileURLToPath, pathToFileURL} from 'node:url';
-import {validate, mergeStyle, ROLES, ANIMS, linksOf} from '../bin/validate.mjs';
+import {validate, mergeStyle, ROLES, ANIMS, linksOf, resolveCanvas} from '../bin/validate.mjs';
 import {create, FORMAT} from '../bin/create.mjs';
 import {loadChecker} from '../lib/spell.mjs';
 import {assemble, extract, extractInPage, classify, detectTitle} from '../bin/import-html.mjs';
@@ -506,6 +506,32 @@ test('validator: structural errors', () => {
   assert.ok(validate({w: 1, h: 1, styles: {roles: {}}, slides: [{els: []}]}).errors.some(e => /styles\.roles missing/.test(e)));
   assert.ok(validate({w: 1, h: 1, styles: {roles: {H1: {font: 'x'}}}, slides: [{els: []}]}).errors.some(e => /role H1: missing size/.test(e)));
   assert.ok(validate({w: 1, h: 1, format: 'poster', styles: {roles: {}}, slides: [{els: []}]}).errors.some(e => /format "poster"/.test(e)));
+});
+// ROADMAP U1.1 — the canvas is resolved once, by the resolver create builds with, so a model that names only `format` validates
+test('validator: w/h come from format exactly as create applies them; a model naming neither says both ways out', () => {
+  const m = {styles: {roles: modelOf(tpl).styles.roles}, slides: [{els: []}]};
+  for (const [f, p] of Object.entries(FORMAT)) {
+    assert.deepEqual(validate({...m, format: f}).errors, [], `format ${f} alone must validate`);
+    const c = resolveCanvas({...m, format: f});
+    assert.deepEqual([c.w, c.h], [p.w, p.h], f);
+    const d = create({...m, format: f}, {}).deck;
+    assert.deepEqual([c.w, c.h], [d.w, d.h], `${f}: validate and create resolve the same canvas`);
+  }
+  // the model's own w/h still win over the preset, exactly as create applies them
+  assert.deepEqual((c => [c.w, c.h])(resolveCanvas({...m, format: 'carousel', w: 1200, h: 700})), [1200, 700]);
+  // neither format nor w/h: ONE error, naming both ways out
+  const bare = validate(m).errors;
+  assert.equal(bare.length, 1, `one error, got ${JSON.stringify(bare)}`);
+  assert.match(bare[0], /format/); assert.match(bare[0], /\bw\b/); assert.match(bare[0], /\bh\b/);
+  // a size that is present but not a positive number still says which one
+  assert.ok(validate({...m, w: 960, h: 0}).errors.some(e => /deck\.h must be a positive number/.test(e)));
+  // …and the CLI, the path every agent takes: a model that names only its format passes, and the library layout it names
+  // is cut to that format's canvas (the resolution happens before libraryFor, exactly as in create)
+  const mf = path.join(tmp, 'format-only.json');
+  fs.writeFileSync(mf, JSON.stringify({format: 'story', title: 'fmt', slides: [{layout: 'content', els: [{slot: 'title', text: 'Renewals hold at 94%'}]}]}));
+  const r = spawnSync(process.execPath, [path.join(root, 'bin/validate.mjs'), mf], {encoding: 'utf8'});
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /0 errors/);
 });
 
 // ── 5. create ──

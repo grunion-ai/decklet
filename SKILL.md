@@ -138,7 +138,7 @@ Say, in this order:
 Top level:
 | prop | type | default | example |
 |---|---|---|---|
-| `w`, `h` | number | from format | `960`, `540` |
+| `w`, `h` | number | from `format`, in `validate` as in `create` | `960`, `540` — name `format` or both; a model naming neither is an error |
 | `format` | enum | `slides` | `"carousel"` |
 | `page` | `letter`\|`a4` | from format | set by create |
 | `title` | string | `decklet` | `"Q3 update"` — tab title + `⤓`/`⌘S` filename; `--title` overwrites it |

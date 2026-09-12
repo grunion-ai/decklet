@@ -29,7 +29,36 @@ export function fillKpi(deck) {
   return deck;
 }
 export const ANIMS = ['rise', 'fade', 'pop', 'wipe'];   // entrance motion on slide entry — the engine ignores anything else
-export const FORMATS = ['slides', 'slides-4x3', 'story', 'carousel', 'carousel-4x5', 'document-letter', 'document-a4', 'document-letter-landscape', 'document-a4-landscape', 'poster-a3'];
+// page-size presets of ONE model space: canvas size + print page (named sizes only — Safari ignores px @page sizes).
+// The table lives here, the lower half of the pair, because create() imports this module: create re-exports it, so
+// `import {create, FORMAT} from './create.mjs'` still reads the same object and the two can never hold different numbers.
+export const FORMAT = {
+  'slides':          {w: 960,  h: 540,  page: 'letter'},   // 16:9 — or 1600×900 via --space
+  'carousel':        {w: 1080, h: 1080, page: 'letter'},   // 1:1   (experimental — see README)
+  'carousel-4x5':    {w: 1080, h: 1350, page: 'letter'},   // 4:5   (experimental)
+  'document-letter': {w: 816,  h: 1056, page: 'letter'},   // 8.5×11in at 96dpi — print zoom is exactly 1 (experimental)
+  'document-a4':     {w: 794,  h: 1123, page: 'a4'},       // 210×297mm at 96dpi — print zoom is exactly 1 (experimental)
+  // ROADMAP D1 presets. Every library layout and template is cut for 16:9, so on these canvases they render stretched until D2
+  // (aspect-aware composition) lands — validate says so per slide; draw free rows or define the deck's own layouts.
+  'slides-4x3':      {w: 960,  h: 720,  page: 'letter'},   // 4:3   (experimental)
+  'story':           {w: 1080, h: 1920, page: 'letter'},   // 9:16  (experimental)
+  'document-letter-landscape': {w: 1056, h: 816, page: 'letter-landscape'}, // zoom 1 (experimental; Safari prints Letter portrait — use bin/pdf.mjs)
+  'document-a4-landscape':     {w: 1123, h: 794, page: 'a4-landscape'},     // zoom 1 (experimental; same Safari caveat)
+  'poster-a3':       {w: 1123, h: 1587, page: 'a3'},       // 297×420mm at 96dpi, zoom 1 (experimental)
+};
+export const FORMATS = Object.keys(FORMAT);
+// The canvas a deck will wear: --space wins, then the model's own w/h, then the named format's preset. create() resolves
+// with fallback 'slides' (a model that names nothing still builds 16:9); validate resolves with no fallback, so a model
+// naming neither format nor w/h is reported instead of silently sized. ONE resolver — validate can never measure text fit
+// against a canvas create would not build. (ROADMAP U1.1)
+export function resolveCanvas(deck, {format, space, fallback} = {}) {
+  const fmt = format || deck.format || fallback || null;
+  const preset = fmt ? FORMAT[fmt] || null : null;
+  let w = deck.w, h = deck.h;
+  if (space) [w, h] = space.split('x').map(Number);
+  if ((w == null || h == null) && preset) ({w, h} = preset);
+  return {format: fmt, page: preset ? preset.page : deck.page, w, h};
+}
 export const PAGES = ['letter', 'a4', 'letter-landscape', 'a4-landscape', 'a3'];   // named @page sizes the runtime knows (template PAGES)
 export const ARROWS = ['start', 'end', 'both'];          // WHICH ends carry a head
 export const HEADS = ['triangle', 'chevron', 'dot', 'bar'];   // WHAT is drawn there row
@@ -68,9 +97,13 @@ export function validate(deck) {
   const errors = [], warnings = [];
   const E = (m) => errors.push(m), Wn = (m) => warnings.push(m);
   if (!deck || typeof deck !== 'object') return {ok: false, errors: ['model is not an object'], warnings};
-  const W = deck.w, H = deck.h;
-  if (!isNum(W) || W <= 0) E('deck.w must be a positive number');
-  if (!isNum(H) || H <= 0) E('deck.h must be a positive number');
+  // the canvas create() will build: an explicit w/h wins, else the named format's preset (U1.1 — the contract's "from format")
+  const {w: W, h: H} = resolveCanvas(deck);
+  if (deck.format == null && deck.w == null && deck.h == null) E(`deck size missing — name a format (${FORMATS.join('|')}), or give deck.w and deck.h as positive numbers`);
+  else {
+    if (!isNum(W) || W <= 0) E('deck.w must be a positive number');
+    if (!isNum(H) || H <= 0) E('deck.h must be a positive number');
+  }
   if (deck.format && !FORMATS.includes(deck.format)) E(`deck.format "${deck.format}" not one of ${FORMATS.join('|')}`);
   if (deck.page && !PAGES.includes(deck.page)) E(`deck.page "${deck.page}" must be ${PAGES.join('|')}`);
   // styles.roles — the eight-role strict type scale: every role is a complete treatment; one font+size per role
@@ -363,6 +396,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const tpl = new URL('../template.html', import.meta.url);
     if (fs.existsSync(tpl)) { const t = JSON.parse(fs.readFileSync(tpl, 'utf8').match(/\/\*DECK\*\/([\s\S]*?)\/\*\/DECK\*\//)[1]); deck.styles = {...t.styles, ...(deck.styles || {}), roles: t.styles.roles}; console.error('note    no styles.roles in the model — validated against the template\'s neutral roles (create.mjs does the same)'); }
   }
+  // the canvas first: the library cuts its layouts to w/h, so `format` must be resolved before they are pulled in (U1.1)
+  const canvas = resolveCanvas(deck);
+  if (canvas.w != null && canvas.h != null) { deck.w = canvas.w; deck.h = canvas.h; if (canvas.page) deck.page = deck.page || canvas.page; }
   deck.layouts = {...libraryFor(deck), ...(deck.layouts || {})}; fillKpi(deck); expandCharts(deck);   // exactly what create() does, so the same rows are judged
   const r = validate(deck);
   for (const m of r.errors) console.error('ERROR   ' + m);

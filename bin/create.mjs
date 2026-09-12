@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {pathToFileURL, fileURLToPath} from 'node:url';
-import {validate, mergeStyle, fillKpi} from './validate.mjs';
+import {validate, mergeStyle, fillKpi, FORMAT, resolveCanvas} from './validate.mjs';
 import {libraryFor} from '../lib/layouts.mjs';
 import {expandCharts} from '../lib/chart.mjs';
 import {expandTemplates} from '../lib/templates.mjs';
@@ -17,21 +17,10 @@ import {expandIcons} from '../lib/icons.mjs';
 import {flags as spellFlags, loadChecker} from '../lib/spell.mjs';
 import {stampIds, diffDecks, applyLog, blockOf, hasBlock, putBlock} from '../lib/edits.mjs';
 
-// page-size presets of ONE model space: canvas size + print page (named sizes only — Safari ignores px @page sizes)
-export const FORMAT = {
-  'slides':          {w: 960,  h: 540,  page: 'letter'},   // 16:9 — or 1600×900 via --space
-  'carousel':        {w: 1080, h: 1080, page: 'letter'},   // 1:1   (experimental — see README)
-  'carousel-4x5':    {w: 1080, h: 1350, page: 'letter'},   // 4:5   (experimental)
-  'document-letter': {w: 816,  h: 1056, page: 'letter'},   // 8.5×11in at 96dpi — print zoom is exactly 1 (experimental)
-  'document-a4':     {w: 794,  h: 1123, page: 'a4'},       // 210×297mm at 96dpi — print zoom is exactly 1 (experimental)
-  // ROADMAP D1 presets. Every library layout and template is cut for 16:9, so on these canvases they render stretched until D2
-  // (aspect-aware composition) lands — validate says so per slide; draw free rows or define the deck's own layouts.
-  'slides-4x3':      {w: 960,  h: 720,  page: 'letter'},   // 4:3   (experimental)
-  'story':           {w: 1080, h: 1920, page: 'letter'},   // 9:16  (experimental)
-  'document-letter-landscape': {w: 1056, h: 816, page: 'letter-landscape'}, // zoom 1 (experimental; Safari prints Letter portrait — use bin/pdf.mjs)
-  'document-a4-landscape':     {w: 1123, h: 794, page: 'a4-landscape'},     // zoom 1 (experimental; same Safari caveat)
-  'poster-a3':       {w: 1123, h: 1587, page: 'a3'},       // 297×420mm at 96dpi, zoom 1 (experimental)
-};
+// page-size presets of ONE model space: the FORMAT table lives in validate.mjs (the module create builds on), re-exported
+// here so `import {create, FORMAT} from './create.mjs'` is unchanged and the validator can never size a deck differently.
+export {FORMAT};
+
 const here = path.dirname(fileURLToPath(import.meta.url));
 const esc = s => s.replace(/<\/script/gi, '<\\/script');
 const put = (html, mark, to) => {
@@ -62,9 +51,9 @@ export function create(model, {style = null, format, space, title, template, fro
   if (prev) inheritIds(deck, prev);
   const fmt = format || deck.format || 'slides';
   if (!FORMAT[fmt]) throw new Error(`unknown format ${fmt}`);
-  deck.format = fmt; deck.page = FORMAT[fmt].page;
-  if (space) { const [w, h] = space.split('x').map(Number); deck.w = w; deck.h = h; }
-  if (deck.w == null || deck.h == null) { deck.w = FORMAT[fmt].w; deck.h = FORMAT[fmt].h; }
+  // the ONE resolver, shared with validate: --space, then the model's own w/h, then the preset (ROADMAP U1.1)
+  const canvas = resolveCanvas(deck, {format, space, fallback: 'slides'});
+  deck.format = canvas.format; deck.page = canvas.page; deck.w = canvas.w; deck.h = canvas.h;
   // style.json: {tokens:{bg,fg,muted,accent,card,line,sel,box}, roles:{…}, pad:{…}} — shared with validate --style so the two never drift
   mergeStyle(deck, style);
   expandTemplates(deck); // template slides → their rows (the template's chrome layout named on the slide), before the library resolves
