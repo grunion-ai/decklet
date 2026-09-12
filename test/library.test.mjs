@@ -15,5 +15,5 @@ test('library.html == create(build-sheet): every template and layout, by kind, c
   assert.equal(r.status, 0, r.stderr);
   const model = JSON.parse(fs.readFileSync(path.join(root, 'templates/candidates.model.json'), 'utf8'));
   assert.equal(model.slides.filter(s => !/^kind-/.test(s.name)).length, 80, '58 templates + 22 layouts');
-  assert.equal(create(model, {title: 'decklet library', spell: await loadChecker('en')}).html, fs.readFileSync(path.join(root, 'library.html'), 'utf8'), 'library.html needs a rebuild: node templates/build-sheet.mjs && node bin/create.mjs --model templates/candidates.model.json --out library.html --title "decklet library" --force');
+  assert.equal(create(model, {title: 'decklet library', spell: await loadChecker('en')}).html, fs.readFileSync(path.join(root, 'library.html'), 'utf8'), 'library.html needs a rebuild: npm run build:library');
 });
