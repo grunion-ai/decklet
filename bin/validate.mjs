@@ -95,6 +95,7 @@ export function validate(deck) {
     if (s.template != null && !TEMPLATE[s.template]) E(`slides[${si}]: template "${s.template}" not in the library (${Object.keys(TEMPLATE).join(', ')})`);
     else if (s.template != null) for (const k of Object.keys(s.fill || {})) if (!templateKeys(s.template).some(e => e.key === k)) E(`slides[${si}]: fill key "${k}" is not a text key of ${s.template} (${templateKeys(s.template).map(e => e.key).join(' ')})`);
     if (s.density != null && !DENSITY[s.density]) E(`slides[${si}]: density "${s.density}" not one of ${Object.keys(DENSITY).join('|')}`);
+    if (s.notes != null && typeof s.notes !== 'string') E(`slides[${si}]: notes must be a string — speaker notes, one string per slide`);
     for (const [ri, r] of (Array.isArray(s.els) ? s.els : []).entries()) if (r && r.icon != null && !ICONS[r.icon]) E(`slides[${si}].els[${ri}]: icon "${r.icon}" not in the set (${iconNames()})`);
   }
   if (deck.density != null && !DENSITY[deck.density]) E(`density "${deck.density}" not one of ${Object.keys(DENSITY).join('|')}`);
@@ -189,6 +190,7 @@ export function validate(deck) {
     if (r.css) Wn(`${where}: raw css escape hatch used`);
     if (r.chart != null) for (const m of checkChart(r.chart)) E(`${where}: ${m}`);   // a chart row create() could not expand
     if (r.img && !/^data:/.test(r.img)) E(`${where}: img must be a data: URI (single file, zero network)`);
+    if (r.alt != null && typeof r.alt !== 'string') E(`${where}: alt must be a string — what the row shows, for a reader who cannot see it`);
     if (r.svg && /<script|href\s*=\s*["']https?:/i.test(r.svg)) E(`${where}: svg contains script or external href`);
     if (textual && /^\s*\d+\s*\/\s*\d+\s*$/.test(plain(r))) Wn(`${where}: "${plain(r).trim()}" looks like a hardcoded page counter — the footer master renders it`);
     // geometry: inside the canvas (slot geometry resolved)

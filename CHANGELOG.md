@@ -1,5 +1,6 @@
 # Changelog
 ## Unreleased
+- **`slide.notes` and `row.alt` join the model contract.** Both plain strings, both optional, both type-checked by `validate` (`slides[n]: notes must be a string`, `…els[m]: alt must be a string`). They are ordinary keys on existing objects, so the edit log, the version history and `create --from` (human wins) carry them with no new code — the round-trip is gated in test/edits.test.mjs. Nothing renders either yet: `notes` seeds the notes panel, the handout page and HTML-import recovery; `alt` seeds the toolbar field and accessible export. ROADMAP P2.
 - **`create --from` reads a deck built before 0.5.0.** Such a file has no `/*LOG*/` or `/*VERSIONS*/` data block, but its `fileHtml()` source holds the same marker strings as quoted literals; `blockOf` was an unanchored whole-document search, so it matched the literal and threw an uncaught `SyntaxError` on `'+J(log)+'`. The block regex is now anchored to the data form (`=/*X*/…/*/X*/`), a missing block reads as `marker X missing`, and `--from` takes an empty log and history in its place: the id and the previous state are carried into `VERSIONS`, nothing is replayed, and the CLI says the file predates the edit log. Gate: two cases in test/edits.test.mjs. ROADMAP P1.4.
 
 ## 0.7.0 — PDFs are vector, spellcheck everywhere, the HUD in four groups

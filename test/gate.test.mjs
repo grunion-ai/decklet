@@ -234,6 +234,14 @@ test('motion: rise · fade · pop · wipe are the whole vocabulary; unknown anim
   assert.match(read('bin/verify.mjs'), /\.el\{animation:none!important\}/, 'parity measures the settled frame');
 });
 
+// ROADMAP P2: slide.notes and row.alt are plain scalars on existing objects; they ride the edit log, versions and --from for free
+test('validator: slide.notes and row.alt are strings when present', () => {
+  const ok = validate(withRoles({w: 960, h: 540, slides: [{notes: 'say this', els: [{x: 0, y: 0, w: 100, h: 100, img: 'data:image/png;base64,AA==', alt: 'a chart'}]}]}));
+  assert.deepEqual(ok.errors.filter(e => /notes|alt/.test(e)), []);
+  const v = validate(withRoles({w: 960, h: 540, slides: [{notes: ['a', 'b'], els: [{x: 0, y: 0, w: 100, h: 100, img: 'data:image/png;base64,AA==', alt: 7}]}]}));
+  assert.ok(v.errors.some(e => /slides\[0\]: notes must be a string/.test(e)), v.errors.join('\n'));
+  assert.ok(v.errors.some(e => /slides\[0\]\.els\[0\]: alt must be a string/.test(e)), v.errors.join('\n'));
+});
 test('validator: anim must be one of the four', () => {
   const v = validate(withRoles({w: 960, h: 540, slides: [{els: [
     {x: 0, y: 0, w: 100, role: 'Body', anim: 'rise', text: 'ok'},
