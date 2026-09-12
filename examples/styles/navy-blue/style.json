@@ -1,0 +1,94 @@
+{
+ "tokens": {
+  "bg": "#08132A",
+  "fg": "#E0DCD4",
+  "muted": "#B4B8C4",
+  "accent": "#60A5FA",
+  "card": "#0C1B33",
+  "line": "#1A2D54",
+  "sel": "#2563EB",
+  "box": "#132444"
+ },
+ "roles": {
+  "Title": {
+   "font": "'Palatino Linotype',Palatino,'Book Antiqua','Iowan Old Style',Georgia,serif",
+   "size": 62,
+   "weight": 700,
+   "lh": 68,
+   "ls": -0.8,
+   "color": "var(--fg)",
+   "cw": 0.46
+  },
+  "Supertitle": {
+   "font": "ui-monospace,Menlo,Consolas,monospace",
+   "size": 12,
+   "weight": 500,
+   "lh": 16,
+   "ls": 1.5,
+   "color": "var(--accent)",
+   "tt": "uppercase",
+   "cw": 0.73
+  },
+  "H1": {
+   "font": "'Palatino Linotype',Palatino,'Book Antiqua','Iowan Old Style',Georgia,serif",
+   "size": 34,
+   "weight": 700,
+   "lh": 40,
+   "ls": -0.2,
+   "color": "var(--fg)",
+   "cw": 0.47
+  },
+  "H2": {
+   "font": "'Palatino Linotype',Palatino,'Book Antiqua','Iowan Old Style',Georgia,serif",
+   "size": 22,
+   "weight": 700,
+   "lh": 28,
+   "ls": 0,
+   "color": "var(--fg)",
+   "cw": 0.47
+  },
+  "Body": {
+   "font": "'Trebuchet MS','Lucida Grande','Lucida Sans Unicode',sans-serif",
+   "size": 16,
+   "weight": 400,
+   "lh": 24,
+   "ls": 0,
+   "color": "var(--fg)",
+   "cw": 0.46
+  },
+  "Caption": {
+   "font": "'Trebuchet MS','Lucida Grande','Lucida Sans Unicode',sans-serif",
+   "size": 13,
+   "weight": 400,
+   "lh": 18,
+   "ls": 0,
+   "color": "var(--muted)",
+   "cw": 0.46
+  },
+  "Label": {
+   "font": "ui-monospace,Menlo,Consolas,monospace",
+   "size": 11,
+   "weight": 500,
+   "lh": 14,
+   "ls": 1,
+   "color": "var(--muted)",
+   "tt": "uppercase",
+   "cw": 0.69
+  },
+  "Stat": {
+   "font": "'Palatino Linotype',Palatino,'Book Antiqua','Iowan Old Style',Georgia,serif",
+   "size": 40,
+   "weight": 700,
+   "lh": 44,
+   "ls": -0.6,
+   "color": "var(--accent)",
+   "cw": 0.46
+  }
+ },
+ "pad": {
+  "chip": "3px 8px",
+  "pill": "5px 12px"
+ },
+ "margin": 60,
+ "gap": 4
+}
