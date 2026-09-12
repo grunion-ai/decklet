@@ -20,3 +20,23 @@ test('library.html == create(build-sheet): every template and layout, by kind, c
   assert.ok(names.indexOf('kind-figures') < names.indexOf('figure-decision') && names.indexOf('figure-layers') < names.indexOf('layout-diagram'), 'the nine figures sit under Figures, the bare diagram layout after them');
   assert.equal(create(model, {title: 'decklet library', spell: await loadChecker('en')}).html, fs.readFileSync(path.join(root, 'library.html'), 'utf8'), 'library.html needs a rebuild: npm run build:library');
 });
+
+// ROADMAP L4: one foot band on the sheet — left the source line (kind · id / template · id / layout · id) in the master foot, right the
+// counter (the engine's, since the foot is left-anchored). A template's own sample chrome never enters the band; the two full-bleed
+// image slides (hero, split — the corner is inside the photo) hide the foot, template and layout alike, and carry nothing there.
+test('sheet: every slide\'s foot band (y ≥ 496) carries the same set of rows — the foot override with its source line, nothing else; only the full-bleed image slides hide it', () => {
+  const model = JSON.parse(fs.readFileSync(path.join(root, 'templates/candidates.model.json'), 'utf8'));
+  const foot = model.master.find(m => m.footer);
+  assert.ok(foot.x + foot.w / 2 < model.w / 2, 'the foot is left-anchored, so the counter takes the corner');
+  const band = s => s.els.filter(e => e.override === foot.id || (e.role && e.y != null && e.y + (e.h || 0) >= 496)).map(e => e.override ? `override:${e.override}` : `row@${e.y}`);
+  const shown = model.slides.filter(s => !(s.hide || []).includes(foot.id)), hidden = model.slides.filter(s => (s.hide || []).includes(foot.id));
+  assert.deepEqual(hidden.map(s => s.name).sort(), ['image-hero-overlay', 'image-split'], 'the modern nine review as their templates, so these are the only two');
+  for (const s of hidden) assert.deepEqual(band(s), [], `${s.name}: a hidden foot leaves the band empty`);
+  assert.deepEqual([...new Set(shown.map(s => JSON.stringify(band(s))))], ['["override:foot"]'], 'one set of rows in the band on every shown slide');
+  for (const s of shown) {
+    const o = s.els.find(e => e.override === foot.id);
+    assert.match(o.text, /^(kind|template|layout) · [a-z0-9-]+$/, `${s.name}: the foot is the source line`);
+    assert.equal(o.text.split(' · ')[1], s.name.replace(/^(kind|layout)-/, ''), `${s.name}: the source line names the slide`);
+    assert.deepEqual(Object.keys(o).filter(k => !['color', 'op'].includes(k)).sort(), ['override', 'text'], `${s.name}: the override changes the text (and at most its paint) — never geometry, so the counter stays where the master puts it`);
+  }
+});
