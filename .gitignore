@@ -12,3 +12,9 @@ package-lock.json
 test/residue.local
 templates/review.html
 *-png/
+templates/options.html
+templates/options.model.json
+templates/options.index.json
+templates/options-artifact.html
+templates/opt-shots/
+templates/opt-thumbs/
