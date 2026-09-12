@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 // build-sheet.mjs — the whole slide library for review: every template AND every library layout as one slide,
 // organised by the kind of slide it is (title & section, agenda, concept, quote, data, process, figures,
-// timeline, image, end). A divider opens each kind; the footer names the source of each slide (template · id / layout · id).
+// timeline, image, end). A divider opens each kind. ONE foot band on every slide (ROADMAP L4): the left-anchored master foot carries
+// the source line — kind · id / template · id / layout · id — and the engine's page counter takes the corner; only the two
+// full-bleed image slides (hero, split — the corner is inside the photo) hide the foot.
+// A template's own sample rows never enter the band (y ≥ 496); test/library.test.mjs asserts the set of band rows is the same on every slide.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -131,9 +134,14 @@ const fill = (name) => {
 };
 
 // ── the deck
-const divider = (k, i) => ({ name: `kind-${k.id}`, layout: 'title', els: [{ slot: 'supertitle', text: `${String(i + 1).padStart(2, '0')} · ${k.templates.length + k.layouts.length} slides` }, { slot: 'title', text: k.name }, { x: 60, y: 400, w: 700, role: 'Body', color: 'var(--muted)', text: k.note }] });
-const tslide = (t) => ({ name: t.id, layout: t.layout || undefined, hide: t.layout ? undefined : ['foot'], els: [...scale(bind(t), 1), ...(t.layout ? [{ override: 'foot', text: `template · ${t.id}` }] : [])] });
-const lslide = (n) => ({ name: `layout-${n}`, layout: n, hide: n === 'image-hero-overlay' ? ['foot'] : undefined, els: [...fill(n), { override: 'foot', text: `layout · ${n}` }] });
+const FULL_BLEED = ['image-hero-overlay', 'image-split'];   // the photo owns the corner: no foot line; the engine's pin stands in for the counter
+// the foot line may take the ONE paint a slide's ground forces on it (cover-split's accent panel owns the left foot, so the line wears
+// the panel's own label colour); geometry never — the counter stays where the master puts it
+const FOOT_PAINT = { 'cover-split': { color: 'var(--card)', op: 0.7 } };
+const foot = (source, id) => ({ override: 'foot', text: `${source} · ${id}`, ...(FOOT_PAINT[id] || {}) });
+const divider = (k, i) => ({ name: `kind-${k.id}`, layout: 'title', els: [{ slot: 'supertitle', text: `${String(i + 1).padStart(2, '0')} · ${k.templates.length + k.layouts.length} slides` }, { slot: 'title', text: k.name }, { x: 60, y: 400, w: 700, role: 'Body', color: 'var(--muted)', text: k.note }, foot('kind', k.id)] });
+const tslide = (t) => ({ name: t.id, layout: t.layout || undefined, hide: FULL_BLEED.includes(t.id) ? ['foot'] : undefined, els: [...scale(bind(t), 1), ...(FULL_BLEED.includes(t.id) ? [] : [foot('template', t.id)])] });
+const lslide = (n) => ({ name: `layout-${n}`, layout: n, hide: FULL_BLEED.includes(n) ? ['foot'] : undefined, els: [...fill(n), ...(FULL_BLEED.includes(n) ? [] : [foot('layout', n)])] });
 const index = [];
 const slides = [];
 for (const [i, k] of KINDS.entries()) {
