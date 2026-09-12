@@ -7,7 +7,7 @@ import path from 'node:path';
 import os from 'node:os';
 import {execFileSync, spawnSync} from 'node:child_process';
 import {fileURLToPath, pathToFileURL} from 'node:url';
-import {validate, mergeStyle, ROLES, ANIMS} from '../bin/validate.mjs';
+import {validate, mergeStyle, ROLES, ANIMS, linksOf} from '../bin/validate.mjs';
 import {create, FORMAT} from '../bin/create.mjs';
 import {loadChecker} from '../lib/spell.mjs';
 import {assemble, extract, extractInPage, classify, detectTitle} from '../bin/import-html.mjs';
@@ -117,9 +117,9 @@ test('⤓ PDF writer: slide-sized pages from foreignObject rasters, byte-exact x
   assert.match(tpl, /pdfbtn\.setAttribute\('aria-busy'/, '⤓ reports that it is working');
 });
 test('links: one href model — a whole-row link and an inline link mark, http/https/mailto only', () => {
-  assert.match(tpl, /const href=u=>\{u=String\(u==null\?'':u\)\.trim\(\);return \/\^\(https\?:\|mailto:\)\/i\.test\(u\)\?u:''\}/, 'one scheme gate for both surfaces');
+  assert.match(tpl, /const href=u=>\{u=String\(u==null\?'':u\)\.trim\(\);if\(u\[0\]==='#'\)\{const n=slideNo\(u\.slice\(1\)\);return n\?'#'\+n:''\}return \/\^\(https\?:\|mailto:\)\/i\.test\(u\)\?u:''\}/, 'one scheme gate for both surfaces: outward schemes, or an in-deck target resolved to a slide number');
   assert.match(tpl, /d\.querySelectorAll\('a\[href\]'\)\.forEach/, 'inline runs are re-gated at render — a saved copy can carry anything');
-  assert.match(tpl, /a\.className='lk';a\.href=href\(r\.href\)/, 'a row href paints one inset anchor over the whole row (the CTA box is a box + a text row)');
+  assert.match(tpl, /const u=href\(r\.href\),a=document\.createElement\('a'\);a\.className='lk';a\.href=u;if\(u\[0\]!=='#'\)\{a\.target='_blank'/, 'a row href paints one inset anchor over the whole row (the CTA box is a box + a text row); only an outward link opens a new tab');
   assert.match(tpl, /body\.present \.el a\.lk\{pointer-events:auto\}/, 'clickable while presenting, inert while editing');
   // the mark sits in the inline segment, immediately after strikethrough
   assert.match(tpl, /data-cmd="strikeThrough"[^\n]*\n\s*<button data-link="1"/, 'B I U S̶ → link, in that order');
@@ -374,7 +374,31 @@ test('validator: href is model content — http/https/mailto only, on a row and 
     {x: 0, y: 500, w: 200, role: 'Body', html: 'x <a href="data:text/html,z">y</a>'},
   ]}]}));
   assert.equal(bad.errors.length, 3, JSON.stringify(bad.errors));
-  for (const e of bad.errors) assert.match(e, /href .* must be http/);
+  for (const e of bad.errors) assert.match(e, /href .* must be http, https, mailto or #slide/);
+});
+// ROADMAP V3.1 + V3.3: an href may point INTO the deck — '#7' (1-based slide number) or '#<slide id>' — and validate resolves it
+test('validator: in-deck href targets — "#n" and "#<slide id>" resolve; a target that names no slide is an error; linksOf lists every link with its resolution', () => {
+  const three = els => ({w: 960, h: 540, slides: [{els}, {els: [{x: 0, y: 0, w: 100, role: 'Body', text: 'two'}]}, {id: 'end', els: [{x: 0, y: 0, w: 100, role: 'Body', text: 'three'}]}]});
+  const ok = validate(withRoles(three([
+    {x: 0, y: 0, w: 200, h: 40, bg: '#000', href: '#3'},
+    {x: 0, y: 100, w: 200, role: 'Body', text: 'agenda', href: '#s2'},
+    {x: 0, y: 200, w: 200, role: 'Body', html: 'to the <a href="#end">end</a> and <a href="https://example.com">out</a>'},
+  ])));
+  assert.deepEqual(ok.errors, []);
+  const bad = validate(withRoles(three([
+    {x: 0, y: 0, w: 200, h: 40, bg: '#000', href: '#9'},
+    {x: 0, y: 100, w: 200, role: 'Body', text: 'agenda', href: '#nope'},
+    {x: 0, y: 200, w: 200, role: 'Body', html: 'to the <a href="#0">start</a>'},
+  ])));
+  assert.equal(bad.errors.length, 3, JSON.stringify(bad.errors));
+  for (const e of bad.errors) assert.match(e, /href "#(9|nope|0)" names no slide \(3 slides: s2, s3, end\)/);   // create stamps the unstamped slides AFTER the ones that carry an id: s2, s3
+  const deck = withRoles(three([{x: 0, y: 0, w: 200, h: 40, bg: '#000', href: '#3'}, {x: 0, y: 200, w: 200, role: 'Body', html: 'to the <a href="#end">end</a> and <a href="https://example.com">out</a>'}]));
+  assert.deepEqual(linksOf(deck), [
+    {slide: 1, row: 'r1', href: '#3', to: 3},
+    {slide: 1, row: 'r2', href: '#end', to: 3},
+    {slide: 1, row: 'r2', href: 'https://example.com', to: null},
+  ]);
+  assert.deepEqual(linksOf({slides: [{els: [{href: '#s1'}]}]}), [{slide: 1, row: 0, href: '#s1', to: 1}], 'an unstamped model resolves the ids create will stamp');
 });
 test('validator: curve is six numbers, arrow is one of three and only on a line or a curve', () => {
   const v = validate(withRoles({w: 960, h: 540, slides: [{els: [

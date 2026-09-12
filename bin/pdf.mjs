@@ -30,7 +30,7 @@ export async function toPdf(file, out = file.replace(/\.html?$/, '') + '.pdf') {
     await p.goto(pathToFileURL(path.resolve(file)).href);
     await p.evaluate(() => document.fonts.ready);
     const {W, H, slides, hrefs} = await p.evaluate(() => ({W, H, slides: deck.slides.length,
-      hrefs: deck.slides.reduce((n, s) => n + s.els.filter(e => e.href && !e.hide).length, 0) + deck.slides.reduce((n, s) => n + s.els.filter(e => e.html).reduce((k, e) => k + (e.html.match(/<a\s[^>]*href=/g) || []).length, 0), 0)}));
+      hrefs: deck.slides.reduce((n, s) => n + s.els.filter(e => e.href && !/^\s*#/.test(e.href) && !e.hide).length, 0) + deck.slides.reduce((n, s) => n + s.els.filter(e => e.html).reduce((k, e) => k + (e.html.match(/<a\s[^>]*href=["'](?!#)/g) || []).length, 0), 0)})); // outward links only: an in-deck '#' target is no /URI annotation
     await p.addStyleTag({content: `@page{size:${W}px ${H}px;margin:0}#print .pg{zoom:1!important}`});
     await p.emulateMedia({media: 'print'});
     await p.evaluate(() => dispatchEvent(new Event('beforeprint')));

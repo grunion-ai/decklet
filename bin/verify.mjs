@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
-import {validate} from './validate.mjs';
+import {validate, linksOf} from './validate.mjs';
 
 export const modelOf = html => JSON.parse(html.match(/\/\*DECK\*\/([\s\S]*?)\/\*\/DECK\*\//)[1].replace(/<\\\/script/g, '</script'));
 
@@ -25,7 +25,7 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
   // self-containment — the guarantee the whole engine rests on
   if (/(src|href)\s*=\s*["']https?:/i.test(html) || /@import|<link[^>]+stylesheet|fetch\s*\(|XMLHttpRequest|new\s+WebSocket/i.test(html)) res.errors.push('deck references the network');
   const deck = modelOf(html);
-  const v = validate(deck); res.contract = v;
+  const v = validate(deck); res.contract = v; res.links = linksOf(deck); // every link, for a reviewer to check; an unresolved '#' is a contract error
   if (!v.ok) res.errors.push(`model contract: ${v.errors.length} errors`);
   if (strict && v.warnings.length) res.errors.push(`model contract: ${v.warnings.length} warnings (--strict)`);
   let chromium; try { ({chromium} = await import('playwright')); } catch { res.skipped.push('layout parity + AE: Playwright not installed (npm i -D playwright && npx playwright install chromium)'); }
@@ -199,6 +199,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const r = await verify(file, {refs: o.refs, out: o.out, threshold: o.threshold ? +o.threshold : 0.5, fuzz: o.fuzz || '2%', strict: !!o.strict, report: o.report || null, fonts: o.fonts || null});
   for (const m of r.contract.errors) console.error('ERROR   contract: ' + m);
   for (const m of r.contract.warnings) console.error('warning contract: ' + m);
+  for (const l of r.links || []) console.log(`link    slide ${l.slide} ${l.row}: ${l.href}${l.to != null ? ' → ' + (l.to ? 'slide ' + l.to : 'NO SUCH SLIDE') : ''}`);
   for (const s of r.parity) console.log(`parity  slide ${s.slide} ${s.name}: ${s.pass ? 'PASS' : 'FAIL ' + JSON.stringify(s.rows)}`);
   for (const s of r.parity) for (const m of s.occlusion || []) console.log(`occlusion ${m}`);
   for (const s of r.parity) if (s.crowding?.length) console.log(`crowding slide ${s.slide} ${s.name}: ${s.crowding.length} row(s) the scale changed now wrap/crowd differently — ${s.crowding.map(c => JSON.stringify(c.text)).join(', ')}`);
