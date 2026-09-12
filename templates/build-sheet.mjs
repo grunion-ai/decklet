@@ -37,8 +37,25 @@ for (const n of Object.keys(LIBRARY)) if (!placedL.includes(n) && LIBRARY[n].gro
 for (const id of placedT) if (!TEMPLATES.some(t => t.id === id)) throw new Error(`kind names unknown template ${id}`);
 for (const n of placedL) if (!LIBRARY[n]) throw new Error(`kind names unknown layout ${n}`);
 
+// ── sample media: templates/samples/* (build products of samples/make.mjs — nothing photographed, nothing downloaded) as
+// data: URIs, bound to the image templates and layouts the way `cta` gets its `href`, so the sheet shows the image tool
+// and the GIF playing. A template's media row is the `shot()` placeholder (cat-modern.mjs); a layout's is its `image` slot.
+const MIME = { jpg: 'jpeg', png: 'png', gif: 'gif' };
+export const SAMPLES = Object.fromEntries(fs.readdirSync(path.join(dir, 'samples')).filter(f => MIME[f.split('.').pop()])
+  .map(f => [f, `data:image/${MIME[f.split('.').pop()]};base64,${fs.readFileSync(path.join(dir, 'samples', f)).toString('base64')}`]));
+export const MEDIA = {   // slide id → [sample, alt, object-position]
+  'image-hero-overlay': ['photo-1.jpg', 'A hillside at dusk under a low sun', 'center'],
+  'image-split': ['photo-2.jpg', 'A harbour skyline at night, lights on the water', '60% 50%'],
+  'annotated-shot': ['clip.gif', 'The events screen: a failed delivery retried and going green', 'left top'],
+  'image-left': ['ui-shot.png', 'The events screen of an event-delivery dashboard', 'left top'],
+  'image-right': ['photo-1.jpg', 'A hillside at dusk under a low sun', 'center'],
+};
+for (const [id, [f]] of Object.entries(MEDIA)) if (!SAMPLES[f]) throw new Error(`${id} binds a sample that is not in templates/samples: ${f}`);
+const SHOT = 'linear-gradient(135deg,var(--box),var(--line))';   // the templates' media placeholder; the first such row takes the sample
+const media = (id, e) => { const [f, alt, pos] = MEDIA[id]; const { bg, ...rest } = e; return { ...rest, img: SAMPLES[f], fit: 'cover', pos, alt }; };
+const bind = (t) => { let done = false; return MEDIA[t.id] ? t.els.map(e => (!done && e.bg === SHOT && (done = true)) ? media(t.id, e) : e) : t.els; };
+
 // ── sample content for the library layouts: one bound row per slot, by slot name, then by role
-const IMG = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 3"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5B9CF6"/><stop offset="1" stop-color="#1E3A8A"/></linearGradient></defs><rect width="4" height="3" fill="url(#g)"/></svg>');
 const CHART = { mark: 'bar', data: [{ label: 'Mon', value: 48 }, { label: 'Tue', value: 61 }, { label: 'Wed', value: 57 }, { label: 'Thu', value: 74 }], source: 'Desk log, one week' };
 // sample content for the library layouts, by `layout.slot`, then by slot name, then by role. Every layout speaks for one
 // of the same fictional companies the templates use (Tallyline, Fieldsense, Stride, Meridian Partners, Forage, Relay),
@@ -71,8 +88,8 @@ const TEXT = {
   'diagram.supertitle': 'Architecture', 'diagram.title': 'From the sensor to the dashboard', 'diagram.subtitle': 'Three parts, one radio link, no wiring.', 'diagram.caption': 'The sensor reports to the gateway; the gateway posts to the cloud, so the gateway takes the only power outlet.', 'diagram.note': '', 'diagram.source': 'Source · the system diagram', 'diagram.legend': '',
   'timeline.supertitle': 'Launch', 'timeline.title': 'One release, four dates', 'timeline.subtitle': 'Code freeze to store listing.', 'timeline.note': 'The gap between the second and third dates is the app review.', 'timeline.source': 'Source · the release plan', 'timeline.legend': '',
   // images
-  'image-left.supertitle': 'Hardware', 'image-left.title': 'The second-generation gateway', 'image-left.subtitle': 'Solar top-up, one radio, no cables.', 'image-left.body': 'Twelve sensors per gateway, one gateway per site, mounted in twenty minutes. The battery lasts a season.', 'image-left.note': 'Photographed on the first install.', 'image-left.source': 'Source · Fieldsense', 'image-left.legend': '',
-  'image-right.supertitle': 'Route', 'image-right.title': 'The morning run in October', 'image-right.subtitle': 'Eleven stops, one hub, one driver.', 'image-right.body': 'Start at the hub, finish at the hub. The hotels are in the first hour; the rest is restaurants along the waterfront.', 'image-right.note': 'Chilled van, dock access before seven.', 'image-right.source': 'Source · dispatch', 'image-right.legend': '',
+  'image-left.supertitle': 'Product', 'image-left.title': 'The events screen, rebuilt', 'image-left.subtitle': 'One queue, every endpoint, no tabs.', 'image-left.body': 'Failed deliveries sort to the top, a retry is one click, and the payload diff opens in place. Nothing to install.', 'image-left.note': 'Screenshot from the September build.', 'image-left.source': 'Source · Relay', 'image-left.legend': '',
+  'image-right.supertitle': 'Route', 'image-right.title': 'The morning run in October', 'image-right.subtitle': 'Eleven stops, one hub, one driver.', 'image-right.body': 'Start at the hub, finish at the hub. The hotels are in the first hour; the rest is restaurants out along the valley road.', 'image-right.note': 'Chilled van, first farm gate before seven.', 'image-right.source': 'Source · dispatch', 'image-right.legend': '',
   // closers
   'cta.title': 'Start on a Monday.', 'cta.body': 'Two weeks inside your team and one written plan at the end.', 'cta.button-label': 'Book a working session',
   'end.title': 'Thank you', 'end.body': 'hello@example.com · Meridian Partners', 'end.caption': 'Slides made with decklet · MIT',
@@ -89,7 +106,7 @@ const DELTAS = { 'kpi-grid': ['↑ 12%', '↓ 2', '↑ 4 min', 'new'], 'kpi-grid
 const fill = (name) => {
   const lay = LIBRARY[name];
   const els = Object.entries(lay.slots).filter(([slot]) => TEXT[`${name}.${slot}`] !== '').map(([slot, sl]) => {
-    if (slot === 'image') return { slot, img: IMG, fit: 'cover' };
+    if (slot === 'image') return media(name, { slot });
     if (slot === 'chart') return { slot, chart: CHART };
     if (!sl.role) return { slot };                                        // paint: the slot carries it
     let m;
@@ -113,7 +130,7 @@ const fill = (name) => {
 
 // ── the deck
 const divider = (k, i) => ({ name: `kind-${k.id}`, layout: 'title', els: [{ slot: 'supertitle', text: `${String(i + 1).padStart(2, '0')} · ${k.templates.length + k.layouts.length} slides` }, { slot: 'title', text: k.name }, { x: 60, y: 400, w: 700, role: 'Body', color: 'var(--muted)', text: k.note }] });
-const tslide = (t) => ({ name: t.id, layout: t.layout || undefined, hide: t.layout ? undefined : ['foot'], els: [...scale(t.els, 1), ...(t.layout ? [{ override: 'foot', text: `template · ${t.id}` }] : [])] });
+const tslide = (t) => ({ name: t.id, layout: t.layout || undefined, hide: t.layout ? undefined : ['foot'], els: [...scale(bind(t), 1), ...(t.layout ? [{ override: 'foot', text: `template · ${t.id}` }] : [])] });
 const lslide = (n) => ({ name: `layout-${n}`, layout: n, hide: n === 'image-hero-overlay' ? ['foot'] : undefined, els: [...fill(n), { override: 'foot', text: `layout · ${n}` }] });
 const index = [];
 const slides = [];
