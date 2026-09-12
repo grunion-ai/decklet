@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // decklet create — headless: model.json (+ style.json) → one self-contained deck.html
 // usage: node bin/create.mjs --model model.json [--style style.json] --out deck.html
-//          [--format slides|carousel|carousel-4x5|document-letter|document-a4] [--space 960x540|1600x900] [--title "…"] [--force]
+//          [--format slides|slides-4x3|story|carousel|carousel-4x5|document-letter|document-a4|document-letter-landscape|document-a4-landscape|poster-a3] [--space 960x540|1600x900] [--title "…"] [--force]
 //          [--from prev.html]   revise an existing deck: keep its id + slide/row ids, replay the human edits it carries
 //                               (human wins, conflicts reported), push its state into the version history
 // library: import {create, FORMAT} from './create.mjs'
@@ -24,6 +24,13 @@ export const FORMAT = {
   'carousel-4x5':    {w: 1080, h: 1350, page: 'letter'},   // 4:5   (experimental)
   'document-letter': {w: 816,  h: 1056, page: 'letter'},   // 8.5×11in at 96dpi — print zoom is exactly 1 (experimental)
   'document-a4':     {w: 794,  h: 1123, page: 'a4'},       // 210×297mm at 96dpi — print zoom is exactly 1 (experimental)
+  // ROADMAP D1 presets. Every library layout and template is cut for 16:9, so on these canvases they render stretched until D2
+  // (aspect-aware composition) lands — validate says so per slide; draw free rows or define the deck's own layouts.
+  'slides-4x3':      {w: 960,  h: 720,  page: 'letter'},   // 4:3   (experimental)
+  'story':           {w: 1080, h: 1920, page: 'letter'},   // 9:16  (experimental)
+  'document-letter-landscape': {w: 1056, h: 816, page: 'letter-landscape'}, // zoom 1 (experimental; Safari prints Letter portrait — use bin/pdf.mjs)
+  'document-a4-landscape':     {w: 1123, h: 794, page: 'a4-landscape'},     // zoom 1 (experimental; same Safari caveat)
+  'poster-a3':       {w: 1123, h: 1587, page: 'a3'},       // 297×420mm at 96dpi, zoom 1 (experimental)
 };
 const here = path.dirname(fileURLToPath(import.meta.url));
 const esc = s => s.replace(/<\/script/gi, '<\\/script');
