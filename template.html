@@ -127,6 +127,7 @@ body.dragging,#canvas.dragging{-webkit-user-select:none;user-select:none}
 /* the contact sheet keeps the HUD: pinned above the z-20 sheet only while it is open; ‹ › ⛶ are disabled (the sheet is the navigator), + Slide, ⊞, ⤓ and the autosave dot stay live */
 body.sheet #hud{position:fixed;left:0;right:0;bottom:0;z-index:21;background:var(--bg)}body.sheet #sheet{padding-bottom:64px}
 #hud button:disabled{opacity:.35;cursor:default}
+#pdf[aria-busy]{position:relative;overflow:hidden;min-width:7ch;color:var(--muted);font-variant-numeric:tabular-nums}#pdf[aria-busy]::after{content:'';position:absolute;left:0;bottom:0;height:2px;width:calc(var(--p,0)*100%);background:var(--accent)} /* L2.1: ⤓ while exporting — `n / N` and a hairline bar, tokens only */
 #grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
 .cell{position:relative;aspect-ratio:var(--AR);border:2px solid var(--line);border-radius:8px;overflow:hidden;cursor:grab;background:var(--card);touch-action:none;-webkit-user-select:none;user-select:none;transition:transform .15s ease}
 .cell.sel{border-color:var(--sel);box-shadow:0 0 0 2px var(--sel)}
@@ -889,24 +890,34 @@ document.addEventListener('selectionchange',()=>{if(!tb.hidden||canvas.querySele
 // ── contact sheet: the slide manager ──
 const sheet=$('sheet'),grid=$('grid');let gsel=new Set(),ganchor=0,clip=null,ins=null;
 function sheetUi(on){sheet.hidden=!on;document.body.classList.toggle('sheet',on);for(const k of ['prev','next','fs','add-text','add-box'])$(k).disabled=on}
-function sheetOpen(){commitEdit();sel.clear();gsel=new Set([i]);ganchor=i;sheetUi(true);sheetRender();tb.hidden=true}
+function sheetOpen(){commitEdit();sel.clear();gsel=new Set([i]);ganchor=i;sheetUi(true);cellOf=new WeakMap();sheetRender();tb.hidden=true}
 function sheetClose(){sheetUi(false);render()}
 $('sheet-back').onclick=sheetClose; // ← Back: closes to the CURRENT slide (i untouched); Esc / dblclick-a-cell unchanged
 // #sheet (fixed, overflow:auto) is the scroller, not the window: emptying the grid collapses its scroll height and the browser
 // clamps scrollTop to 0, so every action snapped the sheet to the top. Keep the offset across the rebuild; then the acted-on
 // slide (i) comes into view only if it is off screen (block:'nearest' is a no-op for a visible cell).
+// Cells are keyed by slide object: an action makes a new object for every slide it touches (dup, paste, + Slide, undo's
+// JSON.parse) and keeps the rest, so only the touched slides are drawn; the kept cells are renumbered and FLIP from where
+// they were to where they now sit. sheetOpen starts from a clean map because the canvas edits a slide in place.
+let cellOf=new WeakMap();
 function sheetRender(){
-  const top=sheet.scrollTop;
-  grid.innerHTML='';
-  deck.slides.forEach((s,n)=>{
-    const c=document.createElement('div');c.className='cell'+(gsel.has(n)?' sel':'');c.dataset.n=n;
-    const cv=document.createElement('div');cv.className='cv';drawEls(s,cv,false);num(cv,n+1);
-    const lb=document.createElement('span');lb.className='n';lb.textContent=n+1;
-    c.append(cv,lb);grid.appendChild(c);
-    cv.style.transform=`scale(${(c.clientWidth/W).toFixed(4)})`;
+  const top=sheet.scrollTop,was=new Map([...grid.children].map(c=>[c,c.getBoundingClientRect()]));
+  const cells=deck.slides.map((s,n)=>{
+    let c=cellOf.get(s);
+    if(c)c.querySelector('.num')?.remove();
+    else{c=document.createElement('div');c.className='cell';const cv=document.createElement('div');cv.className='cv';drawEls(s,cv,false);const lb=document.createElement('span');lb.className='n';c.append(cv,lb);cellOf.set(s,c)}
+    c.classList.toggle('sel',gsel.has(n));c.classList.remove('lift','drop');c.style.transform='';c.dataset.n=n;num(c.firstChild,n+1);c.lastChild.textContent=n+1;
+    return c;
   });
+  grid.replaceChildren(...cells);
+  const sc=`scale(${(cells[0].clientWidth/W).toFixed(4)})`;cells.forEach(c=>c.firstChild.style.transform=sc);
   sheet.scrollTop=top;
   const c=grid.children[i];if(c)c.scrollIntoView({block:'nearest'});
+  if(RM.matches)return;
+  const mv=cells.map(c=>{const b=was.get(c);if(!b)return null;const a=c.getBoundingClientRect(),dx=b.left-a.left,dy=(b.top+top)-(a.top+sheet.scrollTop);return Math.hypot(dx,dy)<1?null:[c,dx,dy]}).filter(Boolean); // scroll-independent: both rects in content space
+  mv.forEach(([c,dx,dy])=>{c.style.transition='none';c.style.transform=`translate(${dx}px,${dy}px)`});
+  grid.offsetWidth; // one reflow: the inverted frame lands before the transition is switched back on
+  mv.forEach(([c])=>{c.style.transition='';c.style.transform=''});
 }
 grid.addEventListener('mousedown',e=>{
   const c=e.target.closest('.cell');if(!c)return;e.preventDefault();const n=+c.dataset.n; // preventDefault: thumbnails are renders, never text — no native selection/focus on press
@@ -1026,12 +1037,14 @@ const CHROMIUM=!!navigator.userAgentData; // only Chromium engines implement UA 
 function printPdf(){commitEdit();const st=document.createElement('style');st.id='pdfpage';st.textContent=`@page{size:${W}px ${H}px;margin:0}#print .pg{zoom:1!important}`;document.head.appendChild(st);print()}
 addEventListener('afterprint',()=>{$('pdfpage')?.remove()});
 const deflate=async bytes=>{const cs=new CompressionStream('deflate');const w=cs.writable.getWriter();w.write(bytes);w.close();const out=new Uint8Array(await new Response(cs.readable).arrayBuffer());let s='';for(let i=0;i<out.length;i+=32768)s+=String.fromCharCode.apply(null,out.subarray(i,i+32768));return s};
+const pdfScale=n=>n>40?2:3; // L2.2: 3× to 40 slides; above that 2× — at slide size the third pixel buys nothing a reader sees, and the render is the whole wait
 async function exportPdf(){
-  commitEdit();await document.fonts.ready;const css=document.querySelector('style').textContent,S=3,pics=[],annots=[];
+  commitEdit();await document.fonts.ready;const css=document.querySelector('style').textContent,S=pdfScale(deck.slides.length),pics=[],annots=[];
   const load=src=>new Promise((ok,no)=>{const im=new Image();im.onload=()=>ok(im);im.onerror=no;im.src=src});
   // ONE offscreen host holds every clone for its whole life. The clone is never repositioned into the page to be serialised
   // and the visible canvas is never repainted to read a colour — both used to flash an inverted slide at the viewer.
-  const pdfbtn=$('pdf');pdfbtn.setAttribute('aria-busy','true');
+  const pdfbtn=$('pdf'),icon=pdfbtn.innerHTML,N=deck.slides.length,tick=n=>{pdfbtn.textContent=`${n} / ${N}`;pdfbtn.style.setProperty('--p',n/N)}; // L2.1: the button is the progress counter; #pdf[aria-busy]::after is the bar
+  pdfbtn.setAttribute('aria-busy','true');tick(0);
   const host=document.createElement('div');host.style.cssText='position:fixed;left:-99999px;top:0;width:0;height:0;overflow:hidden';document.body.appendChild(host);
   try{
   for(const [n,s] of deck.slides.entries()){
@@ -1070,8 +1083,9 @@ async function exportPdf(){
     if('CompressionStream' in self){const px=g.getImageData(0,0,c.width,c.height).data,rgb=new Uint8Array(px.length/4*3);for(let i=0,j=0;i<px.length;i+=4){rgb[j++]=px[i];rgb[j++]=px[i+1];rgb[j++]=px[i+2]}
       const z=await deflate(rgb);if(z.length<=6e6)pic={f:'/FlateDecode',d:z}} // upgrade path: a PNG predictor row filter would shrink gradients; flat slide art deflates well without one
     pics.push(pic||{f:'/DCTDecode',d:atob(c.toDataURL('image/jpeg',.92).split(',')[1])});
+    tick(n+1);await new Promise(r=>setTimeout(r)); // yield to the event loop so the counter and bar paint before the next page
   }
-  }finally{host.remove();pdfbtn.removeAttribute('aria-busy')}
+  }finally{host.remove();pdfbtn.removeAttribute('aria-busy');pdfbtn.innerHTML=icon;pdfbtn.style.removeProperty('--p')}
   // minimal PDF: 1 catalog · 2 pages · per slide {page, image XObject, content}; offsets tracked as bytes (latin-1 strings)
   const obj=[],off=[];let out='%PDF-1.4\n%\xE2\xE3\xCF\xD3\n';
   const add=body=>{obj.push(body);return obj.length};

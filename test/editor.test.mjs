@@ -233,3 +233,67 @@ for (const bn of ['chromium', 'webkit']) live(`the contact sheet keeps its scrol
   assert.ok(r.top0 <= cellH, `scrolled just far enough (${r.top0})`);
   assert.deepEqual(p.errs, []); } finally { await b.close(); }
 });
+
+// L1.2 — the sheet patches cells in place: an action rebuilds only the slides it touched; the other cells keep their DOM
+// node (and thumbnail) and FLIP to where they now sit. Counters and labels are renumbered on every cell.
+for (const bn of ['chromium', 'webkit']) live(`the contact sheet keeps the untouched cells' DOM nodes through a duplicate and a delete (${bn})`, async () => {
+  const b = await pw[bn].launch(); try { const p = await fresh(b, write(`sheetpatch-${bn}.html`, create(sheetDeck()).html));
+  await p.keyboard.press('c'); await p.evaluate(() => { window.__cells = [...grid.children]; });
+  await pick(p, 20); await p.evaluate(() => $('dup').click()); await p.waitForTimeout(60);
+  const d = await p.evaluate(() => {
+    const now = [...grid.children], same = now.map((c, n) => n <= 20 ? c === __cells[n] : n === 21 ? !__cells.includes(c) : c === __cells[n - 1]);
+    return {n: now.length, same, num: now[30].querySelector('.num').textContent, label: now[30].querySelector('.n').textContent, sel: now.map(c => c.classList.contains('sel'))};
+  });
+  assert.equal(d.n, 41);
+  assert.ok(d.same.every(Boolean), `every cell but the new one is the node it was: ${d.same.map((s, n) => s ? '' : n).filter(x => x !== '').join(',')} differ`);
+  assert.equal(d.num, '31 / 41', 'the counter is renumbered on a kept cell'); assert.equal(d.label, '31');
+  assert.deepEqual(d.sel.map((s, n) => s ? n : -1).filter(n => n >= 0), [21], 'the copy is the selection');
+  await p.evaluate(() => { window.__cells = [...grid.children]; }); await pick(p, 5); await p.keyboard.press('Backspace'); await p.waitForTimeout(60);
+  const e = await p.evaluate(() => {
+    const now = [...grid.children];
+    return {n: now.length, same: now.every((c, n) => c === __cells[n < 5 ? n : n + 1]), num: now[5].querySelector('.num').textContent, label: now[5].querySelector('.n').textContent, sel: now.findIndex(c => c.classList.contains('sel'))};
+  });
+  assert.equal(e.n, 40); assert.ok(e.same, 'after a delete every remaining cell is the node it was');
+  assert.equal(e.num, '6 / 40'); assert.equal(e.label, '6'); assert.equal(e.sel, 5, 'the slide after the deleted one is selected');
+  assert.deepEqual(p.errs, []); } finally { await b.close(); }
+});
+
+// ROADMAP L2 — the WebKit rasteriser (Chromium takes the print dialog) used to run 89 serial foreignObject renders with
+// nothing on screen but an aria-busy attribute that no CSS reads: the page looked frozen. The ⤓ button now counts pages
+// and paints a hairline bar, and the loop yields after each page so the frame lands.
+live('⤓ in WebKit: the button counts `n / N` with a bar while exporting, reaches `12 / 12` before the blob exists, and comes back whole', async () => {
+  const twelve = model({slides: Array.from({length: 12}, (_, i) => ({els: [{x: 60, y: 80, w: 800, role: 'H1', text: 'Slide ' + (i + 1)}, {x: 100, y: 300, line: [400, 300], arrow: 'end', h: 3}]}))});
+  const b = await pw.webkit.launch(); const p = await fresh(b, write('progress.html', create(twelve).html));
+  const before = await p.evaluate(() => ({html: pdf.innerHTML, busy: pdf.hasAttribute('aria-busy'), chromium: CHROMIUM}));
+  assert.equal(before.chromium, false, 'WebKit takes the in-file rasteriser');
+  const seen = await p.evaluate(async () => {
+    const texts = [], bars = []; let blobAt = -1;
+    new MutationObserver(() => { const t = pdf.textContent.trim(); if (t && t !== texts.at(-1)) { texts.push(t); bars.push(getComputedStyle(pdf, '::after').width); } }).observe(pdf, {childList: true, subtree: true, characterData: true, attributes: true});
+    URL.createObjectURL = () => { blobAt = texts.length; return 'blob:x'; }; HTMLAnchorElement.prototype.click = () => {};
+    pdf.click(); // the real door, not a direct exportPdf() call
+    while (!pdf.hasAttribute('aria-busy')) await new Promise(r => setTimeout(r, 5));
+    while (pdf.hasAttribute('aria-busy')) await new Promise(r => setTimeout(r, 5));
+    await new Promise(r => setTimeout(r, 50));
+    return {texts, bars, blobAt, html: pdf.innerHTML, busy: pdf.hasAttribute('aria-busy'), scale: [pdfScale(12), pdfScale(40), pdfScale(41), pdfScale(89)]};
+  });
+  assert.ok(seen.texts.includes('12 / 12'), `the counter reached 12 / 12: ${seen.texts.join(' · ')}`);
+  assert.ok(seen.texts.indexOf('12 / 12') < seen.blobAt, `12 / 12 painted before the blob existed (blob at ${seen.blobAt}, 12/12 at ${seen.texts.indexOf('12 / 12')})`);
+  assert.ok(seen.texts.length >= 12, `one tick per page: ${seen.texts.length}`);
+  const widths = seen.bars.map(parseFloat); assert.ok(widths.at(-1) > widths[0], `the bar grew: ${seen.bars[0]} → ${seen.bars.at(-1)}`);
+  assert.equal(seen.html, before.html, 'the icon is back after the export');
+  assert.equal(seen.busy, false, 'aria-busy cleared');
+  assert.deepEqual(seen.scale, [3, 3, 2, 2], 'raster scale: 3× to 40 slides, 2× above (L2.2)');
+  assert.deepEqual(p.errs, []); await b.close();
+});
+live('⤓ in WebKit: a page that throws restores the button and falls through to print()', async () => {
+  const b = await pw.webkit.launch(); const p = await fresh(b, write('progress-err.html', create(model()).html));
+  const r = await p.evaluate(async () => {
+    const html = pdf.innerHTML; let printed = 0; window.print = () => { printed++; };
+    const g = CanvasRenderingContext2D.prototype.getImageData; CanvasRenderingContext2D.prototype.getImageData = () => { throw new DOMException('tainted', 'SecurityError'); };
+    pdf.click(); while (!pdf.hasAttribute('aria-busy')) await new Promise(r => setTimeout(r, 5)); while (pdf.hasAttribute('aria-busy')) await new Promise(r => setTimeout(r, 5)); await new Promise(r => setTimeout(r, 50));
+    CanvasRenderingContext2D.prototype.getImageData = g;
+    return {same: pdf.innerHTML === html, busy: pdf.hasAttribute('aria-busy'), printed, p: pdf.style.getPropertyValue('--p')};
+  });
+  assert.equal(r.same, true, 'icon restored after the failure'); assert.equal(r.busy, false); assert.equal(r.printed, 1, 'print() is the fallback'); assert.equal(r.p, '', 'no stale bar');
+  await b.close();
+});

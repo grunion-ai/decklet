@@ -37,54 +37,76 @@ for (const n of Object.keys(LIBRARY)) if (!placedL.includes(n) && LIBRARY[n].gro
 for (const id of placedT) if (!TEMPLATES.some(t => t.id === id)) throw new Error(`kind names unknown template ${id}`);
 for (const n of placedL) if (!LIBRARY[n]) throw new Error(`kind names unknown layout ${n}`);
 
+// ── sample media: templates/samples/* (build products of samples/make.mjs — nothing photographed, nothing downloaded) as
+// data: URIs, bound to the image templates and layouts the way `cta` gets its `href`, so the sheet shows the image tool
+// and the GIF playing. A template's media row is the `shot()` placeholder (cat-modern.mjs); a layout's is its `image` slot.
+const MIME = { jpg: 'jpeg', png: 'png', gif: 'gif' };
+export const SAMPLES = Object.fromEntries(fs.readdirSync(path.join(dir, 'samples')).filter(f => MIME[f.split('.').pop()])
+  .map(f => [f, `data:image/${MIME[f.split('.').pop()]};base64,${fs.readFileSync(path.join(dir, 'samples', f)).toString('base64')}`]));
+export const MEDIA = {   // slide id → [sample, alt, object-position]
+  'image-hero-overlay': ['photo-1.jpg', 'A hillside at dusk under a low sun', 'center'],
+  'image-split': ['photo-2.jpg', 'A harbour skyline at night, lights on the water', '60% 50%'],
+  'annotated-shot': ['clip.gif', 'The events screen: a failed delivery retried and going green', 'left top'],
+  'image-left': ['ui-shot.png', 'The events screen of an event-delivery dashboard', 'left top'],
+  'image-right': ['photo-1.jpg', 'A hillside at dusk under a low sun', 'center'],
+};
+for (const [id, [f]] of Object.entries(MEDIA)) if (!SAMPLES[f]) throw new Error(`${id} binds a sample that is not in templates/samples: ${f}`);
+const SHOT = 'linear-gradient(135deg,var(--box),var(--line))';   // the templates' media placeholder; the first such row takes the sample
+const media = (id, e) => { const [f, alt, pos] = MEDIA[id]; const { bg, ...rest } = e; return { ...rest, img: SAMPLES[f], fit: 'cover', pos, alt }; };
+const bind = (t) => { let done = false; return MEDIA[t.id] ? t.els.map(e => (!done && e.bg === SHOT && (done = true)) ? media(t.id, e) : e) : t.els; };
+
 // ── sample content for the library layouts: one bound row per slot, by slot name, then by role
-const IMG = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 3"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5B9CF6"/><stop offset="1" stop-color="#1E3A8A"/></linearGradient></defs><rect width="4" height="3" fill="url(#g)"/></svg>');
-const CHART = { mark: 'bar', data: [{ label: 'Mon', value: 48 }, { label: 'Tue', value: 61 }, { label: 'Wed', value: 57 }, { label: 'Thu', value: 74 }], source: 'Front-desk log, one week' };
-// sample content for the library layouts, by `layout.slot`, then by slot name, then by role. Every layout speaks
-// about a different everyday subject, so the sheet reads as twenty-two slides rather than one slide repeated.
+const CHART = { mark: 'bar', data: [{ label: 'Mon', value: 48 }, { label: 'Tue', value: 61 }, { label: 'Wed', value: 57 }, { label: 'Thu', value: 74 }], source: 'Desk log, one week' };
+// sample content for the library layouts, by `layout.slot`, then by slot name, then by role. Every layout speaks for one
+// of the same fictional companies the templates use (Tallyline, Fieldsense, Stride, Meridian Partners, Forage, Relay),
+// each about a different subject, so the sheet reads as twenty-two slides rather than one slide repeated.
 const TEXT = {
   // role / slot defaults (a layout below overrides them)
   supertitle: 'Section', title: 'A title that states the claim', body: 'Two sentences of body copy at most: what the reader should take from this slide, and why it matters now.',
   caption: 'Source · one line', label: 'the label', stat: '63%', number: '02',
   subtitle: 'One line under the title that says what the slide shows.', note: 'A note for the reader who has no speaker in the room.', source: 'Source · where the numbers came from', legend: '● this year  ● last year',
   // openers
-  'cover.supertitle': 'Spring programme', 'cover.title': 'A season at the community garden', 'cover.body': 'Forty plots, a new tool shed, and the first Saturday market in June.', 'cover.caption': 'Volunteer briefing · April',
-  'title.supertitle': 'Part three', 'title.title': 'The kitchen, rebuilt',
-  'section.number': '04', 'section.title': 'Getting around', 'section.body': 'Trains, bikes and the three streets worth walking.',
+  'cover.supertitle': 'Board update', 'cover.title': 'Tallyline, third quarter', 'cover.body': 'Forty new accounts, a second data center, and the first profitable month in September.', 'cover.caption': 'Board pack · October 2026',
+  'title.supertitle': 'Part three', 'title.title': 'The close, rebuilt',
+  'section.number': '04', 'section.title': 'Go-to-market', 'section.body': 'Channels, pricing and the three accounts worth a visit.',
   'content.supertitle': 'Field notes', 'content.title': 'A title over an empty canvas', 'content.subtitle': 'The rows of the slide go here; this chrome is all the layout gives.', 'content.note': 'Bind only the chrome you need.', 'content.source': 'Source · your own', 'content.legend': '',
-  'agenda.supertitle': 'Today', 'agenda.title': 'Five things in thirty minutes', 'agenda.subtitle': 'Questions at the end, or in the thread afterwards.', 'agenda.note': 'Times are a guide; the third item usually runs long.', 'agenda.source': 'Agenda · team meeting, week 12', 'agenda.legend': '',
+  'agenda.supertitle': 'Today', 'agenda.title': 'Five things in thirty minutes', 'agenda.subtitle': 'Questions at the end, or in the thread afterwards.', 'agenda.note': 'Times are a guide; the third item usually runs long.', 'agenda.source': 'Agenda · product review, week 12', 'agenda.legend': '',
   // text
   'statement.title': 'Every long meeting is a short memo nobody wrote.', 'statement.caption': 'the thesis',
-  'quote.quote': 'We planted in March, harvested in July, and ate the first tomatoes on the steps of the shed.', 'quote.attribution': 'Plot 17 · second season',
-  'two-cols.supertitle': 'Housing', 'two-cols.title': 'Renting against buying in a small city', 'two-cols.subtitle': 'Ten years, one household, the same street.', 'two-cols.left': 'Renting keeps the deposit liquid and moves are cheap. The rent rises with the market and the landlord decides on the kitchen.', 'two-cols.right': 'Buying fixes the monthly cost and every repair is yours. The deposit is gone for a decade and a move costs a year of savings.', 'two-cols.note': 'Both columns assume the same commute and the same school.', 'two-cols.source': 'Source · city rent index, 2016–2026', 'two-cols.legend': '',
-  'two-cols-header.supertitle': 'Sleep', 'two-cols-header.title': 'What changed when the lights went down at ten', 'two-cols-header.subtitle': 'A four-week household experiment.', 'two-cols-header.header': 'Bedtime moved an hour earlier; nothing else did.', 'two-cols-header.left': 'Mornings got easier within a week. Breakfast happened, the bus was caught, and the first hour at work stopped being lost.', 'two-cols-header.right': 'Evenings got shorter. Television dropped to one episode, reading came back, and the dishwasher ran before dinner instead of after.', 'two-cols-header.note': 'Weekends kept the old schedule and the difference showed by Monday.', 'two-cols-header.source': 'Source · a paper diary, 28 nights', 'two-cols-header.legend': '',
-  'comparison.supertitle': 'Commute', 'comparison.title': 'Bike or bus for six kilometres', 'comparison.subtitle': 'Door to desk, measured over a month.', 'comparison.left-head': 'Bike', 'comparison.right-head': 'Bus', 'comparison.left': 'Twenty-two minutes, the same every day. Rain three mornings a month. Arrive awake.', 'comparison.right': 'Eighteen to forty minutes, most of it waiting. Dry. Arrive having read twelve pages.', 'comparison.note': 'The bike wins on time; the bus wins on the book.', 'comparison.source': 'Source · phone timer, 20 working days', 'comparison.legend': '',
+  'quote.quote': 'We cut our produce bill by a fifth and the kitchen stopped calling six suppliers every morning.', 'quote.attribution': 'Head chef · Harbor Hotels',
+  'two-cols.supertitle': 'Pricing', 'two-cols.title': 'Usage pricing against a flat seat', 'two-cols.subtitle': 'Two years, one account, the same product.', 'two-cols.left': 'Usage pricing keeps the entry cheap and small teams sign up on a card. The bill rises with traffic and finance cannot forecast it.', 'two-cols.right': 'A flat seat fixes the monthly cost and every spike is free. Small teams balk at the floor and a quiet quarter is paid for anyway.', 'two-cols.note': 'Both columns assume the same support tier and the same contract term.', 'two-cols.source': 'Source · billing data, 2024–2026', 'two-cols.legend': '',
+  'two-cols-header.supertitle': 'Retention', 'two-cols-header.title': 'What changed when the reminder moved to 7 pm', 'two-cols-header.subtitle': 'A four-week product experiment.', 'two-cols-header.header': 'The reminder moved from 7 am to 7 pm; nothing else did.', 'two-cols-header.left': 'Morning runs held. The runners who left were the ones who never ran before work, and they now plan the night before.', 'two-cols-header.right': 'Evening runs rose within a week. Second-week retention climbed four points and the support inbox lost its notifications thread.', 'two-cols-header.note': 'The control group kept the morning reminder and the gap held through week four.', 'two-cols-header.source': 'Source · product analytics, 28 days', 'two-cols-header.legend': '',
+  'comparison.supertitle': 'Connectivity', 'comparison.title': 'Cellular or radio for the field', 'comparison.subtitle': 'Sensor to dashboard, measured over a month.', 'comparison.left-head': 'Cellular', 'comparison.right-head': 'Radio', 'comparison.left': 'Two-minute readings, the same every day. Dead zones on three farms in ten. A SIM fee per unit.', 'comparison.right': 'Fifteen-minute readings, most of the delay at the gateway. No dead zones. One gateway per site.', 'comparison.note': 'Cellular wins on cadence; radio wins on cost.', 'comparison.source': 'Source · field trial, 20 sites', 'comparison.legend': '',
   // numbers
-  'fact.stat': '11 min', 'fact.label': 'saved on the school run by leaving at 7:50 instead of 8:00', 'fact.body': 'The lights on the ring road change at eight. Ten minutes earlier and the whole run is green.',
-  'stat.supertitle': 'Library', 'stat.title': 'Most borrowed books are picked up on a Saturday', 'stat.subtitle': 'Weekend loans against the whole week.', 'stat.stat': '58%', 'stat.caption': 'of loans, Saturdays, last twelve months', 'stat.note': 'Opening on Sunday would spread the queue, not grow it.', 'stat.source': 'Source · loan desk counts, twelve months', 'stat.legend': '',
-  'kpi-grid.supertitle': 'Bakery', 'kpi-grid.title': 'The first month with the second oven', 'kpi-grid.subtitle': 'Three numbers, against the month before.', 'kpi-grid.body': 'More loaves before nine, fewer sold out by noon, and the Saturday queue is gone.', 'kpi-grid.note': 'Flour cost rose in the same month and is not in these numbers.', 'kpi-grid.source': 'Source · till and oven log, March', 'kpi-grid.legend': '● March  ● February',
-  'kpi-grid-4.supertitle': 'Swimming pool', 'kpi-grid-4.title': 'Summer opening, in four numbers', 'kpi-grid-4.subtitle': 'June to August, against last summer.', 'kpi-grid-4.body': 'Attendance rose with the early lane sessions; lessons filled a week after booking opened.', 'kpi-grid-4.note': 'The heatwave week is in the attendance figure.', 'kpi-grid-4.source': 'Source · turnstile counts, June–August', 'kpi-grid-4.legend': '● this summer  ● last summer',
-  'chart.supertitle': 'Clinic', 'chart.title': 'Walk-in visits climb through the week', 'chart.subtitle': 'Front-desk count, Monday to Thursday.', 'chart.takeaway': 'Thursday carries half again what Monday does; the second nurse belongs on Thursday, not Monday.', 'chart.source': 'Source · front-desk log, one week', 'chart.legend': '● walk-ins',
+  'fact.stat': '4 days', 'fact.label': 'saved on the month-end close by matching payments on arrival', 'fact.body': 'The bank feed posts overnight. Matching it the same morning clears the queue before the close begins.',
+  'stat.supertitle': 'Activity', 'stat.title': 'Most runs are logged on a Saturday', 'stat.subtitle': 'Weekend runs against the whole week.', 'stat.stat': '58%', 'stat.caption': 'of runs, Saturdays, last twelve months', 'stat.note': 'A Sunday challenge spreads the load across the weekend.', 'stat.source': 'Source · activity log, twelve months', 'stat.legend': '',
+  'kpi-grid.supertitle': 'Dispatch', 'kpi-grid.title': 'The first month with the second hub', 'kpi-grid.subtitle': 'Three numbers, against the month before.', 'kpi-grid.body': 'More orders out before nine, fewer late runs, and the Saturday backlog is gone.', 'kpi-grid.note': 'Fuel cost rose in the same month and is outside these numbers.', 'kpi-grid.source': 'Source · dispatch log, March', 'kpi-grid.legend': '● March  ● February',
+  'kpi-grid-4.supertitle': 'Platform', 'kpi-grid-4.title': 'The quarter, in four numbers', 'kpi-grid-4.subtitle': 'July to September, against last quarter.', 'kpi-grid-4.body': 'Events rose with the payments launch; the new region filled a week after it opened.', 'kpi-grid-4.note': 'The outage week is in the availability figure.', 'kpi-grid-4.source': 'Source · platform metrics, Q3', 'kpi-grid-4.legend': '● this quarter  ● last quarter',
+  'chart.supertitle': 'Support desk', 'chart.title': 'Tickets climb through the week', 'chart.subtitle': 'Desk count, Monday to Thursday.', 'chart.takeaway': 'Thursday carries half again what Monday does; the second analyst belongs on Thursday.', 'chart.source': 'Source · desk log, one week', 'chart.legend': '● tickets',
   // diagrams
-  'process-steps.supertitle': 'Recipe', 'process-steps.title': 'Sourdough in four steps and two days', 'process-steps.subtitle': 'Mix on Friday night, bake on Sunday morning.', 'process-steps.body': 'Every step is a wait; the work itself is twenty minutes across the weekend.', 'process-steps.note': 'A colder kitchen adds a few hours to the second step.', 'process-steps.source': 'Source · a well-thumbed notebook', 'process-steps.legend': '',
-  'diagram.supertitle': 'Rainwater', 'diagram.title': 'From the roof to the beds', 'diagram.subtitle': 'Three parts, two hoses, no pump.', 'diagram.caption': 'The roof fills the butt; the butt feeds the beds by gravity, so the butt sits higher than the beds.', 'diagram.note': '', 'diagram.source': 'Source · the garden plan', 'diagram.legend': '',
-  'timeline.supertitle': 'Renovation', 'timeline.title': 'One kitchen, four dates', 'timeline.subtitle': 'Order placed to first dinner.', 'timeline.note': 'The gap between the second and third dates is the plasterer.', 'timeline.source': 'Source · the builder\'s schedule', 'timeline.legend': '',
+  'process-steps.supertitle': 'Engagement', 'process-steps.title': 'An engagement in four steps and six weeks', 'process-steps.subtitle': 'Kickoff on a Monday, handover six weeks later.', 'process-steps.body': 'Every step ends in a written decision; the work between them belongs to the client\'s own team.', 'process-steps.note': 'A larger team adds a week to the second step.', 'process-steps.source': 'Source · the engagement plan', 'process-steps.legend': '',
+  'diagram.supertitle': 'Architecture', 'diagram.title': 'From the sensor to the dashboard', 'diagram.subtitle': 'Three parts, one radio link, no wiring.', 'diagram.caption': 'The sensor reports to the gateway; the gateway posts to the cloud, so the gateway takes the only power outlet.', 'diagram.note': '', 'diagram.source': 'Source · the system diagram', 'diagram.legend': '',
+  'timeline.supertitle': 'Launch', 'timeline.title': 'One release, four dates', 'timeline.subtitle': 'Code freeze to store listing.', 'timeline.note': 'The gap between the second and third dates is the app review.', 'timeline.source': 'Source · the release plan', 'timeline.legend': '',
   // images
-  'image-left.supertitle': 'Museum', 'image-left.title': 'The east gallery, reopened', 'image-left.subtitle': 'Daylight through the new roof.', 'image-left.body': 'Twelve rooms, one route, benches in every third room. The café moved to the courtyard.', 'image-left.note': 'Photographed on the opening morning.', 'image-left.source': 'Source · the museum', 'image-left.legend': '',
-  'image-right.supertitle': 'Trail', 'image-right.title': 'The ridge path in October', 'image-right.subtitle': 'Eleven kilometres, one climb, one pub.', 'image-right.body': 'Start at the station, finish at the other station. The climb is in the first hour; the rest is along the top.', 'image-right.note': 'Boots, not trainers, after rain.', 'image-right.source': 'Source · a walking club', 'image-right.legend': '',
+  'image-left.supertitle': 'Product', 'image-left.title': 'The events screen, rebuilt', 'image-left.subtitle': 'One queue, every endpoint, no tabs.', 'image-left.body': 'Failed deliveries sort to the top, a retry is one click, and the payload diff opens in place. Nothing to install.', 'image-left.note': 'Screenshot from the September build.', 'image-left.source': 'Source · Relay', 'image-left.legend': '',
+  'image-right.supertitle': 'Route', 'image-right.title': 'The morning run in October', 'image-right.subtitle': 'Eleven stops, one hub, one driver.', 'image-right.body': 'Start at the hub, finish at the hub. The hotels are in the first hour; the rest is restaurants out along the valley road.', 'image-right.note': 'Chilled van, first farm gate before seven.', 'image-right.source': 'Source · dispatch', 'image-right.legend': '',
   // closers
-  'cta.title': 'Come on Saturday.', 'cta.body': 'Ten till two, bring gloves. Tea is provided, cake is negotiable.', 'cta.button-label': 'Sign up for a plot',
-  'end.title': 'Thank you', 'end.body': 'hello@example.org · the shed, plot 1', 'end.caption': 'Slides made with decklet · MIT',
+  'cta.title': 'Start on a Monday.', 'cta.body': 'Two weeks inside your team and one written plan at the end.', 'cta.button-label': 'Book a working session',
+  'end.title': 'Thank you', 'end.body': 'hello@example.com · Meridian Partners', 'end.caption': 'Slides made with decklet · MIT',
 };
-const ITEMS = ['Where we are', 'What changed', 'What it cost', 'What is next', 'Questions'];
-const STEPS = ['Mix the starter', 'Fold and rest', 'Shape and prove', 'Bake hot'];
-const EVENTS = ['Order placed', 'Old kitchen out', 'Plaster dry', 'First dinner'];
+const ITEMS = ['Where we are', 'What shipped', 'What it cost', 'What is next', 'Questions'];
+const STEPS = ['Kickoff', 'Discover', 'Design', 'Hand over'];
+const EVENTS = ['Code freeze', 'Beta out', 'Review passed', 'In the store'];
 const DATES = ['Mar', 'May', 'Jun', 'Jul'];
-const KPIS = [['640', 'loaves a week'], ['3', 'sell-outs'], ['12 min', 'longest queue'], ['9', 'lane sessions']];
+const KPIS = {   // per layout, so the two grids speak for two companies
+  'kpi-grid': [['640', 'orders a week'], ['3', 'late runs'], ['12 min', 'longest wait'], ['9', 'routes']],
+  'kpi-grid-4': [['40M', 'events'], ['99.98%', 'delivered'], ['84 ms', 'median latency'], ['3', 'regions']],
+};
+const DELTAS = { 'kpi-grid': ['↑ 12%', '↓ 2', '↑ 4 min', 'new'], 'kpi-grid-4': ['↑ 12%', '↑ 0.01', '↓ 6 ms', '+1'] };
 const fill = (name) => {
   const lay = LIBRARY[name];
   const els = Object.entries(lay.slots).filter(([slot]) => TEXT[`${name}.${slot}`] !== '').map(([slot, sl]) => {
-    if (slot === 'image') return { slot, img: IMG, fit: 'cover' };
+    if (slot === 'image') return media(name, { slot });
     if (slot === 'chart') return { slot, chart: CHART };
     if (!sl.role) return { slot };                                        // paint: the slot carries it
     let m;
@@ -93,14 +115,14 @@ const fill = (name) => {
     if ((m = /^step(\d)$/.exec(slot))) return { slot, text: STEPS[m[1] - 1] };
     if ((m = /^t(\d)$/.exec(slot))) return { slot, text: DATES[m[1] - 1] };
     if ((m = /^e(\d)$/.exec(slot))) return { slot, text: EVENTS[m[1] - 1] };
-    if ((m = /^kpi(\d)-delta$/.exec(slot))) return { slot, text: ['↑ 12%', '↓ 2', '↑ 4 min', 'new'][m[1] - 1] };
-    if ((m = /^kpi(\d)-label$/.exec(slot))) return { slot, text: KPIS[m[1] - 1][1] };
-    if ((m = /^kpi(\d)$/.exec(slot))) return { slot, text: KPIS[m[1] - 1][0] };
+    if ((m = /^kpi(\d)-delta$/.exec(slot))) return { slot, text: DELTAS[name][m[1] - 1] };
+    if ((m = /^kpi(\d)-label$/.exec(slot))) return { slot, text: KPIS[name][m[1] - 1][1] };
+    if ((m = /^kpi(\d)$/.exec(slot))) return { slot, text: KPIS[name][m[1] - 1][0] };
     return { slot, text: TEXT[`${name}.${slot}`] ?? TEXT[slot] ?? slot };
   });
   if (name === 'diagram') {   // a figure inside the frame: three boxes, two connectors
     const box = (x, t) => ({ x, y: 250, w: 200, h: 72, box: 1, role: 'H2', text: t });
-    els.push(box(80, 'Roof'), { x: 280, y: 286, line: [340, 286], h: 2.5, bg: 'var(--fg)', arrow: 'end', head: 'triangle' }, box(340, 'Water butt'), { x: 540, y: 286, line: [600, 286], h: 2.5, bg: 'var(--fg)', arrow: 'end', head: 'triangle' }, box(600, 'Beds'));
+    els.push(box(80, 'Sensor'), { x: 280, y: 286, line: [340, 286], h: 2.5, bg: 'var(--fg)', arrow: 'end', head: 'triangle' }, box(340, 'Gateway'), { x: 540, y: 286, line: [600, 286], h: 2.5, bg: 'var(--fg)', arrow: 'end', head: 'triangle' }, box(600, 'Dashboard'));
   }
   if (name === 'cta') for (const e of els) if (e.slot === 'button' || e.slot === 'button-label') e.href = 'https://example.com';
   return els;
@@ -108,7 +130,7 @@ const fill = (name) => {
 
 // ── the deck
 const divider = (k, i) => ({ name: `kind-${k.id}`, layout: 'title', els: [{ slot: 'supertitle', text: `${String(i + 1).padStart(2, '0')} · ${k.templates.length + k.layouts.length} slides` }, { slot: 'title', text: k.name }, { x: 60, y: 400, w: 700, role: 'Body', color: 'var(--muted)', text: k.note }] });
-const tslide = (t) => ({ name: t.id, layout: t.layout || undefined, hide: t.layout ? undefined : ['foot'], els: [...scale(t.els, 1), ...(t.layout ? [{ override: 'foot', text: `template · ${t.id}` }] : [])] });
+const tslide = (t) => ({ name: t.id, layout: t.layout || undefined, hide: t.layout ? undefined : ['foot'], els: [...scale(bind(t), 1), ...(t.layout ? [{ override: 'foot', text: `template · ${t.id}` }] : [])] });
 const lslide = (n) => ({ name: `layout-${n}`, layout: n, hide: n === 'image-hero-overlay' ? ['foot'] : undefined, els: [...fill(n), { override: 'foot', text: `layout · ${n}` }] });
 const index = [];
 const slides = [];
@@ -124,6 +146,7 @@ const model = {
   title: 'decklet slide library',
   w: 960, h: 540,
   styles: { margin: 60 },
+  spell: { ignore: ['tallyline', 'fieldsense'] },   // the invented company names; every other word is in the dictionary
   // `title` and `content` come from the library (the templates were cut on the same geometry)
   master: [ { id: 'foot', footer: 1, x: 60, y: 506, w: 340, role: 'Label', text: 'decklet library' } ],
   slides,

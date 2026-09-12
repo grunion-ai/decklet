@@ -1,0 +1,94 @@
+{
+ "tokens": {
+  "bg": "#111315",
+  "fg": "#F3F4F6",
+  "muted": "#9CA3AF",
+  "accent": "#5B9CF6",
+  "card": "#1A1D21",
+  "line": "#2C3138",
+  "sel": "#5B9CF6",
+  "box": "#20262E"
+ },
+ "roles": {
+  "Title": {
+   "font": "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif",
+   "size": 64,
+   "weight": 800,
+   "lh": 68,
+   "ls": -1.5,
+   "color": "var(--fg)",
+   "cw": 0.45
+  },
+  "Supertitle": {
+   "font": "ui-monospace,Menlo,Consolas,monospace",
+   "size": 12,
+   "weight": 500,
+   "lh": 16,
+   "ls": 1.5,
+   "color": "var(--accent)",
+   "tt": "uppercase",
+   "cw": 0.73
+  },
+  "H1": {
+   "font": "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif",
+   "size": 34,
+   "weight": 800,
+   "lh": 40,
+   "ls": -0.5,
+   "color": "var(--fg)",
+   "cw": 0.46
+  },
+  "H2": {
+   "font": "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif",
+   "size": 22,
+   "weight": 600,
+   "lh": 28,
+   "ls": -0.3,
+   "color": "var(--fg)",
+   "cw": 0.44
+  },
+  "Body": {
+   "font": "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif",
+   "size": 16,
+   "weight": 400,
+   "lh": 24,
+   "ls": 0,
+   "color": "var(--fg)",
+   "cw": 0.46
+  },
+  "Caption": {
+   "font": "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif",
+   "size": 13,
+   "weight": 400,
+   "lh": 18,
+   "ls": 0,
+   "color": "var(--muted)",
+   "cw": 0.47
+  },
+  "Label": {
+   "font": "ui-monospace,Menlo,Consolas,monospace",
+   "size": 11,
+   "weight": 500,
+   "lh": 14,
+   "ls": 1,
+   "color": "var(--muted)",
+   "tt": "uppercase",
+   "cw": 0.69
+  },
+  "Stat": {
+   "font": "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif",
+   "size": 40,
+   "weight": 800,
+   "lh": 44,
+   "ls": -1,
+   "color": "var(--accent)",
+   "cw": 0.45
+  }
+ },
+ "pad": {
+  "chip": "3px 8px",
+  "pill": "5px 12px"
+ },
+ "margin": 60,
+ "gap": 4
+}
