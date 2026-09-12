@@ -91,13 +91,16 @@ test('diagram: routing — a target not to the right takes V-H-V between the hor
   const lab = t => stacked.find(r => r.text === t);
   assert.deepEqual([lab('down').x, lab('down').y, lab('down').align], [256, 124, undefined], 'no horizontal run: label beside the vertical');
   assert.deepEqual([lab('back').y, lab('back').align], [118, 'center'], 'V-H-V: label centred on the horizontal run');
-  assert.deepEqual([lab('bent').x, lab('bent').y, lab('bent').align], [152, 119, 'center'], 'H-V-H with a short last run and room between the nodes: label centred on the vertical, its halo over the line');
+  assert.deepEqual([lab('bent').x, lab('bent').y, lab('bent').align], [182, 119, undefined], 'H-V-H with a short last run: label beside the vertical at its midpoint');
+  const near = diagramRows({w: 500, h: 200, label: 'near', nodes: [{id: 'a', x: 8, y: 120, w: 200, h: 60, title: 'A'}, {id: 'b', x: 288, y: 60, w: 200, h: 60, title: 'B'}],
+    edges: [{from: 'a', to: 'b', label: 'close'}]}, {x: 0, y: 0, w: 500, h: 200});
+  assert.deepEqual([near.find(r => r.text === 'close').x, near.find(r => r.text === 'close').y, near.find(r => r.text === 'close').align], [220, 42, 'center'], 'a short vertical (the target one row up): beside it the chip would sit in the target box, so it lifts above the node tops, centred on the bend');
   assert.deepEqual([lab('flat').y, lab('flat').align], [36, 'center'], 'straight: label centred on the span');
   const tight = diagramRows({w: 400, h: 200, label: 'tight', nodes: [
     {id: 'a', x: 8, y: 40, w: 120, h: 40, title: 'A'}, {id: 'b', x: 168, y: 40, w: 120, h: 40, title: 'B'}, {id: 'c', x: 168, y: 120, w: 120, h: 40, title: 'C'}],
     edges: [{from: 'a', to: 'b', label: 'screen passed'}, {from: 'a', to: 'c', label: 'linked to'}]}, unit);
   assert.equal(tight.find(r => r.text === 'screen passed').y, 18, 'wider than the 40px run: lifted 22 above the node tops, so the 16px chip keeps the 4px gap');
-  assert.deepEqual([tight.find(r => r.text === 'linked to').x, tight.find(r => r.text === 'linked to').y], [158, 97], 'bent with a short last run and no room between the nodes: beside the vertical at its midpoint');
+  assert.deepEqual([tight.find(r => r.text === 'linked to').x, tight.find(r => r.text === 'linked to').y], [158, 97], 'bent with a short last run: beside the vertical at its midpoint');
 });
 
 test('diagram: timeline — one headless accent rule, each tick its own group (dot + label + sublabel); note — one Label row', () => {

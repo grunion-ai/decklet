@@ -307,12 +307,28 @@ Picking a layout by what the content is:
 | the ask | `cta` |
 
 ## TEMPLATE LIBRARY
-Fifty-nine finished slides ship with the engine (`lib/templates.mjs`, sources in `lib/templates/cat-*.mjs`): the candidate sheet surveyed across the open-source slide catalogs and promoted whole (2026-09-07). A template is a layout PLUS sample rows — an issue tree, a Sankey, a scorecard, a bento grid — so the agent binds content instead of drawing. Print the catalogue — id · tier · density · note, then every text key with its sample — with:
+Sixty-seven finished slides ship with the engine (`lib/templates.mjs`, sources in `lib/templates/cat-*.mjs`): the candidate sheet surveyed across the open-source slide catalogs and promoted whole (2026-09-07). A template is a layout PLUS sample rows — an issue tree, a Sankey, a scorecard, a bento grid — so the agent binds content instead of drawing. Print the catalogue — id · tier · density · note, then every text key with its sample — with:
 ```
 node bin/validate.mjs --templates
 ```
 A slide names one and fills its keys: `{template: 'three-up-cards', fill: {t1: 'What you get', t2: 'Three things, one price.', t3: '01', …}}`. Every text row of the template is a key, `t1`…`tn` in row order; a key left out keeps the sample text (so fill them all before shipping). `create` expands the slide into the template's rows, scaled from the 960×540 cut to the canvas, sets the slide's `layout` to the template's chrome (`content` or `title` from the library — a deck-defined layout of that name wins) and its `density`, and keeps any free `els` after the template rows. An unknown template or fill key is a validate error listing what exists. A template is an accelerant like a layout: edit the rows it produced, add rows beside them, or draw free — nothing here is a fence.
-Tiers: **core** (in 4+ surveyed catalogs), **standard** (consulting catalogs), **fringe** (dataviz literature, rare on slides). Categories: Narrative · Numbers · Comparison · Frameworks · Process · Charts · Modern.
+Tiers: **core** (in 4+ surveyed catalogs), **standard** (consulting catalogs), **fringe** (dataviz literature, rare on slides). Categories: Narrative · Numbers · Comparison · Frameworks · Process · Charts · Modern · Figures.
+
+**Figures** are the nine figure kinds as templates, each the rows `diagramSlide()` makes from a spec (§ GRAPHICS) on the `diagram` layout, reading density, with a caption that states the claim:
+
+| id | figure | the sample shows |
+|---|---|---|
+| `figure-decision` | options → one pick, a timeline, a note | three options into one contract; chosen path in accent, loser dashed, three release ticks |
+| `figure-flow` | a request through hops | order → storefront → warehouse; the stock-out branch dashed to the supplier |
+| `figure-before-after` | the edge that changes | invoices by email (dashed, above) against a portal hop (accent, below) |
+| `figure-data-model` | entities and relations | account → order → shipment has-many chain; contact linked off account |
+| `figure-states` | a record's lifecycle | a lead new → won in accent; lost the dashed branch off new |
+| `figure-release` | versions on a rule | six ticks, 1.0 filled, a note naming the gate for 2.0 |
+| `figure-boundaries` | regions a request crosses | shop · head office · bank as dashed groups; the daily close in accent |
+| `figure-tree` | questions and answers | two diamonds, three pills; full refund in accent, decline dashed |
+| `figure-layers` | dependencies one way | three full-width layers, two downward edges, a note for the missing edge |
+
+Fill the keys like any template, or copy the spec shape from `lib/templates/cat-figures.mjs` and call `diagramSlide()` for a figure of your own.
 ## DENSITY
 Two named densities, defined in `lib/layouts.mjs` (`DENSITY`) so "dense" and "fluffy" build the same deck every time. A deck says `density: 'speaker' | 'reading'`; a slide may carry its own. `validate` warns on every slide that misses its density's shape; an unknown density is an error.
 | density | aka | for | the slide carries | max |

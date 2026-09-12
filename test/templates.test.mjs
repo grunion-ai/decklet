@@ -1,4 +1,4 @@
-// decklet template library gate — the 58 candidates ship in the engine as `template:` slides. A template is a finished
+// decklet template library gate — the 58 candidates plus the nine figures ship in the engine as `template:` slides. A template is a finished
 // slide's rows with sample content; the deck names one, fills its text keys, and create() expands it into ordinary
 // rows (like a chart row). Nothing here is a fence: a template slide may add free rows, and every template validates
 // with zero errors under the neutral scale.
@@ -12,14 +12,15 @@ import {validate} from '../bin/validate.mjs';
 import {create} from '../bin/create.mjs';
 import {TEMPLATES, TEMPLATE, templateKeys, expandTemplates, templateCatalogue} from '../lib/templates.mjs';
 import {LIBRARY} from '../lib/layouts.mjs';
+import {diagramLayout} from '../lib/diagram.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = f => fs.readFileSync(path.join(root, f), 'utf8');
 const v = m => validate(create(m).deck);   // validate what create() judges: the neutral roles filled in
 const deck = (slides, extra = {}) => ({w: 960, h: 540, title: 'tpl', ...extra, slides});
 
-test('templates: 58 ship, every id unique, every one names a tier, a category and a density', () => {
-  assert.equal(TEMPLATES.length, 58);
-  assert.equal(new Set(TEMPLATES.map(t => t.id)).size, 58);
+test('templates: 67 ship, every id unique, every one names a tier, a category and a density', () => {
+  assert.equal(TEMPLATES.length, 67);
+  assert.equal(new Set(TEMPLATES.map(t => t.id)).size, 67);
   for (const t of TEMPLATES) {
     assert.ok(['core', 'standard', 'fringe'].includes(t.tier), t.id + ' tier');
     assert.ok(t.cat && t.note, t.id + ' cat + note');
@@ -80,9 +81,33 @@ test('templates: an unknown template is an error that lists the library; a fill 
   assert.ok(r2.errors.some(m => /fill key "t9"/.test(m)), r2.errors.join(' | '));
 });
 
-test('templates: validate --templates prints the catalogue', () => {
+test('templates: validate --templates prints the catalogue, the nine figures under Figures', () => {
   const out = spawnSync(process.execPath, [path.join(root, 'bin/validate.mjs'), '--templates'], {encoding: 'utf8'});
   assert.equal(out.status, 0); assert.match(out.stdout, /cycle-loop/); assert.match(out.stdout, /t1/);
+  assert.match(out.stdout, /^Figures$/m);
+  for (const id of FIGURES) assert.match(out.stdout, new RegExp('^  ' + id + ' ', 'm'), id + ' printed');
+});
+
+// the nine figure kinds (ROADMAP L9.2): each is diagramRows() output on the `diagram` layout, reading density, no client residue
+const FIGURES = ['figure-decision', 'figure-flow', 'figure-before-after', 'figure-data-model', 'figure-states', 'figure-release', 'figure-boundaries', 'figure-tree', 'figure-layers'];
+test('templates: the nine figures — Figures category, diagram layout, reading density, chrome + figure rows + caption, every key filled', () => {
+  for (const id of FIGURES) {
+    const t = TEMPLATE[id];
+    assert.ok(t, id + ' ships');
+    assert.equal(t.cat, 'Figures'); assert.equal(t.layout, 'diagram'); assert.equal(t.density, 'reading');
+    assert.deepEqual([t.els[0].slot, t.els[1].slot, t.els.at(-1).slot], ['supertitle', 'title', 'caption'], id + ': chrome around the figure');
+    assert.ok(t.els.some(e => e.line && e.arrow === 'end' && e.to) || t.els.some(e => e.group === 'timeline'), id + ': a headed connector or a timeline rule');
+    const keys = templateKeys(id);
+    assert.ok(keys.length >= 5 && keys.every(k => String(k.text).trim()), id + ': every key carries sample text');
+    const {frame} = diagramLayout('960x540');
+    for (const e of t.els.filter(e => typeof e.x === 'number' && typeof e.w === 'number' && typeof e.h === 'number')) assert.ok(e.x >= frame.x && e.x + e.w <= frame.x + frame.w && e.y >= frame.y && e.y + e.h <= frame.y + frame.h, `${id}: box at ${e.x},${e.y} ${e.w}×${e.h} inside the frame`);
+    for (const e of t.els.filter(e => typeof e.x === 'number' && typeof e.w === 'number')) assert.ok(e.x >= 0 && e.x + e.w <= 960, `${id}: row at x=${e.x} w=${e.w} on the canvas`);   // a tick label centres on its dot and may overhang the frame
+  }
+  const d = deck([{template: 'figure-tree', fill: {t2: 'Two questions per refund'}}]);
+  expandTemplates(d);
+  assert.equal(d.slides[0].layout, 'diagram');
+  assert.ok(d.slides[0].els.some(e => e.svg && /polygon/.test(e.svg)), 'the diamond keeps its paint as an svg row');
+  assert.ok(d.slides[0].els.some(e => e.text === 'Two questions per refund'), 'fill replaced the title');
 });
 
 test('templates: SKILL.md names the template library, the fill contract and the catalogue command', () => {
