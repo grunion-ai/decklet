@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // build-sheet.mjs — the whole slide library for review: every template AND every library layout as one slide,
-// organised by the kind of slide it is (title & section, agenda, concept, quote, data, diagram & process,
+// organised by the kind of slide it is (title & section, agenda, concept, quote, data, process, figures,
 // timeline, image, end). A divider opens each kind; the footer names the source of each slide (template · id / layout · id).
 import fs from 'node:fs';
 import path from 'node:path';
@@ -24,8 +24,10 @@ export const KINDS = [
     templates: ['stat-hero', 'stat-row-4', 'kpi-scorecard', 'stat-plus-chart', 'delta-pair', 'progress-tracker', 'dashboard-composite',
       'chart-column', 'chart-bar-ranked', 'chart-stacked-100', 'chart-grouped', 'chart-line-trend', 'chart-area-band', 'chart-waterfall', 'chart-donut', 'chart-donut-row', 'chart-gauge', 'chart-scatter', 'chart-heatmap', 'chart-histogram', 'chart-slope', 'chart-dumbbell', 'chart-small-multiples', 'chart-marimekko', 'chart-pareto', 'chart-flow-split'],
     layouts: ['fact', 'stat', 'kpi-grid', 'kpi-grid-4', 'chart'] },
-  { id: 'process', name: 'Diagram & process', note: 'Steps, flows, cycles, funnels and free figures.',
-    templates: ['process-flow-4', 'vertical-steps', 'cycle-loop', 'funnel-stages'], layouts: ['process-steps', 'diagram'] },
+  { id: 'process', name: 'Process', note: 'Steps, cycles and funnels.',
+    templates: ['process-flow-4', 'vertical-steps', 'cycle-loop', 'funnel-stages'], layouts: ['process-steps'] },
+  { id: 'figures', name: 'Figures', note: 'The nine figure kinds as rows — decision, flow, before / after, data model, states, release, boundaries, tree, layers — and the bare frame.',
+    templates: ['figure-decision', 'figure-flow', 'figure-before-after', 'figure-data-model', 'figure-states', 'figure-release', 'figure-boundaries', 'figure-tree', 'figure-layers'], layouts: ['diagram'] },
   { id: 'timeline', name: 'Timeline', note: 'Dated events on a spine, lanes on a month grid.', templates: ['timeline-horizontal', 'gantt-lanes'], layouts: ['timeline'] },
   { id: 'image', name: 'Image', note: 'A photo or a screenshot carries the slide.', templates: ['image-hero-overlay', 'image-split', 'annotated-shot'], layouts: ['image-left', 'image-right'] },
   { id: 'end', name: 'End', note: 'The ask, then thanks.', templates: ['closing-cta'], layouts: ['cta', 'end'] },
