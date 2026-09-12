@@ -18,7 +18,9 @@ const model = () => ({w: 960, h: 540, title: 'links', slides: [{els: [
   {x: 60, y: 200, w: 240, h: 56, role: 'Body', align: 'center', valign: 'middle', text: 'Open the box', href: BOX}, // …and its label
   {x: 60, y: 320, w: 800, role: 'Body', html: 'Read the <a href="' + RUN + '">linked run</a> here'},   // an inline link mark
   {x: 60, y: 400, w: 300, role: 'Body', text: 'plain row, no link'},
-]}]});
+  {x: 60, y: 460, w: 240, h: 40, bg: 'var(--accent)', href: '#3'},                                          // in-deck: by slide number…
+  {x: 400, y: 460, w: 400, role: 'Body', html: 'see <a href="#s2">slide two</a>'},                          // …and by slide id, as a run
+]}, {els: [{x: 60, y: 80, w: 800, role: 'H1', text: 'Two'}]}, {els: [{x: 60, y: 80, w: 800, role: 'H1', text: 'Three'}]}]});
 const deck = () => { const f = path.join(tmp, 'links.html'); fs.writeFileSync(f, create(model()).html); return f; };
 // a context that never reaches the network: every https navigation is answered locally, so the popup's URL is still the deck's href
 const launch = async () => {
@@ -81,11 +83,67 @@ live('print + ⤓ PDF: both link surfaces reach the print pages as anchors and t
   const {b, p} = await launch();
   await p.evaluate(() => dispatchEvent(new Event('beforeprint')));
   const printed = await p.$$eval('#print a[href]', as => as.map(a => [a.getAttribute('href'), a.target]));
-  assert.deepEqual(printed.sort(), [[BOX, '_blank'], [BOX, '_blank'], [RUN, '_blank']].sort(), 'print pages carry the anchors ⌘P → Save as PDF follows');
+  assert.deepEqual(printed.sort(), [[BOX, '_blank'], [BOX, '_blank'], [RUN, '_blank'], ['#3', ''], ['#2', '']].sort(), 'print pages carry the anchors ⌘P → Save as PDF follows; in-deck targets ride along without a target');
   const dl = p.waitForEvent('download', {timeout: 8000}); await p.evaluate(() => exportPdf()); const file = await (await dl).path();
   const pdf = fs.readFileSync(file, 'latin1');
   assert.equal((pdf.match(/\/Subtype \/Link/g) || []).length, 3, 'three annotations: box, label, run');
   assert.match(pdf, new RegExp('/URI \\(' + BOX.replace(/[/.]/g, '\\$&') + '\\)'));
   assert.match(pdf, new RegExp('/URI \\(' + RUN.replace(/[/.]/g, '\\$&') + '\\)'));
+  assert.deepEqual(p.errs, []); await b.close();
+});
+
+// ROADMAP V3.1: an href into the deck. Presenting, a click jumps to the slide and the URL hash follows; editing, ⌘-click jumps;
+// nothing opens a tab. The anchor is written as '#<n>' whatever the model said, so the browser's own hash navigation does the work.
+live('in-deck targets: "#3" and "#s2" jump to the slide when presenting (hash follows) and on ⌘-click while editing; no new tab, no target', async () => {
+  const {b, ctx, p} = await launch();
+  const mod = await p.evaluate(() => /Mac|iP/.test(navigator.platform) ? '⌘' : 'Ctrl');
+  assert.deepEqual(await p.$$eval('.el[data-n="5"] a.lk, .el[data-n="6"] a', as => as.map(a => [a.getAttribute('href'), a.target])), [['#3', ''], ['#2', '']], 'resolved to slide numbers, no _blank');
+  assert.equal(await p.$eval('.el[data-n="5"]', d => d.title), `${mod}-click goes to slide 3`, 'the row hint says where');
+  assert.equal(await p.$eval('.el[data-n="6"] a', a => a.title), `${mod}-click goes to slide 2`, 'so does the run');
+  await p.evaluate(() => setPresent(true, true));
+  assert.equal(await p.$eval('.el[data-n="5"]', d => d.title), 'slide 3', 'presenting: the hint is the destination alone');
+  assert.equal(await clickFor(ctx, p, await centre(p, '.el[data-n="5"]')), null, 'no popup');
+  assert.equal(await p.evaluate(() => i), 2, 'slide 3 is shown'); assert.match(p.url(), /#3$/, 'the hash follows');
+  await p.evaluate(() => { location.hash = '#1'; }); await p.waitForTimeout(100); assert.equal(await p.evaluate(() => i), 0);
+  assert.equal(await clickFor(ctx, p, await centre(p, '.el[data-n="6"] a')), null, 'no popup from the run either');
+  assert.equal(await p.evaluate(() => i), 1, 'slide 2 is shown'); assert.match(p.url(), /#2$/);
+  await p.evaluate(() => { setPresent(false); location.hash = '#1'; }); await p.waitForTimeout(100);
+  assert.equal(await clickFor(ctx, p, await centre(p, '.el[data-n="5"]')), null, 'editing: a plain click opens nothing…');
+  assert.deepEqual(await p.evaluate(() => [...sel]), [5], '…it selects the row'); assert.equal(await p.evaluate(() => i), 0, 'and stays');
+  await p.evaluate(() => { sel.clear(); render(); });
+  assert.equal(await clickFor(ctx, p, await centre(p, '.el[data-n="5"]'), {modifiers: ['Meta']}), null, '⌘-click opens no tab…');
+  assert.equal(await p.evaluate(() => i), 2, '…it jumps to slide 3'); assert.match(p.url(), /#3$/);
+  assert.equal(await p.evaluate(() => present()), false, 'still editing');
+  assert.deepEqual(p.errs, []); await b.close();
+});
+
+// ROADMAP V3.2: a human sets a link without touching the model. ⌘K, or the toolbar's link button, is one field for every
+// selected row at once — a painted button and its label — http, https, mailto or #slide; empty clears; anything else is refused.
+live('⌘K / the toolbar link button: one field sets or clears href on every selected row; the gate refuses the rest; the log and undo carry it', async () => {
+  const {b, p} = await launch();
+  let answer = 'https://example.com/new'; p.on('dialog', d => d.accept(answer));
+  await p.evaluate(() => { sel.clear(); sel.add(4); render(); }); await p.keyboard.press('Meta+k');
+  assert.equal(await p.evaluate(() => deck.slides[0].els[4].href), 'https://example.com/new', 'the plain row is linked');
+  assert.equal(await p.$eval('.el[data-n="4"] a.lk', a => a.getAttribute('href')), 'https://example.com/new', '…and rendered');
+  answer = '#s3'; await p.evaluate(() => { sel.clear(); sel.add(1); sel.add(2); render(); }); await p.keyboard.press('Meta+k');
+  assert.deepEqual(await p.evaluate(() => [deck.slides[0].els[1].href, deck.slides[0].els[2].href]), ['#s3', '#s3'], 'the box and its label, together, to a slide by id');
+  assert.equal(await p.$eval('.el[data-n="2"] a.lk', a => a.getAttribute('href')), '#3', 'resolved at render');
+  answer = 'javascript:alert(1)'; await p.keyboard.press('Meta+k');
+  assert.deepEqual(await p.evaluate(() => [deck.slides[0].els[1].href, deck.slides[0].els[2].href]), ['#s3', '#s3'], 'refused: untouched');
+  answer = '#9'; await p.keyboard.press('Meta+k');
+  assert.deepEqual(await p.evaluate(() => [deck.slides[0].els[1].href, deck.slides[0].els[2].href]), ['#s3', '#s3'], 'a target that names no slide is refused too');
+  answer = ''; await p.keyboard.press('Meta+k');
+  assert.deepEqual(await p.evaluate(() => [deck.slides[0].els[1].href, deck.slides[0].els[2].href]), [undefined, undefined], 'empty clears both');
+  assert.equal(await p.$('.el[data-n="2"] a.lk'), null, 'no anchor left');
+  await p.keyboard.press('Meta+z');
+  assert.deepEqual(await p.evaluate(() => [deck.slides[0].els[1].href, deck.slides[0].els[2].href]), ['#s3', '#s3'], '⌘Z undoes the clear');
+  // the toolbar button, on a painted row selected alone (no text segment, so the link button must show on its own)
+  answer = 'mailto:hello@example.com'; await p.evaluate(() => { sel.clear(); sel.add(1); render(); placeTb(); });
+  assert.equal(await p.$eval('#tb', t => t.hidden), false, 'the toolbar shows for a painted row');
+  assert.equal(await p.$eval('#tb [data-link]', b => b.offsetParent !== null), true, 'with the link button');
+  assert.equal(await p.$eval('#tb [data-cmd="bold"]', b => b.offsetParent !== null), false, 'but no text marks');
+  await p.click('#tb [data-link]');
+  assert.equal(await p.evaluate(() => deck.slides[0].els[1].href), 'mailto:hello@example.com', 'the button is the same field');
+  assert.ok(await p.evaluate(() => log.some(e => e.r === deck.slides[0].els[1].id && e.k && e.k.href)), 'the edit log carries the change');
   assert.deepEqual(p.errs, []); await b.close();
 });
