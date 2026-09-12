@@ -92,6 +92,7 @@ export function create(model, {style = null, format, space, title, template, fro
   html = put(html, 'DECK', esc(JSON.stringify(deck)));
   html = putBlock(putBlock(html, 'LOG', log), 'VERSIONS', versions);
   html = put(html, 'KEY', `'decklet:${deck.id}'`);
+  html = put(html, 'ENGINE', `'${JSON.parse(fs.readFileSync(path.join(here, '..', 'package.json'), 'utf8')).version}'`); // the bug report leads with the version that built the file
   html = put(html, 'SPELL', JSON.stringify(spell ? spellFlags(deck, spell) : [])); // option C: the flagged words ride in the file; the editor underlines them
   return {html, deck, hash, migrate};
 }

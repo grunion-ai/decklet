@@ -14,3 +14,7 @@ The latest tagged release and `main`.
 ## Reporting a vulnerability
 
 Use GitHub's private vulnerability reporting on this repo (Security tab, "Report a vulnerability"); it is enabled and reaches the maintainers without a public issue. Include the deck or model that demonstrates the problem. You will get a reply from a person within seven days, and a fix or a written reason before any public disclosure. Please do not open a public issue for an unpatched vulnerability.
+
+## Bugs that are not vulnerabilities
+
+A wrong layout, a broken control, a PDF that does not match the slide: those go to **decklet@grunion.ai** — from a deck, ⓘ → Report a bug; from a terminal, `node bin/bug.mjs deck.html`. The mail is prefilled with the engine version and the deck's shape only, never its content, and you send it yourself. The address is receive-only; a person answers from their own mailbox. Anything that could expose a reader's data or run code takes the private route above, not this one.

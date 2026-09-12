@@ -12,7 +12,8 @@
     "decklet-validate": "bin/validate.mjs",
     "decklet-verify": "bin/verify.mjs",
     "decklet-pdf": "bin/pdf.mjs",
-    "decklet-import-html": "bin/import-html.mjs"
+    "decklet-import-html": "bin/import-html.mjs",
+    "decklet-bug": "bin/bug.mjs"
   },
   "files": [
     "deck.html",
