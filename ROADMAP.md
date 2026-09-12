@@ -210,16 +210,16 @@ Each `slideN.xml` relates to a `notesSlideN.xml` whose root is a shape tree stru
 
 The rendered slide already scales correctly. `fit()` (`template.html:314`) is a uniform scale-to-fit, so a slide looks right at any size. The gaps are in the chrome and the input layer.
 
-### M1. Read it on a phone · `S` · Now → supported
+### M1. Read it on a phone · `S` · Now → supported · M1.1 + M1.4 done (#49)
 
-M1 is the cheapest work in this lane: four small PRs, no new subsystem.
+M1 is the cheapest work in this lane: four small PRs, no new subsystem. M1.1 and M1.4 landed together in #49: `fit()` reads the layout viewport, `svh` + `viewport-fit=cover` + safe-area insets on the shell, and `test/touch.test.mjs` is the phone lane every later story proves itself in.
 
 | Story | Size | What |
 | --- | --- | --- |
-| M1.1 | S | `body{height:100vh}` has no `dvh` fallback and the file uses no `env(safe-area-inset-*)`. On iOS Safari the flex column `fit()` measures into is wrong before any interaction happens. Use `svh` for the shell, add `viewport-fit=cover` and safe-area padding. |
+| M1.1 | S | **Done (#49).** `body{height:100vh}` has no `dvh` fallback and the file uses no `env(safe-area-inset-*)`. On iOS Safari the flex column `fit()` measures into is wrong before any interaction happens. Use `svh` for the shell, add `viewport-fit=cover` and safe-area padding. |
 | M1.2 | S | Present mode has no touch navigation at all. The HUD reappears only on `mousemove` hover-peek (`:811`), which never fires from a finger, and no swipe or tap-to-advance handler exists. A phone in fullscreen present mode currently cannot change slides. |
 | M1.3 | S | Hit targets under a `pointer: coarse` query. Resize and connector nibs are 13x13px; HUD buttons are 26px tall. WCAG 2.2 AA floors at 24x24 CSS px and Apple recommends 44. Chrome drawn inside the scaled canvas shrinks below the floor as the canvas scales down, so render it outside the transform, or divide by the live scale. |
-| M1.4 | S | A touch test lane. Every live test today opens 1280x800 and drives `page.mouse.*`; nothing uses `hasTouch` or a phone-width viewport. |
+| M1.4 | S | **Done (#49).** A touch test lane. Every live test today opens 1280x800 and drives `page.mouse.*`; nothing uses `hasTouch` or a phone-width viewport. |
 
 ### M2. Present from the phone · `S` · Next
 
