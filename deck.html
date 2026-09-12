@@ -574,8 +574,8 @@ function render(){
   if(!$('sheet').hidden)sheetRender();
   placeTb();
 }
-// counter: inside the footer master row when one exists (inherits its font/baseline/padding); else the generic pin
-const num=(root,n)=>{const f=root.querySelector('[data-footer]');const c=document.createElement(f?'span':'div');c.className=f?'num':'num pin';c.textContent=(f&&f.textContent.trim()?' · ':'')+n+' / '+deck.slides.length;if(!f)c.style.right=MG()+'px';(f||root).appendChild(c)};
+// counter: inside the footer master row when one exists (inherits its font/baseline/padding); else the generic pin; deck.counter===0 draws none (a letter, a one-page document)
+const num=(root,n)=>{if(deck.counter===0)return;const f=root.querySelector('[data-footer]');const c=document.createElement(f?'span':'div');c.className=f?'num':'num pin';c.textContent=(f&&f.textContent.trim()?' · ':'')+n+' / '+deck.slides.length;if(!f)c.style.right=MG()+'px';(f||root).appendChild(c)};
 // print: every slide becomes one page painted with its own bg — same drawEls, no handlers needed
 addEventListener('beforeprint',()=>{commitEdit();const p=$('print');p.innerHTML='';deck.slides.forEach((s,n)=>{const pg=document.createElement('div');pg.className='pg';pg.style.background=s.bg||'var(--card)';const cv=document.createElement('div');cv.className='cv';drawEls(s,cv,false);num(cv,n+1);pg.appendChild(cv);p.appendChild(pg)})});
 addEventListener('afterprint',()=>{$('print').innerHTML=''});
