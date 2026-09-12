@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import {pathToFileURL} from 'node:url';
 import {LIBRARY, libraryFor, catalogue, DENSITY, densityReport} from '../lib/layouts.mjs';
-import {TEMPLATE, templateKeys, expandTemplates, templateCatalogue} from '../lib/templates.mjs';
+import {TEMPLATE, templateKeys, fillErrors, expandTemplates, templateCatalogue} from '../lib/templates.mjs';
 import {ICONS, iconNames, expandIcons} from '../lib/icons.mjs';
 import {checkChart, expandCharts} from '../lib/chart.mjs';
 import {stampIds} from '../lib/edits.mjs';
@@ -142,7 +142,7 @@ export function validate(deck) {
   for (const [si, s] of (Array.isArray(deck.slides) ? deck.slides : []).entries()) {
     if (!s || typeof s !== 'object') continue;
     if (s.template != null && !TEMPLATE[s.template]) E(`slides[${si}]: template "${s.template}" not in the library (${Object.keys(TEMPLATE).join(', ')})`);
-    else if (s.template != null) for (const k of Object.keys(s.fill || {})) if (!templateKeys(s.template).some(e => e.key === k)) E(`slides[${si}]: fill key "${k}" is not a text key of ${s.template} (${templateKeys(s.template).map(e => e.key).join(' ')})`);
+    else if (s.template != null) for (const m of fillErrors(s.template, s.fill || {})) E(`slides[${si}]: ${m}`);
     if (s.density != null && !DENSITY[s.density]) E(`slides[${si}]: density "${s.density}" not one of ${Object.keys(DENSITY).join('|')}`);
     // the library and the templates are cut for 16:9 (lib/layouts.mjs, templates/): on any other canvas they stretch until D2
     if (isNum(W) && isNum(H) && Math.abs(W / H - 16 / 9) > 0.01) {
