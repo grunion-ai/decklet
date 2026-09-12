@@ -233,3 +233,27 @@ for (const bn of ['chromium', 'webkit']) live(`the contact sheet keeps its scrol
   assert.ok(r.top0 <= cellH, `scrolled just far enough (${r.top0})`);
   assert.deepEqual(p.errs, []); } finally { await b.close(); }
 });
+
+// L1.2 — the sheet patches cells in place: an action rebuilds only the slides it touched; the other cells keep their DOM
+// node (and thumbnail) and FLIP to where they now sit. Counters and labels are renumbered on every cell.
+for (const bn of ['chromium', 'webkit']) live(`the contact sheet keeps the untouched cells' DOM nodes through a duplicate and a delete (${bn})`, async () => {
+  const b = await pw[bn].launch(); try { const p = await fresh(b, write(`sheetpatch-${bn}.html`, create(sheetDeck()).html));
+  await p.keyboard.press('c'); await p.evaluate(() => { window.__cells = [...grid.children]; });
+  await pick(p, 20); await p.evaluate(() => $('dup').click()); await p.waitForTimeout(60);
+  const d = await p.evaluate(() => {
+    const now = [...grid.children], same = now.map((c, n) => n <= 20 ? c === __cells[n] : n === 21 ? !__cells.includes(c) : c === __cells[n - 1]);
+    return {n: now.length, same, num: now[30].querySelector('.num').textContent, label: now[30].querySelector('.n').textContent, sel: now.map(c => c.classList.contains('sel'))};
+  });
+  assert.equal(d.n, 41);
+  assert.ok(d.same.every(Boolean), `every cell but the new one is the node it was: ${d.same.map((s, n) => s ? '' : n).filter(x => x !== '').join(',')} differ`);
+  assert.equal(d.num, '31 / 41', 'the counter is renumbered on a kept cell'); assert.equal(d.label, '31');
+  assert.deepEqual(d.sel.map((s, n) => s ? n : -1).filter(n => n >= 0), [21], 'the copy is the selection');
+  await p.evaluate(() => { window.__cells = [...grid.children]; }); await pick(p, 5); await p.keyboard.press('Backspace'); await p.waitForTimeout(60);
+  const e = await p.evaluate(() => {
+    const now = [...grid.children];
+    return {n: now.length, same: now.every((c, n) => c === __cells[n < 5 ? n : n + 1]), num: now[5].querySelector('.num').textContent, label: now[5].querySelector('.n').textContent, sel: now.findIndex(c => c.classList.contains('sel'))};
+  });
+  assert.equal(e.n, 40); assert.ok(e.same, 'after a delete every remaining cell is the node it was');
+  assert.equal(e.num, '6 / 40'); assert.equal(e.label, '6'); assert.equal(e.sel, 5, 'the slide after the deleted one is selected');
+  assert.deepEqual(p.errs, []); } finally { await b.close(); }
+});

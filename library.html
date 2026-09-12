@@ -849,24 +849,34 @@ document.addEventListener('selectionchange',()=>{if(!tb.hidden||canvas.querySele
 // ── contact sheet: the slide manager ──
 const sheet=$('sheet'),grid=$('grid');let gsel=new Set(),ganchor=0,clip=null,ins=null;
 function sheetUi(on){sheet.hidden=!on;document.body.classList.toggle('sheet',on);for(const k of ['prev','next','fs','add-text','add-box'])$(k).disabled=on}
-function sheetOpen(){commitEdit();sel.clear();gsel=new Set([i]);ganchor=i;sheetUi(true);sheetRender();tb.hidden=true}
+function sheetOpen(){commitEdit();sel.clear();gsel=new Set([i]);ganchor=i;sheetUi(true);cellOf=new WeakMap();sheetRender();tb.hidden=true}
 function sheetClose(){sheetUi(false);render()}
 $('sheet-back').onclick=sheetClose; // ← Back: closes to the CURRENT slide (i untouched); Esc / dblclick-a-cell unchanged
 // #sheet (fixed, overflow:auto) is the scroller, not the window: emptying the grid collapses its scroll height and the browser
 // clamps scrollTop to 0, so every action snapped the sheet to the top. Keep the offset across the rebuild; then the acted-on
 // slide (i) comes into view only if it is off screen (block:'nearest' is a no-op for a visible cell).
+// Cells are keyed by slide object: an action makes a new object for every slide it touches (dup, paste, + Slide, undo's
+// JSON.parse) and keeps the rest, so only the touched slides are drawn; the kept cells are renumbered and FLIP from where
+// they were to where they now sit. sheetOpen starts from a clean map because the canvas edits a slide in place.
+let cellOf=new WeakMap();
 function sheetRender(){
-  const top=sheet.scrollTop;
-  grid.innerHTML='';
-  deck.slides.forEach((s,n)=>{
-    const c=document.createElement('div');c.className='cell'+(gsel.has(n)?' sel':'');c.dataset.n=n;
-    const cv=document.createElement('div');cv.className='cv';drawEls(s,cv,false);num(cv,n+1);
-    const lb=document.createElement('span');lb.className='n';lb.textContent=n+1;
-    c.append(cv,lb);grid.appendChild(c);
-    cv.style.transform=`scale(${(c.clientWidth/W).toFixed(4)})`;
+  const top=sheet.scrollTop,was=new Map([...grid.children].map(c=>[c,c.getBoundingClientRect()]));
+  const cells=deck.slides.map((s,n)=>{
+    let c=cellOf.get(s);
+    if(c)c.querySelector('.num')?.remove();
+    else{c=document.createElement('div');c.className='cell';const cv=document.createElement('div');cv.className='cv';drawEls(s,cv,false);const lb=document.createElement('span');lb.className='n';c.append(cv,lb);cellOf.set(s,c)}
+    c.classList.toggle('sel',gsel.has(n));c.classList.remove('lift','drop');c.style.transform='';c.dataset.n=n;num(c.firstChild,n+1);c.lastChild.textContent=n+1;
+    return c;
   });
+  grid.replaceChildren(...cells);
+  const sc=`scale(${(cells[0].clientWidth/W).toFixed(4)})`;cells.forEach(c=>c.firstChild.style.transform=sc);
   sheet.scrollTop=top;
   const c=grid.children[i];if(c)c.scrollIntoView({block:'nearest'});
+  if(RM.matches)return;
+  const mv=cells.map(c=>{const b=was.get(c);if(!b)return null;const a=c.getBoundingClientRect(),dx=b.left-a.left,dy=(b.top+top)-(a.top+sheet.scrollTop);return Math.hypot(dx,dy)<1?null:[c,dx,dy]}).filter(Boolean); // scroll-independent: both rects in content space
+  mv.forEach(([c,dx,dy])=>{c.style.transition='none';c.style.transform=`translate(${dx}px,${dy}px)`});
+  grid.offsetWidth; // one reflow: the inverted frame lands before the transition is switched back on
+  mv.forEach(([c])=>{c.style.transition='';c.style.transform=''});
 }
 grid.addEventListener('mousedown',e=>{
   const c=e.target.closest('.cell');if(!c)return;e.preventDefault();const n=+c.dataset.n; // preventDefault: thumbnails are renders, never text — no native selection/focus on press
