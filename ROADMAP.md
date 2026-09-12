@@ -66,7 +66,7 @@ Epics rank by **ICE**: Impact x Confidence x Ease, each 1 to 10, multiplied, wit
 | **Mobile & touch** | M1 Read it on a phone `S` | M2 Present from the phone `S` | M3 Touch editing `L` |
 | **Documents & formats** | D1 Format presets `S` | D2 Aspect-aware composition `XL` | D3 Real documents `XL` |
 | **Export** | X1 Cheap wins `S` | X2 Searchable PDF `M` | X3 PPTX export `L` |
-| **Library & editor** | L7 Spellcheck, the rest `M`<br>L8 Versions, the rest `M` | | |
+| **Library & editor** | L7 Spellcheck, the rest `M`<br>L8 Versions, the rest `M`<br>L11 Type on the sheet `S` | | |
 
 ### ICE scores
 
@@ -94,6 +94,7 @@ Epics rank by **ICE**: Impact x Confidence x Ease, each 1 to 10, multiplied, wit
 | M3 Touch editing | 6 | 5 | 3 | **90** | Later |
 | L7 Spellcheck, the rest | 8 | 7 | 6 | **336** | Now |
 | L8 Versions, the rest | 8 | 7 | 6 | **336** | Now |
+| L11 Type on the sheet | 7 | 8 | 7 | **392** | Now |
 
 Three epics sit off their score.
 
@@ -366,6 +367,16 @@ Filed 2026-09-12 from Kyle's review of the rebuilt library deck (89 slides, deck
 ### L9. Figures in the library · Done (#37 `lib/diagram.mjs` exported as `@grunion/decklet/diagram`, #44 `cat-figures.mjs` + the Figures kind; 67 templates)
 
 ### L10. Styles on the sheet · Done (#38 `examples/styles/`, #42 the closing Styles section)
+
+### L11. Type on the sheet · `S` · Now
+
+L10 shows each kit's palette and weights, but a decklet style is deck-wide (roles win `font/size/lh/ls`), so every Styles slide still sets in the neutral sans. Kyle asked for variation in font as well as colour.
+
+| Story | Size | What |
+| --- | --- | --- |
+| L11.1 | S | A per-slide `styleRef` (or a slot-level role override) the engine honours for `font` and `lh` only, so a Styles slide can wear its kit's family without a second deck. Parity and the gap gate measure with the override's `cw`. |
+| L11.2 | XS | The Styles section binds each kit's family through it; the montage shows Georgia, Helvetica Neue, Palatino, Avenir Next side by side. |
+
 
 ## Carried forward
 
