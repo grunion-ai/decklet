@@ -172,3 +172,30 @@ test('create --from: a conflict is reported and the human value wins; versions a
   assert.equal(v2.migrate.conflicts.length, 1); assert.equal(v2.migrate.conflicts[0].agent, 'Agent title');
   assert.equal(blockOf(v2.html, 'VERSIONS').length, 20); assert.equal(blockOf(v2.html, 'VERSIONS').at(-1).rev, v1.deck.rev);
 });
+
+// ROADMAP P1.4: a deck built before 0.5.0 carries no /*LOG*/ or /*VERSIONS*/ data block, but its fileHtml() source still
+// holds the marker strings. blockOf's regex was an unanchored whole-document search, so it matched the source literal and
+// JSON.parse('+J(log)+') threw an uncaught SyntaxError from create --from.
+const pre050 = html => {
+  const out = html.replace(/const LOG0=\/\*LOG\*\/\[\]\/\*\/LOG\*\/;const VERS0=\/\*VERSIONS\*\/\[\]\/\*\/VERSIONS\*\/;/, 'const LOG0=[];const VERS0=[];');
+  assert.notEqual(out, html, 'fixture: the data blocks were stripped'); assert.match(out, /'\/\*LOG\*\/'/, 'fixture: the source literal stays');
+  return out;
+};
+test('blockOf: anchored to the data block — a marker missing there is reported as missing, never parsed out of fileHtml()\'s source', () => {
+  const html = pre050(create(mk(), {}).html);
+  assert.throws(() => blockOf(html, 'LOG'), {message: 'marker LOG missing'});
+  assert.throws(() => blockOf(html, 'VERSIONS'), {message: 'marker VERSIONS missing'});
+  assert.deepEqual(blockOf(html, 'LOG', []), [], 'a fallback stands in for a missing block');
+  assert.equal(blockOf(html, 'DECK').w, 960, 'the blocks that are there still read');
+});
+test('create --from: a deck built before 0.5.0 (no edit log) carries its id and its state into VERSIONS, replays nothing, and says so', () => {
+  const v1 = create(mk(), {}); const f1 = path.join(tmp, 'pre050.html');
+  fs.writeFileSync(f1, pre050(v1.html));
+  const v2 = create(mk(), {from: f1});
+  assert.equal(v2.deck.id, v1.deck.id, 'id inherited');
+  assert.deepEqual([v2.migrate.applied, v2.migrate.conflicts.length, v2.migrate.orphans.length], [0, 0, 0]);
+  assert.equal(v2.migrate.predates, true, 'the caller can tell the previous file had no log');
+  const vers = blockOf(v2.html, 'VERSIONS');
+  assert.equal(vers.length, 1); assert.equal(vers[0].rev, v1.deck.rev); assert.equal(vers[0].by, 'agent');
+  assert.deepEqual(blockOf(v2.html, 'LOG'), []);
+});
