@@ -24,18 +24,19 @@ Node 22 or newer. Nothing else to install for the engine or the CLI.
 3. **Motion never changes what is measured.** Print, the contact sheet, the PDF and `verify` draw the settled frame. Keep it that way.
 4. **One file, zero network.** No webfonts, no CDNs, no remote images. The gate greps for it.
 5. **Template and engine stay in sync.** `template.html` is the engine with an empty model; `deck.html` is the same engine carrying the explainer. Change the engine in one place and rebuild the other with `npm run build:deck`.
-6. **Atomic pull requests.** One change, one PR, a description that says what changed, why, and how you verified it. Screenshots for anything visual.
+6. **Generated files are regenerated, never merged.** `deck.html` and `library.html` are machine-written output under byte-identity gates (`test/kpi.test.mjs`, `test/library.test.mjs`). Any change to `template.html`, `bin/create.mjs`, `lib/`, `templates/` or `examples/explainer` makes them stale. Rebuild with `npm run build:deck` and `npm run build:library` in the same PR, and again on `main` after every merge that touched those inputs. Never resolve a conflict in either file by hand — two branches conflict on nearly every hunk, so take either side and rebuild. #18 merged without the rebuild and left main red until #19.
+7. **Atomic pull requests.** One change, one PR, a description that says what changed, why, and how you verified it. Screenshots for anything visual.
 
 ## Where things go
 
 | Change | Place |
 | --- | --- |
-| Engine, editor, renderer | `template.html` (then `npm run build:deck`) |
+| Engine, editor, renderer | `template.html` (then `npm run build:deck` and `npm run build:library`) |
 | Model contract, errors, warnings | `bin/validate.mjs` + `SKILL.md` |
 | Layout parity, collisions, pixel diff | `bin/verify.mjs` |
 | HTML pages to model | `bin/import-html.mjs` |
 | Worked examples | `examples/<name>/brief.md` + `model.json` |
-| Layout library | `templates/` |
+| Layout library | `templates/` (then `npm run build:library`) |
 
 ## License
 

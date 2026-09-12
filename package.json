@@ -30,6 +30,7 @@
     "test": "node --test test/**/*.test.mjs",
     "test:live": "npx playwright install chromium && node --test test/**/*.test.mjs",
     "build:deck": "node bin/create.mjs --model examples/explainer/model.json --out deck.html --title decklet",
+    "build:library": "node templates/build-sheet.mjs && node bin/create.mjs --model templates/candidates.model.json --out library.html --title \"decklet library\" --force",
     "verify:deck": "node bin/verify.mjs deck.html"
   },
   "devDependencies": {
