@@ -36,8 +36,13 @@ Outline, markdown, meeting notes, a transcript, a spreadsheet, a brief. You dist
 | `carousel-4x5` | 1080×1350 (4:5) | Letter | experimental |
 | `document-letter` | 816×1056 (8.5×11in) | Letter, zoom 1 | experimental |
 | `document-a4` | 794×1123 (210×297mm) | A4, zoom 1 | experimental |
+| `slides-4x3` | 960×720 (4:3) | Letter | experimental · library stretches |
+| `story` | 1080×1920 (9:16) | Letter | experimental · library stretches |
+| `document-letter-landscape` | 1056×816 | Letter landscape, zoom 1 (Safari: portrait-clipped — use `bin/pdf.mjs`) | experimental · library stretches |
+| `document-a4-landscape` | 1123×794 | A4 landscape, zoom 1 (same Safari caveat) | experimental · library stretches |
+| `poster-a3` | 1123×1587 (297×420mm) | A3, zoom 1 | experimental · library stretches |
 
-Experimental means: canvas sizing, editing, contact sheet and PDF all work; **text does not flow across pages** — every page is a slide you lay out yourself, and a document longer than its page is your problem to split. Treat a document as N fixed pages.
+Experimental means: canvas sizing, editing, contact sheet and PDF all work; **text does not flow across pages** — every page is a slide you lay out yourself, and a document longer than its page is your problem to split. Treat a document as N fixed pages. **Library stretches** means: every library layout and template is cut for 16:9, so on that canvas `validate` warns per slide that a library layout or a template will render stretched (ROADMAP D2) — define the deck's own layouts or draw free rows there.
 
 ### 3. Style — a style guide, an inferred brand, or the neutral fallback
 `style.json` = `{tokens, roles, pad}` (STYLE CONTRACT below). Obtain it in this order:

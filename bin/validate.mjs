@@ -29,7 +29,8 @@ export function fillKpi(deck) {
   return deck;
 }
 export const ANIMS = ['rise', 'fade', 'pop', 'wipe'];   // entrance motion on slide entry — the engine ignores anything else
-export const FORMATS = ['slides', 'carousel', 'carousel-4x5', 'document-letter', 'document-a4'];
+export const FORMATS = ['slides', 'slides-4x3', 'story', 'carousel', 'carousel-4x5', 'document-letter', 'document-a4', 'document-letter-landscape', 'document-a4-landscape', 'poster-a3'];
+export const PAGES = ['letter', 'a4', 'letter-landscape', 'a4-landscape', 'a3'];   // named @page sizes the runtime knows (template PAGES)
 export const ARROWS = ['start', 'end', 'both'];          // WHICH ends carry a head
 export const HEADS = ['triangle', 'chevron', 'dot', 'bar'];   // WHAT is drawn there row
 export const HREF = /^(https?:|mailto:)/i;               // href is model content: navigable schemes only, never javascript:/data:
@@ -71,7 +72,7 @@ export function validate(deck) {
   if (!isNum(W) || W <= 0) E('deck.w must be a positive number');
   if (!isNum(H) || H <= 0) E('deck.h must be a positive number');
   if (deck.format && !FORMATS.includes(deck.format)) E(`deck.format "${deck.format}" not one of ${FORMATS.join('|')}`);
-  if (deck.page && !['letter', 'a4'].includes(deck.page)) E(`deck.page "${deck.page}" must be letter|a4`);
+  if (deck.page && !PAGES.includes(deck.page)) E(`deck.page "${deck.page}" must be ${PAGES.join('|')}`);
   // styles.roles — the eight-role strict type scale: every role is a complete treatment; one font+size per role
   // (Title = display size for title/closing-slide headlines; H1 = content-slide title)
   const roles = deck.styles && deck.styles.roles;
@@ -101,11 +102,20 @@ export function validate(deck) {
   };
   for (const [n, sl] of Object.entries(deck.slots || {})) checkSlot('slots', n, sl);
   // template / icon rows that create() could not expand are reported here, then the valid ones expand so the same rows are judged
+  // the library's own cut of every layout the slides name, scaled to this canvas — a deck layout that equals it IS the library
+  // (merged by create or by the CLI, or copied verbatim), and stretches the same way off 16:9
+  const libCut = Array.isArray(deck.slides) ? libraryFor({w: W, h: H, slides: deck.slides.filter(s => s && typeof s === 'object'), layouts: {}}) : {};
+  const isLibrary = name => !!libCut[name] && JSON.stringify((deck.layouts || {})[name] ?? libCut[name]) === JSON.stringify(libCut[name]);
   for (const [si, s] of (Array.isArray(deck.slides) ? deck.slides : []).entries()) {
     if (!s || typeof s !== 'object') continue;
     if (s.template != null && !TEMPLATE[s.template]) E(`slides[${si}]: template "${s.template}" not in the library (${Object.keys(TEMPLATE).join(', ')})`);
     else if (s.template != null) for (const k of Object.keys(s.fill || {})) if (!templateKeys(s.template).some(e => e.key === k)) E(`slides[${si}]: fill key "${k}" is not a text key of ${s.template} (${templateKeys(s.template).map(e => e.key).join(' ')})`);
     if (s.density != null && !DENSITY[s.density]) E(`slides[${si}]: density "${s.density}" not one of ${Object.keys(DENSITY).join('|')}`);
+    // the library and the templates are cut for 16:9 (lib/layouts.mjs, templates/): on any other canvas they stretch until D2
+    if (isNum(W) && isNum(H) && Math.abs(W / H - 16 / 9) > 0.01) {
+      if (s.template != null && TEMPLATE[s.template]) Wn(`slides[${si}]: template "${s.template}" is cut for 16:9 — on a ${W}×${H} canvas it will stretch (ROADMAP D2); draw free rows or edit the expanded rows`);
+      else if (s.layout && isLibrary(s.layout)) Wn(`slides[${si}]: layout "${s.layout}" is cut for 16:9 — on a ${W}×${H} canvas it will stretch (ROADMAP D2); define the deck's own layout or draw free rows`);
+    }
     if (s.notes != null && typeof s.notes !== 'string') E(`slides[${si}]: notes must be a string — speaker notes, one string per slide`);
     for (const [ri, r] of (Array.isArray(s.els) ? s.els : []).entries()) if (r && r.icon != null && !ICONS[r.icon]) E(`slides[${si}].els[${ri}]: icon "${r.icon}" not in the set (${iconNames()})`);
   }
