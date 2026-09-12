@@ -50,7 +50,7 @@ test('bugReport: the subject is the [decklet] tag and a symptom the reporter ove
   assert.equal(r.body.split('\n')[2], 'deck abc123def4 · looks');
   assert.ok(r.body.includes('\nLooks wrong\nrows       7 (5 text · 1 box · 1 connector)\nclipped    1\n'), 'the category block: aligned key/value probes under the category name\n' + r.body);
   assert.ok(r.body.includes('\nWhat happened\nChips wrap on slide 3 after a retype\n'), 'the description sits under What happened');
-  assert.ok(r.body.includes('\nSteps to reproduce, if you can\n1. \n'), 'a steps prompt stays for the mail app');
+  assert.ok(r.body.includes('\nSteps to reproduce, if you can\n\n'), 'a steps prompt stays for the mail app — no numbered stub, which read as a stray');
   assert.deepEqual(Object.keys(BUG_CATS), ['looks', 'respond', 'save', 'crash'], 'four categories, fixed');
   assert.deepEqual(Object.values(BUG_CATS).map(c => c.label), ['Looks wrong', 'Won\'t respond', 'Save or PDF', 'Crashed']);
   assert.throws(() => bugReport({engine: '0.7.0', cat: 'other', mode: 'cli', client: 'x'}), /category/, 'a fifth category throws');
@@ -127,6 +127,8 @@ test('template: a HUD bug button (last in the view group) opens a native dialog:
   assert.match(tpl, /<textarea id="bugdesc" [^>]*maxlength="300"/, 'a short description, capped so the URL stays under the mailto ceiling');
   assert.match(tpl, /<a id="bugsend" class="primary" href="#"/, 'the primary action is an anchor whose href IS the mailto');
   assert.match(tpl, /id="bugcopy"/, 'Copy report for a mail client that cuts the body');
+  assert.match(tpl, /#bugdlg\{[^}]*margin:auto/, 'the deck resets every margin to 0, which would pin a modal dialog to the top-left corner — margin:auto restores the browser\'s centring');
+  assert.match(tpl, /bugdlg\.addEventListener\('click',e=>\{if\(e\.target===bugdlg\)bugdlg\.close\(\)\}\)/, 'a click on the backdrop (the dialog element itself, outside the form) closes');
   assert.match(tpl, /nothing is sent until you do/, 'the footer says the mail is the reporter\'s to send');
   assert.match(tpl, /const ENGINE=\/\*ENGINE\*\/'0\.0\.0'\/\*\/ENGINE\*\/;/, 'create fills the ENGINE marker with the package version');
   assert.match(tpl, /window\.addEventListener\('error',/, 'an error ring so Crashed has something to say');
@@ -151,6 +153,13 @@ live('live: opening ⓘ fills the anchor with a mailto that names the engine, th
   await p.evaluate(() => setTimeout(() => { throw new Error(`boom (${'ZQTEXT-9f1'}) /Users/zqowner/x.js`); }, 0)); await p.waitForTimeout(60); // an UNCAUGHT error (async, so it reaches window.onerror) lands in the ring, scrubbed
   await p.click('#bug');
   assert.equal(await p.evaluate(() => document.getElementById('bugdlg').open), true, 'the dialog opens');
+  const centred = async () => p.evaluate(() => { const b = document.getElementById('bugdlg').getBoundingClientRect(); return Math.abs(b.x + b.width / 2 - innerWidth / 2) < 4 && Math.abs(b.y + b.height / 2 - innerHeight / 2) < 4; });
+  assert.equal(await centred(), true, 'the dialog is centred in the viewport (Kyle\'s first report: it opened at the top-left corner)');
+  await p.mouse.click(8, 8); await p.waitForTimeout(50);
+  assert.equal(await p.evaluate(() => document.getElementById('bugdlg').open), false, 'a click on the backdrop closes it');
+  await p.keyboard.press('c'); await p.waitForTimeout(50); await p.click('#bug'); await p.waitForTimeout(50);
+  assert.equal(await centred(), true, 'centred over the contact sheet too'); await p.keyboard.press('Escape'); await p.waitForTimeout(50); await p.keyboard.press('Escape'); await p.waitForTimeout(50);
+  await p.click('#bug');
   assert.equal(await p.evaluate(() => document.querySelector('input[name=cat]:checked').value), 'looks', 'Looks wrong is the default tile');
   await p.fill('#bugdesc', 'Chips wrap on slide 3 after a retype');
   let href = await p.getAttribute('#bugsend', 'href');

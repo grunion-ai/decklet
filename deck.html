@@ -87,7 +87,7 @@ body.present .el a.lk{pointer-events:auto}
 #hud .mi-bug svg{transform-origin:50% 60%}#hud .mi-bug svg.animate{animation:mi-bug-wiggle .6s ease-in-out}@keyframes mi-bug-wiggle{25%{transform:rotate(-10deg)}75%{transform:rotate(10deg)}}
 @media (prefers-reduced-motion:reduce){.mi svg,.mi svg *{animation:none!important;transition:none!important}}
 /* Report a bug dialog: the deck's own chrome tokens; tiles are labels around hidden radios so the keyboard walks them as a group */
-#bugdlg{border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--fg);padding:0;width:min(560px,calc(100vw - 32px));font:13px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;box-shadow:0 12px 40px #0008}
+#bugdlg{margin:auto;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--fg);padding:0;width:min(560px,calc(100vw - 32px));font:13px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;box-shadow:0 12px 40px #0008}
 #bugdlg::backdrop{background:#0c101499}
 #bugdlg form{display:flex;flex-direction:column;gap:12px;padding:14px 16px;margin:0}
 #bugdlg .dh{display:flex;align-items:center;gap:8px}#bugdlg .dh svg{width:18px;height:18px}#bugdlg h2{font-size:15px;font-weight:600;margin:0}#bugdlg .x{margin-left:auto;background:none;border:0;color:var(--muted);font-size:18px;line-height:1;cursor:pointer;padding:2px 6px;border-radius:6px}#bugdlg .x:hover{color:var(--fg)}
@@ -355,7 +355,7 @@ function bugReport(o){
   const tail=['A screenshot helps. Replies come from a person\'s mailbox, not from this address.'];
   const snip=o.output?['Tool output ('+(o.tool||'cli')+')',scrub(o.output).trim(),'']:[];
   const deckLine=o.id?['deck '+o.id,o.cat,o.env].filter(Boolean).join(' · '):'';
-  const url=(client,out)=>{const body=[line,client,...(deckLine?[deckLine]:[]),'',...probes,'What happened',desc,'','Steps to reproduce, if you can','1. ','',...out,...tail].join('\n');
+  const url=(client,out)=>{const body=[line,client,...(deckLine?[deckLine]:[]),'',...probes,'What happened',desc,'','Steps to reproduce, if you can','','',...out,...tail].join('\n');
     return {body,mailto:'mailto:'+BUG_TO+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body)}};
   let client=String(o.client||''),out=snip,r=url(client,out),g=0; // over the cap: shrink the snippet by the excess until it fits, then the client string; the reporter's words are never cut
   while(r.mailto.length>BUG_CAP&&out.length&&out[1].length>6&&g++<40){out=[out[0],cut(out[1],Math.max(6,out[1].length-(r.mailto.length-BUG_CAP))),out[2]];r=url(client,out)}
@@ -1147,6 +1147,7 @@ const bugBuild=()=>{const cat=bugdlg.querySelector('input[name=cat]:checked').va
 const bugRender=()=>{$('bugsend').href=bugBuild().mailto};
 function bugOpen(){bugRender();bugdlg.showModal()}
 $('bug').onclick=bugOpen;bugdlg.addEventListener('input',bugRender);bugdlg.addEventListener('change',bugRender);
+bugdlg.addEventListener('click',e=>{if(e.target===bugdlg)bugdlg.close()}); // the form fills the dialog, so a click that lands on the dialog itself is the backdrop
 $('bugsend').onclick=()=>setTimeout(()=>bugdlg.close(),80); // the browser hands the mailto to the mail app; the dialog steps aside
 $('bugcopy').onclick=async()=>{const r=bugBuild(),b=$('bugcopy');try{await navigator.clipboard.writeText('To: '+BUG_TO+'\nSubject: '+r.subject+'\n\n'+r.body);b.textContent='Copied'}catch{b.textContent='Copy failed'}setTimeout(()=>b.textContent='Copy report',1500)};
 helpbtn.onclick=()=>help(!helpmenu.classList.contains('open'));
