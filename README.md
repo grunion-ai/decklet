@@ -41,7 +41,7 @@ git clone https://github.com/grunion-ai/decklet && cd decklet
 node bin/validate.mjs examples/explainer/model.json
 node bin/create.mjs --model examples/explainer/model.json --out deck.html --title decklet
 open deck.html
-node bin/bug.mjs deck.html --tool verify --log verify.log   # something wrong? a prefilled bug mail (engine, format, size, node + OS; never the deck's words)
+node bin/bug.mjs deck.html --category looks --desc "chips wrap" --log verify.log   # a prefilled bug mail: [ISSUE] subject, engine, format, size, node + OS; never the deck's words
 ```
 
 Works with Claude Code, Codex, Cursor and any agent that can run Node: the skill is [`SKILL.md`](SKILL.md), the toolchain is four Node scripts.
@@ -154,7 +154,7 @@ bin/validate.mjs     model contract, pure Node
 bin/create.mjs       model (+style) → deck.html; format presets
 bin/verify.mjs       parity + AE + contract proof (Playwright optional)
 bin/import-html.mjs  finished HTML pages → model.json (Playwright)
-bin/bug.mjs          a prefilled bug report (mailto) — the deck's ⓘ → Report a bug is the same builder
+bin/bug.mjs          a prefilled bug report (mailto) — the deck's bug button and dialog use the same builder
 SKILL.md             the agent authoring skill
 llms.txt             machine summary
 examples/            explainer, quarterly-update, launch-carousel, one-pager (brief → model + style)
@@ -170,7 +170,7 @@ npm run test:live   # same, after: npm i -D playwright && npx playwright install
 
 ## Bugs
 
-In a deck: **ⓘ → Report a bug** opens your mail app with the engine version, format, slide size and count, current slide, mode and browser filled in — never a word, image or token from the deck, and nothing is sent until you press send. From a terminal: `node bin/bug.mjs deck.html --tool verify --log verify.log` prints the same mail with a scrubbed tool snippet (quoted text, JSON and directories stripped). Both go to **decklet@grunion.ai**, a receive-only address read by a person; a reply comes from their own mailbox. Security problems go through GitHub's private vulnerability reporting instead — see [SECURITY.md](SECURITY.md).
+In a deck: the **bug button** (last in the HUD) opens a small dialog — pick one of four kinds (Looks wrong · Won't respond · Save or PDF · Crashed), write a line, **Open mail app**. The mail arrives with `[ISSUE]` at the head of the subject and the engine version, format, slide size and count, current slide, mode, browser and a few counts for that kind of bug filled in — never a word, image or token from the deck, and nothing is sent until you press send. From a terminal: `node bin/bug.mjs deck.html --category looks --desc "what happened" --log verify.log` prints the same mail with a scrubbed tool snippet (quoted text, JSON and directories stripped). Both go to **decklet@grunion.ai**, a receive-only address read by a person; a reply comes from their own mailbox. Security problems go through GitHub's private vulnerability reporting instead — see [SECURITY.md](SECURITY.md).
 
 ## Roadmap
 
