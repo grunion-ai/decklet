@@ -27,6 +27,10 @@
     "CHANGELOG.md",
     "LICENSE"
   ],
+  "exports": {
+    "./diagram": "./lib/diagram.mjs",
+    "./*": "./*"
+  },
   "scripts": {
     "test": "node --test test/**/*.test.mjs",
     "test:live": "npx playwright install chromium && node --test test/**/*.test.mjs",
