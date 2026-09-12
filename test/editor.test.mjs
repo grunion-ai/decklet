@@ -1,6 +1,6 @@
 // decklet editor — live proofs (Playwright, skipped when absent) for the human-edit loop:
 // connector point nibs · arrows in the PDF · autosave that survives reload and a mid-edit reload · slide position by id ·
-// a new version keeps the human's edits (migrate on load) · ⌘S writes the file (File System Access, mocked) · versions · ⌘B
+// a new version keeps the human's edits (migrate on load) · ⌘S writes the file (File System Access, mocked) · ⌘B
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -111,7 +111,7 @@ live('PDF: the arrow head and shaft survive the export (connectors are painted b
   await b.close();
 });
 
-live('autosave: an edit survives reload; a live text edit survives reload (committed on pagehide); the dot goes red when storage throws', async () => {
+live('autosave: an edit survives reload; a live text edit survives reload (committed on pagehide); localStorage refused → the IndexedDB tier, never red', async () => {
   const b = await pw.chromium.launch(); const f = write('as.html', create(model()).html); let p = await fresh(b, f);
   await p.evaluate(() => { snap(); slide().els[1].x = 123; save(); });
   await p.reload(); await p.waitForTimeout(150);
@@ -122,10 +122,10 @@ live('autosave: an edit survives reload; a live text edit survives reload (commi
   assert.equal(await p.evaluate(() => slide().els[0].text), 'Typed then reloaded', 'the edit in flight was committed before the page went');
   await p.close();
   const ctx = await b.newContext(); await ctx.addInitScript(() => { Object.defineProperty(window, 'localStorage', {get() { throw new Error('blocked'); }}); });
-  p = await ctx.newPage(); await p.goto(pathToFileURL(f).href); await p.waitForTimeout(150);
-  assert.equal(await p.evaluate(() => document.getElementById('autosave').dataset.state), 'bad', 'storage blocked → red at load');
+  p = await ctx.newPage(); await p.goto(pathToFileURL(f).href); await p.waitForFunction(() => document.getElementById('autosave').dataset.state !== 'busy');
+  assert.deepEqual(await p.evaluate(() => [document.getElementById('autosave').dataset.state, TIER]), ['ok', 'idb'], 'localStorage blocked → the IndexedDB tier (0.9.0; test/autosave.test.mjs covers the red case)');
   await p.evaluate(() => { snap(); slide().els[1].x = 7; save(); nav(1); nav(-1); });
-  assert.equal(await p.evaluate(() => slide().els[1].x), 7, 'edits still hold in memory for the session');
+  assert.equal(await p.evaluate(() => slide().els[1].x), 7, 'edits hold');
   await b.close();
 });
 
@@ -158,7 +158,7 @@ live('new version: the browser replays its log onto the agent\'s file (human win
   await b.close();
 });
 
-live('⌘S writes the file: the first press links it (picker, mocked), the file carries DECK + LOG + VERSIONS, later edits write back on their own; bin/edits reads it', async () => {
+live('⌘S writes the file: the first press links it (picker, mocked), the file carries DECK + LOG, later edits write back on their own; bin/edits reads it', async () => {
   const b = await pw.chromium.launch(); const f = write('fsa.html', create(model()).html);
   const ctx = await b.newContext(); await ctx.addInitScript(() => {
     window.__writes = []; const h = {kind: 'file', name: 'fsa.html', queryPermission: async () => 'granted', requestPermission: async () => 'granted',
@@ -172,29 +172,14 @@ live('⌘S writes the file: the first press links it (picker, mocked), the file 
   assert.ok(html && html.startsWith('<!DOCTYPE html>'), 'a full document was written');
   assert.equal(blockOf(html, 'DECK').slides[0].els[1].x, 200, 'DECK carries the edit');
   const log = blockOf(html, 'LOG'); assert.equal(log.length, 1); assert.ok(log[0].rev, 'the entry is stamped with the rev it lives in');
-  assert.equal(blockOf(html, 'VERSIONS').length, 1, '⌘S pinned a version'); assert.equal(blockOf(html, 'VERSIONS')[0].by, 'human');
+  assert.ok(!html.includes('/*VERSIONS*/'), 'no history block: that lives in weave since 0.9.0');
   assert.equal(await p.evaluate(() => document.getElementById('autosave').dataset.state), 'ok', 'green: the file has everything');
-  await p.evaluate(() => { snap(); slide().els[1].y = 250; save(); }); await p.waitForTimeout(300);
-  assert.equal(blockOf(await p.evaluate(() => window.__writes.at(-1)), 'DECK').slides[0].els[1].y, 250, 'the next edit wrote back without ⌘S');
+  await p.evaluate(() => { snap(); slide().els[1].y = 250; save(); }); await p.waitForTimeout(1100);
+  assert.equal(blockOf(await p.evaluate(() => window.__writes.at(-1)), 'DECK').slides[0].els[1].y, 250, 'the next edit wrote back without ⌘S (after the 800 ms debounce)');
   const r = edits(html); assert.equal(r.log.length, 1); assert.match(describe(r.log[0]), /slide s1 row r2: x 60 → 200/);
   // a fresh open of the written file shows the edits with no browser storage at all
   const g = write('fsa-copy.html', html); const p2 = await b.newPage(); await p2.goto(pathToFileURL(g).href); await p2.waitForTimeout(150);
   assert.equal(await p2.evaluate(() => slide().els[1].x), 200);
-  await b.close();
-});
-
-live('versions: pin keeps a snapshot, restore brings it back (and pins the state you left), the popover lists them, cap 20', async () => {
-  const b = await pw.chromium.launch(); const p = await fresh(b, write('ver.html', create(model()).html));
-  await p.evaluate(() => pin('first')); assert.equal(await p.evaluate(() => versions.length), 1);
-  await p.evaluate(() => { snap(); slide().els[0].text = 'Changed'; save(); });
-  await p.evaluate(() => document.getElementById('vers').click());
-  assert.equal(await p.evaluate(() => document.querySelectorAll('#versmenu .v').length), 3, 'the save row + one version + the pin row');
-  await p.evaluate(() => document.querySelector('#versmenu [data-restore="0"]').click());
-  assert.equal(await p.evaluate(() => slide().els[0].text), 'One', 'restored');
-  assert.deepEqual(await p.evaluate(() => versions.map(v => v.label)), ['first', 'before restore']);
-  await p.evaluate(() => { for (let n = 0; n < 25; n++) { slide().els[0].text = 'v' + n; pin('p' + n); } });
-  assert.equal(await p.evaluate(() => versions.length), 20);
-  await p.reload(); await p.waitForTimeout(150); assert.equal(await p.evaluate(() => versions.length), 20, 'versions persist');
   await b.close();
 });
 
@@ -263,7 +248,7 @@ for (const bn of ['chromium', 'webkit']) live(`the contact sheet keeps the untou
 // and paints a hairline bar, and the loop yields after each page so the frame lands.
 live('⤓ in WebKit: the button counts `n / N` with a bar while exporting, reaches `12 / 12` before the blob exists, and comes back whole', async () => {
   const twelve = model({slides: Array.from({length: 12}, (_, i) => ({els: [{x: 60, y: 80, w: 800, role: 'H1', text: 'Slide ' + (i + 1)}, {x: 100, y: 300, line: [400, 300], arrow: 'end', h: 3}]}))});
-  const b = await pw.webkit.launch(); const p = await fresh(b, write('progress.html', create(twelve).html));
+  const b = await pw.webkit.launch(); const p = await fresh(b, write('progress.html', create(twelve).html)); await p.waitForTimeout(1700); // the HUD icons play once on load, a beat apart: let the last one settle before the snapshot
   const before = await p.evaluate(() => ({html: pdf.innerHTML, busy: pdf.hasAttribute('aria-busy'), chromium: CHROMIUM}));
   assert.equal(before.chromium, false, 'WebKit takes the in-file rasteriser');
   const seen = await p.evaluate(async () => {

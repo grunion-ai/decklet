@@ -4,7 +4,7 @@ decklet after 0.5.0: the plan, and the order it lands in.
 
 **Just shipped (0.6.0, 2026-09-07):** grid + guides + snap in the editor (a HUD toggle, 16px lattice, magnetic guides), and the expanded template pack: 58 templates and 22 layouts, one per slide, grouped by kind at [library.html](https://grunion-ai.github.io/decklet/library.html). Neither is on this board any more.
 
-**Just shipped (unreleased on main, 2026-09-12):** the Library & editor review, eight of ten epics — L1 the sheet keeps its scroll and patches cells in place (#34, #36), L2 the ⤓ export counts `n / N` (#39), L3 the counter owns the corner (#43), L4 one foot band on the sheet (#45), L5 sample photos, a screenshot and a GIF (#41), L6 placeholder copy across six fictional companies (#40), L9 the nine figures as engine templates (#37, #44), L10 five style kits and a Styles section (#38, #42). The sheet is 130 slides. Off the board; L7 and L8 stay.
+**Just shipped (unreleased on main, 2026-09-12):** the Library & editor review, eight of ten epics — L1 the sheet keeps its scroll and patches cells in place (#34, #36), L2 the ⤓ export counts `n / N` (#39), L3 the counter owns the corner (#43), L4 one foot band on the sheet (#45), L5 sample photos, a screenshot and a GIF (#41), L6 placeholder copy across six fictional companies (#40), L9 the nine figures as engine templates (#37, #44), L10 five style kits and a Styles section (#38, #42). The sheet is 130 slides. Off the board; L7 stays. **0.9.0 (2026-09-12):** the version history left the file for weave and autosave-everywhere took its place — see L8.
 
 Five lanes carry new work: functional speaker notes, media and links, a deck you can read and present on a phone, more document formats, and more export targets. A sixth lane, `Platform & release`, clears the ground for them.
 
@@ -66,7 +66,7 @@ Epics rank by **ICE**: Impact x Confidence x Ease, each 1 to 10, multiplied, wit
 | **Mobile & touch** | M1 Read it on a phone `S` | M2 Present from the phone `S` | M3 Touch editing `L` |
 | **Documents & formats** | D1 Format presets `S` | D2 Aspect-aware composition `XL` | D3 Real documents `XL` |
 | **Export** | X1 Cheap wins `S` | X2 Searchable PDF `M` | X3 PPTX export `L` |
-| **Library & editor** | L7 Spellcheck, the rest `M`<br>L8 Versions, the rest `M`<br>L11 Type on the sheet `S` | | |
+| **Library & editor** | L7 Spellcheck, the rest `M`<br>L11 Type on the sheet `S` | | |
 | **Usability** | U1 `w`/`h` default in validate `XS`<br>U2 The catalogue says what fills `S`<br>U3 A width warning is a failure `XS`<br>U4 Ratings are fill keys `S`<br>U5 The missing starting rungs `M`<br>U6 Counter regression `S`<br>U7 SKILL.md: authoring and editor apart `M` | U8 Two axes on the sheet: look × ladder `L` | |
 
 ### ICE scores
@@ -94,7 +94,6 @@ Epics rank by **ICE**: Impact x Confidence x Ease, each 1 to 10, multiplied, wit
 | D3 Real documents | 8 | 5 | 2 | **80** | Later |
 | M3 Touch editing | 6 | 5 | 3 | **90** | Later |
 | L7 Spellcheck, the rest | 8 | 7 | 6 | **336** | Now |
-| L8 Versions, the rest | 8 | 7 | 6 | **336** | Now |
 | L11 Type on the sheet | 7 | 8 | 7 | **392** | Now |
 | U1 `w`/`h` default in validate | 8 | 10 | 10 | **800** | Now |
 | U6 Counter regression | 9 | 9 | 9 | **729** | Now |
@@ -362,16 +361,9 @@ Filed 2026-09-12 from Kyle's review of the rebuilt library deck (89 slides, deck
 | L7.2 | M | Suggestions and correct-in-place from the painted layer (right-click or a toolbar chip), not only the browser's own menu. |
 | L7.3 | XS | Whatever Kyle hit first goes here as the leading story once named. |
 
-### L8. Versions, the rest · `M` · Now
+### L8. Versions, the rest · Moved to weave (0.9.0)
 
-0.5.0 shipped the in-file version history, the edit log and `create --from`. Reopened for the same reason.
-
-| Story | Size | What |
-| --- | --- | --- |
-| L8.1 | S | A diff view between two versions (which slides, which rows, which keys). |
-| L8.2 | S | Safari ⌘S still downloads instead of saving; a clear path or a clear message. |
-| L8.3 | S | N2.2's storage isolation: a second window must be a reader, never a writer. |
-| L8.4 | XS | Whatever Kyle hit first goes here as the leading story once named. |
+0.5.0 shipped the in-file version history, the edit log and `create --from`. Kyle's ruling, 2026-09-12: decklet must autosave and keep itself current in every browser — desktop, phone, embedded — and it does not need version control; version history is weave's job, a separate product. 0.9.0 removed the history from the file (`/*VERSIONS*/`, the popover, pin and restore; `create --from` reads past the block an older file carries) and shipped autosave everywhere instead: a linked file rewrites itself on every edit (800 ms trailing debounce, flushed by ⌘S, the dot, a hidden tab or an unload); storage is a tier chain — localStorage → IndexedDB → memory — so a cross-site iframe or a locked-down `file://` lands on a tier that persists or an honest red dot; every window of one browser converges live (`storage` + BroadcastChannel, last write wins, readers never write); Playwright proofs under Pixel 7 and iPhone 14 emulation and inside same-origin, cross-site and srcdoc iframes run in CI (test/autosave, test/mobile, test/embed). L8.1 (a diff view) goes with the history to weave; L8.2 (Safari cannot write a local file) stays true and stays documented; L8.3 landed as the reader rule.
 
 ### L9. Figures in the library · Done (#37 `lib/diagram.mjs` exported as `@grunion/decklet/diagram`, #44 `cat-figures.mjs` + the Figures kind; 67 templates)
 

@@ -62,19 +62,21 @@ body.present .el a.lk{pointer-events:auto}
 .pin{position:absolute;bottom:10px;font:12px ui-monospace,Menlo,monospace;color:var(--muted);letter-spacing:.08em}
 /* inline marks change weight/style/position/colour — never size: sub/sup shift the baseline only */
 .el sub,.el sup{font-size:inherit;line-height:0;vertical-align:sub}.el sup{vertical-align:super}
-/* autosave dot: green ✓ persisted · red edits lost on refresh · amber pulse saving */
-#autosave{width:9px;height:9px;border-radius:50%;background:#3fb950;box-shadow:0 0 0 2px var(--bg),0 0 6px #3fb95088;position:absolute;top:-4px;right:-4px;flex:none}
-#autosave::after{content:'✓';position:absolute;inset:0;font:bold 7px/9px sans-serif;color:#0b2e14;text-align:center}
+/* autosave dot: its own HUD button (a tap = save now, the ⌘S door on a phone) wearing one dot — green ✓ persisted · amber saved here, not in the file · red edits lost on refresh · amber pulse saving */
+#autosave{width:26px;min-width:26px;padding:0}
+#autosave i{display:block;position:relative;width:9px;height:9px;border-radius:50%;background:#3fb950;box-shadow:0 0 6px #3fb95088}
+#autosave i::after{content:'✓';position:absolute;inset:0;font:bold 7px/9px sans-serif;color:#0b2e14;text-align:center}
 /* hover label on every HUD control: its name · its key (data-tip, instant — the OS title delay hid the names) */
 #hud [data-tip]{position:relative}
 #hud [data-tip]::before{content:attr(data-tip);display:none;position:absolute;left:50%;transform:translateX(-50%);bottom:calc(100% + 10px);white-space:nowrap;background:var(--card);border:1px solid var(--line);border-radius:6px;padding:4px 8px;color:var(--fg);font:12px ui-monospace,Menlo,monospace;z-index:13;pointer-events:none}
 #hud [data-tip]:hover::before{display:block}
 #hud [data-tip]:last-child::before{left:auto;right:0;transform:none}
 #hud [aria-expanded="true"]::before{display:none!important} /* an open menu is the label */
-#autosave[data-state=bad]{background:#f85149;box-shadow:0 0 6px #f8514988}#autosave[data-state=bad]::after{content:''}
-#autosave[data-state=busy]{background:#d29922;box-shadow:0 0 6px #d2992288;animation:asave .6s ease-in-out infinite alternate}#autosave[data-state=busy]::after{content:''}
+#autosave[data-state=bad] i{background:#f85149;box-shadow:0 0 6px #f8514988}#autosave[data-state=bad] i::after{content:''}
+#autosave[data-state=busy] i{background:#d29922;box-shadow:0 0 6px #d2992288;animation:asave .6s ease-in-out infinite alternate}#autosave[data-state=busy] i::after{content:''}
+#autosave[data-state=local] i{background:#d29922;box-shadow:0 0 6px #d2992288}#autosave[data-state=local] i::after{content:''}
 @keyframes asave{from{opacity:.5}to{opacity:1}}
-@media (prefers-reduced-motion:reduce){#autosave{box-shadow:none;animation:none!important}}
+@media (prefers-reduced-motion:reduce){#autosave i{box-shadow:none;animation:none!important}}
 #hud{position:relative;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 16px calc(8px + env(safe-area-inset-bottom));border-top:1px solid var(--line);font:12px ui-monospace,Menlo,monospace;color:var(--muted)}
 #hud button,#tb button,#sheet-back{background:var(--card);border:1px solid var(--line);color:var(--fg);border-radius:6px;padding:4px 10px;cursor:pointer;font:inherit}
 #hud .sep{width:1px;height:18px;background:var(--line)}
@@ -98,12 +100,9 @@ body.present .el a.lk{pointer-events:auto}
 #bugdlg .df{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font:12px ui-monospace,Menlo,monospace;color:var(--muted)}#bugdlg .df a.primary{background:var(--accent);color:var(--bg);border-radius:6px;padding:6px 12px;text-decoration:none;font-weight:500}#bugdlg .df button{background:var(--card);border:1px solid var(--line);color:var(--fg);border-radius:6px;padding:5px 10px;cursor:pointer;font:inherit}#bugdlg .hint{margin-left:auto}
 @media (max-width:520px){#bugdlg .cats{grid-template-columns:1fr}}
 /* "+" micro-menu: the add controls (Text / Box / Slide) nest under one button; opens upward, click-away closes */
-#addwrap,#helpwrap,#verswrap{position:relative}
+#addwrap,#helpwrap{position:relative}
 #addmenu,#helpmenu{display:none;position:absolute;bottom:calc(100% + 6px);flex-direction:column;gap:4px;padding:6px;background:var(--card);border:1px solid var(--line);border-radius:8px;z-index:11;white-space:nowrap}
 #addmenu{left:0}#addmenu.open{display:flex}
-#versmenu{display:none;position:absolute;bottom:calc(100% + 6px);left:0;flex-direction:column;gap:4px;padding:6px;background:var(--card);border:1px solid var(--line);border-radius:8px;z-index:11;white-space:normal;width:max-content;max-width:min(480px,calc(100vw - 32px));max-height:60vh;overflow:auto}#versmenu.open{display:flex}
-#versmenu .v{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:2px 4px}#versmenu .v button{padding:2px 8px;white-space:nowrap}
-#autosave[data-state=local]{background:#d29922;box-shadow:0 0 6px #d2992288}#autosave[data-state=local]::after{content:''}
 /* ⓘ popover: the ONE home for shortcut hints (the HUD itself stays free of hint text); click or hover opens, click-away / Esc closes */
 #helpmenu{right:0;padding:10px 14px;line-height:1.7;flex-direction:row;gap:20px;white-space:normal;width:max-content;max-width:calc(100vw - 32px)}#helpmenu.open{display:flex}
 #helpmenu .col{flex:1 1 0;min-width:200px;max-width:320px}#helpmenu .ph{color:var(--fg);letter-spacing:.08em;text-transform:uppercase;font-size:11px;margin-bottom:4px}#helpmenu .dim{opacity:.7;margin-top:6px}
@@ -186,10 +185,7 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
   <button id="prev" class="mi mi-chevron-left" data-ms="200" data-tip="Previous slide · ←" aria-label="Previous slide · ←"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" data-mi="chevron"/></svg></button>
   <button id="next" class="mi mi-chevron-right" data-ms="200" data-tip="Next slide · →" aria-label="Next slide · →"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" data-mi="chevron"/></svg></button>
   <div class="spacer"></div>
-  <div id="verswrap">
-    <button id="vers" class="mi mi-history" data-ms="700" data-tip="Autosaved · versions" aria-label="Autosaved · versions" aria-haspopup="true" aria-expanded="false"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><g data-mi="animate"><path d="M12 7v5l4 2"/></g></svg><span id="autosave" role="status" data-state="ok"></span></button>
-    <div id="versmenu" role="dialog" aria-label="Versions"></div>
-  </div>
+  <button id="autosave" data-state="ok" data-tip="Autosaved · click saves the file · ⌘S" aria-label="Autosaved · click saves the file · ⌘S"><i aria-hidden="true"></i></button>
   <div class="sep"></div>
   <div id="addwrap">
     <button id="addbtn" class="mi mi-plus" data-ms="500" data-tip="Add text, box or slide" aria-label="Add text, box or slide" aria-haspopup="true" aria-expanded="false"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="plus" data-mi="animate"><path d="M5 12h14" class="horizontal"/><path d="M12 5v14" class="vertical"/></svg></button>
@@ -229,8 +225,8 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
         <div><kbd>⌘ click</kbd> a link opens in a new tab, a #slide link jumps (presenting: a plain click · hover a link for its hint)</div>
       </div>
       <div class="col"><div class="ph">File</div>
-        <div><kbd>⌘S</kbd> save the file (asks for it once · Safari: downloads a copy)</div>
-        <div class="dim">Buttons only: add · duplicate · spellcheck · versions · PDF. Spellcheck underlines the words the build's dictionary refused, on every slide; the browser's own checker adds the row you type in. Never present, print or PDF.</div>
+        <div><kbd>⌘S</kbd> save the file now (asks for it once, then every edit writes itself · Safari: downloads a copy)</div>
+        <div class="dim">Buttons only: add · duplicate · spellcheck · PDF. Spellcheck underlines the words the build's dictionary refused, on every slide; the browser's own checker adds the row you type in. Never present, print or PDF.</div>
       </div>
     </div>
   </div>
@@ -246,7 +242,7 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
     <div class="cats" role="radiogroup" aria-label="What went wrong">
       <label class="cat"><input type="radio" name="cat" value="looks" checked><b>Looks wrong</b><span>Clipped text, overlap, wrong size or colour</span></label>
       <label class="cat"><input type="radio" name="cat" value="respond"><b>Won't respond</b><span>A click, drag, key or undo did nothing, or the wrong thing</span></label>
-      <label class="cat"><input type="radio" name="cat" value="save"><b>Save or PDF</b><span>⌘S, versions, autosave or the PDF button lost or refused something</span></label>
+      <label class="cat"><input type="radio" name="cat" value="save"><b>Save or PDF</b><span>⌘S, autosave or the PDF button lost or refused something</span></label>
       <label class="cat"><input type="radio" name="cat" value="crash"><b>Crashed</b><span>A blank deck, a freeze, or the slide stopped drawing</span></label>
     </div>
     <label class="desc">What happened<textarea id="bugdesc" rows="3" maxlength="300" placeholder="A few words: what you did, what you saw. The engine version, format, slide and browser are added for you."></textarea></label>
@@ -275,12 +271,24 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
 // img (data-URI) and css (raw escape hatch) are supported but discouraged — the validator warns on css.
 const DECK=/*DECK*/{"w":960,"h":540,"styles":{"roles":{"Title":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":64,"weight":800,"lh":68,"ls":-1.5,"color":"var(--fg)","cw":0.45},"Supertitle":{"font":"ui-monospace,Menlo,Consolas,monospace","size":12,"weight":500,"lh":16,"ls":1.5,"color":"var(--accent)","tt":"uppercase","cw":0.73},"H1":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":34,"weight":800,"lh":40,"ls":-0.5,"color":"var(--fg)","cw":0.46},"H2":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":22,"weight":600,"lh":28,"ls":-0.3,"color":"var(--fg)","cw":0.44},"Body":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":16,"weight":400,"lh":24,"ls":0,"color":"var(--fg)","cw":0.46},"Caption":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":13,"weight":400,"lh":18,"ls":0,"color":"var(--muted)","cw":0.47},"Label":{"font":"ui-monospace,Menlo,Consolas,monospace","size":11,"weight":500,"lh":14,"ls":1,"color":"var(--muted)","tt":"uppercase","cw":0.69},"Stat":{"font":"-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif","size":40,"weight":800,"lh":44,"ls":-1,"color":"var(--accent)","cw":0.45}},"margin":64,"pad":{"chip":"3px 8px","pill":"5px 12px"}},"slots":{},"layouts":{},"master":[],"slides":[{"els":[]}]}/*/DECK*/;
 
-// store shim: localStorage throws in sandboxed contexts (data:/locked-down file:) — degrade to no-persistence, never to a dead page
-// lastSavedAt = the moment of the last CONFIRMED write (set only when setItem returned) — the autosave tooltip reads it
+// store: three tiers, one sync surface. localStorage when the browser allows it → IndexedDB when it does not (a cross-site iframe,
+// a locked-down file:) → memory. The tier is decided once, at load: LS is the probed localStorage or null; on the other two tiers
+// mem is the working copy and, on 'idb', every set also lands in IndexedDB (db 'decklet', store 'kv', keys as they are — NS-prefixed).
+// The IndexedDB copy is read asynchronously (idbLoad), so the deck first draws from DECK and hydrate() runs again when it lands.
+// Deliberately no write queue on the idb tier: puts are ordered by the transaction machinery, the last one wins, a failure turns the dot red.
+// lastSavedAt = the moment of the last CONFIRMED write — the autosave tooltip reads it
 let lastSavedAt=null;
 // mem = the session fallback: when nothing persists, edits still survive navigation, the contact sheet and undo — just not a refresh
 const mem=new Map();
-const store={get:k=>{try{return localStorage.getItem(k)}catch{return mem.has(k)?mem.get(k):null}},set:(k,v)=>{try{localStorage.setItem(k,v);lastSavedAt=new Date();return true}catch{mem.set(k,v);return false}},del:k=>{try{localStorage.removeItem(k)}catch{mem.delete(k)}}};
+const LS=(()=>{try{localStorage.setItem('decklet:probe','1');localStorage.removeItem('decklet:probe');return localStorage}catch{return null}})();
+let TIER=LS?'local':'mem'; // 'idb' once idbLoad has the working copy in mem
+let dbP=null; // one connection, opened on first use; a failed open is forgotten so the next call tries again
+const idb=()=>dbP||(dbP=new Promise((ok,no)=>{let r;try{r=indexedDB.open('decklet',2)}catch(e){return no(e)}r.onupgradeneeded=()=>{for(const s of ['h','kv'])if(!r.result.objectStoreNames.contains(s))r.result.createObjectStore(s)};r.onsuccess=()=>{r.result.onversionchange=()=>{r.result.close();dbP=null};ok(r.result)};r.onerror=()=>no(r.error);r.onblocked=()=>no(new Error('blocked'))}).catch(e=>{dbP=null;throw e}));
+const idbReq=(s,mode,f)=>idb().then(db=>new Promise((ok,no)=>{const r=f(db.transaction(s,mode).objectStore(s));r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)}));
+const store={
+  get:k=>{if(LS)try{return LS.getItem(k)}catch{}return mem.has(k)?mem.get(k):null},
+  set:(k,v)=>{if(LS)try{LS.setItem(k,v);lastSavedAt=new Date();return true}catch{}mem.set(k,v);if(TIER!=='idb')return false;idbReq('kv','readwrite',o=>o.put(v,k)).then(()=>{lastSavedAt=new Date()},e=>{console.warn('decklet: IndexedDB write failed',e);TIER='mem';autosave('bad')});return true},
+  del:k=>{if(LS)try{LS.removeItem(k)}catch{}mem.delete(k);if(TIER==='idb')idbReq('kv','readwrite',o=>o.delete(k)).catch(()=>{})}};
 // ── EDITS: the pure core shared with node (lib/edits.mjs lifts this block out verbatim — ONE source) ──
 // ids: deck.id (the storage namespace, stable across versions), slide.id (unique per deck), row.id (unique per slide; to:/from: use them).
 // log: one entry per changed thing between two snapshots — {s,r,k:{key:[before,after]}} · {s,r,add,at} · {s,r,del} ·
@@ -335,7 +343,7 @@ function applyLog(deck,log){
 // ── BUG: the bug-report builder, the pure core shared with node (lib/bug.mjs lifts this block verbatim — ONE source) ──
 // A report is a mailto the reporter opens, reads and sends. The address is receive-only. bugFacts() is the CLOSED set of
 // what a deck contributes: its shape (format, size, slide count) and its id (10 hex chars of a sha256 over the model — one
-// way) — never text, notes, alt, role names, tokens, fonts, images, links, the title, a path, the log or the versions.
+// way) — never text, notes, alt, role names, tokens, fonts, images, links, the title, a path or the log.
 // BUG_CATS are the four fixed categories (a fifth throws); probes are [key, value] pairs the caller measured — counts and
 // fixed words, never DOM reads inside this block. Subject: [ISSUE] decklet · <category> · <first 70 chars of the description>.
 // scrub() strips quoted strings, JSON payloads and directory parts from tool output so a verify line keeps its shape and
@@ -367,37 +375,42 @@ function bugReport(o){
 const ERRS=[],errPush=m=>{ERRS.push(scrub(String(m).replace(/\([^)]*\)/g,'(…)')));if(ERRS.length>3)ERRS.shift()};
 window.addEventListener('error',e=>errPush((e.message||'error')+' · '+(e.lineno||0)+':'+(e.colno||0)));
 window.addEventListener('unhandledrejection',e=>errPush('rejection: '+String(e.reason&&e.reason.message||e.reason)));
-// the file's own edit log and version history (create.mjs fills both; ⌘S / write-back rewrite them with the browser's)
+// the file's own edit log (create.mjs fills it; write-back rewrites it with the browser's)
 const ENGINE=/*ENGINE*/'0.0.0'/*/ENGINE*/; // the package version that built this file (create.mjs); the bug report leads with it
-const LOG0=/*LOG*/[]/*/LOG*/;const VERS0=/*VERSIONS*/[]/*/VERSIONS*/;const SPELL0=/*SPELL*/[]/*/SPELL*/; // words the build's dictionary refused (lib/spell.mjs); the editor underlines them on every slide
+const LOG0=/*LOG*/[]/*/LOG*/;const SPELL0=/*SPELL*/[]/*/SPELL*/; // words the build's dictionary refused (lib/spell.mjs); the editor underlines them on every slide
 // storage namespace is per deck (create.mjs stamps it with deck.id — stable across versions, so a new file finds the old edits)
 const NS=/*KEY*/'decklet:template'/*/KEY*/,KEY=NS+':model',HKEY=NS+':hist',PKEY=NS+':pos',canvas=document.getElementById('canvas'),$=id=>document.getElementById(id);
-// Safari refuses localStorage on file:// — the browser most people double-click a deck in. PROBE it at load rather than
-// waiting for the first save to go red: there is no storage API that works there (indexedDB/cookies are blocked too), so
-// the honest answer is to name the durable path (⌘S) and the browser that persists (Chrome), and surface the ⌘S button.
+// Safari refuses localStorage on file:// — the browser most people double-click a deck in. The store PROBED it at load rather than
+// waiting for the first save to go red; IndexedDB is tried next, and when nothing persists the honest answer is to name the durable
+// path (⌘S) and the browser that persists (Chrome), and surface the ⌘S button.
 // spellcheck is the browser's own (no dictionary ships): an attribute on every row, painted only on the focused one. The toggle is
 // browser state under NS — never a model key, so it cannot reach the saved file; present/print/⤓ draw with it off (drawEls below).
-const SKEY=NS+':spell';let SPELL=store.get(SKEY)!=='0';
+const SKEY=NS+':spell';let SPELL;
 // grid + layout guides + snap: browser state under NS exactly like spellcheck — never a model key, OFF until this browser turns it on.
-const GKEY=NS+':snap';let SNAP=store.get(GKEY)==='1';
+const GKEY=NS+':snap';let SNAP;
 // feel knobs (browser-only, not persisted): px = the reach of a line · centers = a box's centre snaps too · mid = the canvas
 // mid-lines join the guides · hyst = a held line keeps its grip this much further, so a snapped edge does not chatter at the edge of reach
 const SNAPO={px:10,centers:true,mid:true,hyst:4}; // chosen 2026-09-06: magnetic
 const GP=16; // the grid pitch: the overlay's lattice, the lattice every guide sits on, and the fallback snap (reach GP/2) when no guide is in reach
-const CANSTORE=(()=>{try{localStorage.setItem(NS+':probe','1');localStorage.removeItem(NS+':probe');return true}catch{return false}})();
-const LKEY=NS+':log',VKEY=NS+':vers';
-// the browser's copy of the log and the versions: the file's own, plus what this browser added since (⌘S / write-back put them in the file)
-let log=JSON.parse(store.get(LKEY)||'null')||structuredClone(LOG0),versions=JSON.parse(store.get(VKEY)||'null')||structuredClone(VERS0);
-// load: the stored working copy is trusted only when it was made on THIS file version (deck.rev). A newer file (an agent wrote
-// it) wins as the base, and the browser's log is replayed onto it — human wins, conflicts stay on the entries. So neither a
-// refresh nor a new version ever drops an edit, and a stale copy can never hide what the agent changed.
-let deck=(()=>{const st=JSON.parse(store.get(KEY)||'null');if(st&&st.rev===DECK.rev)return st;const d=structuredClone(DECK);if(st&&log.length){const r=applyLog(d,log);for(const e of log)if(!e.rev)e.rev=d.rev;if(r.conflicts.length)console.warn('decklet: '+r.conflicts.length+' edit(s) conflict with this version — yours were kept',r.conflicts)}return d})();
-stampIds(deck);
+const LKEY=NS+':log';
 // position: this tab's slide (by id — survives renumbering), else the URL hash (#4 = slide 4), else slide 1. A fresh
 // window opens on slide 1; a refresh or a new version of the file keeps the slide you were on. render() clamps.
 const hashPos=()=>parseInt(location.hash.slice(1))-1;
 const tab={get:k=>{try{return sessionStorage.getItem(NS+':'+k)}catch{return null}},set:(k,v)=>{try{sessionStorage.setItem(NS+':'+k,v)}catch{}}};
-let i=Math.max(0,deck.slides.findIndex(s=>s.id===tab.get('slide'))),sel=new Set();if(i===0&&!tab.get('slide')&&hashPos()>0)i=hashPos();
+// the browser's copy of the log: the file's own, plus what this browser added since (write-back puts them in the file)
+let log,deck,history,base,unsynced=0,i=0,sel=new Set();
+// hydrate: the store → the working state. Once at load; once more on the IndexedDB tier when its copy lands (idbLoad, at the foot).
+// The stored working copy is trusted only when it was made on THIS file version (deck.rev). A newer file (an agent wrote
+// it) wins as the base, and the browser's log is replayed onto it — human wins, conflicts stay on the entries. So neither a
+// refresh nor a new version ever drops an edit, and a stale copy can never hide what the agent changed.
+function hydrate(){
+  log=JSON.parse(store.get(LKEY)||'null')||structuredClone(LOG0);
+  deck=(()=>{const st=JSON.parse(store.get(KEY)||'null');if(st&&st.rev===DECK.rev)return st;const d=structuredClone(DECK);if(st&&log.length){const r=applyLog(d,log);for(const e of log)if(!e.rev)e.rev=d.rev;if(r.conflicts.length)console.warn('decklet: '+r.conflicts.length+' edit(s) conflict with this version — yours were kept',r.conflicts)}return d})();
+  stampIds(deck);base=JSON.stringify(deck);unsynced=log.filter(e=>!e.rev).length;
+  history=JSON.parse(store.get(HKEY)||'[]');SPELL=store.get(SKEY)!=='0';SNAP=store.get(GKEY)==='1';
+  i=Math.max(0,deck.slides.findIndex(s=>s.id===tab.get('slide')));if(i===0&&!tab.get('slide')&&hashPos()>0)i=hashPos();sel.clear();
+}
+hydrate();
 // HUD icons move once: on load, a beat apart; then once per hover; never on a loop — one run per trigger
 const miPlay=(h)=>{const ms=+h.dataset.ms||0;if(!ms||h.dataset.on||matchMedia('(prefers-reduced-motion: reduce)').matches)return;h.dataset.on='1';const parts=[...h.querySelectorAll('[data-mi]')];for(const p of parts)p.classList.add(...p.dataset.mi.split(' '));setTimeout(()=>{for(const p of parts)p.classList.remove(...p.dataset.mi.split(' '));delete h.dataset.on},ms)};
 document.querySelectorAll('.mi').forEach((h,i)=>{h.addEventListener('mouseenter',()=>miPlay(h));setTimeout(()=>miPlay(h),300+i*90)});
@@ -409,8 +422,7 @@ const PAGES={letter:[816,'letter'],a4:[794,'a4'],'letter-landscape':[1056,'lette
 const PAGE=PAGES[deck.page]?deck.page:'letter',PW=PAGES[PAGE][0];
 document.documentElement.style.cssText=`--W:${W}px;--H:${H}px;--Z:${(PW/W).toFixed(4)};--AR:${(W/H).toFixed(4)}`;
 if(PAGE!=='letter'){const st=document.createElement('style');st.textContent=`@page{size:${PAGES[PAGE][1]};margin:0}`;document.head.appendChild(st)}
-// undo = snapshot stack; snap() BEFORE each mutation; persisted so ⌘Z survives refresh. no redo yet
-let history=JSON.parse(store.get(HKEY)||'[]');
+// undo = snapshot stack; snap() BEFORE each mutation; persisted so ⌘Z survives refresh. no redo yet (hydrate() reads it)
 const hsave=()=>store.set(HKEY,JSON.stringify(history));
 const snap=()=>{history.push(JSON.stringify(deck));if(history.length>50)history.shift();hsave()};
 function undo(){if(!history.length)return;deck=JSON.parse(history.pop());hsave();sel.clear();save();render()}
@@ -425,21 +437,46 @@ addEventListener('resize',fit);
 // The tooltip (title + hover label) always carries the last confirmed save time.
 const hms=d=>d?d.toTimeString().slice(0,8):'';
 const BLOCKED='Not saved — this browser blocks storage for local files (Safari does, on file://). Press ⌘S to save a copy you can reopen, or open this deck in Chrome.';
-const autosave=(st,msg)=>{const a=$('autosave');if(!a)return;a.dataset.state=st;const txt=msg||{ok:fileAt?'Saved to file · '+hms(fileAt):'Autosaved · '+hms(lastSavedAt),local:'Saved in this browser · '+unsynced+' edit'+(unsynced===1?'':'s')+' not in the file yet — ⌘S writes them',bad:CANSTORE?'Not saved — edits will be lost on refresh'+(lastSavedAt?' (last saved '+hms(lastSavedAt)+')':''):BLOCKED,busy:'Saving…'}[st];a.dataset.full=txt;const b=$('vers');b.dataset.tip='Versions · '+{ok:fileAt?'saved to file '+hms(fileAt):'autosaved '+hms(lastSavedAt),local:'saved in this browser, not in the file',bad:'not saved',busy:'saving…'}[st];b.setAttribute('aria-label',b.dataset.tip);a.setAttribute('aria-label',txt);if($('versmenu').classList.contains('open'))versRender()};
+const autosave=(st,msg)=>{const a=$('autosave');if(!a)return;a.dataset.state=st;const txt=msg||{ok:fileAt?'Saved to file · '+hms(fileAt):'Autosaved · '+hms(lastSavedAt),local:'Saved in this browser · '+unsynced+' edit'+(unsynced===1?'':'s')+' not in the file yet'+(fileH?' — writing':' — ⌘S writes them'),bad:TIER!=='mem'?'Not saved — edits will be lost on refresh'+(lastSavedAt?' (last saved '+hms(lastSavedAt)+')':''):BLOCKED,busy:'Saving…'}[st];a.dataset.full=txt;a.dataset.tip=msg||{ok:fileAt?'Saved to file · '+hms(fileAt):'Autosaved · '+hms(lastSavedAt),local:'Saved in this browser · '+unsynced+' not in the file'+(fileH?'':' · ⌘S'),bad:'Not saved · ⌘S saves a copy',busy:'Saving…'}[st];a.setAttribute('aria-label',txt)};
 // save: every mutation lands here. base = the deck as last saved; the diff since then is appended to the log (stamped with
-// the file rev it was made on — an entry with no rev has not reached a file yet), then model + log + versions persist, then
-// the linked file is rewritten when there is one. `unsynced` = entries no file carries yet: the dot turns amber until ⌘S.
-let base=JSON.stringify(deck),asT,fileH=null,writing=false,unsynced=log.filter(e=>!e.rev).length,fileAt=null;
+// the file rev it was made on — an entry with no rev has not reached a file yet), then model + log persist, the other windows
+// of this browser hear about it (sync below), and the linked file is rewritten on a trailing debounce — a burst of edits is one
+// write, ⌘S or a hidden tab flushes it now. `unsynced` = entries no file carries yet: the dot is amber until they are written.
+let asT,fileH=null,writing=false,fileAt=null,wbT=null;const WB=800;
 const FSA=!!window.showOpenFilePicker;
 function save(){
   stampIds(deck);const now=JSON.stringify(deck),ents=diffDecks(JSON.parse(base),deck).map(e=>({t:new Date().toISOString(),...e}));base=now;
   if(ents.length){log.push(...ents);unsynced+=ents.length;store.set(LKEY,JSON.stringify(log))}
   autosave('busy');const ok=store.set(KEY,now);clearTimeout(asT);
-  if(fileH)writeBack();else asT=setTimeout(()=>autosave(ok?(unsynced?'local':'ok'):'bad'),250)}
-if(!CANSTORE){document.body.classList.add('nostore');autosave('bad')} // say it at load, not after the first lost edit
-// a live text edit or a drag in flight must not die with the tab: commit + save when the page hides or unloads
-addEventListener('pagehide',()=>{commitEdit();if(drag&&drag.moved){drag=null;save()}});
-document.addEventListener('visibilitychange',()=>{if(document.hidden)commitEdit()});
+  if(ents.length)tell({model:now,log:JSON.stringify(log)});
+  if(fileH){clearTimeout(wbT);wbT=setTimeout(writeBack,WB)}
+  asT=setTimeout(()=>autosave(ok?(unsynced?'local':'ok'):'bad'),250)}
+const flush=()=>{if(fileH&&wbT){clearTimeout(wbT);wbT=null;writeBack()}}; // the pending write-back, now
+if(!LS)document.body.classList.add('nostore'); // say it at load, not after the first lost edit (the foot of the script settles the dot)
+// a live text edit or a drag in flight must not die with the tab: commit + save when the page hides or unloads, and write the file
+addEventListener('pagehide',()=>{commitEdit();if(drag&&drag.moved){drag=null;save()}flush()});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){commitEdit();flush()}});
+// ── sync: the other windows and tabs of this browser showing this deck. Every save is told to them — a `storage` event on the
+// localStorage tier, a BroadcastChannel on any tier that has one (Safari 15.4+) — and a window that hears one takes the model as
+// its own: last write wins, the slide you were on is kept by id, an edit in flight lands on top of theirs, and NOTHING is written
+// in response (no echo: a second window is a reader of what it hears). Logs merge by entry, so no window's edits go missing from
+// the replay; a file another agent version wrote (a different rev) is left to the reload path, which reconciles by log.
+const bc=(()=>{try{return new BroadcastChannel(NS)}catch{return null}})();
+const tell=m=>{if(bc)bc.postMessage(m)};
+if(bc)bc.onmessage=e=>receive(e.data);
+addEventListener('storage',e=>{if(e.key===KEY)receive({model:e.newValue});else if(e.key===LKEY)receive({log:e.newValue})});
+let heard=null;const ekey=e=>JSON.stringify({...e,rev:undefined}); // an entry's identity: what changed and when — never the rev a later write stamped on it
+function mergeLog(rl){const mine=new Map(log.map(e=>[ekey(e),e]));let ch=false;for(const e of rl){const k=ekey(e),m=mine.get(k);if(!m){log.push(e);mine.set(k,e);ch=true}else if(e.rev&&!m.rev){m.rev=e.rev;ch=true}}if(ch){log.sort((a,b)=>(a.t||'').localeCompare(b.t||''));unsynced=log.filter(e=>!e.rev).length}return ch}
+function receive(m){
+  if(!m)return;if(m.log)try{mergeLog(JSON.parse(m.log))}catch{}
+  if(m.model==null||m.model===base||m.model===heard)return;heard=m.model;let d;try{d=JSON.parse(m.model)}catch{return}if(!d||d.rev!==DECK.rev)return; // one save reaches a window twice on the localStorage tier (the storage event and the channel): the second copy is ignored
+  const t=canvas.querySelector('.el[contenteditable="true"]'),sid=slide().id,rid=t&&slide().els[+t.dataset.n].id;
+  deck=d;stampIds(deck);base=m.model;if(!LS)mem.set(KEY,m.model);drag=null;sel.clear();
+  i=Math.max(0,deck.slides.findIndex(s=>s.id===sid)); // the slide you were on, by id; a slide they deleted → slide 1
+  if(t){const n=slide().els.findIndex(e=>e.id===rid);if(n>=0){t.dataset.n=n;commitEdit();return}t.contentEditable=false} // the edit in flight lands on its row, on top of theirs (commitEdit saves + renders); a row they deleted takes nothing
+  if(!sheet.hidden){cellOf=new WeakMap();gsel=new Set([i]);ganchor=i;sheetRender()}else render();
+  if(fileH&&unsynced){clearTimeout(wbT);wbT=setTimeout(writeBack,WB)} // the window that holds the file writes what it heard
+  autosave(unsynced?'local':'ok')}
 const slide=()=>deck.slides[i];
 const LAY=s=>({...(deck.slots||{}),...((deck.layouts||{})[s.layout]||{})}); // deck-wide slots under the layout's content slots
 const MG=()=>deck.styles&&deck.styles.margin!=null?deck.styles.margin:Math.round(W*.06);
@@ -623,7 +660,7 @@ const present=()=>document.body.classList.contains('present');
 function render(){
   i=Math.max(0,Math.min(deck.slides.length-1,i));
   const s=slide(),animate=i!==lastAnim;lastAnim=i;
-  if(animate){tab.set('slide',s.id);location.replace('#'+(i+1))} // slide change → this tab remembers the slide id; the URL hash is for deep links and typed #n (replace = no history entry, works on file:)
+  if(animate){tab.set('slide',s.id);if(location.protocol!=='about:')location.replace('#'+(i+1))} // slide change (a srcdoc frame has no URL of its own: a hash there would navigate it to its host) → this tab remembers the slide id; the URL hash is for deep links and typed #n (replace = no history entry, works on file:)
   sel.forEach(k=>{if(typeof k==='number'?!s.els[k]:!(deck.master||[]).some(m=>m.id===k.slice(2)))sel.delete(k)}); // stale keys (slide changed under a selection) never reach the painter
   canvas.innerHTML='';
   drawEls(s,canvas,animate);
@@ -748,7 +785,7 @@ const selBox=items=>{const sc=canvas.getBoundingClientRect().width/W;let l=1e9,t
   // Editing: a plain click selects and drags the row as always; ⌘-click (Ctrl-click off Mac) opens the link and touches nothing.
   const lk=t&&(e.target.closest('.el a[href]')||t.querySelector(':scope>a.lk'));
   if(lk&&present())return;
-  if(lk&&(e.metaKey||e.ctrlKey)){e.preventDefault();const u=lk.getAttribute('href');if(u[0]==='#')location.hash=u;else open(lk.href,'_blank','noopener');return} // an in-deck target jumps; hashchange renders
+  if(lk&&(e.metaKey||e.ctrlKey)){e.preventDefault();const u=lk.getAttribute('href');if(u[0]==='#'){if(location.protocol==='about:'){commitEdit();sel.clear();i=parseInt(u.slice(1))-1;render()}else location.hash=u}else open(lk.href,'_blank','noopener');return} // an in-deck target jumps; hashchange renders
   // click-off = deselect (nib goes with it). Hold and move, and the SAME press becomes a marquee: a drag window that
   // takes every row it wholly contains. Containment, not touch — a band pulled across a full-bleed backdrop takes the
   // rows drawn on it, never the backdrop. ⇧ (or ⌘) keeps what was already selected. Present mode is for reading: no band.
@@ -938,7 +975,8 @@ grid.addEventListener('mousedown',e=>{
 // Drop eases the lifted cell into its slot, then reorder() commits ONE undo snapshot. prefers-reduced-motion: no transitions.
 let pd=null;const RM=matchMedia('(prefers-reduced-motion:reduce)');
 const landing=()=>{const mv=[...gsel].sort((a,b)=>a-b),at2=ins-mv.filter(n=>n<ins).length,order=deck.slides.map((_,n)=>n).filter(n=>!gsel.has(n));order.splice(at2,0,...mv);return order}; // new order of old indices
-grid.addEventListener('pointerdown',e=>{const c=e.target.closest('.cell');if(!c||e.button)return;pd={c,n:+c.dataset.n,x:e.clientX,y:e.clientY,on:false};c.setPointerCapture(e.pointerId)});
+grid.addEventListener('pointerdown',e=>{const c=e.target.closest('.cell');if(!c||e.button)return;pd={c,n:+c.dataset.n,x:e.clientX,y:e.clientY,on:false};try{c.setPointerCapture(e.pointerId)}catch{} // a synthetic pointer (a test's touch) has no capture to take
+  if(e.pointerType==='touch'&&!gsel.has(pd.n)){gsel=new Set([pd.n]);ganchor=pd.n;grid.querySelectorAll('.cell').forEach(x=>x.classList.toggle('sel',gsel.has(+x.dataset.n)))}}); // a finger fires no mousedown before it drags: the grabbed cell is the selection, as a click would make it
 grid.addEventListener('pointermove',e=>{
   if(!pd)return;const dx=e.clientX-pd.x,dy=e.clientY-pd.y;
   if(!pd.on){if(Math.hypot(dx,dy)<6)return;pd.on=true;e.preventDefault();getSelection().removeAllRanges();document.body.classList.add('dragging');pd.cells=[...grid.querySelectorAll('.cell')];pd.rects=pd.cells.map(c=>c.getBoundingClientRect());pd.c.classList.add('lift')}
@@ -1140,7 +1178,7 @@ function bugProbe(cat){
   const env='viewport '+innerWidth+'×'+innerHeight+' · dpr '+devicePixelRatio+' · '+(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
   const P={looks:[['rows',els.length+' ('+n('text')+' text · '+n('box')+' box · '+n('connector')+' connector)'],['clipped',String(clipped)],['guides',SNAP?'on':'off']],
     respond:[['pointer',matchMedia('(pointer: coarse)').matches?'touch':'mouse'],['selection',sel.size+(sel.size===1?' row':' rows')],['autosave',a+' · '+unsynced+' edits not in the file'],['errors',errs]],
-    save:[['autosave',a],['file access',FSA?'yes':'no'],['versions',versions.length+' · '+unsynced+' edits not in the file'],['pdf route',CHROMIUM?'print':'raster'],['errors',errs]],
+    save:[['autosave',a],['file access',FSA?'yes':'no'],['store',TIER],['pending',unsynced+' edits not in the file'],['pdf route',CHROMIUM?'print':'raster'],['errors',errs]],
     crash:[['errors',errs],['uptime',Math.round(performance.now()/1000)+' s'],['drawn',drawn.length+' of '+els.length+' rows']]};
   return {env,probes:P[cat]}}
 const bugdlg=$('bugdlg'),bugdesc=$('bugdesc');
@@ -1154,33 +1192,31 @@ $('bugsend').onclick=()=>setTimeout(()=>bugdlg.close(),80); // the browser hands
 $('bugcopy').onclick=async()=>{const r=bugBuild(),b=$('bugcopy');try{await navigator.clipboard.writeText('To: '+BUG_TO+'\nSubject: '+r.subject+'\n\n'+r.body);b.textContent='Copied'}catch{b.textContent='Copy failed'}setTimeout(()=>b.textContent='Copy report',1500)};
 helpbtn.onclick=()=>help(!helpmenu.classList.contains('open'));
 helpbtn.onmouseenter=()=>{helpT=setTimeout(()=>help(true),350)};helpbtn.onmouseleave=()=>clearTimeout(helpT);
-document.addEventListener('mousedown',e=>{if(!e.target.closest('#addwrap'))menu(false);if(!e.target.closest('#helpwrap'))help(false);if(!e.target.closest('#versmenu,#vers'))vers(false)});
+document.addEventListener('mousedown',e=>{if(!e.target.closest('#addwrap'))menu(false);if(!e.target.closest('#helpwrap'))help(false)});
 // duplicate: selected rows (offset 16px, the copies become the selection) · else the slide, after itself · in the sheet, the selected slides
 $('dup').onclick=()=>{commitEdit();menu(false);
   if(!sheet.hidden){snap();const src=[...gsel].sort((a,b)=>a-b);if(!src.length)return;const at=src[src.length-1]+1;const cp=src.map(n=>{const c=dup(deck.slides[n]);delete c.id;return c});deck.slides.splice(at,0,...cp);gsel=new Set(cp.map((_,x)=>at+x));ganchor=i=at;save();sheetRender();return}
   snap();const s=slide();
   if(sel.size){const ns=[...sel].map(k=>typeof k==='number'?k:fork(k.slice(2)));const cp=ns.map(n=>{const o=s.els[n],c=dup(o);delete c.id;moveBy(c,o,16,16);return c});const at=s.els.length;s.els.push(...cp);sel.clear();cp.forEach((_,x)=>sel.add(at+x));save();render();return}
   const c=dup(s);delete c.id;deck.slides.splice(i+1,0,c);i=i+1;save();render()};
-// fileHtml(): THIS document with the CURRENT model, log and versions baked into their literals, chrome state stripped — the
+// fileHtml(): THIS document with the CURRENT model and log baked into their literals, chrome state stripped — the
 // file an agent reads (bin/edits.mjs, create --from) and the copy that opens anywhere without browser storage.
 function fileHtml(){
   commitEdit();const d=document.documentElement.cloneNode(true),q=s=>d.querySelector(s);
-  d.removeAttribute('style');q('body').removeAttribute('style');q('body').className='';d.querySelectorAll('#hud :disabled').forEach(b=>b.disabled=false);['#canvas','#grid','#print','#versmenu'].forEach(s=>q(s).innerHTML='');
+  d.removeAttribute('style');q('body').removeAttribute('style');q('body').className='';d.querySelectorAll('#hud :disabled').forEach(b=>b.disabled=false);['#canvas','#grid','#print'].forEach(s=>q(s).innerHTML='');
   q('#snap').setAttribute('aria-pressed','false');q('#snap').dataset.tip='Guides + snap · off · G';q('#snap').setAttribute('aria-label',q('#snap').dataset.tip); // guides are browser state: a copy opens with them off
-  q('#tb').hidden=q('#sheet').hidden=true;q('#addmenu').classList.remove('open');q('#helpmenu').classList.remove('open');q('#versmenu').classList.remove('open');
+  q('#tb').hidden=q('#sheet').hidden=true;q('#addmenu').classList.remove('open');q('#helpmenu').classList.remove('open');
   const J=v=>JSON.stringify(v).replace(/<\/script/gi,'<\\/script'),sc=q('script');
   sc.textContent=sc.textContent
     .replace(/\/\*DECK\*\/[\s\S]*?\/\*\/DECK\*\//,()=>'/*DECK*/'+J(deck)+'/*/DECK*/')
-    .replace(/\/\*LOG\*\/[\s\S]*?\/\*\/LOG\*\//,()=>'/*LOG*/'+J(log)+'/*/LOG*/')
-    .replace(/\/\*VERSIONS\*\/[\s\S]*?\/\*\/VERSIONS\*\//,()=>'/*VERSIONS*/'+J(versions)+'/*/VERSIONS*/');
+    .replace(/\/\*LOG\*\/[\s\S]*?\/\*\/LOG\*\//,()=>'/*LOG*/'+J(log)+'/*/LOG*/');
   return '<!DOCTYPE html>\n'+d.outerHTML;
 }
-// ⌘S = SAVE THE FILE. Chrome/Edge: the first ⌘S asks for the deck file once (File System Access) and every save after —
-// ⌘S and autosave alike — rewrites it in place; the handle is kept in IndexedDB so the next session only re-confirms.
-// Elsewhere (Safari, sandboxed contexts) the file cannot be written: ⌘S downloads a copy instead, as before.
-const idb=()=>new Promise((ok,no)=>{const r=indexedDB.open('decklet',1);r.onupgradeneeded=()=>r.result.createObjectStore('h');r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)});
-const hget=async()=>{try{const db=await idb();return await new Promise((ok,no)=>{const r=db.transaction('h').objectStore('h').get(NS);r.onsuccess=()=>ok(r.result||null);r.onerror=()=>no(r.error)})}catch{return null}};
-const hput=async h=>{try{const db=await idb();await new Promise((ok,no)=>{const r=db.transaction('h','readwrite').objectStore('h').put(h,NS);r.onsuccess=ok;r.onerror=()=>no(r.error)})}catch{}};
+// ⌘S (or the dot) = SAVE THE FILE, NOW. Chrome/Edge: the first press asks for the deck file once (File System Access) and from
+// then on every edit rewrites it by itself, on the debounce above; the handle is kept in IndexedDB (store 'h') so the next
+// session only re-confirms. Elsewhere (Safari, sandboxed contexts) the file cannot be written: ⌘S downloads a copy instead.
+const hget=()=>idbReq('h','readonly',o=>o.get(NS)).then(h=>h||null,()=>null);
+const hput=h=>idbReq('h','readwrite',o=>o.put(h,NS)).catch(()=>{});
 async function linkFile(){ // a user gesture is required: called from ⌘S / the dot
   let h=await hget();
   if(h&&(await h.queryPermission({mode:'readwrite'}))!=='granted'&&(await h.requestPermission({mode:'readwrite'}))!=='granted')h=null;
@@ -1189,7 +1225,7 @@ async function linkFile(){ // a user gesture is required: called from ⌘S / the
 }
 let wq=null; // one write in flight; a save during a write queues exactly one more
 async function writeBack(){
-  if(!fileH)return;if(writing){wq=1;return}writing=true;autosave('busy');
+  clearTimeout(wbT);wbT=null;if(!fileH)return;if(writing){wq=1;return}writing=true;autosave('busy');
   const fresh=log.filter(e=>!e.rev);for(const e of fresh)e.rev=deck.rev; // the file about to be written carries them
   try{const w=await fileH.createWritable();await w.write(fileHtml());await w.close();unsynced=0;store.set(LKEY,JSON.stringify(log));fileAt=new Date();autosave('ok')}
   catch(err){console.warn('decklet: write failed',err);for(const e of fresh)delete e.rev;fileH=null;autosave('local')}
@@ -1199,26 +1235,15 @@ async function saveFile(){
   commitEdit();
   if(!FSA){saveCopy();return}
   try{if(!fileH&&!(await linkFile()))return}catch(err){if(err&&err.name==='AbortError')return;console.warn(err);saveCopy();return}
-  pin('⌘S');await writeBack();
+  await writeBack();
 }
+$('autosave').onclick=saveFile; // the dot is the ⌘S door where there is no ⌘ (a phone, a tablet)
 hget().then(async h=>{if(h&&(await h.queryPermission({mode:'readwrite'}))==='granted'){fileH=h;if(unsynced)writeBack()}}); // a handle this browser still trusts: silent write-back from the first edit
 function saveCopy(){
   const html=fileHtml();
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([html],{type:'text/html'}));a.download=document.title.replace(/[\/:*?"<>|]+/g,'-')+'.html';a.click();
   autosave('busy');clearTimeout(asT);asT=setTimeout(()=>autosave('ok','Saved copy · '+hms(new Date())),250);
 }
-// ── versions: snapshots kept IN the file. An agent write pushes the state it replaced (create --from); a human pins one on
-// ⌘S or from the history popover. Restore = the snapshot becomes the working deck (one undo step); nothing is lost — the
-// state you left is pinned first, so a restore is itself reversible from the list. Capped at 20, oldest dropped.
-function pin(label){
-  const last=versions.at(-1);if(last&&JSON.stringify(last.deck)===JSON.stringify(deck))return; // identical to the newest: nothing new to keep
-  versions.push({rev:deck.rev,t:new Date().toISOString(),by:'human',label:label||'pin',deck:JSON.parse(JSON.stringify(deck))});if(versions.length>20)versions.splice(0,versions.length-20);store.set(VKEY,JSON.stringify(versions));versRender()}
-function restore(n){const v=versions[n];if(!v)return;commitEdit();pin('before restore');snap();const rev=deck.rev;deck=JSON.parse(JSON.stringify(v.deck));deck.rev=rev;sel.clear();i=Math.min(i,deck.slides.length-1);save();render();vers(false)}
-const versmenu=$('versmenu'),versbtn=$('vers');
-const vers=open=>{versmenu.classList.toggle('open',open);versbtn.setAttribute('aria-expanded',open);if(open)versRender()};
-function versRender(){versmenu.innerHTML='<div class="v"><span>'+($('autosave').dataset.full||'')+'</span><button data-save="1">Save ⌘S</button></div>'+(versions.length?[...versions].map((v,n)=>[v,n]).reverse().map(([v,n])=>`<div class="v"><span>${new Date(v.t).toLocaleString()} · ${v.by} · ${(v.label||'').replace(/[<>&]/g,'')}</span><button data-restore="${n}">Restore</button></div>`).join('')+`<div class="v"><span>now</span><button data-pin="1">Pin this version</button></div>`:`<div class="v"><span>No versions yet</span><button data-pin="1">Pin this version</button></div>`)}
-versbtn.onclick=()=>vers(!versmenu.classList.contains('open'));
-versmenu.onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.save){vers(false);saveFile();return}if(b.dataset.pin){pin('pin');return}restore(+b.dataset.restore)};
 // add text + box: new text is born Body — or binds to a free slot of the slide's layout (inheriting its role + geometry)
 const TPL={
   text:{x:Math.round(W*.4),y:Math.round(H*.46),w:Math.round(W*.31),role:'Body',text:'New text — double-click to edit'},
@@ -1236,7 +1261,16 @@ $('prev').onclick=()=>nav(-1);
 $('next').onclick=()=>nav(1);
 // + Slide: same layout as the current slide, title slot filled; deleting/reordering lives in the contact sheet
 $('sadd').onclick=()=>{commitEdit();menu(false);snap();const s=slide(),ns={els:[]};if(s.bg)ns.bg=s.bg;if(s.layout){ns.layout=s.layout;const t=Object.entries(LAY(s)).find(([,v])=>v.role==='H1');ns.els.push(t?{slot:t[0],text:'New slide'}:{x:60,y:88,w:W-120,role:'H1',text:'New slide'})}else ns.els.push({x:60,y:88,w:W-120,role:'H1',text:'New slide'});if(!sheet.hidden){i=Math.max(...gsel,i)}deck.slides.splice(i+1,0,ns);i++;sel.clear();save();if(sheet.hidden)render();else{gsel=new Set([i]);ganchor=i;sheetRender()}};
-fit();render();autosave(store.set(KEY,JSON.stringify(deck))?(unsynced?'local':'ok'):'bad'); // on load: green when storage takes a write and the file has every edit, amber with edits pending, red when the shim reports storage unavailable
+// on load: green when storage takes a write and the file has every edit, amber with edits pending, red when nothing persists.
+// Without localStorage the IndexedDB copy is still on its way: the deck is on screen from DECK already; when the copy lands
+// (or 2 s pass — a hung open is a missing tier) hydrate() applies it and the toggles, and the dot settles.
+const settle=()=>autosave(store.set(KEY,JSON.stringify(deck))?(unsynced?'local':'ok'):'bad');
+fit();render();
+async function idbLoad(){try{const range=IDBKeyRange.bound(NS+':',NS+';'); // every key under this deck's namespace
+  const r=await Promise.race([Promise.all([idbReq('kv','readonly',o=>o.getAllKeys(range)),idbReq('kv','readonly',o=>o.getAll(range))]),new Promise(r=>setTimeout(()=>r(null),2000))]);
+  if(!r)return;r[0].forEach((k,n)=>mem.set(k,r[1][n]));TIER='idb';document.body.classList.remove('nostore');hydrate();setSpell(SPELL);setSnap(SNAP)}
+  catch(e){console.warn('decklet: no IndexedDB either — edits live in memory until ⌘S',e)}} // a refusal (Safari on file://) leaves the memory tier
+if(LS)settle();else{autosave('busy','Loading…');idbLoad().then(settle)}
 
 // self-check — model round-trips through JSON and renderer draws every element (+ master rows + counter)
 console.assert(JSON.parse(JSON.stringify(DECK)).slides.length===DECK.slides.length,'model round-trip');

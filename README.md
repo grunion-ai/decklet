@@ -84,7 +84,7 @@ node bin/create.mjs --model model.json --style style.json --out deck.html --form
 node bin/verify.mjs deck.html [--refs shots/]                     # layout parity always; AE diff when refs exist
 node bin/pdf.mjs deck.html [out.pdf]                              # vector PDF, one slide per page at slide size; self-gating
 node bin/edits.mjs deck.html                                       # what the human changed in the editor (read before revising)
-node bin/create.mjs --model model.json --out deck.html --from deck.html   # revise: keep ids, replay human edits (human wins), keep versions
+node bin/create.mjs --model model.json --out deck.html --from deck.html   # revise: keep ids, replay human edits (human wins)
 node bin/import-html.mjs --w 1600 --h 900 --out model.json 'pages/*.html'   # finished HTML → model
 ```
 
@@ -95,7 +95,7 @@ node bin/import-html.mjs --w 1600 --h 900 --out model.json 'pages/*.html'   # fi
 - **Single file.** Model + renderer + editor in one `.html`; nothing is fetched at runtime.
 - **Zero network.** No webfonts, CDNs or remote images; images are data: URIs. The gate greps for it.
 - **Editable.** Drag, ⌘-multi-select, marquee select (drag a window on empty canvas), double-click to retype, corner-nib resize, point nibs on connectors, floating role/mark/colour toolbar (B/I/U/S, sub/sup, the deck's own swatches; ⌘B/⌘I/⌘U), undo that survives reload, contact sheet with grab-and-drag reordering.
-- **Human edits are never lost.** Every edit lands in an in-file log and, with ⌘S in Chrome/Edge, in the deck file itself (File System Access — asked for once). `create --from` replays the log onto the next version, human wins, conflicts flagged; the file keeps a version history you can restore from. `bin/edits.mjs` prints the log for an agent.
+- **Human edits are never lost.** Every edit autosaves in the browser — localStorage, IndexedDB where that is refused, memory as the last resort — on a desktop, a phone or inside an iframe, and every window of the same browser showing the deck picks it up live. Every edit lands in the in-file log and, once the deck file is linked (⌘S or the dot, Chrome/Edge, asked once), is written into the file by itself. `create --from` replays the log onto the next version, human wins, conflicts flagged. `bin/edits.mjs` prints the log for an agent. Version history is not decklet's job: it moved to weave (0.9.0).
 - **Motion, honestly.** Four entrance anims — `rise`, `fade`, `pop`, `wipe` — staggered 120 ms on slide *entry* only. `prefers-reduced-motion` turns them off, and print, the contact sheet, the PDF and `verify` all draw the settled frame, so motion can never change what is measured or exported.
 - **Brand-true.** Eight text roles (Title, Supertitle, H1, H2, Body, Caption, Label, Stat) are the only source of font/size/leading; rows cannot override them. Chrome is one deck-wide master layer on a `margin` token. Tokens re-theme every deck.
 - **PDF.** `⤓` writes a true slide-sized PDF inside the file (foreignObject → canvas → JPEG → PDF, zero dependencies); `⌘P` is the paper path with named Letter/A4 pages (Safari-safe), one page per slide. Safari's in-file raster path is unconfirmed — it falls back to print.
@@ -130,7 +130,7 @@ A row is text by default; `box`, `tile`, `bar`, `line`, `donut`, `svg`, `img` ar
 | `document-letter` / `document-a4` | experimental | page = canvas, print zoom 1; text does not flow across pages |
 | `slides-4x3` · `story` 9:16 · `document-letter-landscape` · `document-a4-landscape` · `poster-a3` | experimental | sizing, editing, PDF work; **library layouts and templates are cut for 16:9 and stretch here** — `validate` warns per slide; draw free rows until aspect-aware composition (ROADMAP D2) |
 | drag / multi-select / resize / undo | supported | undo history persisted per deck; connectors get point nibs |
-| edit log · write-back · versions | supported | in-file `/*LOG*/` + `/*VERSIONS*/`; ⌘S writes the file (Chrome/Edge), `create --from` migrates, restore from the history popover |
+| autosave · edit log · write-back | supported | localStorage → IndexedDB → memory; live across windows of one browser; in-file `/*LOG*/`; the linked file rewrites itself (Chrome/Edge), `create --from` migrates. No version history in the file since 0.9.0 (weave) |
 | inline text editing + B/I/U/S + colour runs | supported | stored as `html` on the row |
 | roles · slots · master layer · footer counter | supported | see SKILL.md |
 | bars, lines, donuts, tiles, boxes | supported | one row each, no SVG layer |

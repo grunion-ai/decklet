@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import {fileURLToPath} from 'node:url';
-import {stampIds, diffDecks, applyLog, blockOf, putBlock} from '../lib/edits.mjs';
+import {stampIds, diffDecks, applyLog, blockOf, hasBlock, putBlock} from '../lib/edits.mjs';
 import {create} from '../bin/create.mjs';
 import {validate} from '../bin/validate.mjs';
 import {modelOf} from '../bin/verify.mjs';
@@ -122,10 +122,10 @@ test('applyLog: structural entries — add/delete rows, add/delete/reorder slide
   applyLog(three, diffDecks(base, rev)); assert.deepEqual(three.slides.map(s => s.id), [...rev.slides.map(s => s.id), 'snew']);
 });
 
-test('template carries the same EDITS block lib/edits.mjs runs (one source), plus LOG and VERSIONS markers', () => {
+test('template carries the same EDITS block lib/edits.mjs runs (one source), plus the LOG marker', () => {
   const tpl = fs.readFileSync(path.join(root, 'template.html'), 'utf8');
   assert.match(tpl, /\/\*EDITS\*\/[\s\S]*function stampIds[\s\S]*function diffDecks[\s\S]*function applyLog[\s\S]*\/\*\/EDITS\*\//);
-  assert.match(tpl, /const LOG0=\/\*LOG\*\/\[\]\/\*\/LOG\*\//); assert.match(tpl, /const VERS0=\/\*VERSIONS\*\/\[\]\/\*\/VERSIONS\*\//);
+  assert.match(tpl, /const LOG0=\/\*LOG\*\/\[\]\/\*\/LOG\*\//); assert.ok(!tpl.includes('/*VERSIONS*/'), 'no history block since 0.9.0');
   assert.deepEqual(blockOf(tpl, 'LOG'), []); assert.deepEqual(blockOf(putBlock(tpl, 'LOG', [{s: 1}]), 'LOG'), [{s: 1}]);
 });
 
@@ -138,7 +138,7 @@ test('create: stamps deck.id + deck.rev + slide/row ids; the storage namespace i
   assert.equal(again.deck.id, deck.id, 'a model that carries its id keeps it');
 });
 
-test('create --from: inherits the deck id and matching slide/row ids from the previous file, replays its log (human wins), and pushes the previous state into VERSIONS', () => {
+test('create --from: inherits the deck id and matching slide/row ids from the previous file and replays its log (human wins)', () => {
   const v1 = create(mk(), {}); const f1 = path.join(tmp, 'v1.html');
   // the human moved a row and retitled a slide in the browser; write-back baked both into DECK and the LOG
   const edited = clone(v1.deck); edited.slides[0].els[1].x = 90; edited.slides[0].els[0].text = 'Uno';
@@ -154,49 +154,45 @@ test('create --from: inherits the deck id and matching slide/row ids from the pr
   assert.equal(v2.deck.slides[0].els[1].x, 90, 'human move carried'); assert.equal(v2.deck.slides[0].els[1].w, 500, 'agent width kept');
   assert.equal(v2.deck.slides[0].els[0].text, 'Uno', 'human text carried'); assert.equal(v2.deck.slides.length, 3);
   assert.deepEqual([v2.migrate.applied, v2.migrate.conflicts.length, v2.migrate.orphans.length], [2, 0, 0]);
-  const vers = blockOf(v2.html, 'VERSIONS');
-  assert.equal(vers.length, 1); assert.equal(vers[0].rev, v1.deck.rev); assert.equal(vers[0].by, 'human'); assert.equal(vers[0].deck.slides[0].els[1].x, 90);
+  assert.ok(!hasBlock(v2.html, 'VERSIONS'), 'no history block');
   assert.ok(blockOf(v2.html, 'LOG').every(e => e.rev === v2.deck.rev), 'carried entries are stamped with the rev they were applied to');
 });
 
-test('create --from: a conflict is reported and the human value wins; versions are capped at 20', () => {
+test('create --from: a conflict is reported and the human value wins; an older file\'s VERSIONS block is read past', () => {
   const v1 = create(mk(), {}); const f1 = path.join(tmp, 'c1.html');
   const edited = clone(v1.deck); edited.slides[0].els[0].text = 'Uno';
   const log = diffDecks(v1.deck, edited).map(e => ({...e, t: '2026-09-06T10:00:00Z'}));
   const vers = Array.from({length: 20}, (_, n) => ({rev: 'r' + n, t: 't', by: 'agent', deck: v1.deck}));
-  let html = putBlock(putBlock(putBlock(v1.html, 'DECK', edited), 'LOG', log), 'VERSIONS', vers);
+  let html = putBlock(putBlock(v1.html, 'DECK', edited), 'LOG', log).replace(/(const LOG0=\/\*LOG\*\/[\s\S]*?\/\*\/LOG\*\/;)/, `$1const VERS0=/*VERSIONS*/${JSON.stringify(vers)}/*/VERSIONS*/;`); // a 0.5–0.8 file
   fs.writeFileSync(f1, html);
   const m2 = mk(); m2.slides[0].els[0].text = 'Agent title';
   const v2 = create(m2, {from: f1});
   assert.equal(v2.deck.slides[0].els[0].text, 'Uno');
   assert.equal(v2.migrate.conflicts.length, 1); assert.equal(v2.migrate.conflicts[0].agent, 'Agent title');
-  assert.equal(blockOf(v2.html, 'VERSIONS').length, 20); assert.equal(blockOf(v2.html, 'VERSIONS').at(-1).rev, v1.deck.rev);
+  assert.ok(!hasBlock(v2.html, 'VERSIONS'), 'the history is not carried');
 });
 
-// ROADMAP P1.4: a deck built before 0.5.0 carries no /*LOG*/ or /*VERSIONS*/ data block, but its fileHtml() source still
+// ROADMAP P1.4: a deck built before 0.5.0 carries no /*LOG*/ data block, but its fileHtml() source still
 // holds the marker strings. blockOf's regex was an unanchored whole-document search, so it matched the source literal and
 // JSON.parse('+J(log)+') threw an uncaught SyntaxError from create --from.
 const pre050 = html => {
-  const out = html.replace(/const LOG0=\/\*LOG\*\/\[\]\/\*\/LOG\*\/;const VERS0=\/\*VERSIONS\*\/\[\]\/\*\/VERSIONS\*\/;/, 'const LOG0=[];const VERS0=[];');
+  const out = html.replace(/const LOG0=\/\*LOG\*\/\[\]\/\*\/LOG\*\/;/, 'const LOG0=[];');
   assert.notEqual(out, html, 'fixture: the data blocks were stripped'); assert.match(out, /'\/\*LOG\*\/'/, 'fixture: the source literal stays');
   return out;
 };
 test('blockOf: anchored to the data block — a marker missing there is reported as missing, never parsed out of fileHtml()\'s source', () => {
   const html = pre050(create(mk(), {}).html);
   assert.throws(() => blockOf(html, 'LOG'), {message: 'marker LOG missing'});
-  assert.throws(() => blockOf(html, 'VERSIONS'), {message: 'marker VERSIONS missing'});
   assert.deepEqual(blockOf(html, 'LOG', []), [], 'a fallback stands in for a missing block');
   assert.equal(blockOf(html, 'DECK').w, 960, 'the blocks that are there still read');
 });
-test('create --from: a deck built before 0.5.0 (no edit log) carries its id and its state into VERSIONS, replays nothing, and says so', () => {
+test('create --from: a deck built before 0.5.0 (no edit log) carries its id, replays nothing, and says so', () => {
   const v1 = create(mk(), {}); const f1 = path.join(tmp, 'pre050.html');
   fs.writeFileSync(f1, pre050(v1.html));
   const v2 = create(mk(), {from: f1});
   assert.equal(v2.deck.id, v1.deck.id, 'id inherited');
   assert.deepEqual([v2.migrate.applied, v2.migrate.conflicts.length, v2.migrate.orphans.length], [0, 0, 0]);
   assert.equal(v2.migrate.predates, true, 'the caller can tell the previous file had no log');
-  const vers = blockOf(v2.html, 'VERSIONS');
-  assert.equal(vers.length, 1); assert.equal(vers[0].rev, v1.deck.rev); assert.equal(vers[0].by, 'agent');
   assert.deepEqual(blockOf(v2.html, 'LOG'), []);
 });
 

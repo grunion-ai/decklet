@@ -15,7 +15,7 @@ import {expandCharts} from '../lib/chart.mjs';
 import {expandTemplates} from '../lib/templates.mjs';
 import {expandIcons} from '../lib/icons.mjs';
 import {flags as spellFlags, loadChecker} from '../lib/spell.mjs';
-import {stampIds, diffDecks, applyLog, blockOf, hasBlock, putBlock, VERSION_CAP} from '../lib/edits.mjs';
+import {stampIds, diffDecks, applyLog, blockOf, hasBlock, putBlock} from '../lib/edits.mjs';
 
 // page-size presets of ONE model space: canvas size + print page (named sizes only — Safari ignores px @page sizes)
 export const FORMAT = {
@@ -84,20 +84,20 @@ export function create(model, {style = null, format, space, title, template, fro
   if (Object.keys(tokens).length) html = put(html, 'TOKENS', Object.entries(tokens).map(([k, v]) => `--${k.replace(/^--/, '')}:${v}`).join(';'));
   deck.id = deck.id || createHash('sha256').update(JSON.stringify(model)).digest('hex').slice(0, 10); // born once, from the first model; --from carries it
   stampIds(deck);
-  // --from: replay the human's edits onto this version (human wins), stamp them with this rev, and keep the previous state
-  let migrate = null, log = [], versions = [];
+  // --from: replay the human's edits onto this version (human wins) and stamp them with this rev. A previous file's
+  // /*VERSIONS*/ block (0.5.0–0.8.x) is read past: the history left the file in 0.9.0.
+  let migrate = null, log = [];
   if (prev) {
-    const predates = !hasBlock(prevHtml, 'LOG');   // built before 0.5.0: no edit log to replay, the state still goes into VERSIONS
-    const plog = blockOf(prevHtml, 'LOG', []), pvers = blockOf(prevHtml, 'VERSIONS', []);
+    const predates = !hasBlock(prevHtml, 'LOG');   // built before 0.5.0: no edit log to replay
+    const plog = blockOf(prevHtml, 'LOG', []);
     migrate = applyLog(deck, plog); if (predates) migrate.predates = true;
-    versions = [...pvers, {rev: prev.rev, t: new Date().toISOString(), by: plog.some(e => !e.rev) ? 'human' : 'agent', label: 'before ' + (title || deck.title || ''), deck: prev}].slice(-VERSION_CAP);
     log = plog;
   }
   const hash = createHash('sha256').update(JSON.stringify(deck)).digest('hex').slice(0, 10);
   deck.rev = hash;
   for (const e of log) if (!e.rev) e.rev = hash;
   html = put(html, 'DECK', esc(JSON.stringify(deck)));
-  html = putBlock(putBlock(html, 'LOG', log), 'VERSIONS', versions);
+  html = putBlock(html, 'LOG', log);
   html = put(html, 'KEY', `'decklet:${deck.id}'`);
   html = put(html, 'ENGINE', `'${JSON.parse(fs.readFileSync(path.join(here, '..', 'package.json'), 'utf8')).version}'`); // the bug report leads with the version that built the file
   html = put(html, 'SPELL', JSON.stringify(spell ? spellFlags(deck, spell) : [])); // option C: the flagged words ride in the file; the editor underlines them

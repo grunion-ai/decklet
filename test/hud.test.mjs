@@ -1,5 +1,5 @@
 // decklet HUD — the toolbar is four groups (navigate · save state · edit · file · view), every control names itself on
-// hover with its key, versions and the autosave dot are one button, duplicate is a button, and C / G are the sheet / guides.
+// hover with its key, the autosave dot is its own button (a tap saves the file), duplicate is a button, and C / G are the sheet / guides.
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -25,9 +25,9 @@ const open = async (b) => {
 
 test('hud: the buttons run navigate · save state · edit · file · view, in that order, with a divider between groups', () => {
   const ids = [...hud.matchAll(/<button id="([^"]+)"/g)].map(m => m[1]).filter(id => !['add-text', 'add-box', 'sadd'].includes(id));
-  assert.deepEqual(ids, ['prev', 'next', 'vers', 'addbtn', 'dup', 'snap', 'spell', 'savecopy', 'pdf', 'grid-btn', 'fs', 'help', 'bug']);
+  assert.deepEqual(ids, ['prev', 'next', 'autosave', 'addbtn', 'dup', 'snap', 'spell', 'savecopy', 'pdf', 'grid-btn', 'fs', 'help', 'bug']);
   assert.equal((hud.match(/class="sep"/g) || []).length, 3, 'three dividers = four groups after the spacer');
-  assert.ok(hud.indexOf('class="spacer"') < hud.indexOf('id="vers"'), 'the save-state button leads the right-hand cluster');
+  assert.ok(hud.indexOf('class="spacer"') < hud.indexOf('id="autosave"'), 'the save-state button leads the right-hand cluster');
 });
 
 test('hud: every control names itself and its key on hover through data-tip, never the OS title delay', () => {
@@ -39,8 +39,8 @@ test('hud: every control names itself and its key on hover through data-tip, nev
   assert.match(tpl, /#hud \[data-tip\]:hover::before\{display:block\}/, 'one tooltip rule for the whole HUD');
 });
 
-test('hud: the autosave dot is a badge on the versions button, and the shortcuts popover drops ⌘P, ⌘D and the old G', () => {
-  assert.match(hud, /<button id="vers"[\s\S]*?<span id="autosave"[\s\S]*?<\/button>/, 'the dot lives inside the versions button');
+test('hud: the autosave dot is its own button, and the shortcuts popover drops ⌘P, ⌘D and the old G', () => {
+  assert.match(hud, /<button id="autosave" data-state="ok"[^>]*><i aria-hidden="true"><\/i><\/button>/, 'the dot is a button of its own');
   const help = hud.slice(hud.indexOf('id="helpmenu"'));
   for (const gone of ['⌘P', '⌘D', '<kbd>Esc · G</kbd>', '✓ button']) assert.ok(!help.includes(gone), gone + ' is gone');
   assert.match(help, /<kbd>C · Esc<\/kbd> contact sheet/);
@@ -48,19 +48,17 @@ test('hud: the autosave dot is a badge on the versions button, and the shortcuts
   assert.equal((help.match(/class="col"/g) || []).length, 3, 'three columns: slides · rows · file');
 });
 
-live('hud: C opens the sheet, G toggles guides, the versions tooltip carries the save state, and the menu has a Save row', async () => {
+live('hud: C opens the sheet, G toggles guides, the dot\'s tooltip carries the save state', async () => {
   const b = await pw.chromium.launch(); const p = await open(b);
   await p.keyboard.press('g'); assert.equal(await p.getAttribute('#snap', 'aria-pressed'), 'true', 'G turns guides on');
   assert.equal(await p.getAttribute('#snap', 'data-tip'), 'Guides + snap · on · G');
   await p.keyboard.press('g'); assert.equal(await p.getAttribute('#snap', 'aria-pressed'), 'false');
   await p.keyboard.press('c'); assert.equal(await p.evaluate(() => sheet.hidden), false, 'C opens the contact sheet');
   await p.keyboard.press('Escape'); assert.equal(await p.evaluate(() => sheet.hidden), true);
-  assert.match(await p.getAttribute('#vers', 'data-tip'), /^Versions · autosaved \d\d:\d\d:\d\d$/, 'the tooltip is short: the control, then the state');
+  assert.match(await p.getAttribute('#autosave', 'data-tip'), /^Autosaved · \d\d:\d\d:\d\d$/, 'the tooltip is the state and its time');
   assert.match(await p.getAttribute('#autosave', 'aria-label'), /^Autosaved · \d\d:\d\d:\d\d$/, 'the full sentence stays on the dot for screen readers');
-  await p.click('#vers'); assert.ok(await p.$('#versmenu button[data-save]'), 'the versions menu carries the Save ⌘S row');
-  assert.match(await p.textContent('#versmenu .v:first-child span'), /^Autosaved · \d\d:\d\d:\d\d$/, 'its first row is the full save status');
-  assert.equal(await p.evaluate(() => getComputedStyle($('vers'), '::before').display), 'none', 'no tooltip while the menu is open');
-  const r = await p.evaluate(() => { const b = versmenu.getBoundingClientRect(); return [b.left >= 0, b.right <= innerWidth]; }); assert.deepEqual(r, [true, true], 'the menu fits inside the window');
+  await p.evaluate(() => { snap(); slide().els[1].x = 99; save(); }); await p.waitForTimeout(300);
+  assert.match(await p.getAttribute('#autosave', 'data-tip'), /^Saved in this browser · 1 not in the file · ⌘S$/, 'amber names the pending count and the door');
   assert.deepEqual(p.errs, []); await b.close();
 });
 
