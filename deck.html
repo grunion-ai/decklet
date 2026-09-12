@@ -216,6 +216,7 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
       </div>
       <div class="col"><div class="ph">File</div>
         <div><kbd>⌘S</kbd> save the file (asks for it once · Safari: downloads a copy)</div>
+        <div><a id="bug" href="#" title="Opens your mail app with the engine version, format and mode filled in — nothing is sent until you do">Report a bug</a> · opens your mail app · nothing is sent until you do</div>
         <div class="dim">Buttons only: add · duplicate · spellcheck · versions · PDF. Spellcheck underlines the words the build's dictionary refused, on every slide; the browser's own checker adds the row you type in. Never present, print or PDF.</div>
       </div>
     </div>
@@ -300,7 +301,31 @@ function applyLog(deck,log){
     setKeys(s.els[n],e,{s:e.s,r:e.r})}
   return R}
 /*/EDITS*/
+// ── BUG: the bug-report builder, the pure core shared with node (lib/bug.mjs lifts this block verbatim — ONE source) ──
+// A report is a mailto the reporter opens, reads and sends. The address is receive-only. bugFacts() is the CLOSED set of
+// what a deck contributes: its shape (format, size, slide count) and its id (10 hex chars of a sha256 over the model — one
+// way) — never text, notes, alt, role names, tokens, fonts, images, links, the title, a path, the log or the versions.
+// scrub() strips quoted strings, JSON payloads and directory parts from tool output so a verify line keeps its shape and
+// loses its words. The whole URL stays under BUG_CAP: Windows mailto handlers cut near 2083 characters.
+/*BUG*/
+const BUG_TO='decklet@grunion.ai',BUG_CAP=2000;
+const scrub=s=>String(s).split('\n').map(l=>l.replace(/\{.*\}/,'{…}').replace(/(["'`]).*?\1/g,'…').replace(/(?:[A-Za-z]:[\\/]|~?\/)[^\s"'`:]*[\\/]/g,'').replace(/ slide (\d+) [^:\n]+:/,' slide $1:').replace(/(— )(?:…|[^\s,(]+)(?:, (?:…|[^\s,(]+))* \(/,'$1… (')).join('\n');
+function bugFacts(deck){return {format:deck.format||'slides',w:deck.w,h:deck.h,slides:deck.slides.length,id:deck.id}}
+function bugReport(o){
+  const line=['decklet '+o.engine+(o.built&&o.built!==o.engine?' (this deck was built with '+o.built+')':''),o.format&&o.w?o.format+' '+o.w+'×'+o.h:'',o.slides?o.slides+' slides':'',o.at?'on slide '+o.at:'',o.mode].filter(Boolean).join(' · ');
+  const cut=(s,n)=>s.length>n?s.slice(0,Math.max(0,n-6))+' [cut]':s;
+  const head=[line,'',... (o.id?['deck '+o.id]:[]),'','What I did','1. ','','What I expected','','','What happened instead','',''];
+  const tail=['A screenshot helps. Replies come from a person\'s mailbox, not from this address.'];
+  const snip=o.output?['Tool output ('+(o.tool||'cli')+')',scrub(o.output).trim(),'']:[];
+  const subject='[decklet] <what you saw, in a few words>';
+  const url=(client,out)=>{head[1]=client;const body=[...head,...(out.length?out:[]),...tail].join('\n');return {body,mailto:'mailto:'+BUG_TO+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body)}};
+  let client=String(o.client||''),out=snip,r=url(client,out),g=0; // over the cap: shrink the snippet by the excess until it fits, then the client string
+  while(r.mailto.length>BUG_CAP&&out.length&&out[1].length>6&&g++<40){out=[out[0],cut(out[1],Math.max(6,out[1].length-(r.mailto.length-BUG_CAP))),out[2]];r=url(client,out)}
+  while(r.mailto.length>BUG_CAP&&client.length>6&&g++<80){client=cut(client,Math.max(6,client.length-(r.mailto.length-BUG_CAP)));r=url(client,out)}
+  return {subject,body:r.body,mailto:r.mailto}}
+/*/BUG*/
 // the file's own edit log and version history (create.mjs fills both; ⌘S / write-back rewrite them with the browser's)
+const ENGINE=/*ENGINE*/'0.7.0'/*/ENGINE*/; // the package version that built this file (create.mjs); the bug report leads with it
 const LOG0=/*LOG*/[]/*/LOG*/;const VERS0=/*VERSIONS*/[]/*/VERSIONS*/;const SPELL0=/*SPELL*/["anim","anims","colours","decklet","donut","draggable","els","esc","fullscreen","github","hardcoded","html","inlined","json","mjs","rasterised","reflows","renderer","restaggers","retheme","supertitle","svg","validator"]/*/SPELL*/; // words the build's dictionary refused (lib/spell.mjs); the editor underlines them on every slide
 // storage namespace is per deck (create.mjs stamps it with deck.id — stable across versions, so a new file finds the old edits)
 const NS=/*KEY*/'decklet:b4094691c0'/*/KEY*/,KEY=NS+':model',HKEY=NS+':hist',PKEY=NS+':pos',canvas=document.getElementById('canvas'),$=id=>document.getElementById(id);
@@ -1034,7 +1059,8 @@ const menu=open=>{addmenu.classList.toggle('open',open);addbtn.setAttribute('ari
 addbtn.onclick=()=>menu(!addmenu.classList.contains('open'));
 // ⓘ popover: click toggles, hover opens after a short delay; click-away (below) or Esc closes
 const helpmenu=$('helpmenu'),helpbtn=$('help');let helpT;
-const help=open=>{helpmenu.classList.toggle('open',open);helpbtn.setAttribute('aria-expanded',open)};
+const bugHref=()=>bugReport({...bugFacts(deck),engine:ENGINE,at:i+1,mode:document.body.classList.contains('present')?'presenting':document.body.classList.contains('sheet')?'contact sheet':'editing',client:navigator.userAgent}).mailto;
+const help=open=>{helpmenu.classList.toggle('open',open);helpbtn.setAttribute('aria-expanded',open);if(open)$('bug').href=bugHref()};
 helpbtn.onclick=()=>help(!helpmenu.classList.contains('open'));
 helpbtn.onmouseenter=()=>{helpT=setTimeout(()=>help(true),350)};helpbtn.onmouseleave=()=>clearTimeout(helpT);
 document.addEventListener('mousedown',e=>{if(!e.target.closest('#addwrap'))menu(false);if(!e.target.closest('#helpwrap'))help(false);if(!e.target.closest('#versmenu,#vers'))vers(false)});

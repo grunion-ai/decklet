@@ -18,12 +18,14 @@ PDF: the ⤓ button writes a true slide-sized PDF inside the file (foreignObject
 - deck.html: the engine with its own explainer deck (12 slides, incl. the motion vocabulary and three inlined GIF clips of the editor) — live at https://grunion-ai.github.io/decklet/deck.html
 - docs/demo.gif, docs/demo-poster.png: README demo recording, a build product of deck.html via docs/record-demo.mjs (Playwright + ffmpeg)
 - docs/record-clips.mjs: films the three editor clips on the explainer's "filmed" slide from deck.html and writes them into examples/explainer/model.json as data: URIs (Playwright + ffmpeg)
-- template.html: the engine with an empty model; create.mjs fills the /*DECK*/ /*TOKENS*/ /*KEY*/ /*LOG*/ /*VERSIONS*/ /*SPELL*/ markers (the /*EDITS*/ block is the in-file edit core, shared with lib/edits.mjs)
+- template.html: the engine with an empty model; create.mjs fills the /*DECK*/ /*TOKENS*/ /*KEY*/ /*ENGINE*/ /*LOG*/ /*VERSIONS*/ /*SPELL*/ markers (the /*EDITS*/ block is the in-file edit core, shared with lib/edits.mjs; the /*BUG*/ block is the bug-report builder, shared with lib/bug.mjs)
 - bin/validate.mjs: pure-Node model contract validator (exit 1 on errors; --strict for warnings); includes the gap gate — declared boxes owe neighbours styles.gap (4px), estimates warn with ~
 - bin/create.mjs: model (+style) -> deck.html with format presets
 - bin/verify.mjs: self-containment + contract + layout parity (always) + AE vs refs (optional); writes results.json
 - bin/pdf.mjs: deck.html -> vector PDF via Chromium print engine + px @page (one slide per page, text stays text, hrefs are /Link annotations, HUD hidden by the deck's @media print); gates pages/ratio/HUD/links, exit 1 on failure. The ONLY way an agent makes a PDF — never screenshots stitched by ImageMagick
 - bin/edits.mjs: prints the human edit log + version history a deck file carries (read before revising)
+- lib/bug.mjs: node side of the bug-report builder (bugReport/bugFacts/scrub lifted from template.html's /*BUG*/ block; engineOf reads a deck's ENGINE literal)
+- bin/bug.mjs: decklet bug — prints a prefilled mailto to decklet@grunion.ai (engine version, format, size, slide count, node + OS, a scrubbed --log snippet); never the deck's words
 - lib/edits.mjs: node side of the in-file edit core (stampIds/diffDecks/applyLog lifted from template.html's /*EDITS*/ block; blockOf/putBlock for DECK/LOG/VERSIONS)
 - bin/import-html.mjs: HTML pages at a fixed viewport -> model.json (master/slots/roles lifted, Title detected on non-content layouts; _lines intent for parity)
 - examples/explainer, examples/quarterly-update, examples/launch-carousel, examples/one-pager: brief.md -> model.json (+ style.json)
