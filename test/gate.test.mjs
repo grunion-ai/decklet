@@ -223,7 +223,14 @@ test('motion: rise · fade · pop · wipe are the whole vocabulary; unknown anim
   assert.match(tpl, /@media \(prefers-reduced-motion:reduce\)\{\.el\.rise,\.el\.fade,\.el\.pop,\.el\.wipe\{animation:none\}\}/, 'one guard turns all four off');
   assert.match(tpl, /if\(an\)d\.style\.animationDelay=\(a\+\+\*120\)\+'ms'/, '120 ms stagger, counted over animated rows only');
   assert.match(tpl, /let lastAnim=-1/); assert.match(tpl, /animate=i!==lastAnim/, 'entry only — drag/select re-renders never restagger');
-  assert.equal((tpl.match(/drawEls\([^)]*,false\)/g) || []).length, 3, 'print + contact sheet + PDF rasteriser draw un-animated');
+  // the settled-frame sites, by name (ROADMAP P1.6): a new un-animated drawEls call names itself here, or the gate says so
+  const settled = {
+    'print (beforeprint)': tpl.slice(tpl.indexOf("addEventListener('beforeprint'"), tpl.indexOf('\n', tpl.indexOf("addEventListener('beforeprint'"))),
+    'contact sheet (sheetRender)': tpl.slice(tpl.indexOf('function sheetRender('), tpl.indexOf('function sheetKey(')),
+    'PDF rasteriser (exportPdf)': tpl.slice(tpl.indexOf('async function exportPdf('), tpl.indexOf('const SPELLSET=')),
+  };
+  for (const [name, src] of Object.entries(settled)) assert.equal((src.match(/drawEls\([^)]*,false\)/g) || []).length, 1, name + ' draws un-animated, once');
+  assert.equal((tpl.match(/drawEls\([^)]*,false\)/g) || []).length, Object.keys(settled).length, 'an un-animated drawEls site outside the named set: add it to `settled`');
   assert.match(read('bin/verify.mjs'), /\.el\{animation:none!important\}/, 'parity measures the settled frame');
 });
 
