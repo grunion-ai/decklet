@@ -12,6 +12,7 @@ import {LIBRARY, libraryFor, catalogue, DENSITY, densityReport} from '../lib/lay
 import {TEMPLATE, templateKeys, expandTemplates, templateCatalogue} from '../lib/templates.mjs';
 import {ICONS, iconNames, expandIcons} from '../lib/icons.mjs';
 import {checkChart, expandCharts} from '../lib/chart.mjs';
+import {stampIds} from '../lib/edits.mjs';
 
 export const ROLES = ['Title', 'Supertitle', 'H1', 'H2', 'Body', 'Caption', 'Label', 'Stat'];
 // the KPI allowance: `Stat2` is an OPTIONAL ninth role — a second, smaller stat size for tiles, so a hero "63%" and a card
@@ -32,6 +33,16 @@ export const FORMATS = ['slides', 'carousel', 'carousel-4x5', 'document-letter',
 export const ARROWS = ['start', 'end', 'both'];          // WHICH ends carry a head
 export const HEADS = ['triangle', 'chevron', 'dot', 'bar'];   // WHAT is drawn there row
 export const HREF = /^(https?:|mailto:)/i;               // href is model content: navigable schemes only, never javascript:/data:
+// an href may point INTO the deck: '#7' (1-based slide number) or '#<slide id>'. slideNo resolves it to the slide number, 0 when
+// it names no slide. A slide with no id yet resolves as the id create WILL stamp (the same stampIds, on a throwaway copy), so a
+// raw model.json can say '#s2' before it is ever built. (ROADMAP V3.1 / V3.3)
+const slideIds = deck => stampIds({slides: (Array.isArray(deck.slides) ? deck.slides : []).filter(s => s && typeof s === 'object').map(s => ({id: s.id}))}).slides.map(s => s.id);
+export const slideNo = (deck, u) => { const t = String(u).trim().slice(1), n = +t, ids = slideIds(deck); if (/^\d+$/.test(t)) return n >= 1 && n <= ids.length ? n : 0; return ids.indexOf(t) + 1; };
+const hrefErr = (deck, u) => { u = String(u).trim(); if (u[0] === '#') return slideNo(deck, u) ? '' : `names no slide (${slideIds(deck).length} slides: ${slideIds(deck).join(', ')})`; return HREF.test(u) ? '' : 'must be http, https, mailto or #slide'; };
+const runHrefs = html => [...String(html || '').matchAll(/<a\b[^>]*\bhref\s*=\s*["']([^"']*)["']/gi)].map(m => m[1].trim());
+// every link in the deck, in slide + row order, with where an in-deck target lands (to: slide number, null for an outward link)
+export const linksOf = deck => (Array.isArray(deck.slides) ? deck.slides : []).flatMap((s, si) => (Array.isArray(s && s.els) ? s.els : []).flatMap((r, ri) =>
+  [...(r && r.href != null ? [String(r.href).trim()] : []), ...runHrefs(r && r.html)].map(href => ({slide: si + 1, row: (r && r.id) || ri, href, to: href[0] === '#' ? slideNo(deck, href) || 0 : null}))));
 const LOCKED = ['font', 'size', 'lh', 'ls', 'mono'];          // only a role may set these
 const ROLE_REQ = ['font', 'size', 'weight', 'color'];   // lh is strongly recommended; null = browser-normal leading (what import-html emits for line-height:normal)
 const isNum = v => typeof v === 'number' && Number.isFinite(v);
@@ -179,8 +190,8 @@ export function validate(deck) {
         }
       }
     }
-    if (r.href != null && !HREF.test(String(r.href).trim())) E(`${where}: href "${String(r.href).slice(0, 40)}" must be http, https or mailto`);
-    if (r.html) for (const m of r.html.matchAll(/<a\b[^>]*\bhref\s*=\s*["']([^"']*)["']/gi)) if (!HREF.test(m[1].trim())) E(`${where}: link run href "${m[1].slice(0, 40)}" must be http, https or mailto`);
+    if (r.href != null) { const m = hrefErr(deck, r.href); if (m) E(`${where}: href "${String(r.href).slice(0, 40)}" ${m}`); }
+    if (r.html) for (const u of runHrefs(r.html)) { const m = hrefErr(deck, u); if (m) E(`${where}: link run href "${u.slice(0, 40)}" ${m}`); }
     if (r.anim && !ANIMS.includes(r.anim)) E(`${where}: anim "${r.anim}" not one of ${ANIMS.join('|')}`);
     if (r.donut != null && !(isNum(r.donut) && r.donut >= 0 && r.donut <= 100)) E(`${where}: donut must be 0..100`);
     if (r.bar && !(isNum(r.h) && r.bg)) E(`${where}: bar needs h and bg`);
