@@ -124,6 +124,7 @@ test('links: one href model — a whole-row link and an inline link mark, http/h
   // the mark sits in the inline segment, immediately after strikethrough
   assert.match(tpl, /data-cmd="strikeThrough"[^\n]*\n\s*<button data-link="1"/, 'B I U S̶ → link, in that order');
   assert.match(tpl, /document\.execCommand\('createLink',false,href\(u\)\)/); assert.match(tpl, /document\.execCommand\('unlink'\)/, 'clearing the field removes the link');
+  assert.match(tpl, /function linkSel\(\)/, 'the same button on a SELECTION links every selected row (⌘K twin)'); assert.match(tpl, /title="Link \(http, https, mailto or #slide\) · ⌘K"/, 'the button names the gate and its key');
   assert.match(tpl, /<kbd>double-click<\/kbd> edit text · select text → roles · B I U S̶ · link · color<\/div>/, 'popover names it');
 });
 test('curve + arrow: a bezier connector is a row like line/donut/bar, and either end can carry a head', () => {

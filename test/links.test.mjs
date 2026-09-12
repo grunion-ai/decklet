@@ -116,3 +116,34 @@ live('in-deck targets: "#3" and "#s2" jump to the slide when presenting (hash fo
   assert.equal(await p.evaluate(() => present()), false, 'still editing');
   assert.deepEqual(p.errs, []); await b.close();
 });
+
+// ROADMAP V3.2: a human sets a link without touching the model. ⌘K, or the toolbar's link button, is one field for every
+// selected row at once — a painted button and its label — http, https, mailto or #slide; empty clears; anything else is refused.
+live('⌘K / the toolbar link button: one field sets or clears href on every selected row; the gate refuses the rest; the log and undo carry it', async () => {
+  const {b, p} = await launch();
+  let answer = 'https://example.com/new'; p.on('dialog', d => d.accept(answer));
+  await p.evaluate(() => { sel.clear(); sel.add(4); render(); }); await p.keyboard.press('Meta+k');
+  assert.equal(await p.evaluate(() => deck.slides[0].els[4].href), 'https://example.com/new', 'the plain row is linked');
+  assert.equal(await p.$eval('.el[data-n="4"] a.lk', a => a.getAttribute('href')), 'https://example.com/new', '…and rendered');
+  answer = '#s3'; await p.evaluate(() => { sel.clear(); sel.add(1); sel.add(2); render(); }); await p.keyboard.press('Meta+k');
+  assert.deepEqual(await p.evaluate(() => [deck.slides[0].els[1].href, deck.slides[0].els[2].href]), ['#s3', '#s3'], 'the box and its label, together, to a slide by id');
+  assert.equal(await p.$eval('.el[data-n="2"] a.lk', a => a.getAttribute('href')), '#3', 'resolved at render');
+  answer = 'javascript:alert(1)'; await p.keyboard.press('Meta+k');
+  assert.deepEqual(await p.evaluate(() => [deck.slides[0].els[1].href, deck.slides[0].els[2].href]), ['#s3', '#s3'], 'refused: untouched');
+  answer = '#9'; await p.keyboard.press('Meta+k');
+  assert.deepEqual(await p.evaluate(() => [deck.slides[0].els[1].href, deck.slides[0].els[2].href]), ['#s3', '#s3'], 'a target that names no slide is refused too');
+  answer = ''; await p.keyboard.press('Meta+k');
+  assert.deepEqual(await p.evaluate(() => [deck.slides[0].els[1].href, deck.slides[0].els[2].href]), [undefined, undefined], 'empty clears both');
+  assert.equal(await p.$('.el[data-n="2"] a.lk'), null, 'no anchor left');
+  await p.keyboard.press('Meta+z');
+  assert.deepEqual(await p.evaluate(() => [deck.slides[0].els[1].href, deck.slides[0].els[2].href]), ['#s3', '#s3'], '⌘Z undoes the clear');
+  // the toolbar button, on a painted row selected alone (no text segment, so the link button must show on its own)
+  answer = 'mailto:hello@example.com'; await p.evaluate(() => { sel.clear(); sel.add(1); render(); placeTb(); });
+  assert.equal(await p.$eval('#tb', t => t.hidden), false, 'the toolbar shows for a painted row');
+  assert.equal(await p.$eval('#tb [data-link]', b => b.offsetParent !== null), true, 'with the link button');
+  assert.equal(await p.$eval('#tb [data-cmd="bold"]', b => b.offsetParent !== null), false, 'but no text marks');
+  await p.click('#tb [data-link]');
+  assert.equal(await p.evaluate(() => deck.slides[0].els[1].href), 'mailto:hello@example.com', 'the button is the same field');
+  assert.ok(await p.evaluate(() => log.some(e => e.r === deck.slides[0].els[1].id && e.k && e.k.href)), 'the edit log carries the change');
+  assert.deepEqual(p.errs, []); await b.close();
+});

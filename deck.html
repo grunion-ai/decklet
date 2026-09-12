@@ -163,7 +163,7 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
     <button data-cmd="italic" title="Italic" aria-label="Italic"><i>I</i></button>
     <button data-cmd="underline" title="Underline" aria-label="Underline"><u>U</u></button>
     <button data-cmd="strikeThrough" title="Strikethrough" aria-label="Strikethrough"><s>S</s></button>
-    <button data-link="1" title="Link (http, https or mailto)" aria-label="Link"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /> <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg></button>
+    <button data-link="1" title="Link (http, https, mailto or #slide) · ⌘K" aria-label="Link"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /> <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg></button>
   </span>
   <span class="seg" id="tb-colors"></span>
   <button id="tb-master" hidden title="Promote this slide-local override back to every slide" aria-label="Promote this slide-local override back to every slide">Apply to all slides</button>
@@ -211,7 +211,8 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
         <div><kbd>double-click</kbd> edit text · select text → roles · B I U S̶ · link · color</div>
         <div><kbd>⌘B · ⌘I · ⌘U</kbd> bold · italic · underline (a selected row takes it whole)</div>
         <div><kbd>⌫</kbd> delete · <kbd>⌘Z</kbd> undo</div>
-        <div><kbd>⌘ click</kbd> a link opens in a new tab (presenting: a plain click · hover a link for its hint)</div>
+        <div><kbd>⌘K</kbd> link the selected rows — one field for all of them (a button and its label) · http, https, mailto or <kbd>#slide</kbd> · empty removes it</div>
+        <div><kbd>⌘ click</kbd> a link opens in a new tab, a #slide link jumps (presenting: a plain click · hover a link for its hint)</div>
       </div>
       <div class="col"><div class="ph">File</div>
         <div><kbd>⌘S</kbd> save the file (asks for it once · Safari: downloads a copy)</div>
@@ -587,6 +588,16 @@ addEventListener('afterprint',()=>{$('print').innerHTML=''});
 // everything else keeps reading from the master (identical everywhere until edited)
 function fork(id){slide().els.push({override:id});return slide().els.length-1}
 const selEl=()=>{if(sel.size!==1)return null;const k=[...sel][0];return typeof k==='number'?slide().els[k]:null};
+// ⌘K / the toolbar link button on a SELECTION: one field sets or clears href on every selected row at once — a painted button
+// and its label. http, https, mailto or #slide (the same gate render applies; the model keeps what was typed, '#s3' stays '#s3');
+// empty clears; anything the gate refuses leaves every row untouched. Master rows fork first, like a nudge. One undo step.
+function linkSel(){
+  if(!sel.size)return;if(canvas.querySelector('.el[contenteditable="true"]'))commitEdit();
+  const rows=[...sel].map(k=>typeof k==='number'?slide().els[k]:deck.master.find(m=>m.id===k.slice(2))),cur=rows.find(r=>r&&r.href);
+  const u=prompt('Link (http, https, mailto or #slide) — empty removes it',cur?cur.href:'https://');if(u==null)return;
+  const v=u.trim();if(v&&!href(v))return;
+  snap();for(const k of [...sel]){let n=k;if(typeof k!=='number'){n=fork(k.slice(2));sel.delete(k);sel.add(n)}const el=slide().els[n];if(v)el.href=v;else delete el.href}
+  save();render()}
 // drag + resize + select + edit — listener sits on #wrap so click-off ANYWHERE outside an element
 // (canvas gaps AND the margin around the canvas) deselects; the HUD is outside #wrap
 let drag=null;
@@ -764,7 +775,8 @@ function placeTb(){
   let rect=node.getBoundingClientRect();
   if(editing&&sr.rangeCount&&!sr.isCollapsed&&node.contains(sr.anchorNode)){const rr=sr.getRangeAt(0).getBoundingClientRect();if(rr.width)rect=rr}
   tb.hidden=false;
-  ['tb-roles','tb-inline','tb-colors'].forEach(id=>$(id).hidden=!textual); // text segments only for text rows
+  ['tb-roles','tb-colors'].forEach(id=>$(id).hidden=!textual); // text segments only for text rows…
+  tb.querySelectorAll('#tb-inline [data-cmd]').forEach(b=>b.hidden=!textual); // …the link button stays: a painted CTA box takes a link too
   const roles=Object.keys(deck.styles&&deck.styles.roles||{}),rw=$('tb-roles');
   rw.innerHTML=roles.map(n=>`<button data-role="${n}" class="${n===(src.role||(src.slot&&LAY(s)[src.slot]||{}).role)?'on':''}" title="${n}">${n}</button>`).join('');
   tb.querySelectorAll('[data-cmd]').forEach(b=>{b.disabled=!editing;b.classList.toggle('on',editing&&document.queryCommandState(b.dataset.cmd))});
@@ -779,8 +791,8 @@ tb.addEventListener('click',e=>{
   if(b.dataset.cmd){document.execCommand(b.dataset.cmd);placeTb();return}
   if(b.dataset.link){ // the link MARK: wraps the selected run in <a href>, exactly as B wraps it in <b>. Empty field = unlink.
     const t0=canvas.querySelector('.el[contenteditable="true"]'),sr0=getSelection();
-    if(!t0||sr0.isCollapsed||!t0.contains(sr0.anchorNode))return; // a link is a run, not a field — select the text first
-    const cur=sr0.anchorNode.parentElement&&sr0.anchorNode.parentElement.closest('a'),u=prompt('Link URL (http, https or mailto)',cur?cur.getAttribute('href'):'https://');
+    if(!t0||sr0.isCollapsed||!t0.contains(sr0.anchorNode)){linkSel();placeTb();return} // no text selected: the field is the selected ROWS' link
+    const cur=sr0.anchorNode.parentElement&&sr0.anchorNode.parentElement.closest('a'),u=prompt('Link (http, https, mailto or #slide) — empty removes it',cur?cur.getAttribute('href'):'https://');
     if(u==null)return;
     if(!u.trim())document.execCommand('unlink');
     else if(href(u))document.execCommand('createLink',false,href(u));
@@ -874,6 +886,7 @@ addEventListener('keydown',e=>{
   if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='s'){e.preventDefault();saveFile();return} // ⌘S never reaches the browser's Save Page As
   if((e.metaKey||e.ctrlKey)&&['b','i','u'].includes(e.key.toLowerCase())&&(e.target.isContentEditable||selEl())){ // ⌘B ⌘I ⌘U = the toolbar marks; on a selected row they take the whole row
     e.preventDefault();if(!e.target.isContentEditable)edit([...sel][0]);document.execCommand({b:'bold',i:'italic',u:'underline'}[e.key.toLowerCase()]);placeTb();return}
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'&&(e.target.isContentEditable||sel.size)){e.preventDefault();tb.querySelector('[data-link]').click();return} // ⌘K = the link button: a run while text is selected, else the selected rows
   if(e.target.isContentEditable){if(e.key==='Escape')e.target.blur();return}
   if(!sheet.hidden){if(sheetKey(e))e.preventDefault();return}
   if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){e.preventDefault();undo();return}
