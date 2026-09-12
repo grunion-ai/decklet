@@ -852,7 +852,11 @@ function sheetUi(on){sheet.hidden=!on;document.body.classList.toggle('sheet',on)
 function sheetOpen(){commitEdit();sel.clear();gsel=new Set([i]);ganchor=i;sheetUi(true);sheetRender();tb.hidden=true}
 function sheetClose(){sheetUi(false);render()}
 $('sheet-back').onclick=sheetClose; // ← Back: closes to the CURRENT slide (i untouched); Esc / dblclick-a-cell unchanged
+// #sheet (fixed, overflow:auto) is the scroller, not the window: emptying the grid collapses its scroll height and the browser
+// clamps scrollTop to 0, so every action snapped the sheet to the top. Keep the offset across the rebuild; then the acted-on
+// slide (i) comes into view only if it is off screen (block:'nearest' is a no-op for a visible cell).
 function sheetRender(){
+  const top=sheet.scrollTop;
   grid.innerHTML='';
   deck.slides.forEach((s,n)=>{
     const c=document.createElement('div');c.className='cell'+(gsel.has(n)?' sel':'');c.dataset.n=n;
@@ -861,6 +865,8 @@ function sheetRender(){
     c.append(cv,lb);grid.appendChild(c);
     cv.style.transform=`scale(${(c.clientWidth/W).toFixed(4)})`;
   });
+  sheet.scrollTop=top;
+  const c=grid.children[i];if(c)c.scrollIntoView({block:'nearest'});
 }
 grid.addEventListener('mousedown',e=>{
   const c=e.target.closest('.cell');if(!c)return;e.preventDefault();const n=+c.dataset.n; // preventDefault: thumbnails are renders, never text — no native selection/focus on press
