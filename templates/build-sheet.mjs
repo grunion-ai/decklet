@@ -5,6 +5,9 @@
 // the source line — kind · id / template · id / layout · id — and the engine's page counter takes the corner; only the two
 // full-bleed image slides (hero, split — the corner is inside the photo) hide the foot.
 // A template's own sample rows never enter the band (y ≥ 496); test/library.test.mjs asserts the set of band rows is the same on every slide.
+// A closing Styles section repeats six of the templates under the five kits in examples/styles: a style is deck-wide, so
+// each slide wears its kit through prefixed tokens (var(--warm-accent)) and a backdrop row, the diagram-showcase pattern; its foot
+// line is `style · <kit> · <template>`.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -133,13 +136,51 @@ const fill = (name) => {
   return els;
 };
 
+// ── the styles section: six slides × five kits. The engine file supplies the neutral scale the sheet is built on.
+const TPL = fs.readFileSync(path.join(dir, '..', 'template.html'), 'utf8');
+const NEUTRAL_STYLES = JSON.parse(TPL.match(/\/\*DECK\*\/([\s\S]*?)\/\*\/DECK\*\//)[1]).styles, NEUTRAL = NEUTRAL_STYLES.roles;
+const NEUTRAL_TOKENS = Object.fromEntries(TPL.match(/\/\*TOKENS\*\/(.*?)\/\*\/TOKENS\*\//)[1].split(';').map(t => t.replace(/^--/, '').split(':')));
+export const KITS = ['warm', 'dark', 'graphite-amber', 'navy-blue', 'display'];   // examples/styles/<name>/style.json, in sheet order
+const BRAND = { warm: 'Hearthline', dark: 'Nightjar', 'graphite-amber': 'Kiln & Co', 'navy-blue': 'Harbourmark', display: 'Orbita' };   // fictional; index notes only
+export const STYLE_SLIDES = ['cover-hero', 'statement', 'benchmark-table', 'chart-column', 'process-flow-4', 'closing-cta'];
+const kits = KITS.map(name => ({ name, ...JSON.parse(fs.readFileSync(path.join(dir, '..', 'examples/styles', name, 'style.json'), 'utf8')) }));
+const PREFIXED = ['fg', 'muted', 'accent', 'card', 'box', 'line'];   // the tokens a slide's rows can name; bg and sel are chrome
+const TOK = /var\(--(fg|muted|accent|card|box|line)\)/g;
+// a template's rows, wearing one kit: every token it names becomes the kit's prefixed twin, every text row takes its role's
+// colour from the kit (the role itself stays the sheet's — a style is deck-wide), plus the kit's weight, and its case when the
+// kit cut that role at the sheet's size; a tile or box that relied on the CSS defaults is painted explicitly so it re-themes too.
+const wear = (els, kit, layout) => {
+  const pre = kit.name, tok = t => `var(--${pre}-${t})`, map = v => typeof v === 'string' ? v.replace(TOK, `var(--${pre}-$1)`) : v;
+  const roleOf = r => r.role || (r.slot && layout && LIBRARY[layout].slots[r.slot] && LIBRARY[layout].slots[r.slot].role);
+  return els.map(r => {
+    const o = { ...r };
+    for (const k of ['bg', 'bd', 'bt', 'br', 'bb', 'bl', 'color', 'html']) if (o[k] != null) o[k] = map(o[k]);
+    const role = roleOf(o), t = role && kit.roles[role], n = role && NEUTRAL[role];
+    if (t && (o.text != null || o.html != null)) {
+      if (o.color == null) o.color = map(t.color);
+      if (o.weight == null && t.weight !== n.weight) o.weight = t.weight;
+      // case travels with the size it was cut for: graphite-amber's caps Title is 56px, and at the sheet's 64 it wraps into the body
+      if (o.tt == null && t.size === n.size && (t.tt || 'none') !== (n.tt || 'none')) o.tt = t.tt || 'none';
+    }
+    if (o.tile && o.bg == null) { o.bg = tok('card'); if (o.bd == null) o.bd = `1px solid ${tok('line')}`; }
+    if (o.box && o.bg == null) { o.bg = tok('box'); if (o.bd == null) o.bd = `1.5px solid ${tok('accent')}`; }
+    return o;
+  });
+};
+// a styled slide: the backdrop first, the template's rows wearing the kit, then the L4 foot line — `style · warm · cover-hero`,
+// in the kit's muted ink (the one paint the band may take), never geometry
+const sslide = (t, kit) => ({ name: `style-${kit.name}-${t.id}`, layout: t.layout || undefined,
+  els: [{ x: 0, y: 0, w: 960, h: 540, bg: `var(--${kit.name}-card)`, over: 1 },   // the slide wears the kit's ground
+    ...wear(scale(t.els, 1), kit, t.layout), { override: 'foot', text: `style · ${kit.name} · ${t.id}`, color: `var(--${kit.name}-muted)` }] });
+const STYLES = { id: 'styles', name: 'Styles', note: 'The same six slides under the five kits in examples/styles — a palette per slide through prefixed tokens, the kit\'s weight and case per row. The type scale is deck-wide: build with --style to see a kit\'s faces.' };
+
 // ── the deck
 const FULL_BLEED = ['image-hero-overlay', 'image-split'];   // the photo owns the corner: no foot line; the engine's pin stands in for the counter
 // the foot line may take the ONE paint a slide's ground forces on it (cover-split's accent panel owns the left foot, so the line wears
 // the panel's own label colour); geometry never — the counter stays where the master puts it
 const FOOT_PAINT = { 'cover-split': { color: 'var(--card)', op: 0.7 } };
 const foot = (source, id) => ({ override: 'foot', text: `${source} · ${id}`, ...(FOOT_PAINT[id] || {}) });
-const divider = (k, i) => ({ name: `kind-${k.id}`, layout: 'title', els: [{ slot: 'supertitle', text: `${String(i + 1).padStart(2, '0')} · ${k.templates.length + k.layouts.length} slides` }, { slot: 'title', text: k.name }, { x: 60, y: 400, w: 700, role: 'Body', color: 'var(--muted)', text: k.note }, foot('kind', k.id)] });
+const divider = (k, i, n = k.templates.length + k.layouts.length) => ({ name: `kind-${k.id}`, layout: 'title', els: [{ slot: 'supertitle', text: `${String(i + 1).padStart(2, '0')} · ${n} slides` }, { slot: 'title', text: k.name }, { x: 60, y: 400, w: 700, role: 'Body', color: 'var(--muted)', text: k.note }, foot('kind', k.id)] });
 const tslide = (t) => ({ name: t.id, layout: t.layout || undefined, hide: FULL_BLEED.includes(t.id) ? ['foot'] : undefined, els: [...scale(bind(t), 1), ...(FULL_BLEED.includes(t.id) ? [] : [foot('template', t.id)])] });
 const lslide = (n) => ({ name: `layout-${n}`, layout: n, hide: FULL_BLEED.includes(n) ? ['foot'] : undefined, els: [...fill(n), ...(FULL_BLEED.includes(n) ? [] : [foot('layout', n)])] });
 const index = [];
@@ -152,6 +193,14 @@ for (const [i, k] of KINDS.entries()) {
   for (const t of ts) { slides.push(tslide(t)); index.push({ kind: k.id, source: 'template', id: t.id, name: t.name, tier: t.tier, cat: t.cat, note: t.note }); }
   for (const n of ls) { slides.push(lslide(n)); index.push({ kind: k.id, source: 'layout', id: n, name: `Layout — ${n}`, tier: 'library', cat: LIBRARY[n].group, note: LIBRARY[n].use }); }
 }
+if (!only) {
+  slides.push(divider(STYLES, KINDS.length, kits.length * STYLE_SLIDES.length));
+  for (const kit of kits) for (const id of STYLE_SLIDES) {
+    const t = TEMPLATES.find(x => x.id === id);
+    slides.push(sslide(t, kit));
+    index.push({ kind: 'styles', source: 'style', style: kit.name, id, name: `${t.name} — ${kit.name}`, tier: t.tier, cat: kit.name, note: `${BRAND[kit.name]} · examples/styles/${kit.name}/style.json` });
+  }
+}
 const model = {
   title: 'decklet slide library',
   w: 960, h: 540,
@@ -163,4 +212,8 @@ const model = {
 };
 fs.writeFileSync(path.join(dir, 'candidates.model.json'), JSON.stringify(model, null, 1));
 fs.writeFileSync(path.join(dir, 'candidates.index.json'), JSON.stringify(index, null, 1));
-console.log(`${index.length} library slides (${index.filter(r => r.source === 'template').length} templates + ${index.filter(r => r.source === 'layout').length} layouts) in ${KINDS.length} kinds → templates/candidates.model.json`);
+// the sheet's style: the neutral tokens the deck is built on, then every kit's tokens under its prefix (create --style)
+const tokens = { ...NEUTRAL_TOKENS };
+for (const kit of kits) for (const t of PREFIXED) tokens[`${kit.name}-${t}`] = kit.tokens[t];
+fs.writeFileSync(path.join(dir, 'candidates.style.json'), JSON.stringify({ tokens, pad: NEUTRAL_STYLES.pad }, null, 1));   // pad too: a style's pad replaces the template's
+console.log(`${index.length} library slides (${index.filter(r => r.source === 'template').length} templates + ${index.filter(r => r.source === 'layout').length} layouts + ${index.filter(r => r.source === 'style').length} styled) in ${KINDS.length + (only ? 0 : 1)} kinds → templates/candidates.model.json`);
