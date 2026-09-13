@@ -130,6 +130,7 @@ A row is text by default; `box`, `tile`, `bar`, `line`, `donut`, `svg`, `img` ar
 | `document-letter` / `document-a4` | experimental | page = canvas, print zoom 1; text does not flow across pages |
 | `slides-4x3` · `story` 9:16 · `document-letter-landscape` · `document-a4-landscape` · `poster-a3` | experimental | sizing, editing, PDF work; **library layouts and templates are cut for 16:9 and stretch here** — `validate` warns per slide; draw free rows until aspect-aware composition (ROADMAP D2) |
 | drag / multi-select / resize / undo | supported | undo history persisted per deck; connectors get point nibs |
+| save button (state at a glance) | supported | one Lucide save glyph: calm saved · amber + count not in the file yet · red + ! nothing persists · pulse while writing; a click writes the file, or downloads a copy where the browser blocks storage |
 | autosave · edit log · write-back | supported | localStorage → IndexedDB → memory; live across windows of one browser; in-file `/*LOG*/`; the linked file rewrites itself (Chrome/Edge), `create --from` migrates. No version history in the file since 0.9.0 (weave) |
 | inline text editing + B/I/U/S + colour runs | supported | stored as `html` on the row |
 | roles · slots · master layer · footer counter | supported | see SKILL.md |

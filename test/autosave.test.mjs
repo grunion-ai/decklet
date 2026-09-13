@@ -29,10 +29,10 @@ const settled = async p => { await p.waitForFunction(() => document.getElementBy
 const until = (p, fn, ms = 2000) => p.waitForFunction(fn, null, {timeout: ms});
 
 // ── static: the shape of the file ──
-test('0.9.0: no version history in the file — no VERSIONS marker, no history control; the autosave dot is its own HUD button', () => {
+test('0.9.0: no version history in the file — no VERSIONS marker, no history control; the save button is its own HUD button', () => {
   assert.ok(!tpl.includes('/*VERSIONS*/'), 'the VERSIONS marker is gone');
   assert.ok(!/id="vers"|#versmenu|versRender|function pin\(|function restore\(/.test(tpl), 'no history popover, pin or restore');
-  assert.match(tpl, /<button id="autosave" data-state="ok" data-tip="[^"]+" aria-label="[^"]+"><i aria-hidden="true"><\/i><\/button>/, 'the dot is a HUD button wearing one dot');
+  assert.match(tpl, /<button id="autosave" class="mi mi-save" data-ms="\d+" data-state="ok" data-tip="[^"]+" aria-label="[^"]+"><svg [^]*?<\/svg><span id="savebad" role="status" hidden><\/span><\/button>/, 'save is a HUD button wearing the save glyph and its state badge');
   assert.ok(tpl.indexOf('id="autosave"') < tpl.indexOf('id="addbtn"') && tpl.indexOf('class="spacer"') < tpl.indexOf('id="autosave"'), 'save state leads the right-hand cluster');
   assert.match(tpl, /\$\('autosave'\)\.onclick=saveFile/, 'a tap on the dot is the ⌘S door (a phone has no ⌘)');
   assert.doesNotMatch(tpl, /pin\('⌘S'\)/, '⌘S pins nothing');
@@ -124,7 +124,7 @@ live('storage tier 3 (webkit): nothing persists (Safari on file://) — red at l
   });
   const p = watch(await ctx.newPage()); await p.goto(pathToFileURL(f).href);
   assert.equal(await settled(p), 'bad', 'red: nothing persists');
-  assert.deepEqual(await p.evaluate(() => [TIER, document.body.classList.contains('nostore'), getComputedStyle($('savecopy')).display !== 'none']), ['mem', true, true]);
+  assert.deepEqual(await p.evaluate(() => [TIER, document.body.classList.contains('nostore'), !$('savebad').hidden]), ['mem', true, true], 'the save button wears its red ! — the copy door is that button');
   assert.match(await p.getAttribute('#autosave', 'aria-label'), /blocks storage for local files/, 'the full sentence names the cause and the way out');
   await p.evaluate(() => { snap(); slide().els[1].x = 7; save(); nav(1); nav(-1); });
   assert.equal(await p.evaluate(() => slide().els[1].x), 7, 'edits still hold in memory for the session');

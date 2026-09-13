@@ -380,6 +380,10 @@ L10 shows each kit's palette and weights, but a decklet style is deck-wide (role
 | L11.1 | S | A per-slide `styleRef` (or a slot-level role override) the engine honours for `font` and `lh` only, so a Styles slide can wear its kit's family without a second deck. Parity and the gap gate measure with the override's `cw`. |
 | L11.2 | XS | The Styles section binds each kit's family through it; the montage shows Georgia, Helvetica Neue, Palatino, Avenir Next side by side. |
 
+### L12. One save door, and an icon that reads · Done (0.11.0)
+
+Filed 2026-09-13 from Kyle's chair on the 0.9.0 build. "Save a copy" was a second button that `#hud button` (1,0,1) beat `#savecopy{display:none}` (1,0,0) into showing in every browser, telling browsers that persist fine that they do not; it is folded into the save button, whose click already falls to `saveCopy()` when there is no file handle. The save indicator itself was a 4×9px dot among 16px icons: it is now the Lucide save glyph at the sibling footprint, state in colour plus a corner badge (calm · amber with the unsynced count · red with a !) and the write pulse kept.
+
 
 ## Usability
 

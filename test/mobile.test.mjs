@@ -63,7 +63,7 @@ live('iPhone 14 (webkit): file:// with storage refused — red at load, Save a c
   await ctx.addInitScript(() => { Object.defineProperty(window, 'localStorage', {get() { throw new Error('blocked'); }}); Object.defineProperty(window, 'indexedDB', {get() { throw new Error('blocked'); }}); });
   const p = watch(await ctx.newPage()); await p.goto(pathToFileURL(f).href);
   assert.equal(await settled(p), 'bad');
-  assert.deepEqual(await p.evaluate(() => [document.body.classList.contains('nostore'), getComputedStyle($('savecopy')).display !== 'none']), [true, true], 'the honest state: red dot, Save a copy in the HUD');
+  assert.deepEqual(await p.evaluate(() => [document.body.classList.contains('nostore'), !$('savebad').hidden]), [true, true], 'the honest state: the save button red and marked, and it is the copy door');
   const [x, y] = await center(p, '#addbtn'); await p.touchscreen.tap(x, y); await p.waitForTimeout(80);
   const [x2, y2] = await center(p, '#sadd'); await p.touchscreen.tap(x2, y2); await p.waitForTimeout(80);
   assert.equal(await p.evaluate(() => deck.slides.length), 5, 'the edit holds in memory');
