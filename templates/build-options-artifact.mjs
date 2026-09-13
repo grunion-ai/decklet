@@ -16,7 +16,7 @@ const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 const stamp = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
 
 const FAMS = [
-  ['Logo', 'L', 'Logo and icon placement', 'Ten placements, six fictional marks drawn from primitives. Every mark row carries `placeholder`, which validate turns into an error in any deck that has not set `draft` — a sample sheet may show these, a real deck may not.'],
+  ['Logo', 'L', 'Logo and icon placement', 'Thirteen placements, six fictional marks drawn from primitives. Every mark row carries `placeholder`, which validate turns into an error in any deck that has not set `draft` — a sample sheet may show these, a real deck may not.'],
 ];
 const cards = (fam, letter) => idx.filter(o => o.fam === fam).map((o, i) => `
   <figure class="frame">
@@ -98,10 +98,10 @@ em.none{color:var(--muted)}
 
 <section class="verdict">
  <dl class="grid">
-  <div class="cell"><dt>Decision</dt><dd>Landed. Sankey dropped, 33 templates added, library at 103.</dd></div>
+  <div class="cell"><dt>Decision</dt><dd>Three fixes in, three top-right placements added. Library at 109.</dd></div>
   <div class="cell"><dt>Why</dt><dd>Chrome, inset, the 2×2 and logo placement were the thin spots.</dd></div>
-  <div class="cell"><dt>Risk</dt><dd>A stand-in mark shipping — now a validate error, not a habit.</dd></div>
-  <div class="cell"><dt>Next</dt><dd>Open the density cut you need; tell me what still reads thin.</dd></div>
+  <div class="cell"><dt>Risk</dt><dd>A stand-in mark shipping — still a validate error, not a habit.</dd></div>
+  <div class="cell"><dt>Next</dt><dd>Check L2, L5 and the three top-right cards; say what still reads wrong.</dd></div>
  </dl>
 </section>
 
@@ -122,18 +122,16 @@ em.none{color:var(--muted)}
 <details><summary><span class="num">1</span><h2>Linked tracker items</h2><span class="sub">none</span></summary>
 <div class="sec"><p><em class="none">No tracker item drives this round — it came out of the library review in session. Filing one is a word away.</em></p></div></details>
 
-<details open><summary><span class="num">2</span><h2>What landed</h2><span class="sub">103 templates</span></summary>
+<details open><summary><span class="num">2</span><h2>What changed this round</h2><span class="sub">3 fixes, 3 additions</span></summary>
 <div class="sec">
 <div class="scroll"><table>
-<thead><tr><th>Family</th><th>Count</th><th>Where it went</th></tr></thead>
+<thead><tr><th>Report</th><th>Cause</th><th>Fix</th></tr></thead>
 <tbody>
-<tr><td>Sankey / flow</td><td>0</td><td>Dropped outright — the five stand-ins and <code>chart-flow-split</code> with them</td></tr>
-<tr><td>Chrome</td><td>8</td><td><code>lib/templates/cat-chrome.mjs</code> · kind <em>Chrome</em></td></tr>
-<tr><td>Inset &amp; density</td><td>6</td><td><code>lib/templates/cat-density.mjs</code> · kind <em>Inset &amp; density</em></td></tr>
-<tr><td>2×2 family</td><td>9</td><td><code>lib/templates/cat-quad.mjs</code> · kind <em>Concept</em></td></tr>
-<tr><td>Logo &amp; icons</td><td>10</td><td><code>lib/templates/cat-logo.mjs</code> · kind <em>Logo &amp; icons</em></td></tr>
+<tr><td>L5 foot text unaware of the rail</td><td>The engine pinned a left-anchored footer to the margin, so the source line ran under the 64px rail whatever the template asked for</td><td>A left-anchored footer now starts at <code>max(margin, x)</code>. The rail declares <code>foot: {x: 110}</code> and the line clears it</td></tr>
+<tr><td>L2 mark sat above the true footer</td><td>It had been pushed out of the band to avoid the sheet's own source line</td><td>The mark is back in the band at x 60; the source line insets to 200 and the counter keeps its corner</td></tr>
+<tr><td>No top-right placement</td><td>The family only offered top-left, foot, rail, cover and watermark</td><td>Three added: mark alone, lockup under a hairline, and a filled badge that survives over a photograph</td></tr>
 </tbody></table></div>
-<p class="lede" style="margin-top:16px">Two cuts of the pack now build beside the full sheet, each under three orthogonal kits (dark, warm, display) rather than five: <code>library-speaker.html</code> at 57 slides, <code>library-reading.html</code> at 122, against 168 for <code>library.html</code>. <code>node templates/build-sheet.mjs --density speaker</code> cuts one.</p>
+<p class="lede" style="margin-top:16px">The master footer still sits on the margin and every other slide is untouched — the inset is opt-in, and the sheet's band contract now fails any slide that puts chrome in the band <em>without</em> declaring it. 109 templates; <code>library.html</code> 168 slides, <code>library-speaker.html</code> 57, <code>library-reading.html</code> 122.</p>
 </div></details>
 
 ${FAMS.map(([fam, letter, title, lede], i) => `
@@ -150,16 +148,16 @@ ${FAMS.map(([fam, letter, title, lede], i) => `
 <thead><tr><th>Gate</th><th>Method</th><th>Pass criteria</th><th>Result</th></tr></thead>
 <tbody>
 <tr><td>Contract</td><td><code>validate --style</code></td><td>0 errors</td><td><span class="pill p-ok">0 errors</span></td></tr>
-<tr><td>Suite</td><td><code>npm test</code></td><td>green</td><td><span class="pill p-ok">287 / 288</span></td></tr>
+<tr><td>Suite</td><td><code>npm test</code></td><td>green</td><td><span class="pill p-ok">302 / 303</span></td></tr>
 <tr><td>Gap gate</td><td><code>validate</code> occlusion + <code>styles.gap</code></td><td>nothing within 4px, no text under ink</td><td><span class="pill p-ok">pass</span></td></tr>
 <tr><td>Layout parity</td><td><code>verify</code> (Chromium)</td><td>no overflow, no collision, counter box identical</td><td><span class="pill p-ok">168 + 57 + 122</span></td></tr>
 <tr><td>Spelling</td><td><code>verify</code> spell</td><td>0 unknown words</td><td><span class="pill p-ok">pass</span></td></tr>
 </tbody></table></div>
-<p class="lede" style="margin-top:14px">The one red is a pre-existing residue hit in <code>CHANGELOG.md</code> from a parallel session, untouched here. Shipped as <code>d23fd15</code> on <code>main</code>.</p>
+<p class="lede" style="margin-top:14px">The one red is a pre-existing residue hit in <code>CHANGELOG.md</code> from a parallel session, untouched here. Shipped as <code>f6f3b41</code> on <code>main</code>.</p>
 </div></details>
 
 <details><summary><span class="num">9</span><h2>What is still open</h2><span class="sub">marks</span></summary>
-<div class="sec"><p class="lede">The marks above are the only family you have not seen rendered. Say which placements stay, and whether the six stand-in marks should keep their invented names or go abstract.</p></div></details>
+<div class="sec"><p class="lede">L2, L5 and L8–L10 are the cards to check first. Still open from last round: whether the six stand-in marks keep their invented names or go abstract.</p></div></details>
 
 </div>`;
 const out = path.join(dir, 'options-artifact.html');
