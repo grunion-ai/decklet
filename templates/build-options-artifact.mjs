@@ -5,20 +5,18 @@ import path from 'node:path';
 import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 const dir = path.dirname(fileURLToPath(import.meta.url));
-const idx = JSON.parse(fs.readFileSync(path.join(dir, 'options.index.json'), 'utf8'));
-const shots = fs.readdirSync(path.join(dir, 'opt-thumbs')).filter(f => f.endsWith('.webp'));
+const idx = JSON.parse(fs.readFileSync(path.join(dir, 'landed.index.json'), 'utf8'));
+const THUMBS = process.env.THUMBS || path.join(dir, 'opt-thumbs');
+const shots = fs.readdirSync(THUMBS).filter(f => f.endsWith('.webp'));
 const find = id => shots.find(f => f.replace(/^\d+-/, '').replace(/\.webp$/, '') === id);
-const uri = id => { const f = find(id); return f ? 'data:image/webp;base64,' + fs.readFileSync(path.join(dir, 'opt-thumbs', f)).toString('base64') : ''; };
+const uri = id => { const f = find(id); return f ? 'data:image/webp;base64,' + fs.readFileSync(path.join(THUMBS, f)).toString('base64') : ''; };
 const root = path.resolve(dir, '..');
 const sh = c => { try { return execSync(c, { cwd: root, encoding: 'utf8' }).trim(); } catch { return 'n/a'; } };
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 const stamp = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
 
 const FAMS = [
-  ['Flow', 'F', 'Sankey and flow', 'Five forms that survive the gate. A sixth — true curved ribbons — does not, and needs an engine primitive.'],
-  ['Chrome', 'C', 'Header and footer', 'Eight chrome kits. The source line moves freely; the page counter’s corner is fixed by the engine, which ruled out two ideas.'],
-  ['Padding', 'P', 'Inset and density', 'Four insets and the same slide at both densities, so the difference is visible rather than described.'],
-  ['Quad', 'Q', '2×2 and its relatives', 'Ten uses of one framework — position, portfolio, effort, risk, stakeholders, movement, recommendation, concept, nine-box, and the document version.'],
+  ['Logo', 'L', 'Logo and icon placement', 'Ten placements, six fictional marks drawn from primitives. Every mark row carries `placeholder`, which validate turns into an error in any deck that has not set `draft` — a sample sheet may show these, a real deck may not.'],
 ];
 const cards = (fam, letter) => idx.filter(o => o.fam === fam).map((o, i) => `
   <figure class="frame">
@@ -26,7 +24,7 @@ const cards = (fam, letter) => idx.filter(o => o.fam === fam).map((o, i) => `
     <figcaption><p class="code">${letter}${i + 1}</p><h4>${esc(o.name)}</h4><p class="note">${esc(o.note)}</p><p class="id">${esc(o.id)}</p></figcaption>
   </figure>`).join('');
 
-const html = `<title>Decklet Option Sheet</title>
+const html = `<title>Decklet Marks and Placement</title>
 <meta name="kind" content="design-review"><meta name="generated-at" content="${stamp}">
 <meta name="repo" content="grunion-ai/decklet"><meta name="branch" content="${sh('git rev-parse --abbrev-ref HEAD')}">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -100,15 +98,15 @@ em.none{color:var(--muted)}
 
 <section class="verdict">
  <dl class="grid">
-  <div class="cell"><dt>Decision</dt><dd>Pick from 29 rendered options across four families.</dd></div>
-  <div class="cell"><dt>Why</dt><dd>Sankey, chrome, padding and the 2×2 were the thin spots in the 67-template library.</dd></div>
-  <div class="cell"><dt>Risk</dt><dd>Curved ribbons need an engine fill primitive; the counter corner is fixed.</dd></div>
-  <div class="cell"><dt>Next</dt><dd>Name the codes to keep; they land as per-density decks.</dd></div>
+  <div class="cell"><dt>Decision</dt><dd>Landed. Sankey dropped, 33 templates added, library at 103.</dd></div>
+  <div class="cell"><dt>Why</dt><dd>Chrome, inset, the 2×2 and logo placement were the thin spots.</dd></div>
+  <div class="cell"><dt>Risk</dt><dd>A stand-in mark shipping — now a validate error, not a habit.</dd></div>
+  <div class="cell"><dt>Next</dt><dd>Open the density cut you need; tell me what still reads thin.</dd></div>
  </dl>
 </section>
 
 <header class="plan-header">
- <div class="bar"><span class="badge">DESIGN-REVIEW</span><h1>Decklet option sheet</h1><time>${stamp}</time></div>
+ <div class="bar"><span class="badge">DESIGN-REVIEW</span><h1>Decklet marks and placement</h1><time>${stamp}</time></div>
  <dl class="meta">
   <div><dt>Repo</dt><dd>grunion-ai/decklet</dd></div>
   <div><dt>Branch</dt><dd>${sh('git rev-parse --abbrev-ref HEAD')}</dd></div>
@@ -124,52 +122,44 @@ em.none{color:var(--muted)}
 <details><summary><span class="num">1</span><h2>Linked tracker items</h2><span class="sub">none</span></summary>
 <div class="sec"><p><em class="none">No tracker item drives this round — it came out of the library review in session. Filing one is a word away.</em></p></div></details>
 
-<details open><summary><span class="num">2</span><h2>Key decisions &amp; trade-offs</h2><span class="sub">3 forks</span></summary>
+<details open><summary><span class="num">2</span><h2>What landed</h2><span class="sub">103 templates</span></summary>
 <div class="sec">
-<figure class="dec">
-<div class="scroll">
-
-\`\`\`mermaid
-flowchart LR
-  A["Thin spots in the library"] --> B{"Sankey"}
-  A --> C{"Chrome"}
-  A --> D{"2x2"}
-  B --> B1["Curved ribbon<br/>engine primitive"]
-  B --> B2["Five gate-safe forms<br/>CHOSEN"]
-  C --> C1["Move the counter<br/>rejected by the engine"]
-  C --> C2["Move the source line<br/>CHOSEN"]
-  D --> D1["One canonical 2x2"]
-  D --> D2["Ten uses of the frame<br/>CHOSEN"]
-\`\`\`
-
-</div>
-<figcaption>Two forks were settled by the engine rather than by taste: a thick <code>curve</code> paints a canvas-sized box and occludes every text row, and the page counter’s corner is asserted identical on every slide. The third is yours.</figcaption>
-</figure>
+<div class="scroll"><table>
+<thead><tr><th>Family</th><th>Count</th><th>Where it went</th></tr></thead>
+<tbody>
+<tr><td>Sankey / flow</td><td>0</td><td>Dropped outright — the five stand-ins and <code>chart-flow-split</code> with them</td></tr>
+<tr><td>Chrome</td><td>8</td><td><code>lib/templates/cat-chrome.mjs</code> · kind <em>Chrome</em></td></tr>
+<tr><td>Inset &amp; density</td><td>6</td><td><code>lib/templates/cat-density.mjs</code> · kind <em>Inset &amp; density</em></td></tr>
+<tr><td>2×2 family</td><td>9</td><td><code>lib/templates/cat-quad.mjs</code> · kind <em>Concept</em></td></tr>
+<tr><td>Logo &amp; icons</td><td>10</td><td><code>lib/templates/cat-logo.mjs</code> · kind <em>Logo &amp; icons</em></td></tr>
+</tbody></table></div>
+<p class="lede" style="margin-top:16px">Two cuts of the pack now build beside the full sheet, each under three orthogonal kits (dark, warm, display) rather than five: <code>library-speaker.html</code> at 57 slides, <code>library-reading.html</code> at 122, against 168 for <code>library.html</code>. <code>node templates/build-sheet.mjs --density speaker</code> cuts one.</p>
 </div></details>
 
 ${FAMS.map(([fam, letter, title, lede], i) => `
 <details open><summary><span class="num">${i + 3}</span><h2>${esc(title)}</h2><span class="sub">${idx.filter(o => o.fam === fam).length} options · ${letter}1–${letter}${idx.filter(o => o.fam === fam).length}</span></summary>
 <div class="sec"><p class="lede">${esc(lede)}</p><div class="sheet">${cards(fam, letter)}</div></div></details>`).join('')}
 
-<details><summary><span class="num">7</span><h2>The one engine gap</h2><span class="sub">curved ribbons</span></summary>
+<details open><summary><span class="num">7</span><h2>The guard on a stand-in mark</h2><span class="sub">validate</span></summary>
 <div class="sec">
-<div class="gap"><b>A true Sankey ribbon is not a template problem.</b> Drawing one as a thick <code>curve</code> row makes the engine size that row’s SVG to <code>-400,-253 1865×1074</code> — far outside the canvas — so <code>verify</code> reports the ribbon outside the canvas and every text row on the slide occluded beneath it. F1–F5 are what the current primitives can honestly draw. A real ribbon wants a <code>ribbon</code> or area-fill row that takes two edge profiles and paints between them. Say the word and it becomes a decklet issue rather than a template.</div>
+<div class="gap"><b>A placeholder logo is an error, not a convention.</b> Every stand-in row carries <code>placeholder: 'northwind'</code>. <code>validate</code> raises an error for each one in any deck, naming the row, so a sample mark cannot reach a client deck by being copied. A sheet that exists to show the marks sets <code>draft: 1</code> on the deck and gets one summary warning instead of thirty. The six marks — northwind, halcyon, meridian, castellan, oakline, brightmoor — are drawn from rects, rings and rules, so nothing is embedded and no real logo can be mistaken for one.</div>
 </div></details>
 
 <details><summary><span class="num">8</span><h2>Verification</h2><span class="sub">all green</span></summary>
 <div class="sec"><div class="scroll"><table>
 <thead><tr><th>Gate</th><th>Method</th><th>Pass criteria</th><th>Result</th></tr></thead>
 <tbody>
-<tr><td>Contract</td><td><code>validate --style warm --strict</code></td><td>0 errors, 0 warnings</td><td><span class="pill p-ok">0 / 0</span></td></tr>
+<tr><td>Contract</td><td><code>validate --style</code></td><td>0 errors</td><td><span class="pill p-ok">0 errors</span></td></tr>
+<tr><td>Suite</td><td><code>npm test</code></td><td>green</td><td><span class="pill p-ok">287 / 288</span></td></tr>
 <tr><td>Gap gate</td><td><code>validate</code> occlusion + <code>styles.gap</code></td><td>nothing within 4px, no text under ink</td><td><span class="pill p-ok">pass</span></td></tr>
-<tr><td>Layout parity</td><td><code>verify</code> (Chromium)</td><td>no overflow, no collision, counter box identical</td><td><span class="pill p-ok">33 / 33</span></td></tr>
+<tr><td>Layout parity</td><td><code>verify</code> (Chromium)</td><td>no overflow, no collision, counter box identical</td><td><span class="pill p-ok">168 + 57 + 122</span></td></tr>
 <tr><td>Spelling</td><td><code>verify</code> spell</td><td>0 unknown words</td><td><span class="pill p-ok">pass</span></td></tr>
 </tbody></table></div>
-<p class="lede" style="margin-top:14px">Deck: <code>templates/options.html</code>. Shots: <code>templates/opt-shots/</code>. Source: <code>templates/options-sankey-chrome.mjs</code>, <code>templates/options-pad-quad.mjs</code>.</p>
+<p class="lede" style="margin-top:14px">The one red is a pre-existing residue hit in <code>CHANGELOG.md</code> from a parallel session, untouched here. Shipped as <code>d23fd15</code> on <code>main</code>.</p>
 </div></details>
 
-<details><summary><span class="num">9</span><h2>How to answer</h2><span class="sub">codes</span></summary>
-<div class="sec"><p class="lede">Name the codes to keep — “F2 F6 C1 C2 C6 P2 P5 P6 Q3 Q4 Q7 Q10” reads fine. Anything you want re-cut rather than cut, say how. Survivors land in the library as one deck per density, each carrying three orthogonal style kits and every template and layout at that density.</p></div></details>
+<details><summary><span class="num">9</span><h2>What is still open</h2><span class="sub">marks</span></summary>
+<div class="sec"><p class="lede">The marks above are the only family you have not seen rendered. Say which placements stay, and whether the six stand-in marks should keep their invented names or go abstract.</p></div></details>
 
 </div>`;
 const out = path.join(dir, 'options-artifact.html');
