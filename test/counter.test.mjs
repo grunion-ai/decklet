@@ -8,7 +8,9 @@ import {pathToFileURL} from 'node:url';
 import {create} from '../bin/create.mjs';
 import {validate} from '../bin/validate.mjs';
 import {verify} from '../bin/verify.mjs';
+import {TEMPLATE} from '../lib/templates.mjs';
 let pw = null; try { pw = await import('playwright'); } catch {}
+const tpl = fs.readFileSync(new URL('../template.html', import.meta.url), 'utf8');
 const live = pw ? test : test.skip;
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'decklet-counter-'));
 const model = (extra = {}) => ({w: 816, h: 1056, title: 'counter', format: 'document-letter', ...extra, slides: [
@@ -146,4 +148,13 @@ live('U6: a counter off the margin fails parity even when every slide agrees', a
   const r = await verify(f, {out: path.join(tmp, 'u6-offmargin-out'), log: () => {}});
   assert.ok(r.errors.some(e => /layout parity failed/.test(e)), r.errors.join(' | '));
   assert.ok(r.parity.some(q => q.rows.some(x => x.n === 'counter' && /margin/.test(x.problems[0]))), JSON.stringify(r.parity));
+});
+
+// A left-anchored footer starts at max(margin, x). The master keeps the margin; a slide whose own chrome owns the left of
+// the band (a rail, a foot mark) overrides x to start past it — and the counter's corner never moves. ROADMAP U6.
+test('footer: an override x insets the source line, and leaves the counter alone', () => {
+  assert.match(tpl, /d\.style\.left=Math\.max\(MG\(\),r\.x\|\|0\)\+'px'/, 'left-anchored footer honours an explicit x');
+  const rail = TEMPLATE['logo-rail-mark'], mark = TEMPLATE['logo-foot-mark'];
+  for (const t of [rail, mark]) assert.ok(t.foot && t.foot.x > 60, t.id + ' declares the inset its own chrome needs');
+  assert.ok(rail.foot.x >= 64 + 24, 'the rail is 64 wide: the line clears it with a gutter');
 });

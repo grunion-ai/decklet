@@ -19,9 +19,9 @@ const read = f => fs.readFileSync(path.join(root, f), 'utf8');
 const v = m => validate(create(m).deck);   // validate what create() judges: the neutral roles filled in
 const deck = (slides, extra = {}) => ({w: 960, h: 540, title: 'tpl', ...extra, slides});
 
-test('templates: 106 ship, every id unique, every one names a tier, a category and a density', () => {
-  assert.equal(TEMPLATES.length, 106);
-  assert.equal(new Set(TEMPLATES.map(t => t.id)).size, 106);
+test('templates: 109 ship, every id unique, every one names a tier, a category and a density', () => {
+  assert.equal(TEMPLATES.length, 109);
+  assert.equal(new Set(TEMPLATES.map(t => t.id)).size, 109);
   for (const t of TEMPLATES) {
     assert.ok(['core', 'standard', 'fringe'].includes(t.tier), t.id + ' tier');
     assert.ok(t.cat && t.note, t.id + ' cat + note');

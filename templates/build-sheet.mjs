@@ -35,7 +35,7 @@ export const KINDS = [
   { id: 'chrome', name: 'Chrome', note: 'Where the header, the footer and the page counter sit.',
     templates: ['chrome-foot-band', 'chrome-hairline-foot', 'chrome-header-kicker', 'chrome-side-rail', 'chrome-tabs', 'chrome-dots', 'chrome-brand-bar', 'chrome-none'], layouts: [] },
   { id: 'mark', name: 'Logo & icons', note: 'Where a mark goes, and where an icon earns its place. Every mark here is a stand-in.',
-    templates: ['logo-corner-mark', 'logo-foot-mark', 'logo-cover-lockup', 'logo-co-brand', 'logo-rail-mark', 'logo-watermark', 'icon-three-up', 'icon-capability-grid', 'icon-bullets', 'logo-proof-wall'], layouts: [] },
+    templates: ['logo-corner-mark', 'logo-top-right-mark', 'logo-top-right-lockup', 'logo-top-right-badge', 'logo-foot-mark', 'logo-cover-lockup', 'logo-co-brand', 'logo-rail-mark', 'logo-watermark', 'icon-three-up', 'icon-capability-grid', 'icon-bullets', 'logo-proof-wall'], layouts: [] },
   { id: 'density', name: 'Inset & density', note: 'What the margin buys, and the same slide at both densities.',
     templates: ['pad-tight-40', 'pad-default-60', 'pad-generous-96', 'pad-asymmetric-rail', 'density-speaker', 'density-reading'], layouts: [] },
   { id: 'quote', name: 'Quote', note: 'Someone else\'s words at display size.', templates: ['quote-pull'], layouts: ['quote'] },
@@ -201,9 +201,11 @@ const FULL_BLEED = ['image-hero-overlay', 'image-split'];   // the photo owns th
 // the foot line may take the ONE paint a slide's ground forces on it (cover-split's accent panel owns the left foot, so the line wears
 // the panel's own label colour); geometry never — the counter stays where the master puts it
 const FOOT_PAINT = { 'cover-split': { color: 'var(--card)', op: 0.7 } };
-const foot = (source, id) => ({ override: 'foot', text: `${source} · ${id}`, ...(FOOT_PAINT[id] || {}) });
+// a template whose own chrome owns the left of the band (a rail, a foot mark) carries `foot: {x, w}`: the source line
+// starts clear of it. Geometry of the COUNTER is untouched — its corner is pinned to w − margin on every slide.
+const foot = (source, id, t) => ({ override: 'foot', text: `${source} · ${id}`, ...(t && t.foot ? t.foot : {}), ...(FOOT_PAINT[id] || {}) });
 const divider = (k, i, n = k.templates.length + k.layouts.length) => ({ name: `kind-${k.id}`, layout: 'title', els: [{ slot: 'supertitle', text: `${String(i + 1).padStart(2, '0')} · ${n} slides` }, { slot: 'title', text: k.name }, { x: 60, y: 400, w: 700, role: 'Body', color: 'var(--muted)', text: k.note }, foot('kind', k.id)] });
-const tslide = (t) => ({ name: t.id, layout: t.layout || undefined, hide: FULL_BLEED.includes(t.id) ? ['foot'] : undefined, els: [...scale(bind(t), 1), ...(FULL_BLEED.includes(t.id) ? [] : [foot('template', t.id)])] });
+const tslide = (t) => ({ name: t.id, layout: t.layout || undefined, hide: FULL_BLEED.includes(t.id) ? ['foot'] : undefined, els: [...scale(bind(t), 1), ...(FULL_BLEED.includes(t.id) ? [] : [foot('template', t.id, t)])] });
 const lslide = (n) => ({ name: `layout-${n}`, layout: n, hide: FULL_BLEED.includes(n) ? ['foot'] : undefined, els: [...fill(n), ...(FULL_BLEED.includes(n) ? [] : [foot('layout', n)])] });
 const index = [];
 const slides = [];

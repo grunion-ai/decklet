@@ -615,8 +615,10 @@ function drawEls(s,root,animate){
     // footer master: the counter is appended INSIDE this row; the row is anchored to the content edge (styles.margin) and grows inward.
     // A row that declares `right` IS right-anchored — reading x/w alone read `{right:60, w:'auto'}` (no x) as left-anchored and then
     // set BOTH edges, so a width:auto row stretched the canvas and its text (and the inline counter) sat at the left. ROADMAP U6.
+    // A left-anchored footer starts at max(margin, x): the master sits on the margin as always, and a slide whose own chrome
+    // owns the left of the band (a rail, a foot mark) overrides x to start past it. The counter's corner is untouched.
     if(r.footer){d.dataset.footer='1';d.style.whiteSpace='nowrap';d.style.width='auto';
-      if(r.right!=null||(r.x||0)+(typeof r.w==='number'?r.w:0)/2>W/2){d.style.left='auto';d.style.right=MG()+'px'}else{d.style.right='';d.style.left=MG()+'px'}}
+      if(r.right!=null||(r.x||0)+(typeof r.w==='number'?r.w:0)/2>W/2){d.style.left='auto';d.style.right=MG()+'px'}else{d.style.right='';d.style.left=Math.max(MG(),r.x||0)+'px'}}
     // line = one rotated div (no SVG layer); donut = one conic-gradient ring with a mask hole
     if(r.line){const x0=r.x||0,y0=r.y||0,dx=r.line[0]-x0,dy=r.line[1]-y0,len=Math.hypot(dx,dy),a=Math.atan2(dy,dx);
       const sw=r.h||3,c=r.bg||'var(--accent)',[as,ae]=AR(r),hd=HEAD(sw);
