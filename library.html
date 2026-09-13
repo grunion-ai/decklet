@@ -1116,11 +1116,11 @@ addEventListener('touchend',e=>{const s=touch;touch=null;if(!s||!present())retur
   if(Math.abs(dx)>=10||Math.abs(dy)>=10||Date.now()-s.t>=500||s.lk)return;
   if(c.clientY>innerHeight*11/12||pinned())document.body.classList.toggle('peek');else nav(s.x<innerWidth/5?-1:1)},{passive:true});
 $('fs').onclick=fs;
-// ⤓ PDF. Two engines, two routes. CHROMIUM honours a pixel @page, so the button goes through the browser's own print engine:
-// the deck's print pipeline (beforeprint → #print, one .pg per slide, HUD/wrap/toolbar hidden by @media print) with an injected
-// `@page{size:W H px}` + `zoom:1` — text stays text, fonts embed, every href is a /Link annotation, ~4× smaller than a raster;
-// the user picks "Save as PDF" in the dialog. afterprint removes the rule so a plain ⌘P is still the Letter paper path.
-// SAFARI ignores px @page sizes (Letter portrait always), so it keeps the in-file rasteriser below: each slide from its live DOM in
+// ⤓ PDF. The button writes the file itself, in every engine — it never opens the print dialog. A pixel `@page` is honoured only by
+// headless printToPDF's preferCSSPageSize: through the DIALOG, Chromium sized every page Letter and letterboxed the 16:9 slide
+// inside it (white bands top and bottom), and the dialog's own "Background graphics" checkbox decided whether the slide's colours
+// printed at all. bin/pdf.mjs keeps the vector route for agents — the same print pipeline, headless, one slide-sized page per
+// slide — and printPdf() below stays only as the fallback when rasterisation throws. The in-file rasteriser: each slide from its live DOM in
 // LAYERS — (a) the deck's <style> + the slide's XHTML inside an SVG foreignObject → <img> → canvas at 3×, with every img/svg row
 // kept as an invisible placeholder (layout intact, pixels deferred); (b) every img row drawn straight onto the canvas from a
 // decoded Image (await decode()), every inline svg row serialised ALONE into its own Image and drawn at the row's rect — in
@@ -1130,7 +1130,6 @@ $('fs').onclick=fs;
 // 6 MB (a photo) falls back to JPEG .92 for that page alone, and an engine without CompressionStream uses JPEG throughout.
 // One XObject drawn full-page on a W×H pt page (1 model px = 1 pt — real 16:9, no letterboxing). Fonts: awaits document.fonts.ready
 // (the deck makes no requests anyway). Falls back to print() if rasterisation throws or the canvas is tainted. The xref table is byte-exact.
-const CHROMIUM=!!navigator.userAgentData; // only Chromium engines implement UA client hints; WebKit and Gecko do not
 function printPdf(){commitEdit();const st=document.createElement('style');st.id='pdfpage';st.textContent=`@page{size:${W}px ${H}px;margin:0}#print .pg{zoom:1!important}`;document.head.appendChild(st);print()}
 addEventListener('afterprint',()=>{$('pdfpage')?.remove()});
 const deflate=async bytes=>{const cs=new CompressionStream('deflate');const w=cs.writable.getWriter();w.write(bytes);w.close();const out=new Uint8Array(await new Response(cs.readable).arrayBuffer());let s='';for(let i=0;i<out.length;i+=32768)s+=String.fromCharCode.apply(null,out.subarray(i,i+32768));return s};
@@ -1198,7 +1197,7 @@ async function exportPdf(){
   const x=out.length;out+=`xref\n0 ${obj.length+1}\n0000000000 65535 f \n`+off.map(o=>String(o).padStart(10,'0')+' 00000 n \n').join('')+`trailer\n<< /Size ${obj.length+1} /Root 1 0 R >>\nstartxref\n${x}\n%%EOF\n`;
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([Uint8Array.from(out,ch=>ch.charCodeAt(0))],{type:'application/pdf'}));a.download=document.title.replace(/[\/:*?"<>|]+/g,'-')+'.pdf';a.click();
 }
-$('pdf').onclick=()=>CHROMIUM?printPdf():exportPdf().catch(()=>print());
+$('pdf').onclick=()=>exportPdf().catch(()=>printPdf()); // the rasteriser in every engine; the dialog only if it throws
 // option C paint: every text node of every live row, each flagged word a Range in one Highlight. Off, presenting, or no
 // Highlight API (old engines) → nothing painted; the browser's own checker (the spellcheck attribute) is the second layer.
 // SPELL0 is {word:[suggestions]} from 0.10.0 and a plain array of words in a 0.7–0.9 deck: both read as one map here.
@@ -1312,7 +1311,7 @@ function bugProbe(cat){
   const env='viewport '+innerWidth+'×'+innerHeight+' · dpr '+devicePixelRatio+' · '+(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
   const P={looks:[['rows',els.length+' ('+n('text')+' text · '+n('box')+' box · '+n('connector')+' connector)'],['clipped',String(clipped)],['guides',SNAP?'on':'off']],
     respond:[['pointer',matchMedia('(pointer: coarse)').matches?'touch':'mouse'],['selection',sel.size+(sel.size===1?' row':' rows')],['autosave',a+' · '+unsynced+' edits not in the file'],['errors',errs]],
-    save:[['autosave',a],['file access',FSA?'yes':'no'],['store',TIER],['pending',unsynced+' edits not in the file'],['pdf route',CHROMIUM?'print':'raster'],['errors',errs]],
+    save:[['autosave',a],['file access',FSA?'yes':'no'],['store',TIER],['pending',unsynced+' edits not in the file'],['pdf route','raster'],['errors',errs]],
     crash:[['errors',errs],['uptime',Math.round(performance.now()/1000)+' s'],['drawn',drawn.length+' of '+els.length+' rows']]};
   return {env,probes:P[cat]}}
 const bugdlg=$('bugdlg'),bugdesc=$('bugdesc');

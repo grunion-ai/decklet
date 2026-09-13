@@ -243,14 +243,13 @@ for (const bn of ['chromium', 'webkit']) live(`the contact sheet keeps the untou
   assert.deepEqual(p.errs, []); } finally { await b.close(); }
 });
 
-// ROADMAP L2 — the WebKit rasteriser (Chromium takes the print dialog) used to run 89 serial foreignObject renders with
+// ROADMAP L2 — the in-file rasteriser (every engine takes it; see test/pdf.test.mjs) used to run 89 serial foreignObject renders with
 // nothing on screen but an aria-busy attribute that no CSS reads: the page looked frozen. The ⤓ button now counts pages
 // and paints a hairline bar, and the loop yields after each page so the frame lands.
 live('⤓ in WebKit: the button counts `n / N` with a bar while exporting, reaches `12 / 12` before the blob exists, and comes back whole', async () => {
   const twelve = model({slides: Array.from({length: 12}, (_, i) => ({els: [{x: 60, y: 80, w: 800, role: 'H1', text: 'Slide ' + (i + 1)}, {x: 100, y: 300, line: [400, 300], arrow: 'end', h: 3}]}))});
   const b = await pw.webkit.launch(); const p = await fresh(b, write('progress.html', create(twelve).html)); await p.waitForTimeout(1700); // the HUD icons play once on load, a beat apart: let the last one settle before the snapshot
-  const before = await p.evaluate(() => ({html: pdf.innerHTML, busy: pdf.hasAttribute('aria-busy'), chromium: CHROMIUM}));
-  assert.equal(before.chromium, false, 'WebKit takes the in-file rasteriser');
+  const before = await p.evaluate(() => ({html: pdf.innerHTML, busy: pdf.hasAttribute('aria-busy')}));
   const seen = await p.evaluate(async () => {
     const texts = [], bars = []; let blobAt = -1;
     new MutationObserver(() => { const t = pdf.textContent.trim(); if (t && t !== texts.at(-1)) { texts.push(t); bars.push(getComputedStyle(pdf, '::after').width); } }).observe(pdf, {childList: true, subtree: true, characterData: true, attributes: true});
