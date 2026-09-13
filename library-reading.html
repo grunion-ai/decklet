@@ -259,7 +259,7 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
       <label class="cat"><input type="radio" name="cat" value="crash"><b>Crashed</b><span>A blank deck, a freeze, or the slide stopped drawing</span></label>
     </div>
     <label class="desc">What happened<textarea id="bugdesc" rows="3" maxlength="300" placeholder="A few words: what you did, what you saw. The engine version, format, slide and browser are added for you."></textarea></label>
-    <div class="df"><a id="bugsend" class="primary" href="#">Open mail app</a><button type="button" id="bugcopy">Copy report</button><span class="hint">to decklet@grunion.ai · nothing is sent until you do</span></div>
+    <div class="df"><a id="bugsend" class="primary" href="#">Open mail app</a><button type="button" id="bugcopy">Copy report</button><span class="hint" id="bughint">to decklet@grunion.ai · nothing is sent until you do</span></div>
   </form>
 </dialog>
 <div id="print"></div>
@@ -1219,10 +1219,13 @@ const bugdlg=$('bugdlg'),bugdesc=$('bugdesc');
 const bugBuild=()=>{const cat=bugdlg.querySelector('input[name=cat]:checked').value,pr=bugProbe(cat);
   return bugReport({...bugFacts(deck),engine:ENGINE,at:i+1,mode:document.body.classList.contains('present')?'presenting':document.body.classList.contains('sheet')?'contact sheet':'editing',client:navigator.userAgent,cat,desc:bugdesc.value,env:pr.env,probes:pr.probes})};
 const bugRender=()=>{$('bugsend').href=bugBuild().mailto};
-function bugOpen(){bugRender();bugdlg.showModal()}
+function bugOpen(){bugRender();$('bughint').textContent='to decklet@grunion.ai · nothing is sent until you do';bugdlg.showModal()}
 $('bug').onclick=bugOpen;bugdlg.addEventListener('input',bugRender);bugdlg.addEventListener('change',bugRender);
 bugdlg.addEventListener('click',e=>{if(e.target===bugdlg)bugdlg.close()}); // the form fills the dialog, so a click that lands on the dialog itself is the backdrop
-$('bugsend').onclick=()=>setTimeout(()=>bugdlg.close(),80); // the browser hands the mailto to the mail app; the dialog steps aside
+// The dialog STAYS OPEN after the mail app is asked for. A sandboxed pane — an embedded browser, a kiosk profile, a Linux box
+// with no handler registered — silently drops a mailto: the click does nothing at all, and a dialog that closed itself read as
+// sent. No API tells the page whether the handler fired, so the hint names both outcomes and Copy report stays one click away.
+$('bugsend').onclick=()=>{$('bughint').textContent='If no mail app opened, this browser has no mailto handler — use Copy report and paste it into any mail client.'};
 $('bugcopy').onclick=async()=>{const r=bugBuild(),b=$('bugcopy');try{await navigator.clipboard.writeText('To: '+BUG_TO+'\nSubject: '+r.subject+'\n\n'+r.body);b.textContent='Copied'}catch{b.textContent='Copy failed'}setTimeout(()=>b.textContent='Copy report',1500)};
 helpbtn.onclick=()=>help(!helpmenu.classList.contains('open'));
 helpbtn.onmouseenter=()=>{helpT=setTimeout(()=>help(true),350)};helpbtn.onmouseleave=()=>clearTimeout(helpT);

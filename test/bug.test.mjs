@@ -214,3 +214,23 @@ test('bin/bug.mjs is a package bin and the docs name it', () => {
   assert.ok(read('README.md').includes('bin/bug.mjs'), 'README names the CLI door');
   assert.ok(read('llms.txt').includes('bin/bug.mjs'), 'llms.txt maps the file');
 });
+
+// A page can offer a mailto: and nothing else, and a sandboxed pane — an embedded browser, a kiosk profile, a machine with no mail
+// client — registers no handler for one, so the click does nothing at all. The dialog used to close itself 80ms later, which read as
+// sent. Nothing tells the page whether the handler fired, so the dialog stays and names the other way out.
+live('live: the bug dialog stays open after "Open mail app" and names Copy report when no mail app answers', async () => {
+  const f = path.join(tmp, 'door.html'); fs.writeFileSync(f, create(leakyDeck(), {title: SENTINEL.title}).html);
+  const b = await pw.chromium.launch(); const p = await b.newPage({viewport: {width: 1280, height: 800}});
+  await p.goto(pathToFileURL(f).href); await p.waitForSelector('#hud');
+  await p.click('#bug');
+  assert.match(await p.textContent('#bughint'), /nothing is sent until you do/, 'the footer opens on the standing hint');
+  await p.evaluate(() => document.getElementById('bugsend').click());   // no mailto handler in a headless pane: the click goes nowhere
+  await p.waitForTimeout(200);
+  assert.equal(await p.evaluate(() => document.getElementById('bugdlg').open), true, 'the dialog stays open — closing itself read as sent');
+  assert.match(await p.textContent('#bughint'), /Copy report/, 'and the hint names the way out');
+  await p.keyboard.press('Escape'); await p.waitForTimeout(50);
+  await p.click('#bug');
+  assert.match(await p.textContent('#bughint'), /nothing is sent until you do/, 'reopening resets it');
+  await b.close();
+});
+
