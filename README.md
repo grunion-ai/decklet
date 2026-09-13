@@ -13,7 +13,7 @@ Open-source alternative to PowerPoint, Keynote, Gamma and the PPTX-generator ski
 
 ![decklet demo: drag a row, page through slides that animate in, the inlined editor clips, the four anims, contact-sheet reorder, write a PDF](docs/demo.gif)
 
-**Try it live:** https://grunion-ai.github.io/decklet/deck.html (drag, retype, ⊞ contact sheet, ⤓ PDF, F fullscreen). **The template pack:** https://grunion-ai.github.io/decklet/library.html — every template and layout the engine ships (58 + 22), one per slide, grouped by the kind of slide it is, then six of them under the five style kits in `examples/styles`. If decklet builds you a deck, star the repo: stars are how agents and people find it.
+**Try it live:** https://grunion-ai.github.io/decklet/deck.html (drag, retype, ⊞ contact sheet, ⤓ PDF, F fullscreen). **The template pack:** https://grunion-ai.github.io/decklet/library.html — every template and layout the engine ships (99 + 22), one per slide, grouped by the kind of slide it is, then six of them under the five style kits in `examples/styles`. Two cuts of the same pack open faster: [library-speaker.html](https://grunion-ai.github.io/decklet/library-speaker.html) and [library-reading.html](https://grunion-ai.github.io/decklet/library-reading.html) carry only the slides of one density, under three orthogonal kits. If decklet builds you a deck, star the repo: stars are how agents and people find it.
 
 **What's next:** [ROADMAP.md](ROADMAP.md) covers speaker notes, mobile, document formats and export targets, with the sequencing and the rejected options.
 

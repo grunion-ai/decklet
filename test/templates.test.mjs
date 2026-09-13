@@ -18,9 +18,9 @@ const read = f => fs.readFileSync(path.join(root, f), 'utf8');
 const v = m => validate(create(m).deck);   // validate what create() judges: the neutral roles filled in
 const deck = (slides, extra = {}) => ({w: 960, h: 540, title: 'tpl', ...extra, slides});
 
-test('templates: 71 ship, every id unique, every one names a tier, a category and a density', () => {
-  assert.equal(TEMPLATES.length, 71);
-  assert.equal(new Set(TEMPLATES.map(t => t.id)).size, 71);
+test('templates: 103 ship, every id unique, every one names a tier, a category and a density', () => {
+  assert.equal(TEMPLATES.length, 103);
+  assert.equal(new Set(TEMPLATES.map(t => t.id)).size, 103);
   for (const t of TEMPLATES) {
     assert.ok(['core', 'standard', 'fringe'].includes(t.tier), t.id + ' tier');
     assert.ok(t.cat && t.note, t.id + ' cat + note');
@@ -81,11 +81,14 @@ test('templates: expand scales the 960×540 cut to the canvas', () => {
   assert.ok(!d.slides[0].els.some(e => e.x === 60), 'no unscaled margin');
 });
 
+// a template whose sample carries a stand-in mark is a draft until the mark is replaced — that is the guard, not a defect
+const hasStandIn = t => t.els.some(r => r.placeholder != null);
+
 test('templates: every template validates with zero errors under the neutral scale, and creates', () => {
   for (const t of TEMPLATES) {
-    const r = v(deck([{template: t.id}]));
+    const r = v(deck([{template: t.id}], hasStandIn(t) ? {draft: 1} : {}));
     assert.deepEqual(r.errors, [], t.id + ': ' + r.errors.join(' | '));
-    const {html} = create(deck([{template: t.id}]));
+    const {html} = create(deck([{template: t.id}], hasStandIn(t) ? {draft: 1} : {}));
     assert.ok(html.includes('/*DECK*/'), t.id + ' creates');
   }
 });
@@ -191,4 +194,12 @@ test('templates: scorecard-grid — a rating is a whole 0..4, only a cell takes 
 test('templates: SKILL.md names the template library, the fill contract and the catalogue command', () => {
   const doc = read('SKILL.md');
   assert.match(doc, /## TEMPLATE LIBRARY/); assert.match(doc, /`template:`|template:/); assert.match(doc, /fill/); assert.match(doc, /--templates/);
+});
+
+test('templates: the logo family ships stand-in marks, and a deck without draft refuses them', () => {
+  const marks = TEMPLATES.filter(t => t.els.some(r => r.placeholder != null));
+  assert.ok(marks.length >= 6, 'the logo placements carry stand-ins: ' + marks.map(t => t.id).join(','));
+  for (const t of marks) assert.equal(t.cat, 'Logo', t.id + ' is a Logo placement');
+  const r = v(deck([{template: 'logo-cover-lockup'}]));
+  assert.ok(r.errors.some(m => /placeholder mark .* may not ship/.test(m)), 'no draft, no stand-in');
 });

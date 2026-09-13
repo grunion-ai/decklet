@@ -16,6 +16,12 @@ import { LIBRARY } from '../lib/layouts.mjs';
 import { scale } from '../lib/templates/kit.mjs';
 const dir = path.dirname(fileURLToPath(import.meta.url));
 const only = process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1].split(',') : null;
+// --density cuts one deck per density: every template and layout tagged with it, then three ORTHOGONAL kits
+// (dark ground / warm paper serif / light display) instead of all five — the widest spread the five kits offer.
+const density = process.argv.includes('--density') ? process.argv[process.argv.indexOf('--density') + 1] : null;
+if (density && !['speaker', 'reading'].includes(density)) throw new Error('--density must be speaker or reading');
+const ORTHOGONAL = ['dark', 'warm', 'display'];
+const stem = density ? `library-${density}` : 'candidates';
 
 // ── the kinds, in deck order, and which template / layout ids belong to each
 export const KINDS = [
@@ -23,12 +29,18 @@ export const KINDS = [
     templates: ['cover-hero', 'cover-split', 'section-numeral'], layouts: ['cover', 'title', 'section', 'content'] },
   { id: 'agenda', name: 'Agenda', note: 'What the deck covers.', templates: ['agenda-ruled'], layouts: ['agenda'] },
   { id: 'concept', name: 'Concept', note: 'Claims, comparisons, frameworks, cards: the slide that carries an argument.',
-    templates: ['bullet-page', 'exec-summary', 'statement', 'three-up-cards', 'bento-grid', 'two-col-compare', 'pros-cons', 'benchmark-table', 'harvey-balls', 'scorecard-grid', 'two-by-two', 'swot', 'temple', 'venn-3', 'pyramid-layers', 'value-chain', 'table-insight', 'proof-strip', 'team-grid'],
+    templates: ['bullet-page', 'exec-summary', 'statement', 'three-up-cards', 'bento-grid', 'two-col-compare', 'pros-cons', 'benchmark-table', 'harvey-balls', 'scorecard-grid', 'two-by-two', 'swot', 'temple', 'venn-3', 'pyramid-layers', 'value-chain', 'table-insight', 'proof-strip', 'team-grid', 'quad-growth-share', 'quad-effort-impact', 'quad-risk-heat', 'quad-stakeholder', 'quad-movement', 'quad-where-we-play', 'quad-conceptual', 'quad-nine-box', 'quad-with-panel'],
     layouts: ['bullets', 'statement', 'two-cols', 'two-cols-header', 'comparison'] },
+  { id: 'chrome', name: 'Chrome', note: 'Where the header, the footer and the page counter sit.',
+    templates: ['chrome-foot-band', 'chrome-hairline-foot', 'chrome-header-kicker', 'chrome-side-rail', 'chrome-tabs', 'chrome-dots', 'chrome-brand-bar', 'chrome-none'], layouts: [] },
+  { id: 'mark', name: 'Logo & icons', note: 'Where a mark goes, and where an icon earns its place. Every mark here is a stand-in.',
+    templates: ['logo-corner-mark', 'logo-foot-mark', 'logo-cover-lockup', 'logo-co-brand', 'logo-rail-mark', 'logo-watermark', 'icon-three-up', 'icon-capability-grid', 'icon-bullets', 'logo-proof-wall'], layouts: [] },
+  { id: 'density', name: 'Inset & density', note: 'What the margin buys, and the same slide at both densities.',
+    templates: ['pad-tight-40', 'pad-default-60', 'pad-generous-96', 'pad-asymmetric-rail', 'density-speaker', 'density-reading'], layouts: [] },
   { id: 'quote', name: 'Quote', note: 'Someone else\'s words at display size.', templates: ['quote-pull'], layouts: ['quote'] },
   { id: 'data', name: 'Data', note: 'Numbers, KPIs and every chart.',
     templates: ['stat-hero', 'stat-row-4', 'kpi-scorecard', 'stat-plus-chart', 'delta-pair', 'progress-tracker', 'dashboard-composite',
-      'chart-column', 'chart-bar-ranked', 'chart-stacked-100', 'chart-grouped', 'chart-line-trend', 'chart-area-band', 'chart-waterfall', 'chart-donut', 'chart-donut-row', 'chart-gauge', 'chart-scatter', 'chart-heatmap', 'chart-histogram', 'chart-slope', 'chart-dumbbell', 'chart-small-multiples', 'chart-marimekko', 'chart-pareto', 'chart-flow-split'],
+      'chart-column', 'chart-bar-ranked', 'chart-stacked-100', 'chart-grouped', 'chart-line-trend', 'chart-area-band', 'chart-waterfall', 'chart-donut', 'chart-donut-row', 'chart-gauge', 'chart-scatter', 'chart-heatmap', 'chart-histogram', 'chart-slope', 'chart-dumbbell', 'chart-small-multiples', 'chart-marimekko', 'chart-pareto'],
     layouts: ['fact', 'stat', 'kpi-grid', 'kpi-grid-4', 'chart'] },
   { id: 'process', name: 'Process', note: 'Steps, cycles and funnels.',
     templates: ['process-flow-4', 'vertical-steps', 'cycle-loop', 'funnel-stages'], layouts: ['process-steps'] },
@@ -151,7 +163,7 @@ const NEUTRAL_TOKENS = Object.fromEntries(TPL.match(/\/\*TOKENS\*\/(.*?)\/\*\/TO
 export const KITS = ['warm', 'dark', 'graphite-amber', 'navy-blue', 'display'];   // examples/styles/<name>/style.json, in sheet order
 const BRAND = { warm: 'Hearthline', dark: 'Nightjar', 'graphite-amber': 'Kiln & Co', 'navy-blue': 'Harbourmark', display: 'Orbita' };   // fictional; index notes only
 export const STYLE_SLIDES = ['cover-hero', 'statement', 'benchmark-table', 'chart-column', 'process-flow-4', 'closing-cta'];
-const kits = KITS.map(name => ({ name, ...JSON.parse(fs.readFileSync(path.join(dir, '..', 'examples/styles', name, 'style.json'), 'utf8')) }));
+const kits = (density ? ORTHOGONAL : KITS).map(name => ({ name, ...JSON.parse(fs.readFileSync(path.join(dir, '..', 'examples/styles', name, 'style.json'), 'utf8')) }));
 const PREFIXED = ['fg', 'muted', 'accent', 'card', 'box', 'line'];   // the tokens a slide's rows can name; bg and sel are chrome
 const TOK = /var\(--(fg|muted|accent|card|box|line)\)/g;
 // a template's rows, wearing one kit: every token it names becomes the kit's prefixed twin, every text row takes its role's
@@ -194,8 +206,8 @@ const lslide = (n) => ({ name: `layout-${n}`, layout: n, hide: FULL_BLEED.includ
 const index = [];
 const slides = [];
 for (const [i, k] of KINDS.entries()) {
-  const ts = TEMPLATES.filter(t => k.templates.includes(t.id) && (!only || only.includes(t.id)));
-  const ls = k.layouts.filter(n => !only || only.includes(n));
+  const ts = TEMPLATES.filter(t => k.templates.includes(t.id) && (!only || only.includes(t.id)) && (!density || t.density === density));
+  const ls = k.layouts.filter(n => (!only || only.includes(n)) && (!density || LIBRARY[n].density === density));
   if (!ts.length && !ls.length) continue;
   slides.push(divider(k, i));
   for (const t of ts) { slides.push(tslide(t)); index.push({ kind: k.id, source: 'template', id: t.id, name: t.name, tier: t.tier, cat: t.cat, note: t.note }); }
@@ -210,18 +222,20 @@ if (!only) {
   }
 }
 const model = {
-  title: 'decklet slide library',
+  title: density ? `decklet ${density} library` : 'decklet slide library',
   w: 960, h: 540,
   styles: { margin: 60 },
-  spell: { ignore: ['tallyline', 'fieldsense'] },   // the invented company names; every other word is in the dictionary
+  spell: { ignore: ['tallyline', 'fieldsense', 'northwind', 'halcyon', 'oakline', 'brightmoor', 'castellan', 'meridian',
+    'api', 'barcode', 'bento', 'cta', 'decklet', 'dedup', 'donut', 'gantt', 'harvey', 'heatmap', 'kpi', 'marimekko', 'pareto', 'rollout', 'screenshotted', 'venn', "else's"] },
+  draft: 1,   // the sheet shows stand-in marks; validate errors on `placeholder` in any deck without this   // the invented company names; every other word is in the dictionary
   // `title` and `content` come from the library (the templates were cut on the same geometry)
-  master: [ { id: 'foot', footer: 1, x: 60, y: 506, w: 340, role: 'Label', text: 'decklet library' } ],
+  master: [ { id: 'foot', footer: 1, x: 60, y: 506, w: 340, role: 'Label', text: density ? `decklet · ${density}` : 'decklet library' } ],
   slides,
 };
-fs.writeFileSync(path.join(dir, 'candidates.model.json'), JSON.stringify(model, null, 1));
-fs.writeFileSync(path.join(dir, 'candidates.index.json'), JSON.stringify(index, null, 1));
+fs.writeFileSync(path.join(dir, `${stem}.model.json`), JSON.stringify(model, null, 1));
+fs.writeFileSync(path.join(dir, `${stem}.index.json`), JSON.stringify(index, null, 1));
 // the sheet's style: the neutral tokens the deck is built on, then every kit's tokens under its prefix (create --style)
 const tokens = { ...NEUTRAL_TOKENS };
 for (const kit of kits) for (const t of PREFIXED) tokens[`${kit.name}-${t}`] = kit.tokens[t];
-fs.writeFileSync(path.join(dir, 'candidates.style.json'), JSON.stringify({ tokens, pad: NEUTRAL_STYLES.pad }, null, 1));   // pad too: a style's pad replaces the template's
-console.log(`${index.length} library slides (${index.filter(r => r.source === 'template').length} templates + ${index.filter(r => r.source === 'layout').length} layouts + ${index.filter(r => r.source === 'style').length} styled) in ${KINDS.length + (only ? 0 : 1)} kinds → templates/candidates.model.json`);
+fs.writeFileSync(path.join(dir, `${stem}.style.json`), JSON.stringify({ tokens, pad: NEUTRAL_STYLES.pad }, null, 1));   // pad too: a style's pad replaces the template's
+console.log(`${index.length} library slides (${index.filter(r => r.source === 'template').length} templates + ${index.filter(r => r.source === 'layout').length} layouts + ${index.filter(r => r.source === 'style').length} styled) in ${KINDS.length + (only ? 0 : 1)} kinds → templates/${stem}.model.json`);

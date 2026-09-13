@@ -94,6 +94,7 @@ export function mergeStyle(deck, style) {
 }
 
 export function validate(deck) {
+  const stands = new Set();   // stand-in marks on a draft sheet: one line at the end, not one per row
   const errors = [], warnings = [];
   const E = (m) => errors.push(m), Wn = (m) => warnings.push(m);
   if (!deck || typeof deck !== 'object') return {ok: false, errors: ['model is not an object'], warnings};
@@ -253,6 +254,8 @@ export function validate(deck) {
     if (r.img && !/^data:/.test(r.img)) E(`${where}: img must be a data: URI (single file, zero network)`);
     if (r.alt != null && typeof r.alt !== 'string') E(`${where}: alt must be a string — what the row shows, for a reader who cannot see it`);
     if (r.svg && /<script|href\s*=\s*["']https?:/i.test(r.svg)) E(`${where}: svg contains script or external href`);
+    // a stand-in mark is a drawing aid, never a shipped brand: a real deck must replace it, a sample sheet says deck.draft
+    if (r.placeholder != null) { if (deck.draft) stands.add(String(r.placeholder)); else E(`${where}: placeholder mark "${r.placeholder}" may not ship — swap in the real logo, or set deck.draft on a sample sheet`); }
     if (textual && /^\s*\d+\s*\/\s*\d+\s*$/.test(plain(r))) Wn(`${where}: "${plain(r).trim()}" looks like a hardcoded page counter — the footer master renders it`);
     // geometry: inside the canvas (slot geometry resolved)
     const right = r.right ?? (r.x == null && slot ? slot.right : null), y = r.y ?? (slot && slot.y) ?? 0, w = r.w ?? (slot && slot.w);
@@ -388,6 +391,7 @@ export function validate(deck) {
       seen.push(a0);
     }
   });
+  if (stands.size) Wn(`draft sheet: ${stands.size} stand-in mark(s) — ${[...stands].sort().join(', ')} — shown under deck.draft; validate errors on them in any deck without it`);
   return {ok: !errors.length, errors, warnings};
 }
 
