@@ -107,7 +107,7 @@ Fix the model; re-run to `VERIFY PASS`, attach `verify-out/results.json`. The ha
 Say, in this order:
 1. Where the file is and that it opens from disk in any browser, no install, no network.
 2. **The editor:** [docs/editor.md](docs/editor.md) — the HUD and its manifest, phones, the contact sheet, both PDF routes, PNG export (`node bin/export.mjs deck.html --png`), presenting, persistence and the bug door.
-   Quote the two or three lines that matter — ⌘S saves the file itself in Chrome/Edge, downloads a copy in Safari; ⤓ writes the PDF; Esc opens the contact sheet — and link the rest.
+   Quote the lines that matter — the save button (⌘S) writes the file in Chrome/Edge, a copy in Safari; ⤓ writes the PDF; Esc opens the contact sheet — and link the rest.
 3. To revise an edited deck, run `node bin/edits.mjs deck.html` to read the log, then `create --from deck.html` (Step 4). Everything a human applies in the editor — geometry, text, links, arrows — round-trips that way; the console `copy(JSON.stringify(deck))` still works for a raw model.
 4. What you inferred (style, layout choices) and anything marked experimental.
 

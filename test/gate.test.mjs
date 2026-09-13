@@ -93,7 +93,7 @@ test('roles are the type system: eight complete roles in the template, locked ke
 test('HUD contract is a set: prev · next · autosave · + (Text/Box/Slide) · contact sheet · PDF · fullscreen · shortcuts', () => {
   assert.match(tpl, /<button id="prev" [^>]*aria-label="Previous slide · ←"><svg [^>]*><path [^>]*\/><\/svg><\/button>/, 'prev is icon-only'); assert.match(tpl, /<button id="next" [^>]*aria-label="Next slide · →"><svg [^>]*><path [^>]*\/><\/svg><\/button>/, 'next is icon-only');
   const ids = [...tpl.matchAll(/<div id="hud">[\s\S]*?<\/div>\n<div id="sheet"/g)][0][0].match(/id="([^"]+)"/g).map(s => s.slice(4, -1)).filter(s => s !== 'hud' && s !== 'sheet').sort();
-  assert.deepEqual(ids, ['add-box', 'add-text', 'addbtn', 'addmenu', 'addwrap', 'autosave', 'bug', 'dup', 'fs', 'grid-btn', 'help', 'helpmenu', 'helpwrap', 'next', 'pdf', 'prev', 'sadd', 'savecopy', 'snap', 'spell', 'spellbad', 'spellwrap']);
+  assert.deepEqual(ids, ['add-box', 'add-text', 'addbtn', 'addmenu', 'addwrap', 'autosave', 'bug', 'dup', 'fs', 'grid-btn', 'help', 'helpmenu', 'helpwrap', 'next', 'pdf', 'prev', 'sadd', 'savebad', 'snap', 'spell', 'spellbad', 'spellwrap']);
   assert.deepEqual([...tpl.match(/<div id="hud">[\s\S]*?\n<\/div>/)[0].matchAll(/id="(prev|next|autosave|addbtn|dup|grid-btn|pdf|fs|help)"/g)].map(m => m[1]), ['prev', 'next', 'autosave', 'addbtn', 'dup', 'pdf', 'grid-btn', 'fs', 'help'], 'save state (the dot) leads the cluster, then edit, file, view; ⓘ rightmost');
   assert.match(tpl, /<button id="help" class="mi mi-circle-question-mark"[^>]*aria-label="Shortcuts"[^>]*><svg /, 'the shortcuts control is the question-mark icon'); assert.match(tpl, /<kbd>← →<\/kbd> previous · next/, 'popover nav line'); assert.match(tpl, /<button id="sheet-back" title="Back to slide \(Esc\)" aria-label="Back to slide \(Esc\)">← Back<\/button>/, 'contact sheet ← Back');
   assert.match(tpl, /if\(\(e\.metaKey\|\|e\.ctrlKey\)&&e\.key\.toLowerCase\(\)==='s'\)\{e\.preventDefault\(\);saveFile\(\);return\}/, '⌘S saves THE FILE (write-back), keyboard only'); assert.doesNotMatch(tpl, /id="save"/);
@@ -102,7 +102,7 @@ test('HUD contract is a set: prev · next · autosave · + (Text/Box/Slide) · c
   assert.match(tpl, /if\(animate\)\{tab\.set\('slide',s\.id\);if\(location\.protocol!=='about:'\)location\.replace\('#'\+\(i\+1\)\)\}/, 'slide change → this tab remembers the slide ID (sessionStorage) + #n hash'); assert.match(tpl, /addEventListener\('hashchange'/, 'hash → slide');
   assert.match(tpl, /  i=Math\.max\(0,deck\.slides\.findIndex\(s=>s\.id===tab\.get\('slide'\)\)\)/, 'load (hydrate): the tab\'s slide id first'); assert.doesNotMatch(tpl, /parseInt\(store\.get\(PKEY\)\)/, 'a fresh window never restores another window\'s slide: it opens on slide 1');
   // autosave indicator: the shim's set reports success; save() drives the dot; reduced motion kills glow + pulse
-  assert.match(tpl, /set:\(k,v\)=>\{if\(LS\)try\{LS\.setItem\(k,v\);lastSavedAt=new Date\(\);return true\}catch\{\}mem\.set\(k,v\);if\(TIER!=='idb'\)return false;/, 'store.set returns boolean + stamps lastSavedAt on a confirmed write; a blocked write still holds the session in memory, and lands in IndexedDB on that tier'); assert.match(tpl, /<button id="autosave" data-state="ok"/); assert.match(tpl, /prefers-reduced-motion:reduce\)\{#autosave i\{box-shadow:none;animation:none!important\}\}/);
+  assert.match(tpl, /set:\(k,v\)=>\{if\(LS\)try\{LS\.setItem\(k,v\);lastSavedAt=new Date\(\);return true\}catch\{\}mem\.set\(k,v\);if\(TIER!=='idb'\)return false;/, 'store.set returns boolean + stamps lastSavedAt on a confirmed write; a blocked write still holds the session in memory, and lands in IndexedDB on that tier'); assert.match(tpl, /<button id="autosave" class="mi mi-save" data-ms="\d+" data-state="ok"/); assert.match(tpl, /prefers-reduced-motion:reduce\)\{#autosave\{animation:none!important\}\}/);
   assert.match(tpl, /\$\('pdf'\)\.onclick=\(\)=>CHROMIUM\?printPdf\(\):exportPdf\(\)\.catch\(\(\)=>print\(\)\)/, '⤓: Chromium takes the vector print route (px @page honoured); Safari writes the raster in-file; print() is the fallback');
   assert.match(tpl, /const CHROMIUM=!!navigator\.userAgentData/); assert.match(tpl, /st\.id='pdfpage';st\.textContent=`@page\{size:\$\{W\}px \$\{H\}px;margin:0\}#print \.pg\{zoom:1!important\}`/, 'the print route injects the slide-sized page and undoes the paper zoom'); assert.match(tpl, /addEventListener\('afterprint',\(\)=>\{\$\('pdfpage'\)\?\.remove\(\)\}\)/, 'and removes it after, so a plain ⌘P is still Letter'); assert.match(tpl, /requestFullscreen/);
 });
@@ -162,7 +162,7 @@ test('blocked storage: probed at load, says what to do, and reveals ⌘S save-a-
   assert.match(tpl, /const mem=new Map\(\)/, 'the shim keeps edits for the session even when nothing persists');
   assert.match(tpl, /document\.body\.classList\.add\('nostore'\)/);
   assert.match(tpl, /blocks storage for local files[^']*⌘S[^']*Chrome/, 'the message names the durable path and the browser that works');
-  assert.match(tpl, /body\.nostore #savecopy\{display:inline-flex\}/, '⌘S gets a button in exactly the state where it is the only way to keep an edit');
+  assert.match(tpl, /bad:'Save a copy · ⌘S — this browser blocks storage, so edits only survive in a copy'/, 'the save button IS the copy door in exactly the state where a copy is the only way to keep an edit');
   assert.equal((tpl.match(/localStorage\./g) || []).length, 2, 'storage API only inside the probe');
 });
 
@@ -187,10 +187,10 @@ test('shortcuts popover cannot drift from the keybindings', () => {
 
 // ── 2c′. the HUD glyphs are the moving Lucide set: one svg per control, played once, never looped ──
 test('HUD icons: every control is a Lucide shape wearing its motion parts; no unicode glyph survives; nothing loops', () => {
-  for (const id of ['prev', 'next', 'addbtn', 'dup', 'grid-btn', 'spell', 'snap', 'savecopy', 'pdf', 'fs', 'help']) {
-    assert.match(tpl, new RegExp(`<button id="${id}" class="mi mi-[\\w-]+" data-ms="\\d+"[^>]*><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"[^>]*>[^]*?data-mi="[^"]+"[^]*?<\\/svg><\\/button>`), `${id} draws a Lucide shape on the 24 grid with its motion parts`);
+  for (const id of ['prev', 'next', 'autosave', 'addbtn', 'dup', 'grid-btn', 'spell', 'snap', 'pdf', 'fs', 'help']) {
+    assert.match(tpl, new RegExp(`<button id="${id}" class="mi mi-[\\w-]+" data-ms="\\d+"[^>]*><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"[^>]*>[^]*?data-mi="[^"]+"[^]*?<\\/svg>(?:<span id="[a-z]+" role="status" hidden><\\/span>)?<\\/button>`), `${id} draws a Lucide shape on the 24 grid with its motion parts`);
   }
-  assert.doesNotMatch(tpl, /<button id="(prev|next|addbtn|grid-btn|savecopy|pdf|fs|help)"[^>]*>[‹›+⊞⤒⤓⛶ⓘ]<\/button>/, 'no control is a typed glyph any more');
+  assert.doesNotMatch(tpl, /<button id="(prev|next|addbtn|grid-btn|pdf|fs|help)"[^>]*>[‹›+⊞⤒⤓⛶ⓘ]<\/button>/, 'no control is a typed glyph any more');
   assert.match(tpl, /@keyframes mi-layout-grid-/, 'the motion rides in the template, scoped per icon'); assert.match(tpl, /\.mi-chevron-left path \{ transition/, 'a chevron slides on a transition, no keyframes needed');
   assert.doesNotMatch(tpl.slice(tpl.indexOf('#hud button svg'), tpl.indexOf('@media (prefers-reduced-motion:reduce)')), /infinite/, 'nothing loops');
   assert.match(tpl, /const miPlay=\(h\)=>\{const ms=\+h\.dataset\.ms\|\|0;if\(!ms\|\|h\.dataset\.on\|\|matchMedia\('\(prefers-reduced-motion: reduce\)'\)\.matches\)return;/, 'one run per trigger, reduced motion respected');
@@ -905,11 +905,11 @@ live('live: storage blocked (Safari on file://) — the deck says so, keeps the 
     await p.addInitScript(() => { for (const k of ['localStorage', 'indexedDB']) Object.defineProperty(window, k, {get() { throw new DOMException('The operation is insecure.', 'SecurityError'); }}); }); // Safari on file:// refuses both (0.9.0: localStorage alone refused → the IndexedDB tier, test/autosave.test.mjs)
     await p.goto(pathToFileURL(f).href); await p.waitForSelector('#canvas .el'); await p.waitForFunction(() => document.getElementById('autosave').dataset.state !== 'busy');
     const s = await p.evaluate(() => { const a = document.getElementById('autosave');
-      return {nostore: document.body.classList.contains('nostore'), state: a.dataset.state, tip: a.getAttribute('aria-label'), button: getComputedStyle(document.getElementById('savecopy')).display}; });
+      return {nostore: document.body.classList.contains('nostore'), state: a.dataset.state, tip: a.getAttribute('aria-label'), button: document.getElementById('savebad').hidden ? 'none' : 'flex'}; });
     assert.equal(s.nostore, true, engine + ': blocked storage detected at load, before the first edit');
     assert.equal(s.state, 'bad', engine);
     assert.match(s.tip, /⌘S/, engine + ': the tooltip names the durable path');
-    assert.notEqual(s.button, 'none', engine + ': ⌘S has a button in this state');
+    assert.notEqual(s.button, 'none', engine + ': the save button wears its red mark in this state');
     // the session still works: edits, navigation and undo all survive without persistence
     assert.deepEqual(await p.evaluate(() => { sel.clear(); sel.add(2); render(); snap(); slide().els[2].text = 'still editable'; save(); nav(1); nav(-1); const t = slide().els[2].text; undo(); return [t, slide().els[2].text.slice(0, 6)]; }), ['still editable', 'Agent-'], engine + ': in-memory shim keeps the session');
     await b.close();
