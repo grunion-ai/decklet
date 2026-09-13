@@ -275,7 +275,10 @@ export function validate(deck) {
   // the counter owns the corner (as the engine draws it): a right-anchored footer carries it inline, a left-anchored one leaves
   // its text at the left and the counter lands at the margin on the footer's top — so THAT slide's set gains a counter box there
   const MGN = deck.styles && isNum(deck.styles.margin) ? deck.styles.margin : Math.round(W * 0.06);
-  const footRight = f => (f.x || 0) + (isNum(f.w) ? f.w : 0) / 2 > W / 2;
+  // a row that declares `right` IS right-anchored (the engine reads it the same way). Reading x/w alone made `{right: 60, w: 'auto'}`
+  // — the anchoring the docs recommend — look left-anchored, so the gate added a counter box on top of the row that hosts it and
+  // warned `overlaps by ~14px counter` on every slide whatever the text said. ROADMAP U6.
+  const footRight = f => f.right != null || (f.x || 0) + (isNum(f.w) ? f.w : 0) / 2 > W / 2;
   const counterRow = s => { const m = master.find(x => x && x.footer); if (!m || (s.hide || []).includes(m.id)) return [];
     const f = {...m, ...(s.els.find(e => e && e.override === m.id) || {})}; if (footRight(f)) return [];
     return [{r: {right: MGN, y: f.y, w: 'auto', role: f.role, p: f.p, nowrap: 1, text: `${deck.slides.length} / ${deck.slides.length}`}, i: 'counter'}]; };

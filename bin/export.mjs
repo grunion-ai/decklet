@@ -4,8 +4,8 @@
 // The per-card export: a LinkedIn or Instagram carousel is posted one image per card, and a screenshot stitched by hand ships
 // the HUD, a selection box or a half-played entrance animation. This is bin/verify.mjs's screenshot loop on its own — goto
 // file://, clear storage (the SHIPPED model, not a stale local edit), transform:none + animation:none on the canvas, then
-// `i = k; sel.clear(); render()` and shoot #canvas — with one difference: verify hides the page counter for AE parity against
-// mockups that never had one; a shipped card KEEPS it. --scale multiplies the device pixels (2 = retina), the frame stays W×H.
+// `i = k; sel.clear(); render()` and shoot #canvas. The page counter is on the card, as it is in verify's own shots (verify masks
+// its box for the AE diff rather than hiding it). --scale multiplies the device pixels (2 = retina), the frame stays W×H.
 // Files: <out>/01-<slide name or slide-1>.png … Default out: <deck>-png/ beside the deck.
 // Spellcheck marks are editor chrome (the deck's own print path drops them): the shot takes the spell button's route, off.
 // Gate (exit 1): #hud computed display is none at shoot time · no spell highlight registered · files == slides · every PNG is W×H×scale (IHDR).
