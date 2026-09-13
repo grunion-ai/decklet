@@ -21,7 +21,7 @@ test('skill: SKILL.md stays inside the authoring budget', () => {
 
 test('skill: every docs/ reference exists and is linked from SKILL.md', () => {
   const doc = read('SKILL.md');
-  for (const f of ['editor.md', 'charts.md', 'connectors.md', 'figures.md', 'examples.md', 'import-html.md', 'verify.md']) {
+  for (const f of ['editor.md', 'charts.md', 'connectors.md', 'figures.md', 'examples.md', 'import-html.md', 'verify.md', 'building.md']) {
     assert.ok(fs.existsSync(path.join(root, 'docs', f)), 'docs/' + f + ' exists');
     assert.ok(doc.includes(`(docs/${f})`), 'SKILL.md links docs/' + f);
     assert.ok(words('docs/' + f) > 80, 'docs/' + f + ' carries the text, not a stub');
@@ -35,6 +35,7 @@ test('skill: the moved rules are still written down somewhere', () => {
   for (const re of [/orthogonal/, /96px/, /control point/i, /fan-out/i, /waive/]) assert.match(read('docs/connectors.md'), re, 'connectors: ' + re);
   for (const re of [/diagramSlide/, /figure-decision/, /figure-layers/, /fits\(run, text\)/, /Y\(tops\)/]) assert.match(read('docs/figures.md'), re, 'figures: ' + re);
   assert.match(read('docs/import-html.md'), /import-html\.mjs/);
+  for (const re of [/MANIFEST\.md/, /must-include/i, /second pass/i, /lower 40%/, /spell\.ignore/]) assert.match(read('docs/building.md'), re, 'building: ' + re);
   const verify = read('docs/verify.md');
   for (const re of [/ink through text/, /straddling a container/, /arrow head inside a fill/, /text over text/, /occlusion/, /Containment is not collision/, /## Thresholds/, /0 errors \(0 warnings with `--strict`\)/, /< 0\.5%/]) assert.match(verify, re, 'verify: ' + re);
   for (const re of [/quarterly-update/, /launch-carousel/, /one-pager/]) assert.match(read('docs/examples.md'), re, 'examples: ' + re);

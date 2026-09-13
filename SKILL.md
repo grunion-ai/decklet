@@ -99,7 +99,7 @@ node bin/verify.mjs deck.html [--refs shots/] [--out verify-out/] [--threshold 0
   Five collision shapes fail it: **ink through text**; **text straddling a container**; **an arrow head inside a fill** (aim at the edge with `to:`); **text over text**; **text under paint** (occlusion — reorder `els`, paint first). Containment is not collision, and `over:1` opts a row out of all five. Each in full, with the boundary cases: [docs/verify.md](docs/verify.md).
 - **AE pixel diff** — when `--refs` exists (needs ImageMagick): `< 0.5%` of pixels differ at 2% fuzz. AE alone passes wrapped labels; parity is what catches them — that is why parity is not optional.
 
-Fix the model, not the output. Re-run until `VERIFY PASS`; attach `verify-out/results.json`.
+Fix the model; re-run to `VERIFY PASS`, attach `verify-out/results.json`. The hand-off needs a second pass: [docs/building.md](docs/building.md).
 
 **When the engine is wrong** (verify fails on a layout the model declares cleanly, a control misbehaves, a PDF does not match the slide): `node bin/bug.mjs deck.html --category looks --desc "what happened" --tool verify --log verify.log` prints a prefilled mail to decklet@grunion.ai — the engine version and the deck's shape, a scrubbed tool snippet, never the deck's words ([docs/editor.md](docs/editor.md#reporting-a-bug)). Say so in the hand-off notes rather than working around the engine in the model.
 
