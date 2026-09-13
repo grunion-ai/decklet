@@ -18,9 +18,9 @@ const read = f => fs.readFileSync(path.join(root, f), 'utf8');
 const v = m => validate(create(m).deck);   // validate what create() judges: the neutral roles filled in
 const deck = (slides, extra = {}) => ({w: 960, h: 540, title: 'tpl', ...extra, slides});
 
-test('templates: 67 ship, every id unique, every one names a tier, a category and a density', () => {
-  assert.equal(TEMPLATES.length, 67);
-  assert.equal(new Set(TEMPLATES.map(t => t.id)).size, 67);
+test('templates: 68 ship, every id unique, every one names a tier, a category and a density', () => {
+  assert.equal(TEMPLATES.length, 68);
+  assert.equal(new Set(TEMPLATES.map(t => t.id)).size, 68);
   for (const t of TEMPLATES) {
     assert.ok(['core', 'standard', 'fringe'].includes(t.tier), t.id + ' tier');
     assert.ok(t.cat && t.note, t.id + ' cat + note');
@@ -108,6 +108,41 @@ test('templates: the nine figures — Figures category, diagram layout, reading 
   assert.equal(d.slides[0].layout, 'diagram');
   assert.ok(d.slides[0].els.some(e => e.svg && /polygon/.test(e.svg)), 'the diamond keeps its paint as an svg row');
   assert.ok(d.slides[0].els.some(e => e.text === 'Two questions per refund'), 'fill replaced the title');
+});
+
+// U5.5: scorecard-grid — the criteria × options grid two study subjects hand-built. Every cell is a fill key, and one
+// key takes either short text or a 0..4 rating drawn as the harvey-balls ring (0 · 25 · 50 · 75 · 100 percent).
+const cellKeys = () => templateKeys('scorecard-grid').filter(k => k.cell);
+test('templates: scorecard-grid — twelve cells, each a fill key; a number draws the ring, a string writes text', () => {
+  const t = TEMPLATE['scorecard-grid'];
+  assert.ok(t, 'scorecard-grid ships'); assert.equal(t.cat, 'Frameworks'); assert.equal(t.density, 'reading');
+  const cells = cellKeys();
+  assert.equal(cells.length, 12, 'four criteria rows × three option columns');
+  const ring = cells.find(k => /^rating /.test(k.text)), txt = cells.find(k => !/^rating /.test(k.text));
+  assert.ok(ring && txt, 'the sample shows both cell forms: ' + cells.map(k => k.text).join(' | '));
+  const sample = t.els.filter(e => e.donut != null);
+  assert.ok(sample.length && sample.every(e => e.w === 36 && /^var\(--/.test(e.color)), 'the sample rings are the harvey-balls shape');
+  const d = deck([{template: 'scorecard-grid', fill: {[ring.key]: 'n/a', [txt.key]: 1}}]);
+  expandTemplates(d);
+  const els = d.slides[0].els;
+  assert.ok(els.some(e => e.text === 'n/a' && e.role === 'Label' && !e.donut), 'a string on a rating cell writes text');
+  const filled = els.find(e => e.donut === 25);   // no sample cell scores 1, so this ring is the one the fill drew
+  assert.ok(filled && filled.w === 36, 'a 1 on a text cell draws a quarter ring the harvey-balls way');
+  const box = filled.cell;   // the cell keeps its column box, so the ring centres in the column it replaced
+  assert.equal(filled.x, box[0] + (box[2] - 36) / 2);
+  assert.ok(!els.some(e => e.text === txt.text), 'the sample text is gone: ' + txt.text);
+});
+
+test('templates: scorecard-grid — a rating is a whole 0..4, only a cell takes a number, and a cell still takes text', () => {
+  const cells = cellKeys();
+  const over = v(deck([{template: 'scorecard-grid', fill: {[cells[0].key]: 5}}]));
+  assert.ok(over.errors.some(m => /0\.\.4/.test(m)), over.errors.join(' | '));
+  const frac = v(deck([{template: 'scorecard-grid', fill: {[cells[0].key]: 2.5}}]));
+  assert.ok(frac.errors.some(m => /0\.\.4/.test(m)), frac.errors.join(' | '));
+  const wrong = v(deck([{template: 'scorecard-grid', fill: {t2: 3}}]));
+  assert.ok(wrong.errors.some(m => /takes text/.test(m)), wrong.errors.join(' | '));
+  const ok = v(deck([{template: 'scorecard-grid', fill: {[cells[0].key]: 0, [cells[1].key]: 4, [cells[2].key]: '18 hrs'}}]));
+  assert.deepEqual(ok.errors, [], ok.errors.join(' | '));
 });
 
 test('templates: SKILL.md names the template library, the fill contract and the catalogue command', () => {
