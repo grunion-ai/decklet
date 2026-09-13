@@ -67,7 +67,7 @@ Epics rank by **ICE**: Impact x Confidence x Ease, each 1 to 10, multiplied, wit
 | **Documents & formats** | D1 Format presets `S` | D2 Aspect-aware composition `XL` | D3 Real documents `XL` |
 | **Export** | X1 Cheap wins `S` | X2 Searchable PDF `M` | X3 PPTX export `L` |
 | **Library & editor** | L7 Spellcheck, the rest `M`<br>L11 Type on the sheet `S` | | |
-| **Usability** | U1 `w`/`h` default in validate `XS`<br>U2 The catalogue says what fills `S`<br>U3 A width warning is a failure `XS`<br>U4 Ratings are fill keys `S`<br>U5 The missing starting rungs `M`<br>U6 Counter regression `S`<br>U7 SKILL.md: authoring and editor apart `M` | U8 Two axes on the sheet: look × ladder `L` | |
+| **Usability** | U9 A `--bad` token in every style `XS`<br>U10 Warn before the browser fails `S` | U8 Two axes on the sheet: look × ladder `L` | |
 
 ### ICE scores
 
@@ -102,6 +102,8 @@ Epics rank by **ICE**: Impact x Confidence x Ease, each 1 to 10, multiplied, wit
 | U4 Ratings are fill keys | 8 | 9 | 7 | **504** | Now |
 | U5 The missing starting rungs | 9 | 9 | 6 | **486** | Now |
 | U7 SKILL.md: authoring and editor apart | 8 | 8 | 7 | **448** | Now |
+| U9 A `--bad` token in every style | 7 | 10 | 10 | **700** | Now |
+| U10 Warn before the browser fails | 8 | 9 | 8 | **576** | Now |
 | U8 Two axes on the sheet | 8 | 7 | 4 | **224** | Next |
 
 Three epics sit off their score.
@@ -381,7 +383,7 @@ L10 shows each kit's palette and weights, but a decklet style is deck-wide (role
 
 ## Usability
 
-Filed 2026-09-12 from a four-subject study: two Opus and two Sonnet agents, each handed only the skill and a nine-rung brief (title → bullet page → image + bullets → stats → block-arrow process → branching diagram → three-tier architecture → six-node architecture with zones → scorecard), one density and one style kit each. All four finished 9/9 `VERIFY PASS` in 60 to 80 minutes and 50 to 62 tool calls. The tools are usable. The same edges cut all four, and three rungs cost more than the advanced diagram did. Reports and decks: harness `scratchpad/usability/<subject>/REPORT.md` (copied into the findings artifact).
+Filed 2026-09-12 from a four-subject study: two Opus and two Sonnet agents, each handed only the skill and a nine-rung brief (title → bullet page → image + bullets → stats → block-arrow process → branching diagram → three-tier architecture → six-node architecture with zones → scorecard), one density and one style kit each. All four finished 9/9 `VERIFY PASS` in 60 to 80 minutes and 50 to 62 tool calls. The tools are usable. The same edges cut all four, and three rungs cost more than the advanced diagram did. Reports and decks: harness `scratchpad/usability/<subject>/REPORT.md` (copied into the findings artifact). U1 to U7 landed 2026-09-12/13; U9 and U10 were added 2026-09-13 from the parity study that followed.
 
 ### U1. `w`/`h` default in validate · `XS` · Now
 
@@ -447,6 +449,23 @@ Reported by the reading-density Opus subject on the #43 engine: a right-anchored
 | U7.1 | S | The HUD, persistence, PDF, versions and bug-reporting text moves to `docs/editor.md`; SKILL.md keeps a two-line pointer. The `<!-- HUD -->` manifest gate follows the text. |
 | U7.2 | XS | DENSITY states that a template carries its own density and overrides the deck's; TEMPLATE LIBRARY says which are reading. |
 | U7.3 | S | CONNECTORS and CHART ROW become `docs/` references linked from GRAPHICS; MOTION shrinks to the four words; GIFS AND IMAGES folds into GRAPHICS; the formats table shows `slides` and one line naming the experimental rest. Target: SKILL.md under 7,000 words with no rule lost (the gate tests that read SKILL.md move with the text). |
+
+### U9. A `--bad` token in every style · `XS` · Now
+
+Two independent builds in the parity study painted a bad number (support tickets up 22%; a 22-point miss) in the same accent as every good number, because the neutral template defines no `--bad` and `var(--bad, var(--accent))` falls through to the accent. A deck's one semantic for "this number is the problem" should not depend on the author shipping a style kit.
+
+| Story | Size | What |
+| --- | --- | --- |
+| U9.1 | XS | `--bad` (and `--good`, if the pair reads better) in the neutral scale and in all five `examples/styles` kits, documented in the STYLE CONTRACT beside the existing tokens. |
+
+### U10. Warn before the browser fails · `S` · Now
+
+`validate` sizes text from one average glyph width per role, so a row near its box width passes validate and fails parity in the browser. U3 established the estimate misses in both directions and cannot be promoted to an error. Every study builder that lost a rebuild lost it here, and the diagram helper compounds it: node width, the 8px snap and the edge-label fit threshold are one coupled system, so widening a node to fit its title can push that node's edge label out of its run.
+
+| Story | Size | What |
+| --- | --- | --- |
+| U10.1 | XS | `validate` warns when a `nowrap` row's estimate reaches ~90% of its box, naming the row and the margin, so an author widens it before `create`. |
+| U10.2 | S | `cw` measured per weight rather than per role (weight-600 Body measures ~15% wider than the role's `cw`), so the estimate is honest for the weights templates actually use. |
 
 ### U8. Two axes on the sheet: look × ladder · `L` · Next
 
