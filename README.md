@@ -70,7 +70,7 @@ A slide engine where the deck is a JSON model and the renderer is the editor. `c
 - in: any content (outline, notes, markdown, transcript, data) + a format (`slides`, `carousel`, `document-letter`, `document-a4`, and the 4:3 / story / landscape / A3 presets) + a style (brand tokens + eight text roles, or the neutral default)
 - out: `deck.html` — one file, ~40 KB (this repo's explainer carries three inlined screen clips, so it weighs ~270 KB), editable, printable, verifiable
 
-**Zero dependencies.** The engine is plain HTML/CSS/JS in a single file. The CLI is plain Node ≥ 22. Playwright is an *optional* devDependency used only by `verify`, `pdf` and `import-html`; nspell + dictionary-en are *optional* devDependencies used only by `create` to flag misspellings (absent, create says so and the editor falls back to the browser's own checker).
+**Zero dependencies.** The engine is plain HTML/CSS/JS in a single file. The CLI is plain Node ≥ 22. Playwright is an *optional* devDependency used only by `verify`, `pdf` and `import-html`; nspell + dictionary-en are *optional* devDependencies used only by `create` to flag misspellings and bake their suggestions into the file (absent, create says so and the editor falls back to the browser's own checker).
 
 **One file.** The model, the styles, the renderer and the editor ship inside the deck. Copy it, email it, commit it.
 
@@ -141,6 +141,7 @@ A row is text by default; `box`, `tile`, `bar`, `line`, `donut`, `svg`, `img` ar
 | fullscreen presentation | supported | F / ⛶, hover-peek HUD (pinned while a menu or the sheet is open) |
 | PDF | supported | ⤓ → slide-sized PDF written in-file (Chromium verified; Safari unconfirmed → print fallback); ⌘P → paper, Letter/A4 named sizes |
 | HTML pages → model | supported | `bin/import-html.mjs` (Playwright) |
+| spellcheck · suggestions | supported | the build's dictionary flags the words (optional peer); the editor washes and underlines them on every slide in every engine, the badge opens a panel of them with the build's suggestions, a pick rewrites the row, `spell.ignore` silences a name |
 | validate / verify | supported | parity mandatory, AE optional |
 | PPTX / Google Slides export | no | out of scope |
 | presenter view, notes | roadmap | |

@@ -19,7 +19,7 @@ const model = () => ({w: 960, h: 540, title: 'export', counter: 1, slides: [
   {name: 'close', els: [{x: 60, y: 80, w: 800, role: 'H1', text: 'Third card'}]},
 ]});
 // the deck carries a flagged word (option C list, as a build with a dictionary writes it) so the editor WOULD underline 'card' at rest
-const deck = (name = 'export.html', m = model(), opts = {}) => { const f = path.join(tmp, name); const html = create(m, opts).html.replace('/*SPELL*/[]/*/SPELL*/', '/*SPELL*/["card"]/*/SPELL*/'); assert.match(html, /\/\*SPELL\*\/\["card"\]/); fs.writeFileSync(f, html); return f; };
+const deck = (name = 'export.html', m = model(), opts = {}) => { const f = path.join(tmp, name); const html = create(m, opts).html.replace('/*SPELL*/{}/*/SPELL*/', '/*SPELL*/{"card":["cards"]}/*/SPELL*/'); assert.match(html, /\/\*SPELL\*\/\{"card":\["cards"\]\}/); fs.writeFileSync(f, html); return f; };
 const size = f => { const b = fs.readFileSync(f); assert.equal(b.toString('latin1', 1, 4), 'PNG', `${f} is not a PNG`); return [b.readUInt32BE(16), b.readUInt32BE(20)]; }; // IHDR width/height, no image library
 const pngs = dir => fs.readdirSync(dir).filter(f => f.endsWith('.png')).sort();
 

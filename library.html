@@ -20,10 +20,23 @@ body.present .el a.lk{pointer-events:auto}
 #savecopy{display:none}body.nostore #savecopy{display:inline-flex}
 #spell.off{opacity:.35}
 /* spell badge: how many flagged words this slide carries (on the toggle) and each thumbnail carries (on the sheet); one per token */
-#spellbad,.spellbad{position:absolute;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#f85149;color:#fff;font:bold 10px/16px ui-monospace,Menlo,monospace;text-align:center;box-shadow:0 0 0 2px var(--bg);pointer-events:none}
-#spellbad{top:-6px;right:-6px}#spellbad[hidden],.spellbad[hidden]{display:none}
+.spellbad{position:absolute;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#f85149;color:#fff;font:bold 10px/16px ui-monospace,Menlo,monospace;text-align:center;box-shadow:0 0 0 2px var(--bg);pointer-events:none}
+#spellwrap{position:relative;display:inline-flex}
+/* the HUD badge is a button by tag and a badge by shape: #hud button is (1,0,1), so the badge box needs two ids to win */
+#hud #spellbad{position:absolute;top:-6px;right:-6px;min-width:16px;height:16px;min-height:0;padding:0 4px;border:0;border-radius:8px;font:bold 10px/16px ui-monospace,Menlo,monospace;background:#f85149;color:#fff;text-align:center;box-shadow:0 0 0 2px var(--bg);cursor:pointer;pointer-events:auto}#spellbad[hidden],.spellbad[hidden]{display:none}
+@media (pointer:coarse){#hud #spellbad{min-width:22px;height:22px;min-height:0;line-height:22px;border-radius:11px;font-size:11px;top:-8px;right:-8px}} /* a finger needs a target, not a dot */
+/* the flagged-word panel: one element, two doors — anchored over the badge, or over the word you clicked while editing its row */
+#spellmenu{position:fixed;z-index:30;display:flex;flex-direction:column;gap:2px;padding:6px;width:max-content;max-width:min(360px,calc(100vw - 16px));max-height:min(56vh,420px);overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 40px #0008;font:12px ui-monospace,Menlo,monospace;color:var(--muted)}
+#spellmenu[hidden]{display:none}
+#spellmenu .hd{padding:2px 6px 6px;border-bottom:1px solid var(--line);margin-bottom:2px;white-space:normal}
+#spellmenu .w{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:4px 6px}
+#spellmenu .w+.w{border-top:1px solid var(--line)}
+#spellmenu b{color:var(--fg);font-weight:600}#spellmenu .x{opacity:.8}#spellmenu .none{opacity:.8;font-style:italic}
+#spellmenu button{font:inherit;min-height:26px;padding:3px 9px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--fg);cursor:pointer}
+#spellmenu button:hover,#spellmenu button:focus-visible{border-color:var(--accent)}
+#spellmenu .ign{margin-left:auto;color:var(--muted);border-style:dashed}
 .cell .spellbad{top:6px;right:8px;z-index:1;height:18px;line-height:18px;border-radius:9px;font-size:11px;box-shadow:none}
-::highlight(spell){text-decoration:underline wavy #f85149;text-decoration-skip-ink:none} /* option C: the build's flagged words, on every row, every browser */ /* spellcheck off: the toggle dims like a disabled control; nothing else changes on screen */
+::highlight(spell){text-decoration:underline wavy #f85149;text-decoration-skip-ink:none;background-color:rgba(248,81,73,.14)} /* option C: the build's flagged words, on every row, every browser. Safari (AppleWebKit 605) paints NO text-decoration inside ::highlight() — it does paint background-color — so the wash is what marks the word there, and it is the click target everywhere */ /* spellcheck off: the toggle dims like a disabled control; nothing else changes on screen */
 #snap[aria-pressed=false]{opacity:.35} /* guides + snap: off (the default) dims the same way */
 /* layout guides = selection chrome: one hairline per distinct slot edge of THIS slide's layout (and the canvas mid-lines), painted by
    render() only — never by drawEls, so print, the sheet and the PDF cannot carry them. They show only while a drag is in flight, the
@@ -170,7 +183,7 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
 @page{size:letter;margin:0} /* any other deck.page injects its overriding @page rule at load — see PAGES */
 @media print{
   #wrap,#hud,#tb,#sheet,.gl,.gg{display:none!important}
-  ::highlight(spell){text-decoration:none} /* the build's flagged words never reach paper */
+  ::highlight(spell){text-decoration:none;background-color:transparent} /* the build's flagged words never reach paper — neither mark */
   body{height:auto;overflow:visible;display:block;background:var(--bg);-webkit-print-color-adjust:exact;print-color-adjust:exact}
   #print{display:block}
   #print .pg{position:relative;width:var(--W);height:var(--H);zoom:var(--Z);background:var(--card);break-after:page;break-inside:avoid}
@@ -209,7 +222,10 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
   </div>
   <button id="dup" class="mi mi-copy" data-ms="900" data-tip="Duplicate selection or slide" aria-label="Duplicate selection or slide"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" class="copy-rect" data-mi="animate"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" class="copy-path" data-mi="animate"/><path d="M12 15h6"/><path d="M15 12v6"/></svg></button>
   <button id="snap" class="mi mi-grip" data-ms="600" data-tip="Guides + snap · off · G" aria-label="Guides + snap · off · G" aria-pressed="false"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g class="dots" data-mi="animate"><circle cx="5" cy="5" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="19" cy="5" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="19" r="1"/><circle cx="12" cy="19" r="1"/><circle cx="19" cy="19" r="1"/></g></svg></button>
-  <button id="spell" class="mi mi-spell-check" data-ms="500" data-tip="Spellcheck · on" aria-label="Spellcheck · on" aria-pressed="true"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 16 6-12 6 12"/><path d="M8 12h8"/><path d="m16 20 2 2 4-4" class="tick" data-mi="animate"/></svg><span id="spellbad" role="status" hidden></span></button>
+  <div id="spellwrap">
+    <button id="spell" class="mi mi-spell-check" data-ms="500" data-tip="Spellcheck · on" aria-label="Spellcheck · on" aria-pressed="true"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 16 6-12 6 12"/><path d="M8 12h8"/><path d="m16 20 2 2 4-4" class="tick" data-mi="animate"/></svg></button>
+    <button id="spellbad" type="button" data-tip="Flagged words on this slide" aria-haspopup="dialog" aria-expanded="false" hidden></button>
+  </div>
   <div class="sep"></div>
   <button id="savecopy" class="mi mi-copy" data-ms="900" data-tip="Save a copy · ⌘S — this browser blocks storage, so edits only survive in a copy" aria-label="Save a copy · ⌘S — this browser blocks storage, so edits only survive in a copy"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" class="copy-rect" data-mi="animate"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" class="copy-path" data-mi="animate"/></svg></button>
   <button id="pdf" class="mi mi-file-down" data-ms="900" data-tip="Download PDF" aria-label="Download PDF"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><g data-mi="animate"><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></g></svg></button>
@@ -239,7 +255,7 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
       </div>
       <div class="col"><div class="ph">File</div>
         <div><kbd>⌘S</kbd> save the file now (asks for it once, then every edit writes itself · Safari: downloads a copy)</div>
-        <div class="dim">Buttons only: add · duplicate · spellcheck · PDF. Spellcheck underlines the words the build's dictionary refused, on every slide, and its badge counts them on this slide; every contact-sheet thumbnail wears its own count. The browser's own checker adds the row you type in. Never present, print or PDF.</div>
+        <div class="dim">Buttons only: add · duplicate · spellcheck · PDF. Spellcheck marks the words the build's dictionary refused, on every slide, with a wavy underline and a red wash; every contact-sheet thumbnail wears its own count. Its red badge opens them: every flagged word on this slide with the build's suggestions — a pick rewrites the row, Ignore in this deck silences the word. A click on a marked word while you are editing its row fixes just that one. The browser's own checker adds the row you type in. Never present, print or PDF.</div>
       </div>
     </div>
   </div>
@@ -262,6 +278,9 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
     <div class="df"><a id="bugsend" class="primary" href="#">Open mail app</a><button type="button" id="bugcopy">Copy report</button><span class="hint">to decklet@grunion.ai · nothing is sent until you do</span></div>
   </form>
 </dialog>
+<!-- Flagged words, reachable: the red badge opens this panel for the whole slide; a click on a painted word while its row is
+     being edited opens it for that one occurrence. The suggestions were baked by the build (lib/spell.mjs); nothing is fetched. -->
+<div id="spellmenu" role="dialog" aria-label="Flagged words" hidden></div>
 <div id="print"></div>
 
 <script>
@@ -389,8 +408,8 @@ const ERRS=[],errPush=m=>{ERRS.push(scrub(String(m).replace(/\([^)]*\)/g,'(…)'
 window.addEventListener('error',e=>errPush((e.message||'error')+' · '+(e.lineno||0)+':'+(e.colno||0)));
 window.addEventListener('unhandledrejection',e=>errPush('rejection: '+String(e.reason&&e.reason.message||e.reason)));
 // the file's own edit log (create.mjs fills it; write-back rewrites it with the browser's)
-const ENGINE=/*ENGINE*/'0.9.0'/*/ENGINE*/; // the package version that built this file (create.mjs); the bug report leads with it
-const LOG0=/*LOG*/[]/*/LOG*/;const SPELL0=/*SPELL*/[]/*/SPELL*/; // words the build's dictionary refused (lib/spell.mjs); the editor underlines them on every slide
+const ENGINE=/*ENGINE*/'0.10.0'/*/ENGINE*/; // the package version that built this file (create.mjs); the bug report leads with it
+const LOG0=/*LOG*/[]/*/LOG*/;const SPELL0=/*SPELL*/{}/*/SPELL*/; // words the build's dictionary refused (lib/spell.mjs); the editor underlines them on every slide
 // storage namespace is per deck (create.mjs stamps it with deck.id — stable across versions, so a new file finds the old edits)
 const NS=/*KEY*/'decklet:26d1466795'/*/KEY*/,KEY=NS+':model',HKEY=NS+':hist',PKEY=NS+':pos',canvas=document.getElementById('canvas'),$=id=>document.getElementById(id);
 // Safari refuses localStorage on file:// — the browser most people double-click a deck in. The store PROBED it at load rather than
@@ -1033,6 +1052,7 @@ function sheetKey(e){
 }
 addEventListener('keydown',e=>{
   if($('bugdlg').open)return; // the dialog owns the keyboard: arrows type, Esc closes it (never the sheet)
+  if(e.key==='Escape'&&!smenu.hidden){e.preventDefault();spellClose(true);return} // the flagged-word panel closes first, and hands focus back to its door
   if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='s'){e.preventDefault();saveFile();return} // ⌘S never reaches the browser's Save Page As
   if((e.metaKey||e.ctrlKey)&&['b','i','u'].includes(e.key.toLowerCase())&&(e.target.isContentEditable||selEl())){ // ⌘B ⌘I ⌘U = the toolbar marks; on a selected row they take the whole row
     e.preventDefault();if(!e.target.isContentEditable)edit([...sel][0]);document.execCommand({b:'bold',i:'italic',u:'underline'}[e.key.toLowerCase()]);placeTb();return}
@@ -1178,20 +1198,97 @@ async function exportPdf(){
 $('pdf').onclick=()=>CHROMIUM?printPdf():exportPdf().catch(()=>print());
 // option C paint: every text node of every live row, each flagged word a Range in one Highlight. Off, presenting, or no
 // Highlight API (old engines) → nothing painted; the browser's own checker (the spellcheck attribute) is the second layer.
-const SPELLSET=new Set(SPELL0);
+// SPELL0 is {word:[suggestions]} from 0.10.0 and a plain array of words in a 0.7–0.9 deck: both read as one map here.
+const SPELLS=Array.isArray(SPELL0)?Object.fromEntries(SPELL0.map(w=>[String(w).toLowerCase(),[]])):(SPELL0||{});
+const SPELLSET=new Set(Object.keys(SPELLS));
+const spellSkip=()=>new Set(((deck.spell&&deck.spell.ignore)||[]).map(w=>String(w).toLowerCase())); // the model key the build honours — the panel appends to it live
+const smenu=$('spellmenu'),sbad=$('spellbad');let spellAnchor=null; // the panel and its door; spellAnchor = the rect it points at, kept so a repaint holds its place
 // spellHits(root) → every flagged token under root as [textNode, index, length]; the canvas paints them, the sheet counts them
-const spellHits=root=>{const out=[];if(!SPELLSET.size)return out;const it=document.createNodeIterator(root,NodeFilter.SHOW_TEXT);let n;
+const spellHits=root=>{const out=[];if(!SPELLSET.size)return out;const skip=spellSkip();const it=document.createNodeIterator(root,NodeFilter.SHOW_TEXT);let n;
   while(n=it.nextNode()){if(n.parentElement.closest('.h,.num,svg'))continue;const s=n.data;let m;const re=/[A-Za-z][A-Za-z']*[A-Za-z]|[A-Za-z]/g;
-    while(m=re.exec(s)){if(SPELLSET.has(m[0].toLowerCase()))out.push([n,m.index,m[0].length])}}
+    while(m=re.exec(s)){const w=m[0].toLowerCase();if(SPELLSET.has(w)&&!skip.has(w))out.push([n,m.index,m[0].length])}}
   return out};
 // the badge: a red count, one per token (a word twice counts twice); hidden at zero, off, or while presenting
-const spellBadge=(b,k,where)=>{b.hidden=!(SPELL&&!present()&&k>0);b.textContent=k;b.setAttribute('aria-label',k+' flagged word'+(k===1?'':'s')+where)};
+const spellBadge=(b,k,where)=>{b.hidden=!(SPELL&&!present()&&k>0);b.textContent=k;const s=k+' flagged word'+(k===1?'':'s')+where;b.setAttribute('aria-label',s);if(b.dataset.tip!=null)b.dataset.tip=s+' · click for the list'};
 function paintSpell(){const hits=SPELL&&!present()?spellHits(canvas):[];spellBadge($('spellbad'),hits.length,' on this slide');
+  if(smenu&&!smenu.hidden){if((!SPELL||present())||(smenu.dataset.scope==='slide'&&!spellPanel(null)))spellClose();else if(smenu.dataset.scope==='slide')spellPlace(spellAnchor)} // an open panel follows the repaint: counts, words, and its place
   const b=$('spell');b.dataset.tip='Spellcheck · '+(SPELL?'on':'off')+(hits.length?' · '+hits.length+' flagged on this slide':'');b.setAttribute('aria-label',b.dataset.tip);
   if(!window.CSS||!CSS.highlights)return;if(!hits.length){CSS.highlights.delete('spell');return}
   const h=new Highlight();for(const [n,a,l] of hits){const r=new Range();r.setStart(n,a);r.setEnd(n,a+l);h.add(r)}CSS.highlights.set('spell',h)}
 const setSpell=on=>{SPELL=on;store.set(SKEY,on?'1':'0');const b=$('spell');b.classList.toggle('off',!on);b.setAttribute('aria-pressed',on);render()};
 $('spell').onclick=()=>{commitEdit();setSpell(!SPELL)};if(!SPELL)setSpell(false);
+// ── the flagged words, reachable ──
+// Two doors onto ONE panel: the red count badge (every flagged word on this slide) and a click on a painted word while its
+// row is being edited (that one occurrence — a bare canvas click selects and drags the row, so it can never be the door).
+// A pick rewrites the row through the ordinary edit path — commitEdit, the model, save() — so it lands in the file and in
+// the edit log bin/edits.mjs reads. "Ignore in this deck" appends to deck.spell.ignore, the model key lib/spell.mjs honours;
+// that key rides the DECK block of the written file (the log carries rows, not deck-level keys).
+const recase=(was,to)=>was===was.toUpperCase()&&was.length>1?to.toUpperCase():was[0]===was[0].toUpperCase()?to[0].toUpperCase()+to.slice(1):to; // RENEWLS → RENEWALS · Renewls → Renewals
+// swap occurrence nth of word (nth below zero = every one) in a row's text or html, never inside a tag or an entity
+function swapWord(src,word,to,nth){let k=0;
+  return String(src).split(/(<[^>]*>|&[a-zA-Z#][a-zA-Z0-9]*;)/).map(p=>p[0]==='<'||p[0]==='&'?p:
+    p.replace(/[A-Za-z][A-Za-z']*[A-Za-z]|[A-Za-z]/g,m=>{if(m.toLowerCase()!==word)return m;const on=nth<0||k===nth;k++;return on?recase(m,to):m})).join('')}
+const spellKey=d=>d.dataset.n!=null?+d.dataset.n:'m:'+d.dataset.m; // a canvas node → the row it stands for, in the selection's own vocabulary
+// the model row to write: a master row forks into this slide first, exactly as editing it does, and the fork carries the text it had
+function spellRow(key){
+  if(typeof key==='number')return slide().els[key];
+  const id=key.slice(2),m=(deck.master||[]).find(x=>x.id===id);if(!m)return null;
+  let el=(slide().els||[]).find(e=>e.override===id);if(!el)el=slide().els[fork(id)];
+  if(el.text==null&&el.html==null){if(m.html!=null)el.html=m.html;else el.text=m.text}
+  return el}
+// every flagged word on this slide, once, in reading order, with every occurrence: {word, sug, at:[{key,nth}]}
+function spellFlagged(){const out=new Map(),per=new Map();
+  for(const [n,a,l] of spellHits(canvas)){const d=n.parentElement.closest('.el');if(!d)continue;
+    const key=spellKey(d),w=n.data.substr(a,l).toLowerCase(),pk=key+'|'+w,nth=per.get(pk)||0;per.set(pk,nth+1);
+    const e=out.get(w)||{word:w,sug:SPELLS[w]||[],at:[]};e.at.push({key,nth});out.set(w,e)}
+  const rank=e=>typeof e.at[0].key==='number'?e.at[0].key:1e6; // the slide's own rows first, in their order; master chrome last
+  return [...out.values()].sort((a,b)=>rank(a)-rank(b))}
+function spellReplace(word,to,at,all){ // all = every occurrence on this slide (the panel); else the one occurrence you clicked
+  commitEdit();snap();let hit=false;const done=new Set();
+  for(const {key,nth} of at){const id=String(key);if(all&&done.has(id))continue;done.add(id); // a row with the word twice is rewritten once, whole
+    const el=spellRow(key);if(!el)continue;const src=el.html!=null?el.html:el.text;if(src==null)continue;
+    const next=swapWord(src,word,to,all?-1:nth);if(next===src)continue;
+    if(el.html!=null)el.html=next;else el.text=next;hit=true}
+  if(hit){save();render()}}
+function spellIgnore(w){commitEdit();snap();
+  const ig=[...((deck.spell&&deck.spell.ignore)||[])];if(!ig.some(x=>String(x).toLowerCase()===w))ig.push(w);
+  deck.spell={...(deck.spell||{}),ignore:ig};save();render()}
+function spellPanel(only){ // only = {word,key,nth} → the word popover; nothing → the badge's panel for the whole slide. false = nothing left to show
+  const all=spellFlagged(),items=only?all.filter(e=>e.word===only.word).map(e=>({...e,at:[only]})):all;
+  if(!items.length)return false;
+  smenu.innerHTML='';smenu.dataset.scope=only?'one':'slide';
+  const hd=document.createElement('div');hd.className='hd';
+  hd.textContent=only?'Flagged word · a pick fixes this one':'Flagged on this slide · a pick fixes every occurrence on this slide';
+  smenu.append(hd);
+  for(const it of items){const row=document.createElement('div');row.className='w';
+    const b=document.createElement('b');b.textContent=it.word;row.append(b);
+    if(it.at.length>1){const x=document.createElement('span');x.className='x';x.textContent='×'+it.at.length;row.append(x)}
+    for(const sg of it.sug){const t=document.createElement('button');t.type='button';t.className='sg';t.textContent=sg;
+      t.onclick=()=>{spellReplace(it.word,sg,it.at,!only);spellAfter(only)};row.append(t)}
+    if(!it.sug.length){const n=document.createElement('span');n.className='none';n.textContent='no suggestion';row.append(n)}
+    const ig=document.createElement('button');ig.type='button';ig.className='ign';ig.textContent='Ignore in this deck';
+    ig.onclick=()=>{spellIgnore(it.word);spellAfter(only)};row.append(ig);
+    smenu.append(row)}
+  return true}
+function spellPlace(r){if(!r)return;const m=smenu.getBoundingClientRect(); // centred on the anchor, above it when there is room, always on screen
+  smenu.style.left=Math.max(8,Math.min(r.left+r.width/2-m.width/2,innerWidth-m.width-8))+'px';
+  const up=r.top-m.height-8;smenu.style.top=(up>8?up:Math.max(8,Math.min(r.bottom+8,innerHeight-m.height-8)))+'px'}
+function spellShow(rect,only){smenu.hidden=false;if(!spellPanel(only)){spellClose();return}
+  spellAnchor=rect;spellPlace(rect);sbad.setAttribute('aria-expanded',String(!only));
+  const first=smenu.querySelector('button');if(first)first.focus()}
+function spellClose(toDoor){smenu.hidden=true;smenu.innerHTML='';spellAnchor=null;sbad.setAttribute('aria-expanded','false');if(toDoor&&!sbad.hidden)sbad.focus()}
+const spellAfter=only=>{if(only)spellClose();else if(!smenu.hidden&&!spellPanel(null))spellClose()}; // the word popover has done its one job; the panel stays until the slide is clean
+sbad.onclick=e=>{e.stopPropagation();if(!smenu.hidden&&smenu.dataset.scope==='slide'){spellClose(true);return}spellShow(sbad.getBoundingClientRect(),null)};
+const caretAt=(x,y)=>{if(document.caretPositionFromPoint){const p=document.caretPositionFromPoint(x,y);return p&&{node:p.offsetNode,off:p.offset}}
+  if(document.caretRangeFromPoint){const r=document.caretRangeFromPoint(x,y);return r&&{node:r.startContainer,off:r.startOffset}}return null};
+canvas.addEventListener('click',e=>{ // door two: the word itself, but only inside the row being edited — elsewhere a click is select-and-drag
+  if(!SPELL||present())return;const t=e.target.closest('[contenteditable="true"]');if(!t)return;
+  const c=caretAt(e.clientX,e.clientY);if(!c)return;const hits=spellHits(t);
+  const at=hits.find(([n,a,l])=>n===c.node&&c.off>=a&&c.off<=a+l);if(!at)return;
+  const word=at[0].data.substr(at[1],at[2]).toLowerCase();let nth=0;
+  for(const [n,a,l] of hits){if(n===at[0]&&a===at[1])break;if(n.data.substr(a,l).toLowerCase()===word)nth++} // its index among that word's occurrences in this row — how swapWord counts
+  const r=new Range();r.setStart(at[0],at[1]);r.setEnd(at[0],at[1]+at[2]);
+  spellShow(r.getBoundingClientRect(),{word,key:spellKey(t),nth})});
 const setSnap=on=>{SNAP=on;store.set(GKEY,on?'1':'0');const b=$('snap');b.setAttribute('aria-pressed',on);b.dataset.tip='Guides + snap · '+(on?'on':'off')+' · G';b.setAttribute('aria-label',b.dataset.tip);render()};
 $('snap').onclick=()=>{commitEdit();setSnap(!SNAP)};if(SNAP)setSnap(true);
 canvas.lang=deck.lang||'en'; // the dictionary the browser picks; deck.lang is optional model data
@@ -1227,7 +1324,7 @@ $('bugsend').onclick=()=>setTimeout(()=>bugdlg.close(),80); // the browser hands
 $('bugcopy').onclick=async()=>{const r=bugBuild(),b=$('bugcopy');try{await navigator.clipboard.writeText('To: '+BUG_TO+'\nSubject: '+r.subject+'\n\n'+r.body);b.textContent='Copied'}catch{b.textContent='Copy failed'}setTimeout(()=>b.textContent='Copy report',1500)};
 helpbtn.onclick=()=>help(!helpmenu.classList.contains('open'));
 helpbtn.onmouseenter=()=>{helpT=setTimeout(()=>help(true),350)};helpbtn.onmouseleave=()=>clearTimeout(helpT);
-document.addEventListener('mousedown',e=>{if(!e.target.closest('#addwrap'))menu(false);if(!e.target.closest('#helpwrap'))help(false)});
+document.addEventListener('mousedown',e=>{if(!e.target.closest('#addwrap'))menu(false);if(!e.target.closest('#helpwrap'))help(false);if(!e.target.closest('#spellmenu,#spellwrap'))spellClose()});
 // duplicate: selected rows (offset 16px, the copies become the selection) · else the slide, after itself · in the sheet, the selected slides
 $('dup').onclick=()=>{commitEdit();menu(false);
   if(!sheet.hidden){snap();const src=[...gsel].sort((a,b)=>a-b);if(!src.length)return;const at=src[src.length-1]+1;const cp=src.map(n=>{const c=dup(deck.slides[n]);delete c.id;return c});deck.slides.splice(at,0,...cp);gsel=new Set(cp.map((_,x)=>at+x));ganchor=i=at;save();sheetRender();return}

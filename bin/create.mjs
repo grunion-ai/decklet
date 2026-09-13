@@ -14,7 +14,7 @@ import {libraryFor} from '../lib/layouts.mjs';
 import {expandCharts} from '../lib/chart.mjs';
 import {expandTemplates} from '../lib/templates.mjs';
 import {expandIcons} from '../lib/icons.mjs';
-import {flags as spellFlags, loadChecker} from '../lib/spell.mjs';
+import {flags as spellFlags, flagMap as spellMap, loadChecker} from '../lib/spell.mjs';
 import {stampIds, diffDecks, applyLog, blockOf, hasBlock, putBlock} from '../lib/edits.mjs';
 
 // page-size presets of ONE model space: the FORMAT table lives in validate.mjs (the module create builds on), re-exported
@@ -89,7 +89,7 @@ export function create(model, {style = null, format, space, title, template, fro
   html = putBlock(html, 'LOG', log);
   html = put(html, 'KEY', `'decklet:${deck.id}'`);
   html = put(html, 'ENGINE', `'${JSON.parse(fs.readFileSync(path.join(here, '..', 'package.json'), 'utf8')).version}'`); // the bug report leads with the version that built the file
-  html = put(html, 'SPELL', JSON.stringify(spell ? spellFlags(deck, spell) : [])); // option C: the flagged words ride in the file; the editor underlines them
+  html = put(html, 'SPELL', JSON.stringify(spell ? spellMap(deck, spell) : {})); // option C: the flagged words AND their suggestions ride in the file; the editor underlines them and offers the fix
   return {html, deck, hash, migrate};
 }
 

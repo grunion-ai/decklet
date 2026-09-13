@@ -360,7 +360,7 @@ Filed 2026-09-12 from Kyle's review of the rebuilt library deck (89 slides, deck
 | Story | Size | What |
 | --- | --- | --- |
 | L7.1 | S | A typo typed after the build is only flagged by the browser layer until the next `create`; the editor re-checks the row it just committed. |
-| L7.2 | M | Suggestions and correct-in-place from the painted layer (right-click or a toolbar chip), not only the browser's own menu. |
+| L7.2 | M | Suggestions and correct-in-place from the painted layer, not only the browser's own menu. **Done (0.10.0)**: the build bakes each flagged word's suggestions into `/*SPELL*/`; the count badge opens a panel of this slide's flagged words and a pick rewrites the row (every occurrence on the slide, case and markup kept), a click on a marked word while its row is being edited fixes that one, and "Ignore in this deck" writes `spell.ignore`. The same release made the mark visible in Safari (a wash beside the wavy underline). |
 | L7.3 | XS | Whatever Kyle hit first goes here as the leading story once named. |
 
 ### L8. Versions, the rest · Moved to weave (0.9.0)
