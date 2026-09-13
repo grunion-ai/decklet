@@ -18,9 +18,9 @@ const read = f => fs.readFileSync(path.join(root, f), 'utf8');
 const v = m => validate(create(m).deck);   // validate what create() judges: the neutral roles filled in
 const deck = (slides, extra = {}) => ({w: 960, h: 540, title: 'tpl', ...extra, slides});
 
-test('templates: 103 ship, every id unique, every one names a tier, a category and a density', () => {
-  assert.equal(TEMPLATES.length, 103);
-  assert.equal(new Set(TEMPLATES.map(t => t.id)).size, 103);
+test('templates: 106 ship, every id unique, every one names a tier, a category and a density', () => {
+  assert.equal(TEMPLATES.length, 106);
+  assert.equal(new Set(TEMPLATES.map(t => t.id)).size, 106);
   for (const t of TEMPLATES) {
     assert.ok(['core', 'standard', 'fringe'].includes(t.tier), t.id + ' tier');
     assert.ok(t.cat && t.note, t.id + ' cat + note');
@@ -91,6 +91,43 @@ test('templates: every template validates with zero errors under the neutral sca
     const {html} = create(deck([{template: t.id}], hasStandIn(t) ? {draft: 1} : {}));
     assert.ok(html.includes('/*DECK*/'), t.id + ' creates');
   }
+});
+
+// ── U5.3 / U5.4: the block-arrow flow at three lengths, and a stats page a presenter can stand beside
+test('templates: process-flow-3 · -4 · -5 are one shape — the box width falls out of the count, and the four-box cut is the one that shipped', () => {
+  for (const [id, n, w] of [['process-flow-3', 3, 251], ['process-flow-4', 4, 180], ['process-flow-5', 5, 138]]) {
+    const t = TEMPLATE[id]; assert.ok(t, id + ' ships');
+    assert.equal(t.layout, 'content'); assert.equal(t.cat, 'Process'); assert.equal(t.tier, 'core');
+    const boxes = t.els.filter(e => /^st\d$/.test(e.id || '')), arrows = t.els.filter(e => e.arrow === 'end' && e.to);
+    assert.equal(boxes.length, n, id + ': one box per step');
+    assert.equal(arrows.length, n - 1, id + ': an arrow between each pair, none after the last');
+    for (const b of boxes) { assert.equal(b.w, w, `${id}: ${w}px boxes`); assert.equal(b.y, 200); assert.equal(b.h, 132); }
+    for (let i = 0; i < n; i++) assert.equal(boxes[i].x, 60 + i * (w + 32), `${id}: box ${i} on the ${w + 32}px pitch`);
+    for (let i = 0; i < n - 1; i++) {
+      assert.equal(arrows[i].to, `st${i + 1}`, `${id}: arrow ${i} terminates on the next box`);
+      assert.equal(arrows[i].x, boxes[i].x + w, `${id}: arrow ${i} leaves the box border`);
+      assert.equal(arrows[i].line[0], boxes[i + 1].x, `${id}: arrow ${i} reaches the next border`);
+    }
+    assert.ok(boxes.at(-1).x + w <= 900, `${id}: the row stays inside the margins (ends ${boxes.at(-1).x + w})`);
+    assert.equal(t.els[0].slot, 'supertitle'); assert.equal(t.els[1].slot, 'title');
+    assert.ok(t.els.some(e => e.line && !e.arrow) && t.els.at(-1).role === 'Label', id + ': the rule and the one-line reading close it');
+  }
+  const four = TEMPLATE['process-flow-4'].els.filter(e => /^st\d$/.test(e.id || ''));
+  assert.deepEqual(four.map(b => b.x), [60, 272, 484, 696], 'the four-box geometry is unchanged, so every model built on it still builds');
+});
+
+test('templates: stat-row-3 is the speaker cut — three Stat tiles, three labels, no paragraph', () => {
+  const t = TEMPLATE['stat-row-3'];
+  assert.ok(t, 'stat-row-3 ships');
+  assert.equal(t.density, 'speaker', 'every other numbers template is reading');
+  assert.equal(t.cat, 'Numbers'); assert.equal(t.layout, 'content');
+  const tiles = t.els.filter(e => e.tile && e.role === 'Stat'), labels = t.els.filter(e => e.role === 'Label' && !e.slot);
+  assert.equal(tiles.length, 3, 'three numbers'); assert.equal(labels.length, 3, 'one label each');
+  assert.ok(!t.els.some(e => e.role === 'Body'), 'no paragraph — that is what makes it a speaker slide');
+  for (const [i, tl] of tiles.entries()) { assert.equal(tl.y, 200); assert.equal(tl.h, 150); assert.equal(labels[i].y, 366); assert.ok(tl.x + tl.w <= 900); }
+  const r = v(deck([{template: 'stat-row-3'}], {density: 'speaker'}));
+  assert.deepEqual(r.errors, []);
+  assert.deepEqual(r.warnings.filter(m => /density/.test(m)), [], 'within the speaker budget: 3 points, under 40 words');
 });
 
 test('templates: an unknown template is an error that lists the library; a fill key that does not exist is an error', () => {
