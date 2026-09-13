@@ -78,6 +78,8 @@ node bin/validate.mjs model.json --style style.json --strict   # warnings fail t
 ```
 **Always pass the same `--style` you will pass to `create`.** Text fit is only meaningful against the scale the deck will actually wear: without it the model is measured against the template's neutral roles, so `validate` can report 0 warnings on a model `create --style` then floods with overflow — and `verify` fails on. Omit `--style` only when there is none.
 
+**`--strict` is the pre-hand-off gate, and a `nowrap` width warning is what `verify` fails on.** `nowrap text "…" likely wider than w=168 — widen or use w:"auto"` is the same fit the parity check measures in the browser, so on ordinary copy the row comes back `overflows its box` and the build is dead. Fix it in the model — shorten the text, widen the row, or `w:'auto'` — before you create. Treat every warning `--strict` fails on the same way: fix it, or write the reason into the hand-off note. The class stays a warning because the estimate is `chars × size × cw` and an average glyph width can miss in both directions: measured in Chromium at Body 16/`cw` 0.46, `lillililliltililliltil` estimates 162px and renders 100, inside its box and warned about; `MMMWWWMM` estimates 59px and renders 114, over its 70px box and never warned. So a silent `validate` is not a pass either, which is why Step 5 is mandatory.
+
 ### Step 4 — create
 ```
 node bin/create.mjs --model model.json [--style style.json] --out deck.html --format slides [--space 1600x900] [--title "…"] [--from prev.html]

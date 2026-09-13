@@ -670,6 +670,33 @@ live('live: parity — a snapped row (_src) may render fewer lines (crowding, re
   const rf = await verify(fewer, {out: path.join(tmp, 'v-fewer'), log: () => {}});
   assert.equal(rf.parity[0].pass, true, 'snapped row that renders FEWER lines (collapsed runs): not a failure'); assert.equal(rf.parity[0].crowding.length, 1, '…reported as scale crowding');
 });
+// ROADMAP U3.1 — the nowrap width warning is an ESTIMATE (chars × size × cw), and `verify` measures the same row in a browser.
+// It stays a warning because the two disagree in both directions, and `--strict` is the gate that makes the warning blocking.
+live('live: the nowrap width warning is an estimate — ordinary copy overflows as warned, narrow glyphs do not, wide glyphs overflow unwarned', async () => {
+  const rows = [
+    {text: 'Quarterly renewals by segment', w: 100, role: 'Body'},   // estimate 213, measured 225 — warned and it overflows
+    {text: 'lillililliltililliltil', w: 100, role: 'Body'},          // estimate 162, measured  100 — warned and it fits
+    {text: 'MMMWWWMM', w: 70, role: 'Body'},                         // estimate  59, measured  114 — not warned and it overflows
+  ];
+  const m = {format: 'slides', title: 'fit', slides: [{els: rows.map((r, i) => ({x: 40, y: 40 + i * 90, nowrap: 1, ...r}))}]};
+  const {html, deck} = create(m, {});
+  const f = path.join(tmp, 'nowrap-fit.html'); fs.writeFileSync(f, html);
+  const warned = i => validate(deck).warnings.some(w => w.startsWith(`slides[0].els[${i}]:`) && /nowrap text/.test(w));
+  assert.deepEqual([warned(0), warned(1), warned(2)], [true, true, false], 'the estimate warns on the first two and is silent on the third');
+  const r = await verify(f, {out: path.join(tmp, 'v-nowrap-fit'), log: () => {}});
+  const problems = t => (r.parity[0].rows.find(x => x.text === t) || {problems: []}).problems;
+  assert.match(problems(rows[0].text).join(' '), /overflows its box/, 'ordinary copy: the warning and the measurement agree');
+  assert.deepEqual(problems(rows[1].text), [], 'narrow glyphs: warned, and it renders inside its box — so the warning cannot become an error');
+  assert.match(problems(rows[2].text).join(' '), /overflows its box/, 'wide glyphs: no warning, and it overflows — so the silence is not a pass either');
+  assert.equal(r.ok, false, 'verify is the measurement that decides');
+});
+test('SKILL.md PROCESS: --strict is the pre-hand-off gate and the nowrap width warning is named as blocking', () => {
+  const doc = read('SKILL.md');
+  const step3 = doc.slice(doc.indexOf('### Step 3'), doc.indexOf('### Step 4'));
+  assert.match(step3, /--strict/, 'Step 3 names --strict');
+  assert.match(step3, /pre-hand-off gate/, 'Step 3 calls --strict the pre-hand-off gate');
+  assert.match(step3, /nowrap[\s\S]{0,400}verify/, 'Step 3 says a nowrap width warning is what verify fails on');
+});
 live('live: AE — a deck that differs from its reference reports the real pixel count (compare exits 1 and prints to stderr; never a silent 0)', async () => {
   let magick = true; try { execFileSync('magick', ['-version'], {stdio: 'pipe'}); } catch { magick = false; }
   if (!magick) return;
