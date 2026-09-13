@@ -93,7 +93,7 @@ test('roles are the type system: eight complete roles in the template, locked ke
 test('HUD contract is a set: prev · next · autosave · + (Text/Box/Slide) · contact sheet · PDF · fullscreen · shortcuts', () => {
   assert.match(tpl, /<button id="prev" [^>]*aria-label="Previous slide · ←"><svg [^>]*><path [^>]*\/><\/svg><\/button>/, 'prev is icon-only'); assert.match(tpl, /<button id="next" [^>]*aria-label="Next slide · →"><svg [^>]*><path [^>]*\/><\/svg><\/button>/, 'next is icon-only');
   const ids = [...tpl.matchAll(/<div id="hud">[\s\S]*?<\/div>\n<div id="sheet"/g)][0][0].match(/id="([^"]+)"/g).map(s => s.slice(4, -1)).filter(s => s !== 'hud' && s !== 'sheet').sort();
-  assert.deepEqual(ids, ['add-box', 'add-text', 'addbtn', 'addmenu', 'addwrap', 'autosave', 'bug', 'dup', 'fs', 'grid-btn', 'help', 'helpmenu', 'helpwrap', 'next', 'pdf', 'prev', 'sadd', 'savecopy', 'snap', 'spell', 'spellbad']);
+  assert.deepEqual(ids, ['add-box', 'add-text', 'addbtn', 'addmenu', 'addwrap', 'autosave', 'bug', 'dup', 'fs', 'grid-btn', 'help', 'helpmenu', 'helpwrap', 'next', 'pdf', 'prev', 'sadd', 'savecopy', 'snap', 'spell', 'spellbad', 'spellwrap']);
   assert.deepEqual([...tpl.match(/<div id="hud">[\s\S]*?\n<\/div>/)[0].matchAll(/id="(prev|next|autosave|addbtn|dup|grid-btn|pdf|fs|help)"/g)].map(m => m[1]), ['prev', 'next', 'autosave', 'addbtn', 'dup', 'pdf', 'grid-btn', 'fs', 'help'], 'save state (the dot) leads the cluster, then edit, file, view; ⓘ rightmost');
   assert.match(tpl, /<button id="help" class="mi mi-circle-question-mark"[^>]*aria-label="Shortcuts"[^>]*><svg /, 'the shortcuts control is the question-mark icon'); assert.match(tpl, /<kbd>← →<\/kbd> previous · next/, 'popover nav line'); assert.match(tpl, /<button id="sheet-back" title="Back to slide \(Esc\)" aria-label="Back to slide \(Esc\)">← Back<\/button>/, 'contact sheet ← Back');
   assert.match(tpl, /if\(\(e\.metaKey\|\|e\.ctrlKey\)&&e\.key\.toLowerCase\(\)==='s'\)\{e\.preventDefault\(\);saveFile\(\);return\}/, '⌘S saves THE FILE (write-back), keyboard only'); assert.doesNotMatch(tpl, /id="save"/);
@@ -1476,7 +1476,9 @@ test('spellcheck: the HUD carries the toggle, on by default, per browser (localS
   assert.match(tpl, /SKEY=NS\+':spell'/, 'state is per deck, per browser'); assert.match(tpl, /Buttons only:[^<]*spellcheck/, 'the ⓘ popover names the toggle');
   assert.match(tpl, /#spell\.off\{opacity:\.35\}/, 'off = dimmed');
   assert.match(tpl, /canvas\.lang=deck\.lang\|\|'en'/, 'the dictionary follows deck.lang, else en');
-  assert.match(tpl, /d\.setAttribute\('spellcheck'/, 'every text row carries the attribute'); assert.doesNotMatch(tpl, /deck\.spell(?!check)/, 'the model never carries the toggle');
+  assert.match(tpl, /d\.setAttribute\('spellcheck'/, 'every text row carries the attribute');
+  assert.doesNotMatch(tpl, /deck\.spell\s*=\s*(?:SPELL|on|!)/, 'the toggle is browser state, never model data');
+  assert.match(tpl, /deck\.spell&&deck\.spell\.ignore/, 'deck.spell.ignore IS model data: the build honours it and the panel appends to it');
   assert.match(read('SKILL.md'), /\| `lang` \|/, 'SKILL.md documents deck.lang');
 });
 live('live: spellcheck — rows wear the attribute, present strips it, off persists across reload, the ⤓ PDF is byte-identical either way', async () => {
