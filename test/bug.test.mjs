@@ -138,8 +138,9 @@ test('template: a HUD bug button (last in the view group) opens a native dialog:
 test('create stamps the package version into the ENGINE marker; the SKILL.md HUD manifest is unchanged by the anchor', () => {
   const {html} = create(structuredClone(explainer), {title: 'bug'});
   assert.ok(html.includes(`const ENGINE=/*ENGINE*/'${pkg}'/*/ENGINE*/;`), `deck carries ENGINE='${pkg}'`);
-  assert.ok(read('SKILL.md').includes('Report a bug'), 'SKILL.md documents the door');
-  assert.match(read('SKILL.md'), /<!-- HUD: [^>]* help bug -->/, 'the HUD manifest ends in bug');
+  assert.ok(read('docs/editor.md').includes('Report a bug'), 'docs/editor.md documents the door');
+  assert.match(read('docs/editor.md'), /<!-- HUD: [^>]* help bug -->/, 'the HUD manifest ends in bug');
+  assert.match(read('SKILL.md'), /bin\/bug\.mjs/, 'SKILL.md keeps the agent-side door');
   assert.ok(read('README.md').includes('decklet@grunion.ai'), 'README names the address');
   assert.match(read('SECURITY.md'), /private vulnerability reporting/, 'security keeps GitHub private reporting');
   assert.match(read('SECURITY.md'), /decklet@grunion\.ai/, 'SECURITY.md routes ordinary bugs to the address');

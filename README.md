@@ -76,7 +76,7 @@ A slide engine where the deck is a JSON model and the renderer is the editor. `c
 
 ## For agents
 
-Read [`SKILL.md`](SKILL.md) — it is the product. It defines the inputs, the process, the model and style contracts, verification thresholds, anti-patterns and three worked examples. The whole loop:
+Read [`SKILL.md`](SKILL.md) — it is the product. It is the authoring path only; the editor (HUD, persistence, PDF, versions, the bug door) is [`docs/editor.md`](docs/editor.md), and the chart row, the connector shapes, the nine figures and the worked examples sit beside it in [`docs/`](docs/). It defines the inputs, the process, the model and style contracts, verification thresholds, anti-patterns and three worked examples. The whole loop:
 
 ```
 node bin/validate.mjs model.json                                   # contract check, no browser
@@ -156,6 +156,7 @@ bin/verify.mjs       parity + AE + contract proof (Playwright optional)
 bin/import-html.mjs  finished HTML pages → model.json (Playwright)
 bin/bug.mjs          a prefilled bug report (mailto) — the deck's bug button and dialog use the same builder
 SKILL.md             the agent authoring skill
+docs/                the references it links: editor.md, verify.md, charts.md, connectors.md, figures.md, examples.md, import-html.md
 llms.txt             machine summary
 examples/            explainer, quarterly-update, launch-carousel, one-pager (brief → model + style)
 test/gate.test.mjs   engine + validator + create + import + live proofs

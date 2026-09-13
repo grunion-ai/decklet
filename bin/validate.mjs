@@ -210,7 +210,7 @@ export function validate(deck) {
       else if (!r.line && !r.curve) E(`${where}: dash needs a line or a curve`);
     }
     // ── connector SHAPE rules. Warnings, never errors: a deck may have a deliberate exception — declare it with waive:1.
-    // Ruled on two connector probes (decks/connector-probe*/RULES.md); see SKILL.md CONNECTORS for the full list.
+    // Ruled on two connector probes (decks/connector-probe*/RULES.md); see docs/connectors.md for the full list.
     //
     // A CONNECTOR IS A STROKE WITH A HEAD. Every rule below is about a line that POINTS AT something: where it may run, how
     // it may bend, how much air it leaves at the thing it points to. A headless stroke is a rule, an underline, an

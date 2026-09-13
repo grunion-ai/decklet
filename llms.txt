@@ -13,7 +13,13 @@ Model: {w,h,format,styles:{roles,margin,pad},slots,layouts:{name:{slot:{x,y,w,ro
 PDF: the ⤓ button writes a true slide-sized PDF inside the file (foreignObject -> canvas -> JPEG -> PDF, zero dependencies; verified in Chromium, Safari unconfirmed -> falls back to print). ⌘P is the paper path: named Letter/A4 pages, one slide per page.
 
 ## Files
-- SKILL.md: the agent authoring skill — inputs, process, model + style contracts, layouts, master, verification thresholds, anti-patterns, worked examples
+- SKILL.md: the agent authoring skill — inputs, process, model + style contracts, layouts, templates, density, graphics, verification thresholds, anti-patterns (~7,000 words, the authoring path only)
+- docs/editor.md: what the deck file does once a human opens it — the HUD manifest and every control, the contact sheet, presenting, both PDF routes, persistence (File System Access, Safari, the amber dot), versions, revising an edited deck, motion, the bug door
+- docs/verify.md: what layout parity measures — the five collision shapes in full, and every validate/verify threshold with its pass criterion
+- docs/charts.md: the chart row's drawing rules (bars from zero, one explicit max, direct value labels, no legend, annotations)
+- docs/connectors.md: the shapes a deck may draw — a connector is a stroke with a head; orthogonal runs, S-curve channels, control points, termination, weight, fan-out, entry
+- docs/figures.md: diagramSlide()/diagramRows() spec API and the nine figure templates
+- docs/examples.md, docs/import-html.md: four worked briefs end to end, and finished HTML pages into a model
 - README.md: what/for whom/guarantees/feature matrix/roadmap
 - deck.html: the engine with its own explainer deck (12 slides, incl. the motion vocabulary and three inlined GIF clips of the editor) — live at https://grunion-ai.github.io/decklet/deck.html
 - docs/demo.gif, docs/demo-poster.png: README demo recording, a build product of deck.html via docs/record-demo.mjs (Playwright + ffmpeg)

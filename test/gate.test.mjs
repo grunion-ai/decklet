@@ -198,13 +198,13 @@ test('HUD icons: every control is a Lucide shape wearing its motion parts; no un
   assert.match(tpl, /@media \(prefers-reduced-motion:reduce\)\{\.mi svg,\.mi svg \*\{animation:none!important;transition:none!important\}\}/);
 });
 
-// ── 2c. the HUD is a contract: what ships and what SKILL.md promises are checked against each other ──
-test('HUD contract does not drift: SKILL.md names exactly the controls the template ships', () => {
+// ── 2c. the HUD is a contract: what ships and what docs/editor.md promises are checked against each other ──
+test('HUD contract does not drift: docs/editor.md names exactly the controls the template ships', () => {
   // the controls themselves, not the items inside the + and ⓘ pop-ups
   const hud = tpl.match(/<div id="hud">[\s\S]*?\n<\/div>/)[0].replace(/<div id="(?:addmenu|helpmenu)"[\s\S]*?<\/div>/g, '');
   const shipped = [...hud.matchAll(/<(?:button|span) id="([^"]+)"/g)].map(m => m[1]);
-  const doc = read('SKILL.md').match(/<!-- HUD: ([^>]*) -->/);
-  assert.ok(doc, 'SKILL.md carries a machine-checked HUD manifest');
+  const doc = read('docs/editor.md').match(/<!-- HUD: ([^>]*) -->/);
+  assert.ok(doc, 'docs/editor.md carries a machine-checked HUD manifest');
   assert.deepEqual(doc[1].trim().split(/\s+/), shipped, 'the documented HUD and the shipped HUD are the same set, in the same order');
 });
 test('present mode: the peek HUD is a centred pill, so it cannot sit on the page counter', () => {
@@ -1528,7 +1528,7 @@ test('guides + snap: the HUD carries the toggle, OFF by default, per browser (lo
   assert.match(tpl, /function snapTo\([^)]*\)\{if\(!SNAP\)return\{dx,dy,hit:null\}/, 'off = the raw delta, nothing else runs');
   assert.doesNotMatch(tpl.slice(tpl.indexOf('function nudgeSel('), tpl.indexOf('save();render();', tpl.indexOf('function nudgeSel('))), /snapTo|nearest\(/, 'the keyboard nudge never snaps: 1px is the point of it');
   assert.match(tpl, /q\('#snap'\)\.setAttribute\('aria-pressed','false'\)/, 'fileHtml() resets the toggle: a saved copy opens with guides off');
-  assert.match(read('SKILL.md'), /guides/, 'SKILL.md hand-off names the toggle');
+  assert.match(read('docs/editor.md'), /guides/, 'the editor reference names the toggle');
 });
 live('live: guides + snap — off paints nothing; on paints one hairline per distinct slot edge; a drag lands on a line in range, passes one out of range; off = raw delta; the resize nib and a connector nib snap too; print, the sheet and the ⤓ PDF carry none; save() writes no key; on survives a reload', async () => {
   // margin 64 → x 64|896 ; slots add x 464|496 and y 80|160|304 ; the canvas mid-lines add x 480 and y 272 (270 seated on the lattice) ; the red box (x 304, w 96) and the line are the movers
