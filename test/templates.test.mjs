@@ -18,9 +18,9 @@ const read = f => fs.readFileSync(path.join(root, f), 'utf8');
 const v = m => validate(create(m).deck);   // validate what create() judges: the neutral roles filled in
 const deck = (slides, extra = {}) => ({w: 960, h: 540, title: 'tpl', ...extra, slides});
 
-test('templates: 68 ship, every id unique, every one names a tier, a category and a density', () => {
-  assert.equal(TEMPLATES.length, 68);
-  assert.equal(new Set(TEMPLATES.map(t => t.id)).size, 68);
+test('templates: 69 ship, every id unique, every one names a tier, a category and a density', () => {
+  assert.equal(TEMPLATES.length, 69);
+  assert.equal(new Set(TEMPLATES.map(t => t.id)).size, 69);
   for (const t of TEMPLATES) {
     assert.ok(['core', 'standard', 'fringe'].includes(t.tier), t.id + ' tier');
     assert.ok(t.cat && t.note, t.id + ' cat + note');
@@ -50,11 +50,11 @@ test('templates: the catalogue names the rows fill cannot reach, per template', 
   assert.deepEqual(templateFixed('statement'), [], 'a text-only template has nothing fixed');
   assert.ok(templateFixed('chart-column').some(s => /bars?$/.test(s)), 'a chart template names its bars');
   assert.equal(templateFixed('no-such'), null);
-  const isText = r => r.text != null || r.html != null;
+  assert.deepEqual(templateFixed('scorecard-grid'), ['5 rules'], 'a cell\'s rating ring is a key, so only the rules are fixed');
   const cat = templateCatalogue();
   for (const t of TEMPLATES) {
     const fixed = templateFixed(t.id);
-    assert.equal(fixed.reduce((n, s) => n + Number(s.split(' ')[0]), 0), t.els.filter(r => !isText(r)).length, t.id + ': every unreachable row counted');
+    assert.equal(fixed.reduce((n, s) => n + Number(s.split(' ')[0]), 0), t.els.length - templateKeys(t.id).length, t.id + ': every row a key does not reach is counted');
     assert.ok(cat.includes('    fixed: ' + (fixed.length ? fixed.join(' · ') : 'none — every row fills')), t.id + ' fixed line');
   }
   assert.match(cat, /^ {4}fixed: none — every row fills$/m, 'a fully fillable template says so');
@@ -104,8 +104,8 @@ test('templates: validate --templates prints the catalogue, the nine figures und
   for (const id of FIGURES) assert.match(out.stdout, new RegExp('^  ' + id + ' ', 'm'), id + ' printed');
 });
 
-// the nine figure kinds (ROADMAP L9.2): each is diagramRows() output on the `diagram` layout, reading density, no client residue
-const FIGURES = ['figure-decision', 'figure-flow', 'figure-before-after', 'figure-data-model', 'figure-states', 'figure-release', 'figure-boundaries', 'figure-tree', 'figure-layers'];
+// the figure kinds (ROADMAP L9.2, plus the six-node boundaries figure of U5.6): each is diagramRows() output on the `diagram` layout, reading density, no client residue
+const FIGURES = ['figure-decision', 'figure-flow', 'figure-before-after', 'figure-data-model', 'figure-states', 'figure-release', 'figure-boundaries', 'figure-boundaries-6', 'figure-tree', 'figure-layers'];
 test('templates: the nine figures — Figures category, diagram layout, reading density, chrome + figure rows + caption, every key filled', () => {
   for (const id of FIGURES) {
     const t = TEMPLATE[id];
@@ -124,6 +124,33 @@ test('templates: the nine figures — Figures category, diagram layout, reading 
   assert.equal(d.slides[0].layout, 'diagram');
   assert.ok(d.slides[0].els.some(e => e.svg && /polygon/.test(e.svg)), 'the diamond keeps its paint as an svg row');
   assert.ok(d.slides[0].els.some(e => e.text === 'Two questions per refund'), 'fill replaced the title');
+});
+
+// U5.6: the advanced architecture as a template — three zones, seven nodes, six labelled edges, and every label on its
+// own run. A label that does not fit lifts to Y(tops)-22, which is where a group's label sits (Y(g.y)+6): the channels
+// are cut so none of them lifts.
+test('templates: figure-boundaries-6 — three zones, seven nodes, six labelled edges, no label lifted onto a group label', () => {
+  const t = TEMPLATE['figure-boundaries-6'];
+  assert.ok(t, 'figure-boundaries-6 ships');
+  const rows = t.els;
+  const groups = new Set(rows.filter(r => /^g:/.test(r.group || '')).map(r => r.group));
+  const nodes = new Set(rows.filter(r => r.group && !/^[ge]:|^tick:|^note$|^timeline$/.test(r.group)).map(r => r.group));
+  const edges = new Set(rows.filter(r => /^e:/.test(r.group || '')).map(r => r.group));
+  assert.equal(groups.size, 3, [...groups].join(' '));
+  assert.equal(nodes.size, 7, [...nodes].join(' '));
+  assert.equal(edges.size, 6, [...edges].join(' '));
+  const edgeLabels = rows.filter(r => /^e:/.test(r.group || '') && r.role === 'Label');
+  assert.equal(edgeLabels.length, 6, 'every edge carries a label');
+  // a Label's line box is 14px; two labels are legal when they sit styles.gap (4) apart on either axis
+  const groupLabels = rows.filter(r => /^g:/.test(r.group || '') && r.role === 'Label');
+  assert.equal(groupLabels.length, 3);
+  for (const a of edgeLabels) for (const b of groupLabels) {
+    const apart = a.x + a.w + 4 <= b.x || b.x + b.w + 4 <= a.x || a.y + 18 <= b.y || b.y + 18 <= a.y;
+    assert.ok(apart, `"${a.text}" lifted onto the group label "${b.text}" (${a.x},${a.y} vs ${b.x},${b.y})`);
+  }
+  const r = v(deck([{template: 'figure-boundaries-6'}]));
+  assert.deepEqual(r.errors, [], r.errors.join(' | '));
+  assert.deepEqual(r.warnings, [], 'the gap gate is clean too: ' + r.warnings.join(' | '));
 });
 
 // U5.5: scorecard-grid — the criteria × options grid two study subjects hand-built. Every cell is a fill key, and one

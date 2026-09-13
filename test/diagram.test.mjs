@@ -162,6 +162,20 @@ test('diagram: palette — a token prefix maps every colour to that palette\'s t
   assert.deepEqual(s.els.find(r => r.slot === 'caption'), {slot: 'caption', text: 'C', color: 'var(--us-muted)'});
 });
 
+// ROADMAP U5.6: the study's four subjects all read lib/diagram.mjs to find where a label lands. GRAPHICS → Figures now
+// states it — the group label's corner, the edge label's run and its lift, the one fits() rule behind both — and names
+// both import paths, so neither question sends the next agent into the source.
+test('diagram: SKILL.md states where a group label sits, where an edge label lands and lifts, the fits() rule, and both import paths', () => {
+  const doc = fs.readFileSync(path.join(root, 'SKILL.md'), 'utf8');
+  const figures = doc.slice(doc.indexOf('- **Figures**'), doc.indexOf('- **Clips**'));
+  assert.match(figures, /X\(g\.x\) ?\+ ?12, ?Y\(g\.y\) ?\+ ?6/, 'the group label corner');
+  assert.match(figures, /Y\(tops\) ?[-−] ?22/, 'the lift');
+  assert.match(figures, /does not fit/, 'when it lifts');
+  assert.match(figures, /fits\(run, text\)/, 'the rule the auto-router asks');
+  assert.match(figures, /@grunion\/decklet\/diagram/, 'the package path');
+  assert.match(figures, /\.\/lib\/diagram\.mjs/, 'the file path beside a checkout');
+});
+
 test('diagram: the package exports it, so a caller imports @grunion/decklet/diagram', () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
   assert.equal(pkg.exports['./diagram'], './lib/diagram.mjs');
