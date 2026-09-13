@@ -58,4 +58,4 @@ Four words, and no fifth: `rise` (text — the default), `fade` (quiet chrome), 
 
 ## Reporting a bug
 
-The bug door is the HUD's last control, above. `node bin/bug.mjs --category <kind> --desc "…"` prints the same prefilled `mailto:decklet@grunion.ai` from the command line. The address is receive-only, and a report never carries a word, note, alt text, token, image, link, path or edit of the deck.
+The bug door is the HUD's last control, above. **Open mail app** hands the browser a `mailto:` and the dialog stays open: a sandboxed pane — an embedded browser, a kiosk profile, a machine with no mail client — registers no handler, the click then does nothing at all, and nothing tells the page which happened. The footer hint says so and **Copy report** puts the same text on the clipboard for any mail client. `node bin/bug.mjs --category <kind> --desc "…"` prints the same prefilled `mailto:decklet@grunion.ai` from the command line. The address is receive-only, and a report never carries a word, note, alt text, token, image, link, path or edit of the deck.
