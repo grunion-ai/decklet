@@ -10,7 +10,7 @@ import {fileURLToPath} from 'node:url';
 import {validate, ROLES} from '../bin/validate.mjs';
 import {create} from '../bin/create.mjs';
 import {verify} from '../bin/verify.mjs';
-import {LIBRARY, GROUPS, DENSE, COUNTER, libraryFor, catalogue} from '../lib/layouts.mjs';
+import {LIBRARY, GROUPS, DENSE, COUNTER, NEUTRAL_LH, libraryFor, catalogue, freeArea} from '../lib/layouts.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 let pw = null; try { pw = await import('playwright'); } catch {}
@@ -118,10 +118,41 @@ test('library: the catalogue printer lists every layout with its group, use and 
   assert.equal(r.status, 0, r.stderr); assert.equal(r.stdout, c + '\n');
 });
 
+// U2.2 — an agent placing a free row beside a bound slot reads the printed geometry, never lib/layouts.mjs
+test('library: the catalogue prints every slot box and the free band under the chrome', () => {
+  const c = catalogue();
+  for (const [name, lay] of Object.entries(LIBRARY)) {
+    const fa = freeArea(lay);
+    assert.ok(c.includes(`free: x ${fa.x} y ${fa.y} w ${fa.w} h ${fa.h}`), name + ' free band');
+    for (const [s, sl] of Object.entries(lay.slots)) {
+      const x = sl.right != null ? 'r' + sl.right : String(sl.x ?? 0);
+      assert.match(c, new RegExp('^ +' + s + ' +\\S+ +' + x + ' +' + (sl.y ?? 0) + ' +' + String(sl.w ?? '-').replace(/[-]/g, '\\-'), 'm'), `${name}.${s} box`);
+    }
+  }
+  assert.match(c, /960×540 cut/, 'the cut the numbers are in');
+});
+
+test('library: the free band starts under the lowest chrome slot and ends at the foot', () => {
+  const content = freeArea(LIBRARY.content);
+  assert.deepEqual(content, {x: 60, y: DENSE.subtitle.y + NEUTRAL_LH.H2, w: 840, h: DENSE.note.y - (DENSE.subtitle.y + NEUTRAL_LH.H2)},
+    'a dense layout: under the subtitle, above the note');
+  for (const [name, lay] of Object.entries(LIBRARY)) {
+    const fa = freeArea(lay);
+    assert.ok(fa.h > 0, name + ' has a band');
+    for (const n of ['supertitle', 'title', 'subtitle']) if (lay.slots[n]) assert.ok(lay.slots[n].y < fa.y, `${name}.${n} is chrome, above the band`);
+    for (const n of ['note', 'source', 'legend', 'footer']) if (lay.slots[n]) assert.ok(lay.slots[n].y >= fa.y + fa.h, `${name}.${n} is foot, below the band`);
+  }
+});
+
+test('library: NEUTRAL_LH is the template scale — the printed geometry cannot drift from the runtime', () => {
+  const roles = JSON.parse(fs.readFileSync(path.join(root, 'template.html'), 'utf8').match(/\/\*DECK\*\/([\s\S]*?)\/\*\/DECK\*\//)[1]).styles.roles;
+  for (const [r, v] of Object.entries(roles)) assert.equal(NEUTRAL_LH[r], v.lh, r + ' leading');
+});
+
 test('library: the counter owns the corner — COUNTER is the reserve, and no dense or right-anchored slot enters it on any layout', () => {
   assert.deepEqual(COUNTER, {right: 60, y: 466, w: 96, h: 74}, 'the bottom-right corner of the 960×540 cut: the right foot from y 466 down');
   assert.equal(DENSE.legend.right, COUNTER.right + COUNTER.w + 12, 'the legend keeps its right alignment, left of the reserve plus a 12px gap');
-  const LH = {Title: 68, Supertitle: 16, H1: 40, H2: 28, Body: 24, Caption: 18, Label: 14, Stat: 44, Stat2: 44};   // the neutral scale, one line
+  const LH = NEUTRAL_LH;
   const cx = 960 - COUNTER.right - COUNTER.w;
   for (const [name, lay] of Object.entries(LIBRARY)) for (const [slot, sl] of Object.entries(lay.slots)) {
     if (!(slot in DENSE) && sl.right == null) continue;

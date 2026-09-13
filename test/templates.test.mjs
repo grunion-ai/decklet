@@ -10,7 +10,7 @@ import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {validate} from '../bin/validate.mjs';
 import {create} from '../bin/create.mjs';
-import {TEMPLATES, TEMPLATE, templateKeys, expandTemplates, templateCatalogue} from '../lib/templates.mjs';
+import {TEMPLATES, TEMPLATE, templateKeys, templateFixed, expandTemplates, templateCatalogue} from '../lib/templates.mjs';
 import {LIBRARY} from '../lib/layouts.mjs';
 import {diagramLayout} from '../lib/diagram.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -42,6 +42,22 @@ test('templates: keys — every text row gets t1..tn in row order; the catalogue
   const cat = templateCatalogue();
   assert.match(cat, /three-up-cards/); assert.match(cat, /t1/); assert.match(cat, /Three things, priced as one\./);
   for (const t of TEMPLATES) assert.match(cat, new RegExp(t.id.replace(/[-]/g, '\\-')), t.id + ' in the catalogue');
+});
+
+// U2.1 — a template reads as fully fillable until the catalogue says which rows carry the sample's values
+test('templates: the catalogue names the rows fill cannot reach, per template', () => {
+  assert.deepEqual(templateFixed('harvey-balls'), ['12 rings', '4 rules'], 'twelve rating rings are literals in els');
+  assert.deepEqual(templateFixed('statement'), [], 'a text-only template has nothing fixed');
+  assert.ok(templateFixed('chart-column').some(s => /bars?$/.test(s)), 'a chart template names its bars');
+  assert.equal(templateFixed('no-such'), null);
+  const isText = r => r.text != null || r.html != null;
+  const cat = templateCatalogue();
+  for (const t of TEMPLATES) {
+    const fixed = templateFixed(t.id);
+    assert.equal(fixed.reduce((n, s) => n + Number(s.split(' ')[0]), 0), t.els.filter(r => !isText(r)).length, t.id + ': every unreachable row counted');
+    assert.ok(cat.includes('    fixed: ' + (fixed.length ? fixed.join(' · ') : 'none — every row fills')), t.id + ' fixed line');
+  }
+  assert.match(cat, /^ {4}fixed: none — every row fills$/m, 'a fully fillable template says so');
 });
 
 test('templates: expand — a template slide becomes the template rows, fill overrides by key, free rows are kept after', () => {
