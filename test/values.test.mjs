@@ -112,3 +112,66 @@ live('live: the four Harvey-ball levels paint as four different balls at 960px',
   const cut = got.map(g => (g.img.match(/(\d+(?:\.\d+)?)%/) || [])[1]);
   assert.deepEqual(cut, Object.values(RATINGS).map(v => String(v * 25)), 'each ball is cut at its own rating: ' + cut.join(','));
 });
+
+// ── U4.2: a chart template's series is a value key too. `data` takes the `chart` row's own array and the template hands it
+// to that row, so the numbers arrive through the expansion path the engine already draws with.
+const QUARTERS = [{label: 'Q1', value: 41}, {label: 'Q2', value: 58}, {label: 'Q3', value: 52}, {label: 'Q4', value: 77}];
+const chartOf = s => s.els.find(r => r.chart);
+
+test('values: the chart templates the chart row can draw declare `data`, with the mark it draws', () => {
+  for (const [id, mark, n] of [['chart-column', 'bar', 4], ['chart-grouped', 'bar', 4], ['chart-line-trend', 'line', 6]]) {
+    const [v, ...rest] = templateVals(id);
+    assert.deepEqual(rest, [], id + ': one value key');
+    assert.equal(v.key, 'data'); assert.equal(v.kind, 'data'); assert.equal(v.mark, mark);
+    assert.equal(v.sample.length, n, id + ': the sample is the series the sheet shows');
+    assert.equal(chartOf(TEMPLATE[id]).chart.mark, mark, id + ': the sample already goes through the chart row');
+  }
+  assert.deepEqual(templateVals('chart-grouped')[0].series, ['Actual', 'Plan'], 'two series: value and compare');
+  assert.deepEqual(templateVals('chart-waterfall'), [], 'a chart the chart row cannot draw keeps its rows fixed');
+});
+
+test('values: a filled chart-column expands into bars carrying the filled points', () => {
+  const d = deckOf([{template: 'chart-column', fill: {t3: 'Signed bookings · $000s', data: QUARTERS}}]);
+  assert.deepEqual(validate(structuredClone(d)).errors, []);
+  const rows = validate(d) && d.slides[0].els;   // validate() expands templates then charts, as create() does
+  const bars = rows.filter(r => r.bar), labels = rows.filter(r => r.role === 'Label').map(r => r.text);
+  assert.equal(bars.length, 4, 'four points, four bars');
+  const tops = bars.map(b => b.y);
+  assert.deepEqual(tops.map((y, i) => y < tops[0] === (QUARTERS[i].value > 41)), [true, true, true, true], 'bar height follows the value');
+  for (const p of QUARTERS) { assert.ok(labels.includes(String(p.value)), 'the value label ' + p.value); assert.ok(labels.includes(p.label), 'the axis label ' + p.label); }
+  assert.ok(!labels.includes('62') && !labels.includes('$62K'), 'and none of the sample: ' + labels.join(' '));
+  assert.ok(rows.some(r => r.text === 'Signed bookings · $000s'), 'the text keys still fill');
+  // two series: value and compare, eight bars
+  const g = deckOf([{template: 'chart-grouped', fill: {data: QUARTERS.map((p, i) => ({...p, compare: 60 + i}))}}]);
+  validate(g);
+  assert.equal(g.slides[0].els.filter(r => r.bar).length, 8, 'four pairs');
+});
+
+test('values: a data fill the chart row refuses is a validate error, named on the key', () => {
+  const bad = fill => validate(deckOf([{template: 'chart-column', fill}])).errors;
+  assert.ok(bad({data: [{label: 'Q1', value: 41}]}).some(m => /"data"/.test(m) && /two data points/.test(m)), bad({data: [{label: 'Q1', value: 41}]}).join(' | '));
+  assert.ok(bad({data: [{label: 'Q1', value: 'lots'}, {label: 'Q2', value: 2}]}).some(m => /"data"/.test(m) && /must be a number/.test(m)));
+  assert.ok(bad({data: 'four quarters'}).some(m => /"data"/.test(m)));
+  assert.deepEqual(bad({data: QUARTERS}), []);
+});
+
+test('values: --templates says which chart templates take data, and the rest keep their series fixed', () => {
+  const cat = templateCatalogue();
+  const block = id => cat.slice(cat.indexOf('  ' + id.padEnd(22))).split('\n').slice(0, 8);
+  assert.ok(block('chart-column').some(l => /^\s+data\s+bar data\s/.test(l)), block('chart-column').join('\n'));
+  assert.ok(block('chart-line-trend').some(l => /^\s+data\s+line data\s/.test(l)), 'the line chart names its mark');
+  assert.ok(block('chart-column').some(l => /fixed: none — every row fills/.test(l)), 'nothing left fixed: ' + block('chart-column').join('\n'));
+  assert.ok(block('chart-waterfall').some(l => /fixed: 5 rules · 5 shapes/.test(l)), 'a chart without a data key still says its rows are fixed');
+});
+
+live('live: a filled chart-column deck verifies, and the bars on the page are the filled numbers', async () => {
+  const f = path.join(tmp, 'chart.html');
+  fs.writeFileSync(f, create(deckOf([{template: 'chart-column', fill: {data: QUARTERS}}])).html);
+  const r = await verify(f, {out: path.join(tmp, 'v-chart'), log: () => {}});
+  assert.deepEqual(r.errors, [], JSON.stringify(r.parity.filter(p => !p.pass)));
+  const b = await pw.chromium.launch(); const p = await b.newPage({viewport: {width: 1280, height: 800}});
+  await p.goto(pathToFileURL(f).href); await p.waitForSelector('#canvas .el');
+  const got = await p.evaluate(() => [...canvas.querySelectorAll('.el')].map(d => d.textContent).filter(t => /^\d+$/.test(t)));
+  await b.close();
+  assert.deepEqual(got.filter(t => QUARTERS.some(q => String(q.value) === t)).sort(), ['41', '52', '58', '77'], 'every point is painted: ' + got.join(','));
+});
