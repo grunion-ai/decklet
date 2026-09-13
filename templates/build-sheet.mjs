@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { TEMPLATES } from './index.mjs';
 import { LIBRARY } from '../lib/layouts.mjs';
 import { scale } from '../lib/templates/kit.mjs';
+import { chartRows } from '../lib/chart.mjs';
 const dir = path.dirname(fileURLToPath(import.meta.url));
 const only = process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1].split(',') : null;
 // --density cuts one deck per density: every template and layout tagged with it, then three ORTHOGONAL kits
@@ -172,7 +173,8 @@ const TOK = /var\(--(fg|muted|accent|card|box|line)\)/g;
 const wear = (els, kit, layout) => {
   const pre = kit.name, tok = t => `var(--${pre}-${t})`, map = v => typeof v === 'string' ? v.replace(TOK, `var(--${pre}-$1)`) : v;
   const roleOf = r => r.role || (r.slot && layout && LIBRARY[layout].slots[r.slot] && LIBRARY[layout].slots[r.slot].role);
-  return els.map(r => {
+  // a chart row is expanded HERE, before the kit is worn: create() would expand it after, with the sheet's neutral accent baked in
+  return els.flatMap(r => r.chart ? chartRows(r, NEUTRAL) : [r]).map(r => {
     const o = { ...r };
     for (const k of ['bg', 'bd', 'bt', 'br', 'bb', 'bl', 'color', 'html']) if (o[k] != null) o[k] = map(o[k]);
     const role = roleOf(o), t = role && kit.roles[role], n = role && NEUTRAL[role];

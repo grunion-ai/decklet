@@ -50,7 +50,8 @@ test('templates: the catalogue names the rows fill cannot reach, per template', 
   assert.deepEqual(templateFixed('harvey-balls'), ['4 rules'], 'the twelve balls are value keys since U4.1 — only the rules are fixed');
   assert.deepEqual(templateFixed('progress-tracker'), ['4 shapes'], 'the bar fills follow p1…p4; the tracks behind them are fixed');
   assert.deepEqual(templateFixed('statement'), [], 'a text-only template has nothing fixed');
-  assert.ok(templateFixed('chart-column').some(s => /bars?$/.test(s)), 'a chart template names its bars');
+  assert.ok(templateFixed('stat-plus-chart').some(s => /bars?$/.test(s)), 'a template whose series is literal names its bars');
+  assert.deepEqual(templateFixed('chart-column'), [], 'a chart template whose series is a `data` key has nothing fixed (U4.2)');
   assert.equal(templateFixed('no-such'), null);
   assert.deepEqual(templateFixed('scorecard-grid'), ['5 rules'], 'a cell\'s rating ring is a key, so only the rules are fixed');
   const cat = templateCatalogue();

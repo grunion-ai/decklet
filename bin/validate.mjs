@@ -156,6 +156,7 @@ export function validate(deck) {
   if (deck.density != null && !DENSITY[deck.density]) E(`density "${deck.density}" not one of ${Object.keys(DENSITY).join('|')}`);
   expandTemplates(deck); expandIcons(deck);
   const layouts = {...libraryFor(deck), ...(deck.layouts || {})};   // a slide may name a library layout the deck does not define
+  expandCharts(deck);   // a chart template expands INTO a chart row (U4.2): judge the rows it stands for, as create() does
   for (const [ln, lay] of Object.entries(layouts)) for (const [n, sl] of Object.entries(lay || {})) checkSlot(`layouts.${ln}`, n, sl);
   // points or prose: `body` and the bullet slots `b1…bn` share one column on the image layouts, so a slide binds one or the other
   for (const [si, s] of (Array.isArray(deck.slides) ? deck.slides : []).entries()) {
