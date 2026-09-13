@@ -1,6 +1,7 @@
 // decklet pdf — the agent's PDF is vector, slide-sized, HUD-free and linked (Playwright, skipped when absent).
 // bin/pdf.mjs drives the deck's own print pipeline (beforeprint → #print pages) through Chromium's print engine with a
-// pixel @page, so text stays text and every href becomes a /Link annotation. The button takes the same route in Chromium.
+// pixel @page, so text stays text and every href becomes a /Link annotation. The button writes its own raster PDF instead:
+// the print dialog ignores a px @page (preferCSSPageSize is headless-only) and letterboxed every slide on a Letter page.
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -44,16 +45,16 @@ live('bin/pdf.mjs refuses a deck whose gate fails', async () => {
   await assert.rejects(toPdf(f, path.join(tmp, 'broken.pdf')), /HUD/);
 });
 
-live('the PDF button in Chromium takes the print route: px @page injected, print() called, cleaned up after', async () => {
+live('the PDF button writes a slide-sized PDF itself and never opens the print dialog', async () => {
   const b = await pw.chromium.launch(); const p = await b.newPage({viewport: {width: 1280, height: 800}});
   await p.addInitScript(() => { window.__printed = 0; window.print = () => { window.__printed++; }; });
   await p.goto(pathToFileURL(deck()).href);
-  await p.click('#pdf');
-  await p.waitForFunction(() => window.__printed === 1);
-  const rule = await p.evaluate(() => document.getElementById('pdfpage')?.textContent || '');
-  assert.match(rule, /@page\{size:960px 540px;margin:0\}/);
-  assert.match(rule, /#print \.pg\{zoom:1!important\}/);
-  await p.evaluate(() => dispatchEvent(new Event('afterprint')));
-  assert.equal(await p.evaluate(() => !!document.getElementById('pdfpage')), false);
+  const [dl] = await Promise.all([p.waitForEvent('download', {timeout: 3e4}), p.click('#pdf')]);
+  const out = path.join(tmp, 'button.pdf'); await dl.saveAs(out);
+  const r = inspect(fs.readFileSync(out));
+  assert.equal(r.pages, 3);
+  assert.deepEqual(r.box, [960, 540]);                          // the slide's own size — never Letter, never letterboxed
+  assert.equal(await p.evaluate(() => window.__printed), 0);    // the dialog decides paper size and background colour; it is not a route
+  assert.match(dl.suggestedFilename(), /\.pdf$/);
   await b.close();
 });
