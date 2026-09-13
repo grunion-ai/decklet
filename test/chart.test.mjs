@@ -121,9 +121,9 @@ live('live: chart rows render with parity and zero page errors, and the expanded
   assert.ok(moved.bar && moved.x > 60, 'a bar is a plain draggable row after expansion: ' + JSON.stringify(moved));
 });
 
-test('chart: SKILL.md carries the drawing rules', () => {
-  const doc = fs.readFileSync(path.join(root, 'SKILL.md'), 'utf8');
-  const sec = doc.slice(doc.indexOf('## CHART ROW'));
+test('chart: docs/charts.md carries the drawing rules, and SKILL.md links it', () => {
+  assert.match(fs.readFileSync(path.join(root, 'SKILL.md'), 'utf8'), /\[docs\/charts\.md\]\(docs\/charts\.md\)/, 'GRAPHICS sends the reader to the chart reference');
+  const sec = fs.readFileSync(path.join(root, 'docs/charts.md'), 'utf8');
   assert.ok(sec.length > 500);
   for (const re of [/start at zero/, /max label/, /[Dd]irect value labels/, /dashed/, /60%/, /muted:true/, /annotations/, /source/, /rising/]) assert.match(sec, re);
 });

@@ -5,7 +5,7 @@ Thanks for looking. decklet stays small on purpose: one HTML file is the engine,
 ## Before you start
 
 - **Open an issue before a large change.** A feature that adds a runtime dependency, a build step, a network request, or a second file next to `deck.html` will be declined on shape, whatever its quality.
-- **Read [`SKILL.md`](SKILL.md) first.** It is the contract the engine, the validator and the verifier all enforce. A change that makes the three disagree is a bug even when each part looks right on its own.
+- **Read [`SKILL.md`](SKILL.md) first** (and [`docs/`](docs/) for the editor, chart, connector, figure and example references it links). It is the contract the engine, the validator and the verifier all enforce. A change that makes the three disagree is a bug even when each part looks right on its own.
 
 ## Setup
 
@@ -33,6 +33,7 @@ Node 22 or newer. Nothing else to install for the engine or the CLI.
 | --- | --- |
 | Engine, editor, renderer | `template.html` (then `npm run build:deck` and `npm run build:library`) |
 | Model contract, errors, warnings | `bin/validate.mjs` + `SKILL.md` |
+| Editor behaviour (HUD, persistence, PDF, versions) | `template.html` + `docs/editor.md` |
 | Layout parity, collisions, pixel diff | `bin/verify.mjs` |
 | HTML pages to model | `bin/import-html.mjs` |
 | Worked examples | `examples/<name>/brief.md` + `model.json` |

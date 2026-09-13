@@ -66,7 +66,7 @@ test('spell: the toggle wears a count badge, every contact-sheet cell carries on
   assert.match(tpl, /<button id="spell"[\s\S]*?<span id="spellbad" role="status" hidden><\/span><\/button>/, 'the badge lives inside the spellcheck button, as the autosave dot lives inside its button');
   assert.match(tpl, /\.cell \.spellbad\{[^}]*right:8px/, 'the cell badge sits top-right, clear of the slide number at the left');
   assert.match(tpl, /\.cell \.n\{[^}]*left:8px/, 'the slide number stays at the left');
-  assert.match(fs.readFileSync(path.join(root, 'SKILL.md'), 'utf8'), /<!-- HUD: [^>]* spell spellbad /, 'the manifest names the badge after its button');
+  assert.match(fs.readFileSync(path.join(root, 'docs/editor.md'), 'utf8'), /<!-- HUD: [^>]* spell spellbad /, 'the manifest names the badge after its button');
 });
 
 live('spell: the badge counts this slide, follows typing and the toggle, and every sheet cell wears its own count', async () => {
