@@ -156,6 +156,13 @@ export function validate(deck) {
   expandTemplates(deck); expandIcons(deck);
   const layouts = {...libraryFor(deck), ...(deck.layouts || {})};   // a slide may name a library layout the deck does not define
   for (const [ln, lay] of Object.entries(layouts)) for (const [n, sl] of Object.entries(lay || {})) checkSlot(`layouts.${ln}`, n, sl);
+  // points or prose: `body` and the bullet slots `b1…bn` share one column on the image layouts, so a slide binds one or the other
+  for (const [si, s] of (Array.isArray(deck.slides) ? deck.slides : []).entries()) {
+    if (!s || typeof s !== 'object' || !Array.isArray(s.els)) continue;
+    const bound = new Set(s.els.filter(r => r && isText(r) && r.slot).map(r => r.slot));
+    const bs = [...bound].filter(k => /^b\d$/.test(k)).sort();
+    if (bound.has('body') && bs.length) E(`slides[${si}]: binds "body" and ${bs.join(', ')} — a column carries the paragraph or the points, never both`);
+  }
   // master
   const master = deck.master || [];
   if (!Array.isArray(master)) E('master must be an array');

@@ -36,6 +36,10 @@ body.present .el a.lk{pointer-events:auto}
 .el{position:absolute;cursor:grab;padding:0;border-radius:0;white-space:normal;line-height:normal}
 .el.box{border:1.5px solid var(--accent);background:var(--box);text-align:center;padding:6px 8px;border-radius:8px;white-space:pre-wrap;display:flex;flex-direction:column;justify-content:center} /* a box with a height centres its text on the box, like a tile */
 .el.tile{background:var(--card);border:1px solid var(--line);border-radius:12px;text-align:center;display:flex;flex-direction:column;justify-content:center}
+/* bullet: the marker the engine draws for a list row. It hangs OUTSIDE the row's box (1.25em left) so the box stays exactly what
+   the model declares — parity, the gap gate and a drag all read the same rect — and it is sized in em, so it grows with the role
+   and with the canvas. `top` falls back to .5em where the `lh` unit is missing; at the usual 1.5 leading the two agree. */
+.el.bul::before{content:'';position:absolute;left:-1.25em;top:.5em;top:calc(.5lh - .25em);width:.5em;height:.5em;border-radius:50%;background:var(--accent)}
 .el svg{display:block;width:100%;height:100%}
 /* motion: four entrance anims, staggered 120 ms on slide ENTRY. rise = text, fade = quiet chrome, pop = stats/tiles, wipe = bars, lines, rules */
 .el.rise{animation:rise .5s cubic-bezier(.2,.7,.3,1) backwards}
@@ -591,7 +595,7 @@ function drawEls(s,root,animate){
     const r=res(el,s),d=document.createElement('div');
     terminate(r,s); // `to`/`from` clip the stroke before anything reads r.x/r.y/r.line/r.curve
     const an=animate&&ANIM.includes(r.anim)?r.anim:'';
-    d.className='el'+(r.box?' box':'')+(r.tile?' tile':'')+(an?' '+an:'');
+    d.className='el'+(r.box?' box':'')+(r.tile?' tile':'')+(r.bullet?' bul':'')+(an?' '+an:'');
     if(r.svg)d.innerHTML=r.svg;
     else if(r.img){const im=new Image();im.src=r.img;im.style.cssText=`display:block;width:100%;height:100%;object-fit:${r.fit||'fill'};object-position:${r.pos||'50% 50%'};pointer-events:none`;d.appendChild(im)}
     else if(r.html){d.innerHTML=r.html; // rich inline runs (<b>/<i>/<u>/<s>/<span>/<a href>) — re-gate the links on the way in

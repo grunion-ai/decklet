@@ -180,6 +180,7 @@ Row — every prop optional; a row is whatever its props make it:
 | `align` | css | `left` | `center`, `right` |
 | `valign` | `middle` \| `bottom` | top | vertical seat of the text inside a row that carries `h` — a label over a painted button, a floor caption; `box`/`tile` rows centre already |
 | `nowrap` | 1 | — | single line, never wraps (parity checks it) |
+| `bullet` | 1 | — | the engine draws a list marker for this row: a dot half an em across, hanging 1.25em to the LEFT of the row's box. The box itself is unchanged, so parity, the gap gate and a drag all read the geometry the model declares; the marker sizes and seats itself from the role, so it follows the brand's scale and the canvas. Usually inherited from a `b1…bn` slot (`bullets`, `image-left`, `image-right`), where an unbound bullet draws no row and therefore no dot |
 | `ws` | css | — | `pre-wrap` etc. (`\n` in text already pre-wraps) |
 | `p` | token \| css | — | padding: `'chip'`, `'pill'`, `'4px 10px'`, or a number |
 | `bg` | css | — | background (box/bar/rect) |
@@ -250,7 +251,7 @@ Resolution order for any row: slot geometry ← master row (for `override` rows)
 
 ## LAYOUT LIBRARY
 
-Thirty-one named layouts ship with the engine (`lib/layouts.mjs`), in the same shape as a `layouts` entry. Name one on a slide the deck does not define and `create` merges it into `deck.layouts`, scaled from its 960×540 cut to the canvas (1600×900 = ×1.67). Print the catalogue — name, group, density, use, then every slot's box (`x y w h` on the 960×540 cut) and the free band left under the chrome — with:
+Thirty-two named layouts ship with the engine (`lib/layouts.mjs`), in the same shape as a `layouts` entry. Name one on a slide the deck does not define and `create` merges it into `deck.layouts`, scaled from its 960×540 cut to the canvas (1600×900 = ×1.67). Print the catalogue — name, group, density, use, then every slot's box (`x y w h` on the 960×540 cut) and the free band left under the chrome — with:
 ```
 node bin/validate.mjs --layouts
 ```
@@ -268,8 +269,9 @@ Read that instead of inventing geometry: the catalogue carries the numbers, so p
 | | `quote` | speaker | quote (H2, italic) · attribution (Caption) |
 | | `two-cols` | reading | supertitle · title · left · right (Body) |
 | | `two-cols-header` | reading | supertitle · title · header (H2) · left · right |
-| visuals | `image-left` | reading | image (400×320 media) · supertitle · title · body |
-| | `image-right` | reading | supertitle · title · body · image |
+| | `bullets` | reading | supertitle · title · b1–b6 (Body, one line each, `bullet` dot) — the plain bullet page |
+| visuals | `image-left` | reading | image (400×320 media) · supertitle · title · body **or** b1–b4 (Body, `bullet` dot) |
+| | `image-right` | reading | supertitle · title · body **or** b1–b4 · image |
 | modern | `bento-grid` | reading | supertitle · title · hero (paint) · hero-label · hero-value (Title) · hero-chart (376×160 media) · card1–2 (paint) + card1–2-label + card1–2-value (Stat) · action (accent paint) · action-label · action-body |
 | | `image-hero-overlay` | speaker | image (full-bleed media, give it `img`) · scrim (paint) · label · title (Title) · caption — `hide` the footer on the slide |
 | | `image-split` | speaker | image (440×540 media, right) · label · title (H1) · body · button (paint, give it `href`) · button-label (Label, same `href`) |
@@ -298,12 +300,13 @@ Picking a layout by what the content is:
 
 | the slide's content is… | layout |
 |---|---|
+| four to six points under a title | `bullets` |
 | the deck's name and promise | `cover`; `end` closes |
 | what the deck will cover | `agenda`; `section` between parts |
 | one claim | `statement`; with a number in it → `fact`; the number alone → `stat` |
 | someone's words | `quote` |
 | two bodies of text, a lede over two columns | `two-cols`, `two-cols-header` |
-| a picture and a paragraph | `image-left` / `image-right` |
+| a picture and a paragraph, or a picture and three or four points | `image-left` / `image-right` |
 | three or four numbers with movement | `kpi-grid` / `kpi-grid-4` |
 | a series with real numbers | `chart` — no numbers, no chart layout |
 | A against B | `comparison` |
@@ -311,11 +314,12 @@ Picking a layout by what the content is:
 | the ask | `cta` |
 
 ## TEMPLATE LIBRARY
-Sixty-nine finished slides ship with the engine (`lib/templates.mjs`, sources in `lib/templates/cat-*.mjs`): the candidate sheet surveyed across the open-source slide catalogs and promoted whole (2026-09-07). A template is a layout PLUS sample rows — an issue tree, a Sankey, a scorecard, a bento grid — so the agent binds content instead of drawing. Print the catalogue — id · tier · density · note, the rows `fill` cannot reach, then every text key with its sample — with:
+Seventy-one finished slides ship with the engine (`lib/templates.mjs`, sources in `lib/templates/cat-*.mjs`): the candidate sheet surveyed across the open-source slide catalogs and promoted whole (2026-09-07). A template is a layout PLUS sample rows — an issue tree, a Sankey, a scorecard, a bento grid — so the agent binds content instead of drawing. Print the catalogue — id · tier · density · note, the rows `fill` cannot reach, then every text key with its sample — with:
 ```
 node bin/validate.mjs --templates
 ```
 A slide names one and fills its keys: `{template: 'three-up-cards', fill: {t1: 'What you get', t2: 'Three things, one price.', t3: '01', …}}`. Every text row of the template is a key, `t1`…`tn` in row order; a key left out keeps the sample text (so fill them all before shipping). Only text rows are keys: the `fixed:` line under each template counts what `fill` cannot reach — `harvey-balls` prints `fixed: 12 rings · 4 rules`, and those twelve scores stay the sample's until you edit the expanded rows. A template whose every row is a key prints `fixed: none — every row fills`. `create` expands the slide into the template's rows, scaled from the 960×540 cut to the canvas, sets the slide's `layout` to the template's chrome (`content` or `title` from the library — a deck-defined layout of that name wins) and its `density`, and keeps any free `els` after the template rows. An unknown template or fill key is a validate error listing what exists. One key takes more than text: a **scorecard cell** (`scorecard-grid`, printed as role `Cell`) takes a short string OR a whole `0`–`4` rating, which draws the harvey-ball ring at 0 · 25 · 50 · 75 · 100 percent; anything outside that range is a validate error. A template is an accelerant like a layout: edit the rows it produced, add rows beside them, or draw free — nothing here is a fence.
+The two plainest slides in any deck are templates too: `bullet-page` (a title and five points on the `bullets` layout, a dot per point) and `image-bullets` (a photo with three short points beside it on `image-left`). Bind three or fewer points and drop the dense chrome and either one is a speaker slide.
 Tiers: **core** (in 4+ surveyed catalogs), **standard** (consulting catalogs), **fringe** (dataviz literature, rare on slides). Categories: Narrative · Numbers · Comparison · Frameworks · Process · Charts · Modern · Figures.
 
 **Figures** are the figure kinds as templates, each the rows `diagramSlide()` makes from a spec (§ GRAPHICS) on the `diagram` layout, reading density, with a caption that states the claim:
