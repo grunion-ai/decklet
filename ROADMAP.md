@@ -68,7 +68,7 @@ Epics rank by **ICE**: Impact x Confidence x Ease, each 1 to 10, multiplied, wit
 | **Export** | X1 Cheap wins `S` | X2 Searchable PDF `M` | X3 PPTX export `L` |
 | **Library & editor** | L7 Spellcheck, the rest `M`<br>L11 Type on the sheet `S` | | |
 | **Usability** | U9 A `--bad` token in every style `XS`<br>U10 Warn before the browser fails `S` | U8 Two axes on the sheet: look × ladder `L` | |
-| **Getting started** | S6 A kit must not collide with the chrome `S`<br>S7 The catalogue says what a template draws `M`<br>S8 Print a slice of the catalogue `S`<br>S9 The first build should not be thrown away `XS` | | |
+| **Getting started** | S6 A kit must not collide with the chrome `S`<br>S7 The catalogue says what a template draws `M`<br>S8 Print a slice of the catalogue `S`<br>S9 The first build should not be thrown away `XS`<br>S10 Coverage a tool can check `S` | | |
 
 ### ICE scores
 
@@ -110,6 +110,7 @@ Epics rank by **ICE**: Impact x Confidence x Ease, each 1 to 10, multiplied, wit
 | S4 One front door on the skill | 8 | 9 | 9 | **648** | Now |
 | S3 new.mjs: a model that already builds | 9 | 8 | 7 | **504** | Now |
 | S6 A kit must not collide with the chrome | 7 | 9 | 8 | **504** | Now |
+| S10 Coverage a tool can check | 9 | 10 | 8 | **720** | Now |
 | S7 The catalogue says what a template draws | 9 | 9 | 7 | **567** | Now |
 | S9 The first build should not be thrown away | 6 | 10 | 10 | **600** | Now |
 | S8 Print a slice of the catalogue | 7 | 9 | 8 | **504** | Now |
@@ -498,6 +499,22 @@ Filed 2026-09-13 from the parity study: 30 decks, 5 briefs, 7 setups, blind-judg
 **Round 4 measured the lane.** With S1–S5 shipped, ten fresh builders (five Opus, five Sonnet) built all five briefs from the engine alone — no study scaffolding, the engine's own `docs/building.md` as the procedure. All ten reached `VERIFY PASS` on 8/8 slides; nine opened no engine source at all, and `bin/new.mjs` put a validating model on disk 27 to 90 seconds from a cold start. S7 to S9 are what the round left behind.
 
 **One result shapes the whole lane.** A setup that replaced the contract with a one-page summary scored **0.861** against **0.878** for the skill alone — below baseline. Condensing the rules makes an author skim the rules. So nothing here summarises the contract. Each row either makes a tool answer the question that sent an author to the source, or removes a decision from the first five minutes.
+
+### S10. Coverage a tool can check · `S` · Now
+
+The manifest is written from the same reading of the brief that produces the model, so it catches a drop **between the plan and the deck** and is blind to a drop **between the brief and the plan**. Round 4 caught this exactly:
+
+One deck scored 0.74 of its reference, the round's worst, because the brief's opening figures — 40,000 sensors, a report every 30 s, 840 ms p95, two outages — appear nowhere in the deck. Its `MANIFEST.md` has a `## Numbers (every one gets a slide)` table listing six numbers, every one of them genuinely on a slide and honestly ticked. The four missing figures were never written into the manifest, so the tick could not miss them. A second deck's manifest had no sections at all. The procedure asks for "every number in the brief", and an author who misreads the brief once misreads it in both places.
+
+Nothing here needs a model to judge it: a number in the brief either appears in the model or it does not.
+
+| Story | Size | What |
+| --- | --- | --- |
+| S10.1 | S | `node bin/coverage.mjs --brief brief.md --model model.json` lists every number-like token in the brief (currency, percentages, counts, durations, dates) and whether it appears in the model, exiting non-zero on a miss. The author explains or fixes each one; a deliberate omission is a flag, not a silent gap. |
+| S10.2 | XS | `docs/building.md` runs it at the tick, so the mechanical half of coverage stops being self-reported. |
+| S10.3 | XS | The same output seeds `MANIFEST.md`'s numbers table, so the table is extracted rather than transcribed. |
+
+**Scope, honestly.** This checks presence, not correctness: a number on the wrong slide, in the wrong units, or attached to the wrong subject still passes. Those stay the screenshot pass's job. Presence is the half a tool can own, and it is the half that produced the round's worst deck.
 
 ### S7. The catalogue says what a template draws · `M` · Now
 
