@@ -58,3 +58,45 @@ test('skill: README, llms.txt and the package manifest name the docs set', () =>
   assert.match(read('llms.txt'), /docs\/editor\.md/, 'llms.txt lists it');
   assert.ok(JSON.parse(read('package.json')).files.includes('docs'), 'docs/ ships in the package');
 });
+
+// ROADMAP S4 — one front door. The block ROUTES: the commands in order, the two catalogues, and a question-to-page
+// list. It must not restate a rule; a summary of the contract invites skimming the contract (the 30-deck study scored
+// a summarised skill BELOW baseline). So this gate holds shape and links, never wording.
+test('skill: START HERE is the front door, above INPUTS, twelve lines at most', () => {
+  const doc = read('SKILL.md');
+  const at = doc.indexOf('\n## START HERE\n');
+  assert.ok(at > -1, 'SKILL.md carries a ## START HERE block');
+  assert.ok(at < doc.indexOf('\n## INPUTS'), 'START HERE sits above INPUTS');
+  assert.ok(at < doc.indexOf('\n## PROCESS'), 'and above PROCESS');
+  assert.ok(doc.slice(0, at).includes('# decklet — agent authoring skill'), 'directly under the title');
+
+  const block = doc.slice(at + 1).split(/\n---|\n## /)[0];
+  const lines = block.split('\n').filter(l => l.trim());
+  assert.ok(lines.length <= 12, `START HERE is ${lines.length} lines (max 12) — route, do not explain`);
+
+  // the sequence, in order, as commands
+  const seq = ['bin/new.mjs', 'bin/validate.mjs', 'bin/create.mjs', 'bin/verify.mjs'];
+  let cursor = 0;
+  for (const cmd of seq) {
+    const i = block.indexOf('node ' + cmd, cursor);
+    assert.ok(i > -1, `START HERE runs ${cmd}`);
+    cursor = i;
+  }
+  assert.match(block, /--strict/, 'and gates with --strict');
+  for (const m of block.matchAll(/bin\/[\w-]+\.mjs/g)) {
+    assert.ok(fs.existsSync(path.join(root, m[0])), `START HERE names ${m[0]}, which exists`);
+  }
+  assert.match(block, /--layouts/, 'names the layout catalogue');
+  assert.match(block, /--templates/, 'names the template catalogue');
+  assert.match(block, /VERIFY PASS/, 'says a first pass is half the job');
+
+  // every page it points at resolves, and the five questions are routed
+  for (const [q, page] of [[/figure/i, 'figures.md'], [/chart/i, 'charts.md'], [/verify/i, 'verify.md'],
+                           [/editor/i, 'editor.md'], [/example|model/i, 'examples.md'], [/building|pass/i, 'building.md']]) {
+    assert.match(block, q, 'START HERE routes ' + page);
+    assert.ok(block.includes(`(docs/${page})`), 'START HERE links docs/' + page);
+  }
+  for (const m of block.matchAll(/\(docs\/([\w.-]+)\)/g)) {
+    assert.ok(fs.existsSync(path.join(root, 'docs', m[1])), `docs/${m[1]} exists`);
+  }
+});

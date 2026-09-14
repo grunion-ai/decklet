@@ -15,9 +15,23 @@ triggers:
 
 You produce a **model** (JSON). The toolchain produces a **deck** (one `.html` file) that a human can drag, retype, present and print. Your job is to get the model right; the validator and verifier tell you when you haven't.
 
-```
-content + format + style  →  slide plan  →  model.json  →  validate  →  create  →  verify  →  hand-off
-```
+## START HERE
+
+    node bin/new.mjs --out model.json --slides 8 --density reading
+    node bin/validate.mjs model.json --style style.json --strict
+    node bin/create.mjs --model model.json --style style.json --out deck.html --format slides
+    node bin/verify.mjs deck.html --strict
+
+`node bin/validate.mjs --layouts` prints every slot box and free band; `--templates` prints every fill key and the `fixed:` rows no key reaches.
+A first `VERIFY PASS` is half the job — the second pass is [docs/building.md](docs/building.md).
+
+- a figure → [docs/figures.md](docs/figures.md)
+- a chart → [docs/charts.md](docs/charts.md)
+- what `verify` measures → [docs/verify.md](docs/verify.md)
+- the editor, PDF, versions → [docs/editor.md](docs/editor.md)
+- worked models → [docs/examples.md](docs/examples.md)
+
+---
 
 All commands run from the repo root with plain Node ≥ 22. Installed as a Claude Code plugin, the repo root is `${CLAUDE_PLUGIN_ROOT}`; installed with `npx skills add`, it is the skill's own directory. Only `verify` (and `import-html`) need the optional `playwright` devDependency.
 
@@ -26,7 +40,7 @@ All commands run from the repo root with plain Node ≥ 22. Installed as a Claud
 ## INPUTS
 
 ### 1. Content — anything
-Outline, markdown, meeting notes, a transcript, a spreadsheet, a brief. You distil it; nothing is pasted verbatim. One idea per slide. Numbers become `Stat` rows, lists become 2–4 short `Body` rows or tiles, sequences become boxes with arrows, comparisons become two columns.
+Outline, markdown, meeting notes, a transcript, a spreadsheet, a brief; finished HTML pages: [docs/import-html.md](docs/import-html.md). You distil it; nothing is pasted verbatim. One idea per slide. Numbers become `Stat` rows, lists become 2–4 short `Body` rows or tiles, sequences become boxes with arrows, comparisons become two columns.
 
 ### 2. Format — one of
 | format | canvas (model px) | print page | status |
@@ -60,14 +74,13 @@ Discipline, in order of importance:
 - **Slot discipline.** Supertitle and title geometry lives in `layouts.<name>`; the slide row is `{slot:'title', text:'…'}` with no x/y/w. Define one layout per slide family (`title`, `content`; add `section`, `two-col` as needed).
 - **Master discipline.** Anything that appears on every slide (footer, rule, mark) is a `master` row, once — chrome is deck-wide and never varies per layout. Exactly one master row has `footer:1` and the engine renders the page counter with it (§ MASTER layer): `{id:'foot', footer:1, right: 60, y: 506, w:'auto', role:'Label', nowrap:1}` puts the deck name and `· n / N` together at the right foot; `{… x: 60 …}` keeps the name at the left with the counter alone in the corner. Never type `3 / 9` into a row.
 - **Text-fit.** A label that must stay on one line gets `nowrap:1` and enough `w` (≈ `cw` × size × chars — the role's measured glyph width, 0.46 for the neutral sans, 0.69 for the mono Label), or `w:'auto'` to hug. Chips/pills: `w:'auto'` + `p:'chip'` (+ `bg`/`bd`/`radius`); one that sits on a right edge takes `right:` instead of `x`. Body copy gets a `w` that yields ≤ 3 lines at the role's size.
-- **Charts are rows.** A bar or line chart is one `chart` row that `create` expands into bars, lines, dots and `Label` rows with the drawing rules applied ([docs/charts.md](docs/charts.md)) — write the data, not the geometry.
+- **Charts are rows.** A bar or line chart is one `chart` row that `create` expands into bars, lines, dots and `Label` rows with the drawing rules applied — write the data, not the geometry.
 - **Cards are groups.** There is no container row: a card is a tile plus its rows sharing one `group` — `{x,y,w,h,bg,bd,radius,group:'card1'}` and each text row inside it with `group:'card1'`, every row at its own canvas x/y. The human drags the card and the rows come along; you still position each row, once.
 - **Colour.** Use `var(--accent)`, `var(--fg)`, `var(--muted)`, `var(--line)`, `var(--card)` so a style swap re-themes the deck; literal hex only for chart series.
 
 ### Step 3 — validate (no browser)
 ```
-node bin/validate.mjs model.json --style style.json            # 0 errors required; read every warning
-node bin/validate.mjs model.json --style style.json --strict   # warnings fail too — use before hand-off
+node bin/validate.mjs model.json --style style.json [--strict]   # 0 errors required; read every warning — --strict fails on them
 ```
 **Always pass the same `--style` you will pass to `create`.** Text fit is only meaningful against the scale the deck will actually wear: without it the model is measured against the template's neutral roles, so `validate` can report 0 warnings on a model `create --style` then floods with overflow — and `verify` fails on. Omit `--style` only when there is none.
 
@@ -96,10 +109,10 @@ node bin/verify.mjs deck.html [--refs shots/] [--out verify-out/] [--threshold 0
 - **Contract** — always.
 - **Air** — always, in `validate`, with no browser: the `gap` gate below. It refuses the layout before it exists; parity measures what actually rendered.
 - **Layout parity** — always (needs Playwright): no text row overflows its box, every `nowrap` row renders one line, imported rows render their source line count, every element is inside the canvas, **no painted row is drawn through a text row**, zero page errors.
-  Five collision shapes fail it: **ink through text**; **text straddling a container**; **an arrow head inside a fill** (aim at the edge with `to:`); **text over text**; **text under paint** (occlusion — reorder `els`, paint first). Containment is not collision, and `over:1` opts a row out of all five. Each in full, with the boundary cases: [docs/verify.md](docs/verify.md).
+  Five collision shapes fail it: **ink through text**; **text straddling a container**; **an arrow head inside a fill** (aim at the edge with `to:`); **text over text**; **text under paint** (occlusion — reorder `els`, paint first). Containment is not collision, and `over:1` opts a row out of all five.
 - **AE pixel diff** — when `--refs` exists (needs ImageMagick): `< 0.5%` of pixels differ at 2% fuzz. AE alone passes wrapped labels; parity is what catches them — that is why parity is not optional.
 
-Fix the model; re-run to `VERIFY PASS`, attach `verify-out/results.json`. The hand-off needs a second pass: [docs/building.md](docs/building.md).
+Fix the model; re-run to `VERIFY PASS`, attach `verify-out/results.json`.
 
 **When the engine is wrong** (verify fails on a layout the model declares cleanly, a control misbehaves, a PDF does not match the slide): `node bin/bug.mjs deck.html --category looks --desc "what happened" --tool verify --log verify.log` prints a prefilled mail to decklet@grunion.ai — the engine version and the deck's shape, a scrubbed tool snippet, never the deck's words ([docs/editor.md](docs/editor.md#reporting-a-bug)). Say so in the hand-off notes rather than working around the engine in the model.
 
@@ -108,7 +121,7 @@ Say, in this order:
 1. Where the file is and that it opens from disk in any browser, no install, no network.
 2. **The editor:** [docs/editor.md](docs/editor.md) — the HUD and its manifest, phones, the contact sheet, both PDF routes, PNG export (`node bin/export.mjs deck.html --png`), presenting, persistence and the bug door.
    Quote the lines that matter — the save button (⌘S) writes the file in Chrome/Edge, a copy in Safari; ⤓ writes the PDF; Esc opens the contact sheet — and link the rest.
-3. To revise an edited deck, run `node bin/edits.mjs deck.html` to read the log, then `create --from deck.html` (Step 4). Everything a human applies in the editor — geometry, text, links, arrows — round-trips that way; the console `copy(JSON.stringify(deck))` still works for a raw model.
+3. To revise, run Step 4's two commands; everything a human applies in the editor — geometry, text, links, arrows — round-trips that way; the console `copy(JSON.stringify(deck))` still works for a raw model.
 4. What you inferred (style, layout choices) and anything marked experimental.
 
 ---
@@ -230,10 +243,7 @@ Resolution order for any row: slot geometry ← master row (for `override` rows)
 
 ## LAYOUT LIBRARY
 
-Thirty-two named layouts ship with the engine (`lib/layouts.mjs`), in the same shape as a `layouts` entry. Name one on a slide the deck does not define and `create` merges it into `deck.layouts`, scaled from its 960×540 cut to the canvas (1600×900 = ×1.67). Print the catalogue — name, group, density, use, then every slot's box (`x y w h`) and the free band — with:
-```
-node bin/validate.mjs --layouts
-```
+Thirty-two named layouts ship with the engine (`lib/layouts.mjs`), in the same shape as a `layouts` entry. Name one on a slide the deck does not define and `create` merges it into `deck.layouts`, scaled from its 960×540 cut to the canvas (1600×900 = ×1.67). `node bin/validate.mjs --layouts` prints it: name, group, density, use and every slot's box (`x y w h`).
 Read that instead of inventing geometry, and instead of `lib/layouts.mjs`: each layout prints a `free:` band, under its lowest chrome slot and above its foot, which is where a free row goes. The library is an accelerant, never a fence: a slide may mix library slots with free rows (`layout:'kpi-grid'` plus a caption and a rule at y 400 is a normal slide), and a deck-defined layout of the same name wins. A slotted row still takes its own x/y/w/h — the `override` path — so a brand with a display role taller than the neutral scale (Title 64/68, Stat 40/44 — what the library is cut for) nudges a slot without redefining the layout. An unknown name is an error that lists the library.
 
 - **openers** — `cover` · `agenda` · `section`
@@ -268,15 +278,12 @@ Picking a layout by what the content is:
 | the ask | `cta` |
 
 ## TEMPLATE LIBRARY
-Seventy-four finished slides ship with the engine (`lib/templates.mjs`, sources in `lib/templates/cat-*.mjs`), surveyed across the open-source slide catalogs and promoted whole. A template is a layout PLUS sample rows — an issue tree, a Sankey, a scorecard, a bento grid — so the agent binds content instead of drawing. Print the catalogue — id · tier · density · note, what `fill` cannot reach, then every text key with its sample — with:
-```
-node bin/validate.mjs --templates
-```
+Seventy-four finished slides ship with the engine (`lib/templates.mjs`, sources in `lib/templates/cat-*.mjs`), surveyed across the open-source slide catalogs and promoted whole. A template is a layout PLUS sample rows — an issue tree, a Sankey, a scorecard, a bento grid — so the agent binds content instead of drawing. `node bin/validate.mjs --templates` prints it: id · tier · density · note and every text key with its sample.
 A slide names one and fills its keys: `{template: 'three-up-cards', fill: {t1: 'What you get', t2: 'Three things, one price.', t3: '01', …}}`. Every text row of the template is a key, `t1`…`tn` in row order; a key left out keeps the sample text (so fill them all before shipping). Two kinds of key: a text row takes a string, and **value keys** take a number in the range `--templates` prints beside them — `harvey-balls` `r1c1`…`r3c4` (0–4 quarters), `progress-tracker` `p1`…`p4`, the gauge and donuts' `v1`… (0–100). `chart-column`, `chart-grouped` and `chart-line-trend` take `data` — the chart row's own `[{label, value, compare?}]`. Out of range is an error; `fixed:` counts the rows no key reaches. `create` expands the slide into the template's rows, scaled from the 960×540 cut to the canvas, sets the slide's `layout` to the template's chrome (`content` or `title` from the library — a deck-defined layout of that name wins) and its `density`, and keeps any free `els` after the template rows. An unknown template or fill key is a validate error listing what exists. A **scorecard cell** (`scorecard-grid`, role `Cell`) takes a short string OR a `0`–`4` rating, which draws the same ball. A template is an accelerant like a layout: edit the rows it produced, add rows beside them, or draw free — nothing here is a fence.
 The starting rungs: `bullet-page` (a title and five points on `bullets`, a dot each), `image-bullets` (a photo and three points on `image-left`), `process-flow-3` · `-4` · `-5` (one block-arrow shape whose box width falls out of the count — 251, 180, 138), and `stat-row-3` (three numbers at **speaker** density, where the other numbers templates are reading).
 Tiers: **core** (in 4+ surveyed catalogs), **standard** (consulting catalogs), **fringe** (dataviz literature, rare on slides). Categories: Narrative · Numbers · Comparison · Frameworks · Process · Charts · Modern · Figures.
 
-**Figures** are the figure kinds as templates — `figure-decision`, `figure-flow`, `figure-before-after`, `figure-data-model`, `figure-states`, `figure-release`, `figure-boundaries`, `figure-boundaries-6`, `figure-tree`, `figure-layers` — each the rows `diagramSlide()` makes from a spec on the `diagram` layout, reading density, with a caption stating the claim. What each sample shows, and the spec path for one of your own: [docs/figures.md](docs/figures.md).
+**Figures** are the figure kinds as templates — `figure-decision`, `figure-flow`, `figure-before-after`, `figure-data-model`, `figure-states`, `figure-release`, `figure-boundaries`, `figure-boundaries-6`, `figure-tree`, `figure-layers` — each the rows `diagramSlide()` makes from a spec on the `diagram` layout, reading density, with a caption stating the claim.
 
 The speaker-density templates are the covers, dividers, quotes, statements, hero numbers, the donut and gauge, the cycle and the tree; everything with a table, a grid or a series is **reading**. `--templates` prints each one's density.
 
@@ -308,7 +315,7 @@ Four words, and no fifth: `rise` (text — the default), `fade` (quiet chrome), 
 
 
 ## VERIFICATION thresholds
-Every check with its pass criterion: [docs/verify.md](docs/verify.md#thresholds). The two that stop a hand-off are `validate --strict` at 0 errors and 0 warnings, and `verify` printing `VERIFY PASS`.
+[docs/verify.md](docs/verify.md#thresholds) lists every check with its pass criterion. The two that stop a hand-off are `validate --strict` at 0 errors and 0 warnings, and `verify` printing `VERIFY PASS`.
 
 ## ANTI-PATTERNS (each is a review failure)
 - **Implicit padding / chrome on plain text.** A text row is text. Padding, radius, pre-wrap belong to `box`/`tile` or explicit `p`. Never fake a card with a padded text row.
@@ -328,7 +335,3 @@ Every check with its pass criterion: [docs/verify.md](docs/verify.md#thresholds)
 - **Motion everywhere.** Every row carrying `anim`, or an anim invented outside the four. Motion marks the reading order of a few rows; the rest are already there.
 - **Unverified hand-off.** A deck without a `VERIFY PASS` is not done.
 
----
-
-## WORKED EXAMPLES
-Three briefs end to end: [docs/examples.md](docs/examples.md). Finished HTML pages into a model: [docs/import-html.md](docs/import-html.md).

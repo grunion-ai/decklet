@@ -13,7 +13,7 @@ Model: {w,h,format,styles:{roles,margin,pad},slots,layouts:{name:{slot:{x,y,w,ro
 PDF: the ⤓ button writes a true slide-sized PDF inside the file (foreignObject -> canvas -> JPEG -> PDF, zero dependencies; verified in Chromium, Safari unconfirmed -> falls back to print). ⌘P is the paper path: named Letter/A4 pages, one slide per page.
 
 ## Files
-- SKILL.md: the agent authoring skill — inputs, process, model + style contracts, layouts, templates, density, graphics, verification thresholds, anti-patterns (~7,000 words, the authoring path only)
+- SKILL.md: the agent authoring skill — a START HERE routing block, then inputs, process, model + style contracts, layouts, templates, density, graphics, verification thresholds, anti-patterns (~7,000 words, the authoring path only)
 - docs/building.md: the recommended build loop — a coverage manifest written before the model, then a mandatory second pass over the verify PNGs (tick the manifest, then shape / facts / chrome); the shape rules, the number-tracing rule and the polish rules a parity study found
 - docs/editor.md: what the deck file does once a human opens it — the HUD manifest and every control, the contact sheet, presenting, both PDF routes, persistence (File System Access, Safari, the amber dot), versions, revising an edited deck, motion, the bug door
 - docs/verify.md: what layout parity measures — the five collision shapes in full, and every validate/verify threshold with its pass criterion
