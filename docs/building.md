@@ -12,9 +12,19 @@ same brief. An agent working from SKILL.md alone reached 0.878 of the reference;
 to 0.952 but left its worst deck at 0.691. The manifest plus the review pass reached 0.994 mean and 0.944 on its worst
 deck, and beat the reference on three briefs of five at the same 14-minute mean wall time.
 
-## 1. Write the coverage manifest
+## 1. Start the deck, then write the coverage manifest
 
-Before any JSON, write `MANIFEST.md` in the run directory.
+```
+node bin/new.mjs --out model.json --slides 8 --density reading [--style warm] [--space 960x540]
+```
+
+That writes three files in the run directory: `model.json` — format, canvas, `styles.margin`, a right-anchored master
+footer and a run of slides that climbs the shape ladder, all of it `validate --strict` and `verify --strict` clean
+before you touch it — `MANIFEST.md`, the table below with an empty row per slide, and, with `--style`, the kit as
+`style.json`. Every line of copy in the model starts `Replace`, and the footer says `PLACEHOLDER` on every slide, so a
+deck that was never written cannot be mistaken for one that was. The slide count is the ladder's: 3 to 12.
+
+Now fill `MANIFEST.md`, before any JSON.
 
 - Copy the brief's **must-include** list verbatim, one line each, then add every numbered content bullet the brief
   gives. Beside each line write the slide number that will carry it and the shape that will carry it — template or
@@ -25,7 +35,7 @@ Before any JSON, write `MANIFEST.md` in the run directory.
   is cheap to change. Derived numbers get their arithmetic written out beside them (`0.65 × 14 + 0.35 × 23 = 17.15`),
   so the second pass checks a computation rather than re-doing it.
 
-A manifest that turns up nothing missing still pays: it is the thing that makes you read each slide later as a set of
+The columns are `Must-include | Slide | Shape | Checked`. A manifest that turns up nothing missing still pays: it is the thing that makes you read each slide later as a set of
 claims instead of as a layout.
 
 ## 2. Build, and pick the shape the content wants
