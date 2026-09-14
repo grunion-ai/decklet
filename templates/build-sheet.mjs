@@ -164,8 +164,8 @@ const NEUTRAL_STYLES = JSON.parse(TPL.match(/\/\*DECK\*\/([\s\S]*?)\/\*\/DECK\*\
 const NEUTRAL_TOKENS = Object.fromEntries(TPL.match(/\/\*TOKENS\*\/(.*?)\/\*\/TOKENS\*\//)[1].split(';').map(t => t.replace(/^--/, '').split(':')));
 export { KITS } from '../examples/styles/index.mjs';   // examples/styles/<name>/style.json, in sheet order
 const BRAND = { warm: 'Hearthline', dark: 'Nightjar', 'graphite-amber': 'Kiln & Co', 'navy-blue': 'Harbourmark', display: 'Orbita',
-  'ocean-ember': 'Tidemark', 'grove-maroon': 'Grove & Ash', 'cyan-charcoal': 'Voltline', 'cocoa-peach': 'Praline',
-  'turquoise-midnight': 'Lagoon Works', 'liberty-red': 'Redstack', 'black-cherry': 'Maison Cerise', 'yellow-forest': 'Fernwood' };   // fictional; index notes only
+  'ocean-ember': 'Tidemark', 'grove-maroon': 'Grove & Ash', 'cyan-charcoal': 'Voltline',
+  'turquoise-midnight': 'Lagoon Works', 'liberty-red': 'Redstack', 'yellow-forest': 'Fernwood' };   // fictional; index notes only
 export const STYLE_SLIDES = ['cover-hero', 'statement', 'benchmark-table', 'chart-column', 'process-flow-4', 'closing-cta'];
 const kits = (density ? ORTHOGONAL : KITS).map(name => ({ name, ...JSON.parse(fs.readFileSync(path.join(dir, '..', 'examples/styles', name, 'style.json'), 'utf8')) }));
 const PREFIXED = ['fg', 'muted', 'accent', 'card', 'box', 'line'];   // the tokens a slide's rows can name; bg and sel are chrome

@@ -43,7 +43,7 @@ Experimental means: canvas sizing, editing, contact sheet and PDF all work; **te
 2. **URL or screenshots given** → infer: background, ink, muted ink, one accent, a card surface, a hairline. Headline family (serif/sans/mono), body family. Build `tokens` + `roles` from that. Say in the hand-off what you inferred.
 3. **Nothing given** → omit `--style`; the template's neutral dark scale is used.
 
-Thirteen kits ship ready to copy in `examples/styles/<name>/style.json`, listed in `examples/styles/index.mjs`. Each is a complete STYLE CONTRACT — eight tokens, eight roles with measured `cw`, system font stacks only — and its own scale: Title 54–74px, inset 48–80px. The explainer builds and verifies under every one (`test/styles.test.mjs`). Copy one, change the tokens, keep the roles.
+Eleven kits ship ready to copy in `examples/styles/<name>/style.json`, listed in `examples/styles/index.mjs`. Each is a complete STYLE CONTRACT — eight tokens, eight roles with measured `cw`, system font stacks only — and its own scale: Title 54–74px, inset 48–72px. The explainer builds and verifies under every one (`test/styles.test.mjs`). Copy one, change the tokens, keep the roles.
 
 Sizes in `roles` are **model pixels** for the chosen canvas: 960-wide ×1, 1600-wide ×1.67, 1080 carousel ×1.9 (viewed small), 816 document ×0.75.
 
