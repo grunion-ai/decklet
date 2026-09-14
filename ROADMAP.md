@@ -26,9 +26,9 @@ These are Jira's sizes. Read them one rung up if SAFe is your habit.
 
 ### Lanes
 
-Eight lanes, one per product area. A lane groups epics for reading; it sets no owner and caps no work in progress.
+Nine lanes, one per product area. A lane groups epics for reading; it sets no owner and caps no work in progress.
 
-`Platform & release` · `Notes & presenting` · `Media & links` · `Mobile & touch` · `Documents & formats` · `Export` · `Library & editor` · `Usability`
+`Platform & release` · `Notes & presenting` · `Media & links` · `Mobile & touch` · `Documents & formats` · `Export` · `Library & editor` · `Usability` · `Getting started`
 
 ### Horizons
 
@@ -68,6 +68,7 @@ Epics rank by **ICE**: Impact x Confidence x Ease, each 1 to 10, multiplied, wit
 | **Export** | X1 Cheap wins `S` | X2 Searchable PDF `M` | X3 PPTX export `L` |
 | **Library & editor** | L7 Spellcheck, the rest `M`<br>L11 Type on the sheet `S` | | |
 | **Usability** | U9 A `--bad` token in every style `XS`<br>U10 Warn before the browser fails `S` | U8 Two axes on the sheet: look × ladder `L` | |
+| **Getting started** | S1 Density explains itself `S`<br>S2 A paint slot cannot vanish `S`<br>S3 `new.mjs`: a model that already builds `M`<br>S4 One front door on the skill `S`<br>S5 create hands back the spell line `XS` | | |
 
 ### ICE scores
 
@@ -103,6 +104,11 @@ Epics rank by **ICE**: Impact x Confidence x Ease, each 1 to 10, multiplied, wit
 | U5 The missing starting rungs | 9 | 9 | 6 | **486** | Now |
 | U7 SKILL.md: authoring and editor apart | 8 | 8 | 7 | **448** | Now |
 | U9 A `--bad` token in every style | 7 | 10 | 10 | **700** | Now |
+| S1 Density explains itself | 9 | 10 | 9 | **810** | Now |
+| S5 create hands back the spell line | 7 | 10 | 10 | **700** | Now |
+| S2 A paint slot cannot vanish | 8 | 10 | 8 | **640** | Now |
+| S4 One front door on the skill | 8 | 9 | 9 | **648** | Now |
+| S3 new.mjs: a model that already builds | 9 | 8 | 7 | **504** | Now |
 | U10 Warn before the browser fails | 8 | 9 | 8 | **576** | Now |
 | U8 Two axes on the sheet | 8 | 7 | 4 | **224** | Next |
 
@@ -480,6 +486,57 @@ Kyle's ask: the library should read as two axes. **Look**: basic or dense spacin
 | U8.1 | S | A `spacing` style token (`basic` / `dense`) that scales margin, gap and role line-heights together; the two sheets built from one model. |
 | U8.2 | M | The sheet opens with the ladder: one fictional company climbing all nine rungs at basic spacing in the neutral kit, then the same nine at dense spacing, then the nine under two kits. The kind-grouped catalogue follows as the reference half. |
 | U8.3 | M | `README` and the Pages index lead with the ladder sheet; the catalogue sheet is linked from it. Depends on U5 (the rungs must exist as templates) and L11 (type per kit). |
+
+## Getting started
+
+Filed 2026-09-13 from the parity study: 30 decks, 5 briefs, 7 setups, blind-judged. Every builder passed, and every builder spent roughly the first third of its run reading — the skill, the catalogues, then engine source for the handful of rules neither prints. The lane exists to delete that third. It is measured, not guessed: the study's own transcripts name what was read and why.
+
+**One result shapes the whole lane.** A setup that replaced the contract with a one-page summary scored **0.861** against **0.878** for the skill alone — below baseline. Condensing the rules makes an author skim the rules. So nothing here summarises the contract. Each row either makes a tool answer the question that sent an author to the source, or removes a decision from the first five minutes.
+
+### S1. Density explains itself · `S` · Now
+
+`densityReport` names the cap and the count (`reading density carries ≤ 8 points, this slide has 12`) but not which rows it counted, and the counting rule — Supertitle, Title, H1, Caption and Label are chrome, everything else is a point — lives only in `lib/layouts.mjs`. Eight of the study's thirty runs read that function, more than any other source read, and several called it the one rule they could not have guessed. Two runs then spent a validate round on the wrong fix.
+
+| Story | Size | What |
+| --- | --- | --- |
+| S1.1 | S | A density message lists the rows it counted (`points: H2 "Re-plan" · Body "…" · Body "…"`) and names the chrome roles it did not, so the fix is visible without opening the engine. The word count says the same for words. |
+| S1.2 | XS | DENSITY states the counting rule in one sentence beside the table. |
+
+### S2. A paint slot cannot vanish · `S` · Now
+
+A layout's `paint` slot draws nothing unless a row binds it, and it must be painted before its own text or it covers it. Two study builds bound a card's text and not its box: one lost a verify round to occlusion after fixing it, and one shipped a decision slide whose two cards were loose text on an empty canvas — `validate --strict` and `verify --strict` both passed it, and only the screenshot pass caught it.
+
+| Story | Size | What |
+| --- | --- | --- |
+| S2.1 | S | `validate` errors when a slide binds a paint slot's text children and not the paint slot itself, naming the row to add. |
+| S2.2 | XS | It warns when a bound paint row is ordered after its own text (the occlusion `verify` would catch, caught one step earlier). |
+
+### S3. `new.mjs`: a model that already builds · `M` · Now
+
+Every run hand-assembled the deck's top level, and the first `validate` of the study was an error on `deck.w` in four runs out of four. The winning practice — a coverage manifest written before the model — also has to be written from nothing each time.
+
+| Story | Size | What |
+| --- | --- | --- |
+| S3.1 | M | `node bin/new.mjs --out model.json --slides 8 --density reading [--style <kit>]` writes a model that validates and verifies as-is: format, canvas, margin, a master footer, and eight slides on library layouts with placeholder text an author replaces. |
+| S3.2 | S | The same command writes `MANIFEST.md` beside it — the coverage table `docs/building.md` asks for, with its columns and its two rules, empty and ready to fill. |
+| S3.3 | XS | `docs/building.md` opens with the command instead of describing the file. |
+
+### S4. One front door on the skill · `S` · Now
+
+SKILL.md is 6,997 words over fourteen sections and eight `docs/` references. An author's first question is "what do I run and in what order", and the answer is spread across PROCESS and three catalogues. This is a routing block, not a summary: it points at the contract, it never restates it.
+
+| Story | Size | What |
+| --- | --- | --- |
+| S4.1 | S | A `## START HERE` block of at most twelve lines directly under the title: the six commands in order, `new.mjs`, the two catalogue flags that print geometry and fill reach, and the one line that says a first `VERIFY PASS` is half the job with the link to `docs/building.md`. Under the 7,000-word budget, paid for from the sections it makes redundant. |
+| S4.2 | XS | `test/skill.test.mjs` holds the block's presence and its links, as it holds the others. |
+
+### S5. `create` hands back the spell line · `XS` · Now
+
+`create` prints the words its dictionary refused; the author then writes them into `spell.ignore` and builds again. Every checklist run in the study spent a build on that loop.
+
+| Story | Size | What |
+| --- | --- | --- |
+| S5.1 | XS | The flag line ends with the line to paste: `spell: {"ignore": ["tallyline", "qoq"]}`. |
 
 ## Carried forward
 
