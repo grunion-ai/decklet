@@ -79,6 +79,7 @@ A slide engine where the deck is a JSON model and the renderer is the editor. `c
 Read [`SKILL.md`](SKILL.md) — it is the product. It is the authoring path only; the build loop it recommends — a coverage manifest, then a second pass over the rendered slides — is [`docs/building.md`](docs/building.md), the editor (HUD, persistence, PDF, versions, the bug door) is [`docs/editor.md`](docs/editor.md), and the chart row, the connector shapes, the nine figures and the worked examples sit beside it in [`docs/`](docs/). It defines the inputs, the process, the model and style contracts, verification thresholds, anti-patterns and three worked examples. The whole loop:
 
 ```
+node bin/new.mjs --out model.json --slides 8 --density reading      # a starter model + MANIFEST.md, both already clean
 node bin/validate.mjs model.json                                   # contract check, no browser
 node bin/create.mjs --model model.json --style style.json --out deck.html --format slides
 node bin/verify.mjs deck.html [--refs shots/]                     # layout parity always; AE diff when refs exist
@@ -152,6 +153,7 @@ A row is text by default; `box`, `tile`, `bar`, `line`, `donut`, `svg`, `img` ar
 ```
 deck.html            the engine + the explainer deck (built from examples/explainer)
 template.html        the engine with an empty model — create.mjs fills it
+bin/new.mjs          a starter model + MANIFEST.md — validate/verify clean before you edit it
 bin/validate.mjs     model contract, pure Node
 bin/create.mjs       model (+style) → deck.html; format presets
 bin/verify.mjs       parity + AE + contract proof (Playwright optional)
