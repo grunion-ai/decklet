@@ -6,16 +6,17 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {KITS} from '../examples/styles/index.mjs';
 import {create} from '../bin/create.mjs';
 import {validate, mergeStyle} from '../bin/validate.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-export const KITS = ['warm', 'dark', 'graphite-amber', 'navy-blue', 'display'];
+export { KITS } from '../examples/styles/index.mjs';   // the shelf itself names its kits; this file gates them
 const TOKENS = ['bg', 'fg', 'muted', 'accent', 'card', 'line', 'sel', 'box'];
 const ROLES = ['Title', 'Supertitle', 'H1', 'H2', 'Body', 'Caption', 'Label', 'Stat'];
 const kit = (n) => JSON.parse(fs.readFileSync(path.join(root, 'examples/styles', n, 'style.json'), 'utf8'));
 const lum = (hex) => { const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
 
-test('styles: the five kits exist and each is a complete STYLE CONTRACT', () => {
+test('styles: every kit exists and each is a complete STYLE CONTRACT', () => {
   for (const n of KITS) {
     const s = kit(n), where = `examples/styles/${n}`;
     assert.deepEqual(Object.keys(s.tokens).sort(), [...TOKENS].sort(), `${where}: the eight tokens, no more`);
@@ -37,12 +38,21 @@ test('styles: the five kits exist and each is a complete STYLE CONTRACT', () => 
   }
 });
 
-test('styles: the kits differ — type and ground vary across the five', () => {
-  const kits = KITS.map(kit);
-  assert.ok(new Set(kits.map(s => s.roles.Title.font)).size >= 4, 'at least four distinct display faces');
-  assert.ok(new Set(kits.map(s => s.roles.Body.font)).size >= 3, 'at least three distinct body faces');
+test('styles: the kits differ — face, scale, ground and inset all vary', () => {
+  const kits = KITS.map(kit), n = kits.length;
+  const spread = (f) => new Set(kits.map(f)).size;
+  assert.ok(spread(s => s.roles.Title.font) >= Math.ceil(n * 2 / 3), `distinct display faces across ${n} kits`);
+  assert.ok(spread(s => s.roles.Body.font) >= 5, 'at least five distinct body faces');
+  // the 2026-09-13 complaint: five kits that changed the ink and the face but wore ONE scale — Title 56–66, Stat 40,
+  // margin 60 on every one. A kit is a scale as much as a palette, so the spread is gated.
+  assert.ok(spread(s => s.roles.Title.size) >= 8, 'at least eight distinct Title sizes');
+  assert.ok(spread(s => s.roles.Stat.size) >= 6, 'at least six distinct Stat sizes');
+  assert.ok(spread(s => s.margin) >= 5, 'at least five distinct content insets');
+  assert.ok(spread(s => s.gap) >= 2, 'the air between rows varies');
+  assert.equal(spread(s => JSON.stringify(s.tokens)), n, 'no two kits share a palette');
+  assert.ok(spread(s => s.tokens.accent) === n, 'every kit has its own accent');
   const dark = kits.filter(s => lum(s.tokens.card) < 0.3).length;
-  assert.ok(dark >= 2 && dark <= 3, `dark and light grounds both represented (${dark} dark of 5)`);
+  assert.ok(dark >= n / 3 && dark <= n * 2 / 3, `dark and light grounds both represented (${dark} dark of ${n})`);
 });
 
 test('styles: the explainer validates with zero errors and builds under every kit', () => {

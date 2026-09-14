@@ -1,0 +1,94 @@
+{
+ "tokens": {
+  "bg": "#CDE8FA",
+  "fg": "#002B4C",
+  "muted": "#4C6E88",
+  "accent": "#C24E14",
+  "card": "#E9F5FE",
+  "line": "#BCD9EC",
+  "sel": "#C24E14",
+  "box": "#FDE3D6"
+ },
+ "roles": {
+  "Title": {
+   "font": "Didot,'Bodoni 72','Hoefler Text',Georgia,serif",
+   "size": 72,
+   "weight": 400,
+   "lh": 76,
+   "ls": -0.5,
+   "color": "var(--fg)",
+   "cw": 0.46
+  },
+  "Supertitle": {
+   "font": "ui-monospace,Menlo,Consolas,monospace",
+   "size": 11,
+   "weight": 500,
+   "lh": 15,
+   "ls": 2.4,
+   "color": "var(--accent)",
+   "tt": "uppercase",
+   "cw": 0.82
+  },
+  "H1": {
+   "font": "Didot,'Bodoni 72','Hoefler Text',Georgia,serif",
+   "size": 38,
+   "weight": 400,
+   "lh": 44,
+   "ls": -0.2,
+   "color": "var(--fg)",
+   "cw": 0.5
+  },
+  "H2": {
+   "font": "Charter,'Iowan Old Style',Georgia,serif",
+   "size": 21,
+   "weight": 700,
+   "lh": 28,
+   "ls": 0,
+   "color": "var(--fg)",
+   "cw": 0.5
+  },
+  "Body": {
+   "font": "Charter,'Iowan Old Style',Georgia,serif",
+   "size": 17,
+   "weight": 400,
+   "lh": 26,
+   "ls": 0,
+   "color": "var(--fg)",
+   "cw": 0.46
+  },
+  "Caption": {
+   "font": "Charter,'Iowan Old Style',Georgia,serif",
+   "size": 13,
+   "weight": 400,
+   "lh": 19,
+   "ls": 0,
+   "color": "var(--muted)",
+   "cw": 0.43
+  },
+  "Label": {
+   "font": "ui-monospace,Menlo,Consolas,monospace",
+   "size": 10,
+   "weight": 500,
+   "lh": 14,
+   "ls": 1.2,
+   "color": "var(--muted)",
+   "tt": "uppercase",
+   "cw": 0.72
+  },
+  "Stat": {
+   "font": "Didot,'Bodoni 72','Hoefler Text',Georgia,serif",
+   "size": 52,
+   "weight": 400,
+   "lh": 54,
+   "ls": -1,
+   "color": "var(--accent)",
+   "cw": 0.54
+  }
+ },
+ "pad": {
+  "chip": "4px 10px",
+  "pill": "6px 14px"
+ },
+ "margin": 72,
+ "gap": 5
+}
