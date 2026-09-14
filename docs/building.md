@@ -45,8 +45,10 @@ Zero errors and zero warnings, against the same `--style` you will pass to `crea
 
 ## 4. `create`
 
-Run it once and **read the spell flags it prints**. Every real name, product and domain term goes into the model's
-`spell.ignore`, then rebuild — a red underline under a customer's name is the first thing a human sees.
+Run it once and **read the spell flags it prints**. Under the flag line `create` prints the line to paste —
+`spell: {"ignore": ["tallyline", "qoq"]}`, the same words lowercased as `spell.ignore` matches them. Paste it into the
+model, drop back anything that is a real typo, and rebuild — a red underline under a customer's name is the first thing
+a human sees.
 
 ## 5. `verify --strict`
 
