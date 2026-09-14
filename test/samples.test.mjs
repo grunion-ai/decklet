@@ -10,7 +10,8 @@ import {fileURLToPath} from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dir = path.join(root, 'templates/samples');
 const KB = 1024;
-const SAMPLE_EACH = 100 * KB, SAMPLE_SUM = 160 * KB, LIBRARY = 640 * KB;   // the budget: ~100 KB an image (SKILL.md), the sheet well under 1 MB
+const SAMPLE_EACH = 100 * KB, SAMPLE_SUM = 160 * KB, LIBRARY = 768 * KB;   // the budget: ~100 KB an image (SKILL.md), the sheet well under 1 MB
+// LIBRARY moved 640 → 768 KB on 2026-09-13: the Styles section went from five kits to thirteen, six slides each.
 
 test('samples: two photos, one screenshot, one GIF, each under 100 KB, together under 160 KB', () => {
   const files = fs.readdirSync(dir).filter(f => /\.(jpg|png|gif)$/.test(f)).sort();

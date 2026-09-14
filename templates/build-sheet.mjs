@@ -5,7 +5,7 @@
 // the source line — kind · id / template · id / layout · id — and the engine's page counter takes the corner; only the two
 // full-bleed image slides (hero, split — the corner is inside the photo) hide the foot.
 // A template's own sample rows never enter the band (y ≥ 496); test/library.test.mjs asserts the set of band rows is the same on every slide.
-// A closing Styles section repeats six of the templates under the five kits in examples/styles: a style is deck-wide, so
+// A closing Styles section repeats six of the templates under every kit in examples/styles: a style is deck-wide, so
 // each slide wears its kit through prefixed tokens (var(--warm-accent)) and a backdrop row, the diagram-showcase pattern; its foot
 // line is `style · <kit> · <template>`.
 import fs from 'node:fs';
@@ -15,10 +15,11 @@ import { TEMPLATES } from './index.mjs';
 import { LIBRARY } from '../lib/layouts.mjs';
 import { scale } from '../lib/templates/kit.mjs';
 import { chartRows } from '../lib/chart.mjs';
+import { KITS } from '../examples/styles/index.mjs';
 const dir = path.dirname(fileURLToPath(import.meta.url));
 const only = process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1].split(',') : null;
 // --density cuts one deck per density: every template and layout tagged with it, then three ORTHOGONAL kits
-// (dark ground / warm paper serif / light display) instead of all five — the widest spread the five kits offer.
+// (dark ground / warm paper serif / light display) instead of the whole shelf — a density deck is about air, not ink.
 const density = process.argv.includes('--density') ? process.argv[process.argv.indexOf('--density') + 1] : null;
 if (density && !['speaker', 'reading'].includes(density)) throw new Error('--density must be speaker or reading');
 const ORTHOGONAL = ['dark', 'warm', 'display'];
@@ -157,12 +158,14 @@ const fill = (name) => {
   return els;
 };
 
-// ── the styles section: six slides × five kits. The engine file supplies the neutral scale the sheet is built on.
+// ── the styles section: six slides × every kit. The engine file supplies the neutral scale the sheet is built on.
 const TPL = fs.readFileSync(path.join(dir, '..', 'template.html'), 'utf8');
 const NEUTRAL_STYLES = JSON.parse(TPL.match(/\/\*DECK\*\/([\s\S]*?)\/\*\/DECK\*\//)[1]).styles, NEUTRAL = NEUTRAL_STYLES.roles;
 const NEUTRAL_TOKENS = Object.fromEntries(TPL.match(/\/\*TOKENS\*\/(.*?)\/\*\/TOKENS\*\//)[1].split(';').map(t => t.replace(/^--/, '').split(':')));
-export const KITS = ['warm', 'dark', 'graphite-amber', 'navy-blue', 'display'];   // examples/styles/<name>/style.json, in sheet order
-const BRAND = { warm: 'Hearthline', dark: 'Nightjar', 'graphite-amber': 'Kiln & Co', 'navy-blue': 'Harbourmark', display: 'Orbita' };   // fictional; index notes only
+export { KITS } from '../examples/styles/index.mjs';   // examples/styles/<name>/style.json, in sheet order
+const BRAND = { warm: 'Hearthline', dark: 'Nightjar', 'graphite-amber': 'Kiln & Co', 'navy-blue': 'Harbourmark', display: 'Orbita',
+  'ocean-ember': 'Tidemark', 'grove-maroon': 'Grove & Ash', 'cyan-charcoal': 'Voltline', 'cocoa-peach': 'Praline',
+  'turquoise-midnight': 'Lagoon Works', 'liberty-red': 'Redstack', 'black-cherry': 'Maison Cerise', 'yellow-forest': 'Fernwood' };   // fictional; index notes only
 export const STYLE_SLIDES = ['cover-hero', 'statement', 'benchmark-table', 'chart-column', 'process-flow-4', 'closing-cta'];
 const kits = (density ? ORTHOGONAL : KITS).map(name => ({ name, ...JSON.parse(fs.readFileSync(path.join(dir, '..', 'examples/styles', name, 'style.json'), 'utf8')) }));
 const PREFIXED = ['fg', 'muted', 'accent', 'card', 'box', 'line'];   // the tokens a slide's rows can name; bg and sel are chrome
@@ -194,7 +197,7 @@ const wear = (els, kit, layout) => {
 const sslide = (t, kit) => ({ name: `style-${kit.name}-${t.id}`, layout: t.layout || undefined,
   els: [{ x: 0, y: 0, w: 960, h: 540, bg: `var(--${kit.name}-card)`, over: 1 },   // the slide wears the kit's ground
     ...wear(scale(t.els, 1), kit, t.layout), { override: 'foot', text: `style · ${kit.name} · ${t.id}`, color: `var(--${kit.name}-muted)` }] });
-const STYLES = { id: 'styles', name: 'Styles', note: 'The same six slides under the five kits in examples/styles — a palette per slide through prefixed tokens, the kit\'s weight and case per row. The type scale is deck-wide: build with --style to see a kit\'s faces.' };
+const STYLES = { id: 'styles', name: 'Styles', note: 'The same six slides under every kit in examples/styles — a palette per slide through prefixed tokens, the kit\'s weight and case per row. The type scale is deck-wide: build with --style to see a kit\'s faces.' };
 
 // ── the deck
 const FULL_BLEED = ['image-hero-overlay', 'image-split'];   // the photo owns the corner: no foot line; the engine's pin stands in for the counter

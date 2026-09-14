@@ -1,0 +1,96 @@
+{
+ "tokens": {
+  "bg": "#FEFBF3",
+  "fg": "#4E0401",
+  "muted": "#8A6558",
+  "accent": "#B26414",
+  "card": "#FFFFFF",
+  "line": "#E9DEC9",
+  "sel": "#B26414",
+  "box": "#FBEBD3"
+ },
+ "roles": {
+  "Title": {
+   "font": "'Avenir Next Condensed','Arial Narrow','Helvetica Neue',sans-serif",
+   "size": 68,
+   "weight": 700,
+   "lh": 64,
+   "ls": 0.5,
+   "color": "var(--fg)",
+   "tt": "uppercase",
+   "cw": 0.46
+  },
+  "Supertitle": {
+   "font": "'Avenir Next Condensed','Arial Narrow','Helvetica Neue',sans-serif",
+   "size": 13,
+   "weight": 600,
+   "lh": 17,
+   "ls": 3,
+   "color": "var(--accent)",
+   "tt": "uppercase",
+   "cw": 0.69
+  },
+  "H1": {
+   "font": "'Avenir Next Condensed','Arial Narrow','Helvetica Neue',sans-serif",
+   "size": 40,
+   "weight": 700,
+   "lh": 42,
+   "ls": 0.3,
+   "color": "var(--fg)",
+   "tt": "uppercase",
+   "cw": 0.5
+  },
+  "H2": {
+   "font": "'Helvetica Neue',Helvetica,Arial,sans-serif",
+   "size": 20,
+   "weight": 700,
+   "lh": 26,
+   "ls": -0.2,
+   "color": "var(--fg)",
+   "cw": 0.51
+  },
+  "Body": {
+   "font": "'Helvetica Neue',Helvetica,Arial,sans-serif",
+   "size": 16,
+   "weight": 400,
+   "lh": 24,
+   "ls": 0,
+   "color": "var(--fg)",
+   "cw": 0.47
+  },
+  "Caption": {
+   "font": "'Helvetica Neue',Helvetica,Arial,sans-serif",
+   "size": 12,
+   "weight": 400,
+   "lh": 17,
+   "ls": 0,
+   "color": "var(--muted)",
+   "cw": 0.43
+  },
+  "Label": {
+   "font": "'American Typewriter','Courier New',Courier,monospace",
+   "size": 11,
+   "weight": 500,
+   "lh": 14,
+   "ls": 0.8,
+   "color": "var(--muted)",
+   "tt": "uppercase",
+   "cw": 0.73
+  },
+  "Stat": {
+   "font": "'Avenir Next Condensed','Arial Narrow','Helvetica Neue',sans-serif",
+   "size": 56,
+   "weight": 700,
+   "lh": 56,
+   "ls": 0,
+   "color": "var(--accent)",
+   "cw": 0.52
+  }
+ },
+ "pad": {
+  "chip": "3px 9px",
+  "pill": "5px 13px"
+ },
+ "margin": 56,
+ "gap": 4
+}

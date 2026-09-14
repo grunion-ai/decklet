@@ -460,7 +460,7 @@ Two independent builds in the parity study painted a bad number (support tickets
 
 | Story | Size | What |
 | --- | --- | --- |
-| U9.1 | XS | `--bad` (and `--good`, if the pair reads better) in the neutral scale and in all five `examples/styles` kits, documented in the STYLE CONTRACT beside the existing tokens. |
+| U9.1 | XS | `--bad` (and `--good`, if the pair reads better) in the neutral scale and in every `examples/styles` kit, documented in the STYLE CONTRACT beside the existing tokens. |
 
 ### U10. Warn before the browser fails · `S` · Now
 

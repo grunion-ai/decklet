@@ -1,5 +1,5 @@
-// The sheet's closing "Styles" section: six slides (cover, statement, table, chart, process, end) repeated under the five
-// kits in examples/styles. A decklet style is deck-wide, so a slide wears its kit through PREFIXED tokens
+// The sheet's closing "Styles" section: six slides (cover, statement, table, chart, process, end) repeated under every
+// kit in examples/styles. A decklet style is deck-wide, so a slide wears its kit through PREFIXED tokens
 // (`var(--warm-accent)`) and a backdrop row in the kit's card colour — the harness diagram-showcase pattern — while the
 // kit's weight and case land per row. templates/candidates.style.json carries the neutral tokens plus every prefixed set.
 import {test} from 'node:test';
@@ -14,14 +14,14 @@ const SIX = ['cover-hero', 'statement', 'benchmark-table', 'chart-column', 'proc
 const BARE = /var\(--(fg|muted|accent|card|box|line)\)/;
 const read = f => JSON.parse(fs.readFileSync(path.join(root, 'templates', f), 'utf8'));
 
-test('sheet: a Styles divider opens thirty slides — the six under every kit, backdrop first, every token prefixed', () => {
+test('sheet: a Styles divider opens six slides per kit — backdrop first, every token prefixed', () => {
   const r = spawnSync(process.execPath, [path.join(root, 'templates/build-sheet.mjs')], {encoding: 'utf8'});
   assert.equal(r.status, 0, r.stderr);
   const model = read('candidates.model.json'), index = read('candidates.index.json'), style = read('candidates.style.json');
   const names = model.slides.map(s => s.name);
   const at = names.indexOf('kind-styles');
   assert.ok(at > 0, 'a kind-styles divider');
-  assert.deepEqual(names.slice(at + 1), KITS.flatMap(k => SIX.map(t => `style-${k}-${t}`)), 'thirty style slides close the deck, six per kit in order');
+  assert.deepEqual(names.slice(at + 1), KITS.flatMap(k => SIX.map(t => `style-${k}-${t}`)), `${6 * KITS.length} style slides close the deck, six per kit in order`);
   for (const k of KITS) for (const t of SIX) {
     const s = model.slides.find(x => x.name === `style-${k}-${t}`), where = s.name;
     assert.deepEqual(s.els[0], {x: 0, y: 0, w: 960, h: 540, bg: `var(--${k}-card)`, over: 1}, `${where}: the backdrop is the first row`);
@@ -47,7 +47,7 @@ test('sheet: a Styles divider opens thirty slides — the six under every kit, b
     for (const t of ['fg', 'muted', 'accent', 'card', 'box', 'line']) assert.equal(style.tokens[`${k}-${t}`], kit.tokens[t], `${k}-${t}`);
   }
   const rows = index.filter(r => r.kind === 'styles');
-  assert.equal(rows.length, 30);
-  assert.deepEqual(rows.map(r => r.source), Array(30).fill('style'));
+  assert.equal(rows.length, 6 * KITS.length);
+  assert.deepEqual(rows.map(r => r.source), Array(6 * KITS.length).fill('style'));
   assert.deepEqual(rows.map(r => `${r.style}/${r.id}`), KITS.flatMap(k => SIX.map(t => `${k}/${t}`)));
 });

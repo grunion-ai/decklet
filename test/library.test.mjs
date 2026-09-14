@@ -11,12 +11,14 @@ import {fileURLToPath} from 'node:url';
 import {create} from '../bin/create.mjs';
 import {TEMPLATES} from '../lib/templates.mjs';
 import {loadChecker} from '../lib/spell.mjs';
+import {KITS} from '../examples/styles/index.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 test('library.html == create(build-sheet): every template and layout, by kind, current', async () => {
   const r = spawnSync(process.execPath, [path.join(root, 'templates/build-sheet.mjs')], {encoding: 'utf8'});
   assert.equal(r.status, 0, r.stderr);
   const model = JSON.parse(fs.readFileSync(path.join(root, 'templates/candidates.model.json'), 'utf8'));
-  assert.equal(model.slides.filter(s => !/^kind-/.test(s.name)).length, 162, '109 templates + 23 layouts + 30 styled');
+  const styled = 6 * KITS.length;   // the Styles section: the same six templates under every kit on the shelf
+  assert.equal(model.slides.filter(s => !/^kind-/.test(s.name)).length, 132 + styled, `109 templates + 23 layouts + ${styled} styled`);
   const style = JSON.parse(fs.readFileSync(path.join(root, 'templates/candidates.style.json'), 'utf8'));
   assert.ok(model.slides.some(s => s.name === 'kind-figures'), 'a Figures kind divider');
   const names = model.slides.map(s => s.name);
