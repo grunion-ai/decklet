@@ -68,7 +68,7 @@ Epics rank by **ICE**: Impact x Confidence x Ease, each 1 to 10, multiplied, wit
 | **Export** | X1 Cheap wins `S` | X2 Searchable PDF `M` | X3 PPTX export `L` |
 | **Library & editor** | L7 Spellcheck, the rest `M`<br>L11 Type on the sheet `S` | | |
 | **Usability** | U9 A `--bad` token in every style `XS`<br>U10 Warn before the browser fails `S` | U8 Two axes on the sheet: look × ladder `L` | |
-| **Getting started** | S1 Density explains itself `S`<br>S2 A paint slot cannot vanish `S`<br>S3 `new.mjs`: a model that already builds `M`<br>S4 One front door on the skill `S`<br>S5 create hands back the spell line `XS`<br>S6 A kit must not collide with the chrome `S` | | |
+| **Getting started** | S6 A kit must not collide with the chrome `S`<br>S7 The catalogue says what a template draws `M`<br>S8 Print a slice of the catalogue `S`<br>S9 The first build should not be thrown away `XS` | | |
 
 ### ICE scores
 
@@ -110,6 +110,9 @@ Epics rank by **ICE**: Impact x Confidence x Ease, each 1 to 10, multiplied, wit
 | S4 One front door on the skill | 8 | 9 | 9 | **648** | Now |
 | S3 new.mjs: a model that already builds | 9 | 8 | 7 | **504** | Now |
 | S6 A kit must not collide with the chrome | 7 | 9 | 8 | **504** | Now |
+| S7 The catalogue says what a template draws | 9 | 9 | 7 | **567** | Now |
+| S9 The first build should not be thrown away | 6 | 10 | 10 | **600** | Now |
+| S8 Print a slice of the catalogue | 7 | 9 | 8 | **504** | Now |
 | U10 Warn before the browser fails | 8 | 9 | 8 | **576** | Now |
 | U8 Two axes on the sheet | 8 | 7 | 4 | **224** | Next |
 
@@ -492,7 +495,45 @@ Kyle's ask: the library should read as two axes. **Look**: basic or dense spacin
 
 Filed 2026-09-13 from the parity study: 30 decks, 5 briefs, 7 setups, blind-judged. Every builder passed, and every builder spent roughly the first third of its run reading — the skill, the catalogues, then engine source for the handful of rules neither prints. The lane exists to delete that third. It is measured, not guessed: the study's own transcripts name what was read and why.
 
+**Round 4 measured the lane.** With S1–S5 shipped, ten fresh builders (five Opus, five Sonnet) built all five briefs from the engine alone — no study scaffolding, the engine's own `docs/building.md` as the procedure. All ten reached `VERIFY PASS` on 8/8 slides; nine opened no engine source at all, and `bin/new.mjs` put a validating model on disk 27 to 90 seconds from a cold start. S7 to S9 are what the round left behind.
+
 **One result shapes the whole lane.** A setup that replaced the contract with a one-page summary scored **0.861** against **0.878** for the skill alone — below baseline. Condensing the rules makes an author skim the rules. So nothing here summarises the contract. Each row either makes a tool answer the question that sent an author to the source, or removes a decision from the first five minutes.
+
+### S7. The catalogue says what a template draws · `M` · Now
+
+Measured in round 4 of the study: with S1–S5 shipped, nine of ten builders opened **no** engine source at all, against two to five source reads each before. One gap accounts for nearly every remaining defect, and it bit four of the ten.
+
+`--templates` prints a template's fill keys and counts its unreachable rows (`fixed: 6 arrows · 7 shapes`). It never says what those rows **depict** or how they are **wired**, so a template's own content is invisible until it renders:
+
+* `figure-release` paints its first tick filled — "shipped". Bound to a roadmap whose first month is October, the slide claimed the October work was already done. Fill reaches text only, so the builder could not correct it and abandoned the template.
+* `figure-boundaries-6` chains its middle zone bottom-to-top, so binding the nodes in the order the keys print drew the database writing up into the ingest API.
+* `image-bullets`' `image` slot is a gradient placeholder, not an `img` row. Nothing short of the source says whether a real photo may be painted over it.
+* `swot`'s quadrant boxes collide with the `note` slot, pushing the dense line down to `source`.
+
+Every one passed `validate --strict` and `verify --strict` and was caught only in the screenshot pass. Two of them are wrong facts, not taste.
+
+| Story | Size | What |
+| --- | --- | --- |
+| S7.1 | S | `--templates` describes each fixed row in a phrase, not a count: what it draws and any state it asserts (`tick 1 filled = shipped`, `image slot is a gradient placeholder, paint an img row over it`). Generate it from the rows, never a hand-kept list that can drift. |
+| S7.2 | S | A figure template prints its wiring: node order and edge direction (`zone 2 chains t18→t19→t20, bottom to top`), so binding in key order cannot silently reverse an arrow. |
+| S7.3 | XS | A template whose fixed rows assert a state carries a one-line warning in its catalogue entry, so a builder chooses it knowing what it claims. |
+
+### S8. Print a slice of the catalogue · `S` · Now
+
+The same round: `--templates` and `--layouts` run 1,764 lines together, and three builders had to redirect them to a file and page through in chunks because the harness truncates long output. Printing everything fixed the source-reading problem and created a paging one. The field a builder needs first — which shapes are legal at the density the brief fixes — is one word buried in each entry.
+
+| Story | Size | What |
+| --- | --- | --- |
+| S8.1 | S | `--templates` and `--layouts` take a filter: `--density speaker`, `--group figures`, `--name <id>`, and a `--brief` one-line-per-entry form. A builder asks for the twelve entries it can actually use. |
+| S8.2 | XS | The `## START HERE` line names the filter, so the first catalogue call is already narrow. |
+
+### S9. The first build should not be thrown away · `XS` · Now
+
+`create` prints the words its dictionary refused and now hands back a pasteable `spell.ignore` line (S5). The loop still costs a build: every round-4 run created once to read the flags, pasted, and created again. The words are knowable before the deck is written.
+
+| Story | Size | What |
+| --- | --- | --- |
+| S9.1 | XS | `validate` runs the same check and prints the same pasteable line, so the flags are known at the gate that runs first and the first `create` is the real one. |
 
 ### S6. A kit must not collide with the chrome · `S` · Now
 
