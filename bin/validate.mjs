@@ -165,6 +165,36 @@ export function validate(deck) {
     const bs = [...bound].filter(k => /^b\d$/.test(k)).sort();
     if (bound.has('body') && bs.length) E(`slides[${si}]: binds "body" and ${bs.join(', ')} — a column carries the paragraph or the points, never both`);
   }
+  // a paint slot cannot vanish: a slot with `h` and no `role` draws NOTHING unless a row binds it, so a slide that binds a
+  // card's text and not the card's box ships loose text on empty canvas — and both gates pass it (ROADMAP S2).
+  // The parent/child relation is the layout's own `group`, not its slot NAMES: `team-grid` groups `photo1` with `name1`,
+  // `timeline` groups `d1` with `t1`. Within a group, the box is the paint slot that geometrically HOLDS a text sibling —
+  // 19 such containers across the library (cards, callouts, kpi tiles, logo plates, the cta button). `photo1` sits above its
+  // name and `card1-rule` holds nothing, so neither is a box and neither is claimed here.
+  const holds = (p, t) => isNum(p.x) && isNum(t.x) && t.x >= p.x - 1 && t.x + (isNum(t.w) ? t.w : 0) <= p.x + p.w + 1 && t.y >= p.y - 1 && t.y <= p.y + p.h + 1;
+  const boxesOf = lay => {                      // group name → {box: slotName, text: [slotName]}
+    const groups = {}, out = [];
+    for (const [n, sl] of Object.entries(lay || {})) if (sl && typeof sl === 'object' && sl.group) (groups[sl.group] ||= []).push([n, sl]);
+    for (const mem of Object.values(groups)) {
+      const text = mem.filter(([, sl]) => sl.role), paint = mem.filter(([, sl]) => sl.h != null && !sl.role);
+      const box = paint.find(([, p]) => text.some(([, t]) => holds(p, t)));
+      if (box && text.length) out.push({box: box[0], group: box[1].group, text: text.map(([n]) => n)});
+    }
+    return out;
+  };
+  for (const [si, s] of (Array.isArray(deck.slides) ? deck.slides : []).entries()) {
+    if (!s || typeof s !== 'object' || !Array.isArray(s.els) || !s.layout || !layouts[s.layout]) continue;
+    const at = n => s.els.findIndex(r => r && r.slot === n);
+    for (const {box, group, text} of boxesOf(layouts[s.layout])) {
+      const kids = text.map(n => ({n, i: at(n)})).filter(k => k.i >= 0).sort((a, b) => a.i - b.i);   // row order, so "after its own text" means after the FIRST of them
+      if (!kids.length) continue;
+      const bi = at(box);
+      // the author may paint the box themselves with a free row carrying the same group — that is the box, bound or not
+      if (bi < 0 && s.els.some(r => r && !isText(r) && (r.group === group || r.group === box))) continue;
+      if (bi < 0) E(`slides[${si}]: binds ${kids.map(k => `"${k.n}"`).join(', ')} but not the paint slot "${box}" they sit on — add {"slot": "${box}"} before its text rows, or they render on empty canvas`);
+      else if (bi > kids[0].i) Wn(`slides[${si}]: paint slot "${box}" is bound at els[${bi}], after its own text (els[${kids[0].i}] "${kids[0].n}") — a later row paints over it; move {"slot": "${box}"} before its text rows`);
+    }
+  }
   // master
   const master = deck.master || [];
   if (!Array.isArray(master)) E('master must be an array');

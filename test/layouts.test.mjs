@@ -285,3 +285,61 @@ live('live: a deck using every library layout renders — parity holds, zero pag
     assert.equal(r.parity.length, m.slides.length);
   }
 });
+
+// ── S2. A paint slot cannot vanish. A layout's paint slot (`h`, no `role`) draws nothing unless a row binds it, and a
+// card's box must be painted BEFORE its own text or it covers it. Two study builds bound a card's text and not its box;
+// one shipped a decision slide whose cards were loose text on empty canvas, and both gates passed it.
+const decision = (els, extra = {}) => ({w: 960, h: 540, title: 'cards', slides: [{layout: 'three-up-cards', els: [
+  {slot: 'title', text: 'Three ways to close the gap'}, ...els], ...extra}]});
+const cardText = n => [{slot: `card${n}-number`, text: `0${n}`}, {slot: `card${n}-head`, text: `Option ${n}`}, {slot: `card${n}-body`, text: 'What it costs and what it buys.'}];
+const cardBox = n => ({slot: `card${n}`});
+
+test('layouts: binding a card\'s text and not its box is an error that names the row to add', () => {
+  const bad = validate(create(decision([...cardText(1), cardBox(2), ...cardText(2)])).deck);
+  const m = bad.errors.filter(e => /card1/.test(e));
+  assert.equal(m.length, 1, bad.errors.join(' | '));
+  assert.match(m[0], /slides\[0\]/);
+  assert.match(m[0], /card1-number|card1-head|card1-body/, 'the bound text rows are named: ' + m[0]);
+  assert.match(m[0], /\{"slot":\s*"card1"\}/, 'the row to add is spelled out: ' + m[0]);
+  assert.ok(!bad.errors.some(e => /card2/.test(e)), 'card2 binds its box and is clean: ' + bad.errors.join(' | '));
+  // the fix passes
+  const good = validate(create(decision([cardBox(1), ...cardText(1), cardBox(2), ...cardText(2)])).deck);
+  assert.deepEqual(good.errors, [], good.errors.join(' | '));
+});
+
+test('layouts: a paint slot bound AFTER its own text is a warning — the box would cover the words', () => {
+  const late = validate(create(decision([...cardText(1), cardBox(1)])).deck);
+  assert.deepEqual(late.errors, [], late.errors.join(' | '));
+  const w = late.warnings.filter(m => /card1/.test(m) && /after/.test(m));
+  assert.equal(w.length, 1, late.warnings.join(' | '));
+  assert.match(w[0], /els\[\d+\]/, 'the message points at the rows: ' + w[0]);
+  assert.ok(!validate(create(decision([cardBox(1), ...cardText(1)])).deck).warnings.some(m => /card1/.test(m) && /after/.test(m)));
+});
+
+test('layouts: the check only fires where a paint slot provably holds its group\'s text', () => {
+  // team-grid's photo sits ABOVE its name, timeline's dot above its label: a missing photo or dot is not text on empty canvas
+  const team = validate(create({w: 960, h: 540, title: 't', slides: [{layout: 'team-grid', els: [
+    {slot: 'title', text: 'Who is on it'}, {slot: 'name1', text: 'R. Vance'}, {slot: 'role1', text: 'Operations'}]}]}).deck);
+  assert.deepEqual(team.errors, [], team.errors.join(' | '));
+  const tl = validate(create({w: 960, h: 540, title: 't', slides: [{layout: 'timeline', els: [
+    {slot: 'title', text: 'The year'}, {slot: 't1', text: 'March'}, {slot: 'e1', text: 'Pilot opens'}]}]}).deck);
+  assert.deepEqual(tl.errors, [], tl.errors.join(' | '));
+  // a free row the author paints themselves, carrying the card's group, counts as the box
+  const own = validate(create(decision([{x: 60, y: 168, w: 264, h: 240, bg: 'var(--card)', radius: 10, group: 'card1'}, ...cardText(1)])).deck);
+  assert.ok(!own.errors.some(e => /card1/.test(e)), own.errors.join(' | '));
+});
+
+live('live: the fixed decision slide paints its three cards; the buggy one paints none', async () => {
+  const painted = create(decision([cardBox(1), ...cardText(1), cardBox(2), ...cardText(2), cardBox(3), ...cardText(3)])).html;
+  const loose = create(decision([...cardText(1), ...cardText(2), ...cardText(3)])).html;
+  const boxes = async html => { const f = path.join(tmp, 'cards-' + html.length + '.html'); fs.writeFileSync(f, html);
+    const b = await pw.chromium.launch(); const p = await b.newPage({viewport: {width: 1280, height: 800}});
+    await p.goto(pathToFileURL(f).href); await p.waitForTimeout(200);
+    const n = await p.evaluate(() => [...document.querySelectorAll('#canvas .el')].filter(el => {
+      const s = getComputedStyle(el), r = el.getBoundingClientRect();
+      return !el.textContent.trim() && r.width > 200 && r.height > 150 && s.backgroundColor !== 'rgba(0, 0, 0, 0)';
+    }).length);
+    await b.close(); return {n, f}; };
+  assert.equal((await boxes(painted)).n, 3, 'three card boxes painted');
+  assert.equal((await boxes(loose)).n, 0, 'the bug: text on empty canvas');
+});
