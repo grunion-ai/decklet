@@ -103,7 +103,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const {html, deck, hash, migrate} = create(model, {style, format: o.format, space: o.space, title: o.title, from: o.from || null, spell});
   const flagged = spell ? spellFlags(deck, spell) : null;
   if (flagged === null) console.error('spell: nspell + dictionary-en not installed — no words flagged (npm i -D nspell dictionary-en)');
-  else if (flagged.length) console.error(`spell: ${flagged.length} word(s) flagged — ${flagged.join(', ')} (spell.ignore in the model silences a name)`);
+  else if (flagged.length) {
+    console.error(`spell: ${flagged.length} word(s) flagged — ${flagged.join(', ')} (spell.ignore in the model silences a name)`);
+    console.error(`spell: {"ignore": [${flagged.map(w => JSON.stringify(w)).join(', ')}]}`); // paste it into the model: the words as spell.ignore matches them, already JSON
+  }
   if (migrate?.predates) console.error(`${o.from} predates the edit log (built before decklet 0.5.0): id and state carried, nothing to replay`);
   if (migrate) { console.error(`migrated ${migrate.applied} human edit(s) from ${o.from} · ${migrate.conflicts.length} conflict(s) · ${migrate.orphans.length} orphan(s)`); for (const c of migrate.conflicts) console.error(`conflict ${c.s || c.m}${c.r ? '/' + c.r : ''}.${c.key}: kept human ${JSON.stringify(c.human)} over agent ${JSON.stringify(c.agent)}`); }
   const v = validate(deck);

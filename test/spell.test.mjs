@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import {fileURLToPath, pathToFileURL} from 'node:url';
+import {spawnSync} from 'node:child_process';
 import {create} from '../bin/create.mjs';
 import {flags, flagMap, textsOf, checkable, loadChecker} from '../lib/spell.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -234,4 +235,23 @@ live('spell: on a phone the badge is a tap target and the panel fits the screen'
     assert.ok(m.x >= 0 && m.x + m.width <= 393, `the panel stays on screen: ${JSON.stringify(m)}`);
     assert.deepEqual(errs, []);
   } finally { await b.close(); }
+});
+
+// S5.1 — the flag line ends with the line an author pastes. The study spent a whole build on retyping the words into
+// spell.ignore by hand; the CLI already knows them, lowercased exactly as the ignore list matches them.
+test('spell: create prints a pasteable spell.ignore line, and pasting it silences the flags', async () => {
+  if (!await loadChecker('en')) return;                                    // optional peer: the gate passes without it
+  const m = path.join(tmp, 'paste.model.json'), out = path.join(tmp, 'paste.html');
+  const build = model => {
+    fs.writeFileSync(m, JSON.stringify(model));
+    const r = spawnSync(process.execPath, [path.join(root, 'bin/create.mjs'), '--model', m, '--out', out], {encoding: 'utf8'});
+    assert.equal(r.status, 0, r.stderr);
+    return r.stderr;
+  };
+  const first = build(model());
+  assert.match(first, /^spell: \d+ word\(s\) flagged/m);
+  const line = first.split('\n').find(l => l.startsWith('spell: {'));
+  assert.equal(line, 'spell: {"ignore": ["fotter", "linkd", "renewls"]}', 'the same words, lowercased, one paste away');
+  const pasted = JSON.parse(line.slice('spell: '.length));                 // the value is JSON, so an author can paste it verbatim
+  assert.doesNotMatch(build({...model(), spell: pasted}), /word\(s\) flagged/, 'pasting it silences the flags');
 });
