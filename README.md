@@ -76,7 +76,7 @@ A slide engine where the deck is a JSON model and the renderer is the editor. `c
 
 ## For agents
 
-Read [`SKILL.md`](SKILL.md) — it is the product. It is the authoring path only; the build loop it recommends — a coverage manifest, then a second pass over the rendered slides — is [`docs/building.md`](docs/building.md), the editor (HUD, persistence, PDF, versions, the bug door) is [`docs/editor.md`](docs/editor.md), and the chart row, the connector shapes, the nine figures and the worked examples sit beside it in [`docs/`](docs/). It defines the inputs, the process, the model and style contracts, verification thresholds, anti-patterns and three worked examples. The whole loop:
+Read [`SKILL.md`](SKILL.md) — it is the product. It is the authoring path only; the build loop it recommends — a coverage manifest, then a second pass over the rendered slides — is [`docs/building.md`](docs/building.md), the editor (HUD, persistence, PDF, versions, the bug door) is [`docs/editor.md`](docs/editor.md), and the chart row, the connector shapes, the nine figures and the worked examples sit beside it in [`docs/`](docs/). Its `## START HERE` block routes the first read — the commands in order, the two catalogues, and which page answers which question. Below it: the inputs, the process, the model and style contracts, verification thresholds and anti-patterns. The whole loop:
 
 ```
 node bin/new.mjs --out model.json --slides 8 --density reading      # a starter model + MANIFEST.md, both already clean
