@@ -62,3 +62,40 @@ test('density: an unknown density is an error; SKILL.md defines both by name and
   assert.match(doc, /## DENSITY/); assert.match(doc, /fluffy/); assert.match(doc, /dense/); assert.match(doc, /`speaker`/); assert.match(doc, /`reading`/);
   for (const k of ['subtitle', 'note', 'source', 'legend']) assert.match(doc, new RegExp('`' + k + '`'), k);
 });
+
+// ── S1. Density explains itself — the message names the rows it counted, so the fix is visible without reading the engine
+test('density: the point message lists the rows it counted, one per point, and names the chrome it did not', () => {
+  const s = {layout: 'two-cols', els: [
+    {slot: 'title', text: 'Re-plan the quarter'},                       // H1 chrome — never a point
+    {slot: 'caption', text: 'a caption'},                               // caption slot — chrome
+    {slot: 'left', text: 'We moved the date to March'},
+    {slot: 'right', text: 'The team stayed the same size'},
+    {x: 60, y: 400, w: 400, role: 'Body', text: 'Spend held flat'},
+    {x: 500, y: 400, w: 400, role: 'Body', text: 'Two hires slipped'},
+  ]};
+  const m = densityReport(s, LIBRARY, 'speaker');
+  assert.match(m, /speaker density carries ≤ 3 points, this slide has 4/);
+  // every counted row is listed as `role "the first few words"`, and exactly the counted ones
+  const listed = (m.match(/points: ([^\n;]+)/) || [, ''])[1].split(' · ').filter(Boolean);
+  assert.equal(listed.length, 4, 'four points counted, four rows listed: ' + m);
+  for (const t of ['We moved the date', 'The team stayed', 'Spend held flat', 'Two hires slipped']) assert.ok(m.includes(t.slice(0, 17)), t + ' is listed: ' + m);
+  assert.ok(!m.includes('Re-plan the quarter') && !m.includes('a caption'), 'chrome rows are not listed: ' + m);
+  assert.match(m, /Supertitle · Title · H1 · Caption · Label/, 'the excluded chrome roles are named: ' + m);
+});
+
+test('density: the word message lists the same rows with their word counts, and says chrome counts here', () => {
+  const s = {layout: 'quote', els: [{slot: 'quote', text: lorem(30)}, {slot: 'attribution', text: lorem(20)}]};
+  const m = densityReport(s, LIBRARY, 'speaker');
+  assert.match(m, /speaker density carries ≤ 40 words, this slide has 50/);
+  assert.match(m, /words: /);
+  assert.ok(/\b30\b/.test(m) && /\b20\b/.test(m), 'each listed row carries its own word count: ' + m);
+  assert.match(m, /chrome/, 'the message says how chrome is treated: ' + m);
+});
+
+test('density: SKILL.md states the counting rule beside the table', () => {
+  const doc = fs.readFileSync(path.join(root, 'SKILL.md'), 'utf8');
+  const sec = doc.slice(doc.indexOf('## DENSITY'), doc.indexOf('## GRAPHICS'));
+  assert.match(sec, /counting rule/i, 'DENSITY states the rule by name');
+  assert.match(sec, /Supertitle.*Title.*H1.*Caption.*Label/, 'the five chrome roles are named in DENSITY');
+  assert.match(sec, /number/, 'the chrome slot list is complete (the `number` slot is chrome too)');
+});
