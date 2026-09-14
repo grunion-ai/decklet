@@ -71,6 +71,33 @@ test('chart: a rising line is one stroke with dots, the annotation a green dot +
   assert.equal(rows.length, 4 + 8 + 9 + 9 + 9 + 2 + 1, 'scale(3)+baseline, segments, dots, values, axis, annotation words+leader, source');
 });
 
+test('chart: adjacent axis and value label boxes never overlap — a label box is the column pitch, not the slot rounded up', () => {
+  // the library sheet's own chart geometry. chart-column is 770 wide over four quarters: a 718px plot at a 179.5px slot,
+  // whose boxes used to be rounded UP to 180 and so overran the next column by a pixel on every style kit in library.html.
+  const geos = [[{x: 150, y: 176, w: 770, h: 244}, 4], [{x: 230, y: 176, w: 690, h: 244}, 4], [{x: 230, y: 176, w: 690, h: 250}, 6], [{x: 60, y: 136, w: 840, h: 276}, 7]];
+  const flat = n => Array.from({length: n}, (_, k) => ({label: 'Q' + (k + 1), value: 60}));   // equal values put every value label in one band
+  for (const [box, n] of geos) for (const mark of ['bar', 'line']) {
+    const where = `${mark} ${box.w}x${n}`, rows = chartRows({...box, chart: {mark, data: flat(n)}}, roles);
+    const bands = new Map();
+    for (const r of rows.filter(r => r.role === 'Label' && r.align === 'center')) { const b = bands.get(r.y) || []; b.push(r); bands.set(r.y, b); }
+    assert.ok(bands.size, where + ': no centred label rows to judge');
+    for (const band of bands.values()) {
+      band.sort((a, b) => a.x - b.x);
+      for (let k = 1; k < band.length; k++) assert.ok(band[k].x >= band[k - 1].x + band[k - 1].w, `${where}: "${band[k - 1].text}" (${band[k - 1].x}+${band[k - 1].w}) runs into "${band[k].text}" at ${band[k].x}`);
+      assert.ok(band.at(-1).x + band.at(-1).w <= box.x + box.w + 0.5, where + ': the last label box leaves the chart');
+    }
+  }
+});
+
+test('chart: the library sheet geometry validates clean — the sheet wears the rows UNGROUPED, so the gate judges every pair', () => {
+  // templates/build-sheet.mjs expands a chart row itself (`chartRows(r, NEUTRAL)`) before the kit is worn, and that row carries
+  // no `group` — so the gap gate compares label to label instead of waving the chart through as one thing, as it does after create().
+  const q = [{label: 'Q1', value: 62, text: '$62K'}, {label: 'Q2', value: 71, text: '$71K'}, {label: 'Q3', value: 78, text: '$78K'}, {label: 'Q4', value: 92, text: '$92K'}];
+  const els = chartRows({x: 150, y: 176, w: 770, h: 244, chart: {mark: 'bar', data: q}}, roles);
+  assert.ok(!els.some(e => e.group), 'ungrouped, as the sheet writes them');
+  assert.deepEqual(validate(create({w: 960, h: 540, slides: [{els}]}).deck).errors, []);
+});
+
 test('chart: validate refuses a chart with no numbers, fewer than two points, non-numeric values, a bad mark or an annotation off the data', () => {
   const one = c => validate(create({w: 960, h: 540, slides: [{els: [{...BOX, chart: c}]}]}).deck).errors;
   assert.deepEqual(one(bars), []); assert.deepEqual(one(rising), []);
