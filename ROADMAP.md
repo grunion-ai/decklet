@@ -68,7 +68,7 @@ Epics rank by **ICE**: Impact x Confidence x Ease, each 1 to 10, multiplied, wit
 | **Export** | X1 Cheap wins `S` | X2 Searchable PDF `M` | X3 PPTX export `L` |
 | **Library & editor** | L7 Spellcheck, the rest `M`<br>L11 Type on the sheet `S` | | |
 | **Usability** | U9 A `--bad` token in every style `XS`<br>U10 Warn before the browser fails `S` | U8 Two axes on the sheet: look × ladder `L` | |
-| **Getting started** | S1 Density explains itself `S`<br>S2 A paint slot cannot vanish `S`<br>S3 `new.mjs`: a model that already builds `M`<br>S4 One front door on the skill `S`<br>S5 create hands back the spell line `XS` | | |
+| **Getting started** | S1 Density explains itself `S`<br>S2 A paint slot cannot vanish `S`<br>S3 `new.mjs`: a model that already builds `M`<br>S4 One front door on the skill `S`<br>S5 create hands back the spell line `XS`<br>S6 A kit must not collide with the chrome `S` | | |
 
 ### ICE scores
 
@@ -109,6 +109,7 @@ Epics rank by **ICE**: Impact x Confidence x Ease, each 1 to 10, multiplied, wit
 | S2 A paint slot cannot vanish | 8 | 10 | 8 | **640** | Now |
 | S4 One front door on the skill | 8 | 9 | 9 | **648** | Now |
 | S3 new.mjs: a model that already builds | 9 | 8 | 7 | **504** | Now |
+| S6 A kit must not collide with the chrome | 7 | 9 | 8 | **504** | Now |
 | U10 Warn before the browser fails | 8 | 9 | 8 | **576** | Now |
 | U8 Two axes on the sheet | 8 | 7 | 4 | **224** | Next |
 
@@ -492,6 +493,15 @@ Kyle's ask: the library should read as two axes. **Look**: basic or dense spacin
 Filed 2026-09-13 from the parity study: 30 decks, 5 briefs, 7 setups, blind-judged. Every builder passed, and every builder spent roughly the first third of its run reading — the skill, the catalogues, then engine source for the handful of rules neither prints. The lane exists to delete that third. It is measured, not guessed: the study's own transcripts name what was read and why.
 
 **One result shapes the whole lane.** A setup that replaced the contract with a one-page summary scored **0.861** against **0.878** for the skill alone — below baseline. Condensing the rules makes an author skim the rules. So nothing here summarises the contract. Each row either makes a tool answer the question that sent an author to the source, or removes a decision from the first five minutes.
+
+### S6. A kit must not collide with the chrome · `S` · Now
+
+Found while building S3's starter across all eleven style kits: on `ocean-ember`, whose H1 sets a 44px leading, the library's chrome pitch leaves under 4px between the title box and the `subtitle` slot, so `validate --strict` reports an overlap for **any** deck that binds `subtitle` on a dense H1 layout. The kit is shipped, the layout is shipped, and the combination cannot pass the gate — an author who picks that kit and writes a subtitle has done nothing wrong. The starter dodges it by binding `note` and `source` instead, which is a workaround, not a fix.
+
+| Story | Size | What |
+| --- | --- | --- |
+| S6.1 | XS | A test that walks every shipped kit × every dense H1 layout with all four dense slots bound and expects `validate --strict` clean. It fails today on at least one pair; the point is to know the true count. |
+| S6.2 | S | Fix what it finds: derive the chrome pitch from the role's own leading rather than a constant, or cap a kit's H1 leading against the pitch. Whichever, the rule lands in the STYLE CONTRACT so a kit author knows the constraint. |
 
 ### S1. Density explains itself · `S` · Now
 
