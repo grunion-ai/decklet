@@ -1,5 +1,6 @@
 // lib/diagram.mjs gate — a spec of nodes / edges / groups / timeline / note becomes native rows (every node, label and
-// connector editable and draggable, grouped so a node or an edge moves as one) inside the library's `diagram` frame.
+// connector its own editable, draggable row — nothing links them) inside the library's `diagram` frame.
+// A bent edge is several `line` rows in a row: the first carries `from`, the last carries `to`. `edgeRuns` walks them back out.
 // Ported from the harness helper that drew the nine figure kinds (2026-09-07); the router, fans and label rules are the
 // ones the eyeball rounds shaped: same-column edges go V-H-V, edges sharing a face fan 20px, a label rides the run
 // nearest its target and lifts or sidesteps when it does not fit.
@@ -13,6 +14,11 @@ import {LIBRARY} from '../lib/layouts.mjs';
 import {validate} from '../bin/validate.mjs';
 import {create} from '../bin/create.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+// the runs of one edge, in emission order: a block opens on a `line` row and closes on the row carrying `to`
+const edgeRuns = rows => { const out = []; let cur = null;
+  for (const r of rows) { if (!r.line) { cur = null; continue; } if (!cur) { cur = [r]; out.push(cur); } else cur.push(r); if (r.to) cur = null; }
+  return out; };
+const runsOf = (rows, from, to) => edgeRuns(rows).find(b => b[0].from === from && b[b.length - 1].to === to) || [];
 
 const spec = {
   w: 900, h: 300, label: 'Buying won the ordering',
@@ -49,32 +55,32 @@ test('diagram: the layout is the library diagram layout, scaled to the space, wi
   assert.throws(() => diagramLayout('4x3x2'), /space/);
 });
 
-test('diagram: nodes — a painted box, a Body title and a Label sublabel, one group; chosen = accent 2px, lost = dashed muted', () => {
+test('diagram: nodes — a painted box, a Body title and a Label sublabel, three independent rows; chosen = accent 2px, lost = dashed muted', () => {
   const rows = diagramRows(spec, fr);
   assert.ok(!rows.some(r => r.svg), 'no svg row for rect nodes');
-  assert.deepEqual(rows.find(r => r.id === 'ae'), {id: 'ae', x: 84, y: 250, w: 200, h: 60, bg: 'var(--box)', bd: '2px solid var(--accent)', radius: 8, group: 'ae'});
+  assert.deepEqual(rows.find(r => r.id === 'ae'), {id: 'ae', x: 84, y: 250, w: 200, h: 60, bg: 'var(--box)', bd: '2px solid var(--accent)', radius: 8});
   assert.equal(rows.find(r => r.id === 'gs').bd, '1px dashed var(--muted)');
   assert.equal(rows.find(r => r.id === 'cp').bg, 'var(--card)');
   assert.equal(rows.find(r => r.id === 'cp').x, 84, 'node origins snap to the 8px grid');
-  assert.deepEqual(rows.find(r => r.group === 'ae' && r.role === 'Body'), {x: 100, y: 258, w: 168, role: 'Body', weight: 600, color: 'var(--fg)', nowrap: 1, text: 'Buy a platform', group: 'ae'});
-  assert.deepEqual(rows.find(r => r.group === 'ae' && r.role === 'Label'), {x: 100, y: 286, w: 168, role: 'Label', nowrap: 1, color: 'var(--muted)', text: 'twelve-month contract', group: 'ae'});
+  assert.deepEqual(rows.find(r => r.text === 'Buy a platform'), {x: 100, y: 258, w: 168, role: 'Body', weight: 600, color: 'var(--fg)', nowrap: 1, text: 'Buy a platform'});
+  assert.deepEqual(rows.find(r => r.text === 'twelve-month contract'), {x: 100, y: 286, w: 168, role: 'Label', nowrap: 1, color: 'var(--muted)', text: 'twelve-month contract'});
   assert.throws(() => diagramRows({w: 100, h: 100, label: 'edge', nodes: [{id: 'a', x: 0, y: 10, w: 50, h: 20, title: 'A'}]}, fr), /inset/, 'a node on the frame edge loses its stroke to the row clip');
   assert.throws(() => diagramRows({w: 100, h: 100, label: 'x', nodes: [{id: 'a', x: 8, y: 8, w: 40, h: 20, title: 'A', shape: 'star'}]}, fr), /shape/);
   assert.throws(() => diagramRows({...spec, label: ''}, fr), /label/, 'the one claim is mandatory');
   assert.throws(() => diagramRows({w: 100, h: 100, label: 'x', nodes: [{id: 'a', x: 8, y: 8, w: 40, h: 20, title: 'A'}], edges: [{from: 'a', to: 'zz'}]}, fr), /unknown node/);
 });
 
-test('diagram: edges — line rows terminated on their nodes, headed, 2.5px (3 chosen), dashed when lost; bent edges are three grouped runs whose ends fan', () => {
+test('diagram: edges — line rows terminated on their nodes, headed, 2.5px (3 chosen), dashed when lost; bent edges are three runs whose ends fan', () => {
   const rows = diagramRows(spec, fr);
-  assert.deepEqual(rows.find(r => r.line && r.from === 'ae'), {x: 284, y: 280, line: [364, 280], h: 3, bg: 'var(--accent)', from: 'ae', to: 'log', arrow: 'end', head: 'triangle', group: 'e:ae-log'});
+  assert.deepEqual(rows.find(r => r.line && r.from === 'ae'), {x: 284, y: 280, line: [364, 280], h: 3, bg: 'var(--accent)', from: 'ae', to: 'log', arrow: 'end', head: 'triangle'});
   assert.equal(rows.find(r => r.line && r.from === 'gs').dash, 1);
   assert.equal(rows.find(r => r.line && r.from === 'cp').h, 2.5);
-  const bent = rows.filter(r => r.group === 'e:cp-log' && r.line);
+  const bent = runsOf(rows, 'cp', 'log');
   assert.equal(bent.length, 3);
   assert.deepEqual([bent[0].from, bent[0].to, bent[1].from, bent[1].to, bent[2].from, bent[2].to, bent[2].arrow], ['cp', undefined, undefined, undefined, undefined, 'log', 'end']);
   assert.deepEqual([bent[0].y, bent[0].line[1], bent[1].x, bent[2].line[1]], [184, 184, 324, 260], 'H-V-H: first run level with the source; three edges enter log on its left face, so the target ends fan 20px apart (cp -20, ae 0, gs +20)');
   // a label is a Label chip over card with explicit padding, centred by explicit width
-  assert.deepEqual(rows.find(r => r.text === 'signed'), {x: 292, y: 262, w: 56, role: 'Label', nowrap: 1, align: 'center', bg: 'var(--card)', p: '1px 4px', text: 'signed', group: 'e:ae-log'});
+  assert.deepEqual(rows.find(r => r.text === 'signed'), {x: 292, y: 262, w: 56, role: 'Label', nowrap: 1, align: 'center', bg: 'var(--card)', p: '1px 4px', text: 'signed'});
 });
 
 test('diagram: routing — a target not to the right takes V-H-V between the horizontal faces; a label that does not fit lifts or sidesteps', () => {
@@ -83,11 +89,11 @@ test('diagram: routing — a target not to the right takes V-H-V between the hor
     {id: 'a', x: 200, y: 24, w: 120, h: 40, title: 'A'}, {id: 'b', x: 200, y: 200, w: 120, h: 40, title: 'B'},
     {id: 'c', x: 24, y: 200, w: 120, h: 40, title: 'C'}, {id: 'd', x: 24, y: 24, w: 120, h: 40, title: 'D'}],
     edges: [{from: 'a', to: 'b', label: 'down'}, {from: 'a', to: 'c', label: 'back'}, {from: 'd', to: 'b', label: 'bent'}, {from: 'd', to: 'a', label: 'flat'}]}, unit);
-  const runs = g => stacked.filter(r => r.group === g && r.line).map(r => [r.x, r.y, ...r.line]);
-  assert.deepEqual(runs('e:a-b'), [[250, 64, 250, 200]], 'same column: straight down, fanned 10px left with the target end');
-  assert.deepEqual(runs('e:a-c'), [[270, 64, 270, 136], [270, 136, 84, 136], [84, 136, 84, 200]], 'target left and below: V-H-V from the fanned start');
-  assert.deepEqual(runs('e:d-b'), [[144, 34, 176, 34], [176, 34, 176, 220], [176, 220, 200, 220]], 'bent edge leaves 10px above the face centre');
-  assert.deepEqual(runs('e:d-a'), [[144, 54, 200, 54]], 'level edge stays level: both ends fanned 10px down');
+  const runs = (from, to) => runsOf(stacked, from, to).map(r => [r.x, r.y, ...r.line]);
+  assert.deepEqual(runs('a', 'b'), [[250, 64, 250, 200]], 'same column: straight down, fanned 10px left with the target end');
+  assert.deepEqual(runs('a', 'c'), [[270, 64, 270, 136], [270, 136, 84, 136], [84, 136, 84, 200]], 'target left and below: V-H-V from the fanned start');
+  assert.deepEqual(runs('d', 'b'), [[144, 34, 176, 34], [176, 34, 176, 220], [176, 220, 200, 220]], 'bent edge leaves 10px above the face centre');
+  assert.deepEqual(runs('d', 'a'), [[144, 54, 200, 54]], 'level edge stays level: both ends fanned 10px down');
   const lab = t => stacked.find(r => r.text === t);
   assert.deepEqual([lab('down').x, lab('down').y, lab('down').align], [256, 124, undefined], 'no horizontal run: label beside the vertical');
   assert.deepEqual([lab('back').y, lab('back').align], [118, 'center'], 'V-H-V: label centred on the horizontal run');
@@ -103,17 +109,17 @@ test('diagram: routing — a target not to the right takes V-H-V between the hor
   assert.deepEqual([tight.find(r => r.text === 'linked to').x, tight.find(r => r.text === 'linked to').y], [158, 97], 'bent with a short last run: beside the vertical at its midpoint');
 });
 
-test('diagram: timeline — one headless accent rule, each tick its own group (dot + label + sublabel); note — one Label row', () => {
+test('diagram: timeline — one headless accent rule, a dot and two labels per tick, each its own row; note — one Label row', () => {
   const rows = diagramRows(spec, fr);
-  assert.deepEqual(rows.find(r => r.line && r.group === 'timeline'), {x: 620, y: 280, line: [940, 280], h: 2, bg: 'var(--accent)', group: 'timeline'});
-  const dots = rows.filter(r => r.radius === '50%' && /^tick:/.test(r.group));
+  assert.deepEqual(rows.find(r => r.line && r.h === 2), {x: 620, y: 280, line: [940, 280], h: 2, bg: 'var(--accent)'});
+  const dots = rows.filter(r => r.radius === '50%');
   assert.equal(dots.length, 3);
-  assert.deepEqual(dots[0], {x: 613, y: 273, w: 14, h: 14, bg: 'var(--accent)', bd: '2px solid var(--accent)', radius: '50%', group: 'tick:Q1'});
+  assert.deepEqual(dots[0], {x: 613, y: 273, w: 14, h: 14, bg: 'var(--accent)', bd: '2px solid var(--accent)', radius: '50%'});
   assert.equal(dots[1].bg, 'var(--card)', 'a tick ahead is hollow');
-  assert.ok(!rows.some(r => r.group === 'timeline' && !r.line), 'nothing but the rule shares the timeline group');
-  assert.deepEqual(rows.find(r => r.text === 'Q1'), {x: 572, y: 248, w: 96, role: 'Label', nowrap: 1, align: 'center', color: 'var(--fg)', tt: 'none', text: 'Q1', group: 'tick:Q1'});
-  assert.deepEqual(rows.find(r => r.text === 'shortlist'), {x: 572, y: 296, w: 96, role: 'Label', nowrap: 1, align: 'center', text: 'shortlist', group: 'tick:Q1'});
-  assert.deepEqual(rows.find(r => r.group === 'note'), {x: 620, y: 350, w: 340, role: 'Label', text: 'exit clause at month six', group: 'note'});
+  assert.ok(!rows.some(r => r.group != null), 'no row carries a link to another');
+  assert.deepEqual(rows.find(r => r.text === 'Q1'), {x: 572, y: 248, w: 96, role: 'Label', nowrap: 1, align: 'center', color: 'var(--fg)', tt: 'none', text: 'Q1'});
+  assert.deepEqual(rows.find(r => r.text === 'shortlist'), {x: 572, y: 296, w: 96, role: 'Label', nowrap: 1, align: 'center', text: 'shortlist'});
+  assert.deepEqual(rows.find(r => r.text === 'exit clause at month six'), {x: 620, y: 350, w: 340, role: 'Label', text: 'exit clause at month six'});
   assert.equal(diagramRows({w: 450, h: 150, label: 'half', nodes: [{id: 'ae', x: 24, y: 24, w: 100, h: 30, title: 'A'}]}, fr).find(r => r.id === 'ae').w, 200, 'a spec narrower than the frame scales to its width');
 });
 
@@ -123,16 +129,16 @@ test('diagram: shapes and groups — pill radius half the height, circle 50%, a 
     nodes: [{id: 'p', x: 24, y: 40, w: 120, h: 40, title: 'Serve', shape: 'pill', state: 'chosen'},
       {id: 'd', x: 200, y: 40, w: 120, h: 60, title: 'hit?', shape: 'diamond'},
       {id: 'c', x: 400, y: 40, w: 60, h: 60, title: 'DB', shape: 'circle'}]}, {x: 0, y: 0, w: 600, h: 300});
-  assert.deepEqual(rows[0], {x: 8, y: 8, w: 280, h: 200, bd: '1px dashed var(--line)', radius: 12, over: 1, group: 'g:edge'});
-  assert.deepEqual(rows[1], {x: 20, y: 14, w: 256, role: 'Label', nowrap: 1, text: 'edge', group: 'g:edge'});
+  assert.deepEqual(rows[0], {x: 8, y: 8, w: 280, h: 200, bd: '1px dashed var(--line)', radius: 12, over: 1});
+  assert.deepEqual(rows[1], {x: 20, y: 14, w: 256, role: 'Label', nowrap: 1, text: 'edge'});
   assert.equal(rows.find(r => r.id === 'p').radius, 20);
-  assert.deepEqual(rows.find(r => r.group === 'p' && r.role), {x: 40, y: 48, w: 88, role: 'Body', weight: 600, color: 'var(--fg)', nowrap: 1, align: 'center', text: 'Serve', group: 'p'});
+  assert.deepEqual(rows.find(r => r.text === 'Serve'), {x: 40, y: 48, w: 88, role: 'Body', weight: 600, color: 'var(--fg)', nowrap: 1, align: 'center', text: 'Serve'});
   assert.equal(rows.find(r => r.id === 'c').radius, '50%');
   const dia = rows.find(r => r.id === 'd');
   assert.match(dia.svg, /<polygon points="60,0 120,30 60,60 0,30"/);
   assert.doesNotMatch(dia.svg, /#[0-9a-fA-F]{3,8}\b|<script|<style|href="http/, 'tokens only, self-contained');
-  assert.deepEqual([dia.x, dia.y, dia.w, dia.h, dia.group], [200, 40, 120, 60, 'd']);
-  assert.equal(rows.find(r => r.group === 'd' && r.role).text, 'hit?');
+  assert.deepEqual([dia.x, dia.y, dia.w, dia.h], [200, 40, 120, 60]);
+  assert.ok(rows.some(r => r.text === 'hit?' && r.role === 'Body'), 'the diamond\'s title is its own row');
 });
 
 test('diagram: slide — rows fill the library frame under the diagram layout, the caption states the claim, and it validates and creates', () => {
@@ -153,7 +159,7 @@ test('diagram: palette — a token prefix maps every colour to that palette\'s t
   const us = diagramRows(spec, fr, {palette: 'us'});
   assert.equal(us.find(r => r.id === 'ae').bd, '2px solid var(--us-accent)');
   assert.equal(us.find(r => r.id === 'cp').bg, 'var(--us-card)');
-  assert.equal(us.find(r => r.group === 'ae' && r.role === 'Body').color, 'var(--us-fg)');
+  assert.equal(us.find(r => r.text === 'Buy a platform').color, 'var(--us-fg)');
   assert.equal(us.find(r => r.text === 'signed').bg, 'var(--us-card)');
   assert.ok(!JSON.stringify(us).includes('var(--fg)') && !JSON.stringify(us).includes('var(--accent)'), 'no bare token survives under a palette');
   const s = diagramSlide(spec, {title: 'T', caption: 'C', palette: 'us'});

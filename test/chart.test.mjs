@@ -91,7 +91,7 @@ test('chart: adjacent axis and value label boxes never overlap — a label box i
 
 test('chart: the library sheet geometry validates clean — the sheet wears the rows UNGROUPED, so the gate judges every pair', () => {
   // templates/build-sheet.mjs expands a chart row itself (`chartRows(r, NEUTRAL)`) before the kit is worn, and that row carries
-  // no `group` — so the gap gate compares label to label instead of waving the chart through as one thing, as it does after create().
+  // the gap gate compares label to label: no row is ever waved through on the strength of a link to another one.
   const q = [{label: 'Q1', value: 62, text: '$62K'}, {label: 'Q2', value: 71, text: '$71K'}, {label: 'Q3', value: 78, text: '$78K'}, {label: 'Q4', value: 92, text: '$92K'}];
   const els = chartRows({x: 150, y: 176, w: 770, h: 244, chart: {mark: 'bar', data: q}}, roles);
   assert.ok(!els.some(e => e.group), 'ungrouped, as the sheet writes them');

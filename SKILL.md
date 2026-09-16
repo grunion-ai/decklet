@@ -75,7 +75,7 @@ Discipline, in order of importance:
 - **Master discipline.** Anything that appears on every slide (footer, rule, mark) is a `master` row, once — chrome is deck-wide and never varies per layout. Exactly one master row has `footer:1` and the engine renders the page counter with it (§ MASTER layer): `{id:'foot', footer:1, right: 60, y: 506, w:'auto', role:'Label', nowrap:1}` puts the deck name and `· n / N` together at the right foot; `{… x: 60 …}` keeps the name at the left with the counter alone in the corner. Never type `3 / 9` into a row.
 - **Text-fit.** A label that must stay on one line gets `nowrap:1` and enough `w` (≈ `cw` × size × chars — the role's measured glyph width, 0.46 for the neutral sans, 0.69 for the mono Label), or `w:'auto'` to hug. Chips/pills: `w:'auto'` + `p:'chip'` (+ `bg`/`bd`/`radius`); one that sits on a right edge takes `right:` instead of `x`. Body copy gets a `w` that yields ≤ 3 lines at the role's size.
 - **Charts are rows.** A bar or line chart is one `chart` row that `create` expands into bars, lines, dots and `Label` rows with the drawing rules applied — write the data, not the geometry.
-- **Cards are groups.** There is no container row: a card is a tile plus its rows sharing one `group` — `{x,y,w,h,bg,bd,radius,group:'card1'}` and each text row inside it with `group:'card1'`, every row at its own canvas x/y. The human drags the card and the rows come along; you still position each row, once.
+- **Cards are painted, not nested.** There is no container row and no link between rows: a card is a painted rect — `{x,y,w,h,bg,bd,radius}` — with text rows drawn over it at their own canvas x/y. Each of them selects, drags and deletes alone, so put the paint row first (row order is z-order) and position every row once.
 - **Colour.** Use `var(--accent)`, `var(--fg)`, `var(--muted)`, `var(--line)`, `var(--card)` so a style swap re-themes the deck; literal hex only for chart series.
 
 ### Step 3 — validate (no browser)
@@ -201,7 +201,6 @@ Row — every prop optional; a row is whatever its props make it:
 | `anim` | `rise`\|`fade`\|`pop`\|`wipe` | — | entrance motion on slide entry, staggered 120 ms in model order (see MOTION) |
 | `chart` | `{mark, data, …}` | — | a bar or line chart drawn into this row's x/y/w/h at create time ([docs/charts.md](docs/charts.md)) |
 | `css` | string | — | raw CSS escape hatch — validator warns |
-| `group` | string | — | rows on a slide sharing one `group` are one unit in the editor: drag, nudge and marquee move them together, the selection draws one box round them, ⌘-click takes a member alone. Every row keeps canvas-space x/y — nothing is relative. A `chart` row's expansion shares one group; the library's kpi tiles, steps, timeline events and cta button are born grouped |
 | `override` | masterId | — | partial row: only the props it carries replace the master's on this slide |
 | `footer` | 1 | — | master only: the page counter renders with this row (§ MASTER layer) |
 | `id` | string | — | master only, unique |
@@ -322,7 +321,7 @@ Four words, and no fifth: `rise` (text — the default), `fade` (quiet chrome), 
 - **Per-slide chrome drift.** A footer or mark redrawn on each slide with slightly different x/y. It is one master row; slides fork only when a human edits.
 - **Size overrides.** `size:18` on a Body row "because it needs to be bigger". Change the role, or use the right role (`Title` for a display headline, `H1` for a slide title). Same for `font`, `lh`, `ls`, `mono`.
 - **Wrapping labels.** Chips, axis labels, step numbers, supertitles that wrap to two lines. `nowrap:1` + width, or `w:'auto'`. Parity fails these on purpose.
-- **Touching boxes.** A chip 2px from the next chip, a caption resting on the rule under it, a value label on its bar's top edge. `validate` names the pair and the distance; give it `styles.gap` of air, or state the relationship (`group`, containment, `over:1`).
+- **Touching boxes.** A chip 2px from the next chip, a caption resting on the rule under it, a value label on its bar's top edge. `validate` names the pair and the distance; give it `styles.gap` of air, or state the relationship (containment, `over:1`).
 - **Guessed x for an auto-width row.** A chip on a card's right edge is `right:`, never a guessed `x` — a `w:'auto'` row has no width until it renders, and the guess runs under its neighbour.
 - **Hand-built arrow heads.** Three `line` rows and a trig helper to draw one arrow. `arrow:'end'` on a `line` or a `curve`. Stiff diagonals where the source had a spline: that is what `curve` is for.
 - **Connectors aimed at a centre.** Giving a connector the target's coordinate puts the head inside its fill, floating. Give the target itself — `to: 'grade'` — and the engine stops the tip on the border. Hand-computed standoffs ("end it 10px short") are the thing `to` exists to delete: the head no longer overshoots, so paying it back by hand now *under*-shoots.

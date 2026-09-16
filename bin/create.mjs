@@ -56,6 +56,10 @@ export function create(model, {style = null, format, space, title, template, fro
   deck.format = canvas.format; deck.page = canvas.page; deck.w = canvas.w; deck.h = canvas.h;
   // style.json: {tokens:{bg,fg,muted,accent,card,line,sel,box}, roles:{…}, pad:{…}} — shared with validate --style so the two never drift
   mergeStyle(deck, style);
+  // `group` left the contract in 0.12.0 — a model written against an older skill still builds, minus the dead prop, so no
+  // deck carries a link the editor no longer honours. validate says so out loud; this only keeps the file clean.
+  for (const s of deck.slides || []) for (const r of (s && s.els) || []) if (r && r.group != null) delete r.group;
+  for (const r of deck.master || []) if (r && r.group != null) delete r.group;
   expandTemplates(deck); // template slides → their rows (the template's chrome layout named on the slide), before the library resolves
   expandIcons(deck);     // icon rows → inline svg rows
   deck.layouts = {...libraryFor(deck), ...(deck.layouts || {})};   // library layouts a slide names and the deck does not define

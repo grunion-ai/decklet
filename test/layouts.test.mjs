@@ -108,7 +108,7 @@ test('library: no dense slot collides — subtitle · note · source · legend c
   for (const [name, lay] of Object.entries(LIBRARY)) for (const k of Object.keys(DENSE)) {
     const A = lay.slots[k] && box(lay.slots[k]); if (!A) continue;
     for (const [n2, sl2] of Object.entries(lay.slots)) {
-      if (n2 === k || (lay.slots[k].group != null && lay.slots[k].group === sl2.group)) continue;
+      if (n2 === k) continue;
       const B = box(sl2); if (!B) continue;
       assert.ok(!hits(A, B), `${name}: dense slot ${k} (${A.x},${A.y} ${A.w}×${A.h}) collides with ${n2} (${B.x},${B.y} ${B.w}×${B.h})`);
     }

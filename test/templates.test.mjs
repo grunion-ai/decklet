@@ -157,7 +157,7 @@ test('templates: the nine figures — Figures category, diagram layout, reading 
     assert.ok(t, id + ' ships');
     assert.equal(t.cat, 'Figures'); assert.equal(t.layout, 'diagram'); assert.equal(t.density, 'reading');
     assert.deepEqual([t.els[0].slot, t.els[1].slot, t.els.at(-1).slot], ['supertitle', 'title', 'caption'], id + ': chrome around the figure');
-    assert.ok(t.els.some(e => e.line && e.arrow === 'end' && e.to) || t.els.some(e => e.group === 'timeline'), id + ': a headed connector or a timeline rule');
+    assert.ok(t.els.some(e => e.line && e.arrow === 'end' && e.to) || t.els.some(e => e.line && !e.to && !e.from), id + ': a headed connector or a timeline rule');
     const keys = templateKeys(id);
     assert.ok(keys.length >= 5 && keys.every(k => String(k.text).trim()), id + ': every key carries sample text');
     const {frame} = diagramLayout('960x540');
@@ -172,26 +172,27 @@ test('templates: the nine figures — Figures category, diagram layout, reading 
 });
 
 // U5.6: the advanced architecture as a template — three zones, seven nodes, six labelled edges, and every label on its
-// own run. A label that does not fit lifts to Y(tops)-22, which is where a group's label sits (Y(g.y)+6): the channels
-// are cut so none of them lifts.
-test('templates: figure-boundaries-6 — three zones, seven nodes, six labelled edges, no label lifted onto a group label', () => {
+// own run. A label that does not fit lifts to Y(tops)-22, which is where a zone's label sits (Y(g.y)+6): the channels
+// are cut so none of them lifts. No row carries a link to another, so the parts are read back out of the rows themselves:
+// a zone is a dashed over:1 box, a node is a row with an id, an edge is a run of `line` rows, an edge label is a chip.
+test('templates: figure-boundaries-6 — three zones, seven nodes, six labelled edges, no label lifted onto a zone label', () => {
   const t = TEMPLATE['figure-boundaries-6'];
   assert.ok(t, 'figure-boundaries-6 ships');
   const rows = t.els;
-  const groups = new Set(rows.filter(r => /^g:/.test(r.group || '')).map(r => r.group));
-  const nodes = new Set(rows.filter(r => r.group && !/^[ge]:|^tick:|^note$|^timeline$/.test(r.group)).map(r => r.group));
-  const edges = new Set(rows.filter(r => /^e:/.test(r.group || '')).map(r => r.group));
-  assert.equal(groups.size, 3, [...groups].join(' '));
-  assert.equal(nodes.size, 7, [...nodes].join(' '));
-  assert.equal(edges.size, 6, [...edges].join(' '));
-  const edgeLabels = rows.filter(r => /^e:/.test(r.group || '') && r.role === 'Label');
-  assert.equal(edgeLabels.length, 6, 'every edge carries a label');
+  const zoneAt = rows.map((r, i) => [r, i]).filter(([r]) => r.over === 1 && /dashed/.test(r.bd || ''));
+  const zoneLabels = zoneAt.map(([, i]) => rows[i + 1]).filter(r => r && r.role === 'Label' && !r.bg);
+  const nodes = rows.filter(r => r.id != null);
+  let edges = 0; for (const r of rows) if (r.line && r.to) edges++;   // one row per edge carries `to`: the last run of it
+  assert.equal(zoneAt.length, 3, 'three dashed zones');
+  assert.equal(nodes.length, 7, 'seven node boxes');
+  assert.equal(edges, 6, 'six edges land on a node');
+  const edgeLabels = rows.filter(r => r.role === 'Label' && r.bg === 'var(--card)');
+  assert.equal(edgeLabels.length, 6, 'every edge carries a label chip');
   // a Label's line box is 14px; two labels are legal when they sit styles.gap (4) apart on either axis
-  const groupLabels = rows.filter(r => /^g:/.test(r.group || '') && r.role === 'Label');
-  assert.equal(groupLabels.length, 3);
-  for (const a of edgeLabels) for (const b of groupLabels) {
+  assert.equal(zoneLabels.length, 3);
+  for (const a of edgeLabels) for (const b of zoneLabels) {
     const apart = a.x + a.w + 4 <= b.x || b.x + b.w + 4 <= a.x || a.y + 18 <= b.y || b.y + 18 <= a.y;
-    assert.ok(apart, `"${a.text}" lifted onto the group label "${b.text}" (${a.x},${a.y} vs ${b.x},${b.y})`);
+    assert.ok(apart, `"${a.text}" lifted onto the zone label "${b.text}" (${a.x},${a.y} vs ${b.x},${b.y})`);
   }
   const r = v(deck([{template: 'figure-boundaries-6'}]));
   assert.deepEqual(r.errors, [], r.errors.join(' | '));
