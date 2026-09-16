@@ -24,20 +24,20 @@ const write = (name, html) => { const f = path.join(tmp, name); fs.writeFileSync
 const open = async (b, f, opts = {}) => { const p = await b.newPage({viewport: {width: 1280, height: 800}, ...opts}); const errs = []; p.on('pageerror', e => errs.push(String(e))); p.errs = errs; await p.goto(pathToFileURL(f).href); await p.waitForTimeout(150); return p; };
 const fresh = async (b, f) => { const p = await open(b, f); await p.evaluate(() => localStorage.clear()); await p.reload(); await p.waitForTimeout(150); return p; };
 
-live('the mini toolbar opens on a text edit inside a group: the edited row wins over the group selection', async () => {
-  // clicking a member selects the whole group (sel.size > 1), and placeTb bailed on any selection but one row — so a
-  // double-click into a grouped row edited the text with no toolbar: no roles, no B/I/U, no colours.
+live('the mini toolbar opens on a text edit inside a multi-row selection: the edited row wins over the selection', async () => {
+  // a marquee or a run of ⌘-clicks leaves several rows selected (sel.size > 1), and placeTb bailed on any selection but one
+  // row — so a double-click into one of them edited the text with no toolbar: no roles, no B/I/U, no colours.
   const m = model({slides: [{els: [
-    {x: 60, y: 100, w: 300, h: 80, bg: 'var(--card)', bd: '1px solid var(--fg)', group: 'card'},
-    {x: 76, y: 108, w: 268, role: 'Body', weight: 600, text: 'Title', group: 'card'},
-    {x: 76, y: 140, w: 268, role: 'Label', text: 'sublabel', group: 'card'},
+    {x: 60, y: 100, w: 300, h: 80, bg: 'var(--card)', bd: '1px solid var(--fg)'},
+    {x: 76, y: 108, w: 268, role: 'Body', weight: 600, text: 'Title'},
+    {x: 76, y: 140, w: 268, role: 'Label', text: 'sublabel'},
     {x: 60, y: 300, w: 300, role: 'Body', text: 'loose'}]}]});
-  const b = await pw.chromium.launch(); const p = await fresh(b, write('grouptb.html', create(m).html));
-  await p.evaluate(() => { sel.clear(); sel.add(1); grp(1).forEach(n => sel.add(n)); render(); });
-  assert.equal(await p.evaluate(() => sel.size), 3, 'a member selects the group');
-  assert.equal(await p.evaluate(() => tb.hidden), true, 'a bare group selection shows no toolbar');
+  const b = await pw.chromium.launch(); const p = await fresh(b, write('multitb.html', create(m).html));
+  await p.evaluate(() => { sel.clear(); [0, 1, 2].forEach(n => sel.add(n)); render(); });
+  assert.equal(await p.evaluate(() => sel.size), 3, 'three rows held together by the human');
+  assert.equal(await p.evaluate(() => tb.hidden), true, 'a bare multi-row selection shows no toolbar');
   await p.evaluate(() => edit(1));
-  assert.equal(await p.evaluate(() => tb.hidden), false, 'editing a grouped text row opens the toolbar');
+  assert.equal(await p.evaluate(() => tb.hidden), false, 'editing one of them opens the toolbar');
   assert.equal(await p.evaluate(() => $('tb-roles').querySelector('.on').dataset.role), 'Body', 'the roles strip marks the edited row\'s role');
   await p.evaluate(() => { commitEdit(); sel.clear(); sel.add(3); render(); });
   assert.equal(await p.evaluate(() => tb.hidden), false, 'a single loose text row still shows it');

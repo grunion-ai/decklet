@@ -25,7 +25,7 @@ Every check the two tools run, and what passes:
 | line count | `verify` parity | imported rows: rendered lines == source `_lines` |
 | bounds | `verify` parity | every element inside the canvas |
 | collision | `verify` parity | no ink through glyphs, no text straddling a container edge, no arrow head inside a fill, no text over text (`over:1` opts out) |
-| air | `validate` | no two declared boxes closer than `styles.gap` (default 4) unless contained, grouped or `over:1`; estimates warn with `~` |
+| air | `validate` | no two declared boxes closer than `styles.gap` (default 4) unless contained or `over:1`; estimates warn with `~` |
 | occlusion | `verify` parity | no text row under an opaque row painted later in `els` |
 | counter | `verify` parity | the page counter's right edge is on `w − styles.margin`, and its box (right edge, top, height) is the same on every slide that shows the footer. The per-slide PNG carries the counter; the AE diff masks its box on both images |
 | page errors | `verify` | none |

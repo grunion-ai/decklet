@@ -167,30 +167,28 @@ export function validate(deck) {
   }
   // a paint slot cannot vanish: a slot with `h` and no `role` draws NOTHING unless a row binds it, so a slide that binds a
   // card's text and not the card's box ships loose text on empty canvas — and both gates pass it (ROADMAP S2).
-  // The parent/child relation is the layout's own `group`, not its slot NAMES: `team-grid` groups `photo1` with `name1`,
-  // `timeline` groups `d1` with `t1`. Within a group, the box is the paint slot that geometrically HOLDS a text sibling —
-  // 19 such containers across the library (cards, callouts, kpi tiles, logo plates, the cta button). `photo1` sits above its
-  // name and `card1-rule` holds nothing, so neither is a box and neither is claimed here.
+  // The relation is GEOMETRY, nothing else: the box is a paint slot that HOLDS a text slot, and the text it holds are its
+  // own — 19 such containers across the library (cards, callouts, kpi tiles, logo plates, the cta button). `photo1` sits
+  // above its name and `card1-rule` holds nothing, so neither is a box and neither is claimed here.
   const holds = (p, t) => isNum(p.x) && isNum(t.x) && t.x >= p.x - 1 && t.x + (isNum(t.w) ? t.w : 0) <= p.x + p.w + 1 && t.y >= p.y - 1 && t.y <= p.y + p.h + 1;
-  const boxesOf = lay => {                      // group name → {box: slotName, text: [slotName]}
-    const groups = {}, out = [];
-    for (const [n, sl] of Object.entries(lay || {})) if (sl && typeof sl === 'object' && sl.group) (groups[sl.group] ||= []).push([n, sl]);
-    for (const mem of Object.values(groups)) {
-      const text = mem.filter(([, sl]) => sl.role), paint = mem.filter(([, sl]) => sl.h != null && !sl.role);
-      const box = paint.find(([, p]) => text.some(([, t]) => holds(p, t)));
-      if (box && text.length) out.push({box: box[0], group: box[1].group, text: text.map(([n]) => n)});
+  const boxesOf = lay => {                      // [{box: slotName, text: [slotName]}]
+    const all = Object.entries(lay || {}).filter(([, sl]) => sl && typeof sl === 'object'), out = [];
+    const text = all.filter(([, sl]) => sl.role), paint = all.filter(([, sl]) => sl.h != null && !sl.role);
+    for (const [bn, p] of paint) {
+      const kids = text.filter(([, t]) => holds(p, t)).map(([n]) => n);
+      if (kids.length) out.push({box: bn, text: kids});
     }
     return out;
   };
   for (const [si, s] of (Array.isArray(deck.slides) ? deck.slides : []).entries()) {
     if (!s || typeof s !== 'object' || !Array.isArray(s.els) || !s.layout || !layouts[s.layout]) continue;
     const at = n => s.els.findIndex(r => r && r.slot === n);
-    for (const {box, group, text} of boxesOf(layouts[s.layout])) {
+    for (const {box, text} of boxesOf(layouts[s.layout])) {
       const kids = text.map(n => ({n, i: at(n)})).filter(k => k.i >= 0).sort((a, b) => a.i - b.i);   // row order, so "after its own text" means after the FIRST of them
       if (!kids.length) continue;
-      const bi = at(box);
-      // the author may paint the box themselves with a free row carrying the same group — that is the box, bound or not
-      if (bi < 0 && s.els.some(r => r && !isText(r) && (r.group === group || r.group === box))) continue;
+      const bi = at(box), bx = layouts[s.layout][box];
+      // the author may paint the box themselves, with a free row covering the slot — that is the box, bound or not
+      if (bi < 0 && s.els.some(r => r && !isText(r) && !r.slot && isNum(r.x) && isNum(r.w) && isNum(r.h) && holds(r, bx) && r.y <= bx.y + 1)) continue;
       if (bi < 0) E(`slides[${si}]: binds ${kids.map(k => `"${k.n}"`).join(', ')} but not the paint slot "${box}" they sit on — add {"slot": "${box}"} before its text rows, or they render on empty canvas`);
       else if (bi > kids[0].i) Wn(`slides[${si}]: paint slot "${box}" is bound at els[${bi}], after its own text (els[${kids[0].i}] "${kids[0].n}") — a later row paints over it; move {"slot": "${box}"} before its text rows`);
     }
@@ -285,7 +283,7 @@ export function validate(deck) {
     if (r.bar && !(isNum(r.h) && r.bg)) E(`${where}: bar needs h and bg`);
     if (r.p != null && typeof r.p === 'string' && !pad[r.p] && !/px|em|%/.test(r.p)) E(`${where}: p "${r.p}" is neither a styles.pad token nor a CSS length`);
     if (r.override && !mids.has(r.override)) E(`${where}: override "${r.override}" is not a master id`);
-    if (r.group != null && typeof r.group !== 'string') E(`${where}: group must be a string — rows sharing one move as one`);
+    if (r.group != null) E(`${where}: \`group\` is gone — every row moves on its own; delete it (a card is a painted row with text rows over it, each one independent)`);
     if (r.css) Wn(`${where}: raw css escape hatch used`);
     if (r.chart != null) for (const m of checkChart(r.chart)) E(`${where}: ${m}`);   // a chart row create() could not expand
     if (r.img && !/^data:/.test(r.img)) E(`${where}: img must be a data: URI (single file, zero network)`);
@@ -307,7 +305,7 @@ export function validate(deck) {
   // the deck exists; this runs on the model, at create, with no browser, and refuses the layout that WOULD collide.
   // Two rows are legal when their declared boxes sit `styles.gap` apart (default 4px — the air the chart library itself
   // leaves between a bar and its value), when one is wholly inside a painted row (a title on its card — containment is not
-  // collision), when they share a `group` (a card and its rows are one thing), or when either says `over:1`. Two graphics
+  // collision), or when either says `over:1`. Two graphics
   // touching is layout, not collision. Two UNPAINTED text rows owe each other no air beyond their line boxes — the role's
   // lh already carries the leading, and a kicker 2px above its title is typography — so for that pair only an overlap
   // counts; a chip (text with bg/bd/box/tile) is a box and owes the gap. A stroke may touch a box edge-on — a rail ending
@@ -336,14 +334,14 @@ export function validate(deck) {
     const slot = (r.slot && ((deck.slots || {})[r.slot] || (s && layouts[s.layout] && layouts[s.layout][r.slot]))) || {};
     if (r.over ?? slot.over) return null;
     const rn = r.role || slot.role, role = roleOf(rn), textual = isText(r);
-    const painted = !!(r.bg ?? slot.bg) || !!(r.bd ?? slot.bd) || !!(r.box ?? slot.box) || !!(r.tile ?? slot.tile), group = r.group ?? slot.group;
+    const painted = !!(r.bg ?? slot.bg) || !!(r.bd ?? slot.bd) || !!(r.box ?? slot.box) || !!(r.tile ?? slot.tile);
     const y = r.y ?? slot.y, right = r.right ?? (r.x == null ? slot.right : null);
     let w = r.w ?? slot.w, h = r.h ?? slot.h, estW = false, estH = false;
     if (r.line && Array.isArray(r.line) && r.line.every(isNum) && isNum(r.x) && isNum(r.y)) {   // an orthogonal rule: a thin rect
       const dx = Math.abs(r.line[0] - r.x), dy = Math.abs(r.line[1] - r.y), th = r.h ?? 3;
       if (dx > 2 && dy > 2) return null;
       const x0 = Math.min(r.x, r.line[0]), y0 = Math.min(r.y, r.line[1]);
-      return {x: dx > 2 ? x0 : x0 - th / 2, y: dy > 2 ? y0 : y0 - th / 2, w: dx > 2 ? dx : th, h: dy > 2 ? dy : th, text: false, boxy: true, group, estW, estH, r};
+      return {x: dx > 2 ? x0 : x0 - th / 2, y: dy > 2 ? y0 : y0 - th / 2, w: dx > 2 ? dx : th, h: dy > 2 ? dy : th, text: false, boxy: true, estW, estH, r};
     }
     if (r.curve) return null;
     if (textual) {
@@ -358,29 +356,35 @@ export function validate(deck) {
     if (!isNum(y)) return null;
     const x = right != null ? W - right - w : r.x ?? slot.x;
     if (!isNum(x)) return null;
-    return {x, y, w, h, text: textual, boxy: !textual || painted, group, estW, estH, r};
+    return {x, y, w, h, text: textual, boxy: !textual || painted, estW, estH, r};
   };
   const label = (r, i) => `${i}${isText(r) ? ` "${plain(r).replace(/\s+/g, ' ').slice(0, 24)}"` : r.line ? ' (line)' : r.svg || r.icon ? ' (svg)' : r.img ? ' (img)' : ' (box)'}`;
   const inside = (a, b) => a.x >= b.x - 1 && a.y >= b.y - 1 && a.x + a.w <= b.x + b.w + 1 && a.y + a.h <= b.y + b.h + 1;
+  // containment on what the model DECLARES: the origin inside the box, and each side that the row states (not the sides guessed
+  // from its text) inside it too. A card holds its own copy even when the line-count estimate runs past the card's bottom edge —
+  // that overflow is the text-fit gate's business, and `verify` measures the real glyphs in a browser.
+  const held = (a, b) => a.x >= b.x - 1 && a.y >= b.y - 1 && (a.estW || a.x + a.w <= b.x + b.w + 1) && (a.estH || a.y + a.h <= b.y + b.h + 1);
   const overlap = (A, B) => Math.min(Math.min(A.x + A.w, B.x + B.w) - Math.max(A.x, B.x), Math.min(A.y + A.h, B.y + B.h) - Math.max(A.y, B.y));
   const gapGate = (rows, where, s) => {
     const R = rows.map(({r, i}) => ({...(rectOf(r, s) || {}), i, r})).filter(o => isNum(o.x));
     // a text row wholly inside a painted box is SHELTERED: the box owns the air around it, so the text is judged only against
     // what enters the box. A connector stopped on the card's edge, a neighbouring tile 4px away — those are the box's business.
-    const shelter = A => A.text && !A.boxy ? R.find(P => P !== A && P.boxy && inside(A, P)) : null;
+    const shelter = A => A.text && !A.boxy ? R.find(P => P !== A && P.boxy && held(A, P)) : null;
     for (let a = 0; a < R.length; a++) for (let b = a + 1; b < R.length; b++) {
       const A = R[a], B = R[b];
       if (!A.text && !B.text) continue;                                                   // two graphics touching is layout, not collision
-      if (A.group != null && A.group === B.group) continue;                                // one thing
-      if ((B.boxy && inside(A, B)) || (A.boxy && inside(B, A))) continue;                  // text on its card
+      if ((B.boxy && held(A, B)) || (A.boxy && held(B, A))) continue;                      // text on its card
       const sa = shelter(A), sb = shelter(B);
       if ((sa && sa !== B && overlap(sa, B) <= 0.5) || (sb && sb !== A && overlap(sb, A) <= 0.5)) continue;
       const g = A.r.line || B.r.line ? 0 : A.boxy || B.boxy ? gap : 0;                    // a stroke may TOUCH a box (termination); two bare text rows carry their own air in their line boxes
       const ox = Math.min(A.x + A.w, B.x + B.w) - Math.max(A.x, B.x), oy = Math.min(A.y + A.h, B.y + B.h) - Math.max(A.y, B.y);
       if (ox + g <= 0.5 || oy + g <= 0.5) continue;                                      // half a pixel is antialiasing, not air
       const onX = ox < oy, est = onX ? A.estW || B.estW : A.estH || B.estH, sep = -Math.min(ox, oy);   // the axis the pair nearly separates on decides
+      // two text rows inside ONE painted box, apart only on a guess (a stat over its label on a kpi tile): the card owns its
+      // interior, and an estimate is no evidence against it. A pair that overlaps on an axis both rows DECLARE still fails.
+      if (est && sa && sa === sb) continue;
       const how = sep >= 0 ? `is ${est ? '~' : ''}${Math.round(sep)}px from` : `overlaps by ${est ? '~' : ''}${Math.round(-sep)}px`;
-      (est ? Wn : E)(`${where}: ${label(A.r, A.i)} ${how} ${label(B.r, B.i)} — ${g ? `styles.gap is ${gap}` : 'text rows may not overlap'}${est ? ' (~ = estimated from the text; set h, or role.cw, to make it exact)' : ''}; over:1 declares an overlay, a shared group one thing`);
+      (est ? Wn : E)(`${where}: ${label(A.r, A.i)} ${how} ${label(B.r, B.i)} — ${g ? `styles.gap is ${gap}` : 'text rows may not overlap'}${est ? ' (~ = estimated from the text; set h, or role.cw, to make it exact)' : ''}; over:1 declares an overlay`);
     }
   };
   master.forEach((m, k) => row(m, `master[${k}]`, null));

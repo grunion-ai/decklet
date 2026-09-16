@@ -333,8 +333,10 @@ test('validator: the gap gate — declared boxes owe each other styles.gap; esti
   const card = {x: 60, y: 80, w: 300, h: 120, bg: '#eee', radius: 8};
   assert.deepEqual(validate(deck([card, chip(72, 'inside')])).errors, []);
   assert.match(validate(deck([card, chip(300, 'straddles')])).errors[0], /els\[0\] \(box\) overlaps by 24px els\[1\] "straddles"/);
-  // a shared group is one thing; over:1 is a declared overlay; two graphics touching is layout
-  assert.deepEqual(validate(deck([chip(60, 'a', {group: 'g'}), chip(170, 'b', {group: 'g'})])).errors, []);
+  // `group` is gone: the prop is an error on the raw model, and two chips 10px into each other are a defect either way
+  assert.match(validate({...deck([]), slides: [{els: [chip(60, 'a', {group: 'g'})]}]}).errors.join(' '), /`group` is gone/);
+  assert.match(validate(deck([chip(60, 'a'), chip(170, 'b')])).errors[0], /overlaps by 10px/);
+  // over:1 is a declared overlay; two graphics touching is layout
   assert.deepEqual(validate(deck([chip(60, 'a'), chip(170, 'b', {over: 1})])).errors, []);
   assert.deepEqual(validate(deck([card, {...card, x: 362}])).errors, []);
   // two bare text rows owe each other no air — a kicker 2px above its title is typography — but they may not overlap;
@@ -342,8 +344,8 @@ test('validator: the gap gate — declared boxes owe each other styles.gap; esti
   assert.deepEqual(validate(deck([{x: 60, y: 100, w: 400, role: 'Label', nowrap: 1, text: 'KICKER'}, {x: 60, y: 114, w: 400, role: 'H1', nowrap: 1, text: 'Title'}])).warnings, [], 'Label lh 14 ends at 114; the title starts there');
   v = validate(deck([{x: 60, y: 100, w: 400, role: 'Body', text: 'a paragraph with no height stated'}, {x: 60, y: 110, w: 400, role: 'Caption', text: 'a caption 10px under its top'}]));
   assert.deepEqual(v.errors, []); assert.equal(v.warnings.length, 1, JSON.stringify(v.warnings)); assert.match(v.warnings[0], /overlaps by ~\d+px[^~]*text rows may not overlap/); assert.ok(v.warnings[0].includes('~ = estimated'), 'marked as an estimate');
-  // a slot's group and over reach the rows bound to it — the library's kpi tile, chip and label are one card
-  const lay = {tile: {x: 60, y: 160, w: 260, h: 120, tile: 1, role: 'Stat2', align: 'center', group: 'k1'}, delta: {right: 960 - 320 + 12, y: 172, w: 'auto', role: 'Label', p: 'chip', nowrap: 1, bg: 'var(--box)', group: 'k1'}};
+  // a chip inside the tile it sits on is sheltered by containment, not by a link — the library's kpi tile and its delta chip
+  const lay = {tile: {x: 60, y: 160, w: 260, h: 120, tile: 1, role: 'Stat2', align: 'center'}, delta: {right: 960 - 320 + 12, y: 172, w: 'auto', role: 'Label', p: 'chip', nowrap: 1, bg: 'var(--box)'}};
   assert.deepEqual(validate(withRoles({w: 960, h: 540, layouts: {k: lay}, slides: [{layout: 'k', els: [{slot: 'tile', text: '63%'}, {slot: 'delta', text: '↑ 8 pts'}]}]})).warnings, []);
   // …and the estimate uses the role's measured cw, so a mono chip (0.69em) is judged wider than the blanket 0.55 would
   const wide = {x: 60, y: 100, w: 'auto', p: 'chip', role: 'Label', nowrap: 1, text: 'TWENTY-FOUR CHARACTERS!!'};   // 24 × 11 × .69 + 16 ≈ 198px
@@ -835,11 +837,11 @@ live('live: a dragged connector travels WHOLE — every point moves by the same 
   await p.evaluate(() => { sel.clear(); sel.add(0); sel.add(2); render(); });
   const boxBefore = await row(2), connBefore = await row(0);
   const bb = await boxOfRow(2), cx = bb.x + bb.width / 2, cy = bb.y + bb.height / 2;
-  await p.mouse.move(cx, cy); await p.mouse.down(); // pressing a row that is already selected keeps the whole group
+  await p.mouse.move(cx, cy); await p.mouse.down(); // pressing a row that is already selected keeps the whole selection
   await p.mouse.move(cx + 40, cy + 40); await p.mouse.move(cx + 80, cy + 80); await p.mouse.up();
   const boxAfter = await row(2), connAfter = await row(0);
   assert.deepEqual([boxAfter.x - boxBefore.x, boxAfter.y - boxBefore.y], [80, 80]);
-  assert.deepEqual([connAfter.x - connBefore.x, connAfter.y - connBefore.y], [80, 80], 'the connector moved with the group');
+  assert.deepEqual([connAfter.x - connBefore.x, connAfter.y - connBefore.y], [80, 80], 'the connector moved with the selection');
   assert.deepEqual([connAfter.line[0] - connBefore.line[0], connAfter.line[1] - connBefore.line[1]], [80, 80], 'head included');
   // ⌘Z restores the whole row, geometry and all
   await p.evaluate(() => undo());
@@ -848,7 +850,7 @@ live('live: a dragged connector travels WHOLE — every point moves by the same 
   await b.close();
   assert.deepEqual(errs, []);
 });
-// ── 2d-ter. the marquee: a drag window is the only way to take a group without clicking each row ──
+// ── 2d-ter. the marquee: a drag window takes several rows at once without clicking each one ──
 live('live: marquee — a drag from empty canvas takes every row it fully contains, ⇧ adds, partial overlap takes nothing, a click still deselects', async () => {
   const model = {w: 960, h: 540, styles: {roles: modelOf(tpl).styles.roles}, slides: [{els: [
     {x: 100, y: 100, w: 120, h: 60, box: 1, bd: '#5B9CF6'},   // 0 — inside band A

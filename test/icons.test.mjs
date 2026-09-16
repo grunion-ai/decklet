@@ -28,11 +28,11 @@ test('icons: iconSvg wraps the shapes in a 24-grid stroke svg in currentColor', 
   assert.equal(iconSvg('no-such'), null);
 });
 
-test('icons: expand — an icon row becomes an svg row keeping x/y/w/h/color/group; a missing size defaults to 24', () => {
-  const d = deck([{icon: 'zap', x: 60, y: 100, w: 32, h: 32, color: 'var(--accent)', group: 'g1'}, {icon: 'check', x: 100, y: 100}]);
+test('icons: expand — an icon row becomes an svg row keeping x/y/w/h/color; a missing size defaults to 24', () => {
+  const d = deck([{icon: 'zap', x: 60, y: 100, w: 32, h: 32, color: 'var(--accent)'}, {icon: 'check', x: 100, y: 100}]);
   expandIcons(d);
   const [a, b] = d.slides[0].els;
-  assert.equal(a.icon, undefined); assert.match(a.svg, /^<svg/); assert.equal(a.w, 32); assert.equal(a.color, 'var(--accent)'); assert.equal(a.group, 'g1');
+  assert.equal(a.icon, undefined); assert.match(a.svg, /^<svg/); assert.equal(a.w, 32); assert.equal(a.color, 'var(--accent)');
   assert.equal(b.w, 24); assert.equal(b.h, 24);
 });
 
