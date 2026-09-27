@@ -46,21 +46,21 @@ const reset = async () => { await page.goto(pathToFileURL(join(root, "deck.html"
 const go = async n => { await ev(k => { i = k; render() }, n); await page.waitForTimeout(700) };
 
 await reset();
-// ── 1. drag · multi-select — the Stat and its label move together, inside the roles slide's right column ──
+// ── 1. drag · multi-select — the Stat and its label move together, on the type set slide's ladder ──
 await go(2);
-const stat = await box('#canvas .el:has-text("1,024")'), lab = await box('#canvas .el:has-text("Stat · 40 / 44")');
-const drag1 = await film("drag", await crop(600, 122, 360), async ({ hold, glide }) => {
+const stat = await box('#canvas .el:has-text("1,024")'), lab = await box('#canvas .el:has-text("40 / 44")');
+const drag1 = await film("drag", await crop(40, 250, 520), async ({ hold, glide }) => {
   await hold(0.4);
   await page.mouse.click(stat.cx, stat.cy); await hold(0.35);
   await page.mouse.click(lab.cx, lab.cy, { modifiers: ["Meta"] }); await hold(0.45);
   await page.mouse.move(stat.cx, stat.cy); await page.mouse.down();
-  await glide(stat.cx, stat.cy, stat.cx - 34, stat.cy + 80, 0.9);
+  await glide(stat.cx, stat.cy, stat.cx + 34, stat.cy - 80, 0.9);
   await page.mouse.up(); await hold(0.7);
   await page.keyboard.press("Escape"); await hold(0.4);
 });
 
 // ── 2. retype · marks — double-click into a row, replace it, embolden a run ──
-await reset(); await go(5);
+await reset(); await go(8);
 const row = await box('#canvas .el:has-text("⌘Z undoes")');
 const retype = await film("retype", await crop(40, 244, 455), async ({ hold }) => {
   await hold(0.4);

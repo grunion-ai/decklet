@@ -259,7 +259,7 @@ test('deck.html == create(examples/explainer)', async () => {
   const {html} = create(explainer.model, {title: 'decklet', spell: await loadChecker('en')}); // the CLI builds with the dictionary when it is installed
   assert.equal(html, deck, 'rebuild with: node bin/create.mjs --model examples/explainer/model.json --out deck.html --title decklet');
   const m = modelOf(deck);
-  assert.equal(m.slides.length, 12); assert.equal(m.master.filter(x => x.footer).length, 1);
+  assert.equal(m.slides.length, 18); assert.equal(m.master.filter(x => x.footer).length, 1);
   assert.ok(m.slides.every(s => s.layout && s.els.some(e => e.slot === 'title')), 'every explainer slide is slotted');
   assert.equal(m.layouts.title.title.role, 'Title', 'cover headline uses the display role'); assert.equal(m.layouts.content.title.role, 'H1');
   assert.equal(m.styles.margin, 60, 'explainer sets the margin token');
@@ -270,7 +270,7 @@ test('explainer: the deck moves the way it documents, and shows the editor as fi
   const m = modelOf(deck);
   const anims = [...new Set(m.slides.flatMap(s => s.els.map(e => e.anim)).filter(Boolean))].sort();
   assert.deepEqual(anims, ['fade', 'pop', 'rise', 'wipe'], 'the deck demonstrates every anim it documents');
-  const clips = m.slides.flatMap(s => s.els.filter(e => e.img));
+  const clips = m.slides.flatMap(s => s.els.filter(e => e.img && !e.img.startsWith('#'))); // '#id' rows are thumbnails from deck.assets
   assert.ok(clips.length >= 3, `${clips.length} clips — the editor slide films drag, reorder and PDF`);
   for (const r of clips) {
     assert.match(r.img, /^data:image\/gif;base64,/, 'a clip is an inlined GIF — still zero network');
@@ -746,7 +746,7 @@ live('live: editor rules — nib, present backdrop, master fork + inline counter
   assert.equal(await ev(() => getComputedStyle(document.body).backgroundColor), 'rgb(18, 52, 86)');
   await ev(() => { document.body.classList.remove('present'); delete deck.slides[1].bg; i = 0; render(); });
   // counter inline in the footer master, on every slide
-  assert.equal(await ev(() => canvas.querySelector('[data-footer] .num').textContent), ' · 1 / 12');
+  assert.equal(await ev(() => canvas.querySelector('[data-footer] .num').textContent), ' · 1 / 18');
   assert.equal(await ev(() => canvas.querySelector('[data-footer]').style.right), '60px', 'footer right edge sits on styles.margin');
   assert.equal(await ev(() => canvas.querySelectorAll('.num.pin').length), 0, 'no generic pin when a footer exists');
   // master fork on edit: dragging the footer creates override:'foot' on that slide only
@@ -767,10 +767,10 @@ live('live: editor rules — nib, present backdrop, master fork + inline counter
   await ev(() => { i = 1; render(); deck.slides[1].els = deck.slides[1].els.filter(e => e.slot !== 'supertitle'); render(); document.getElementById('add-text').click(); });
   assert.equal(await ev(() => slide().els.at(-1).slot), 'supertitle');
   await ev(() => document.getElementById('sadd').click());
-  assert.deepEqual(await ev(() => [slide().layout, slide().els[0].slot, deck.slides.length]), ['content', 'title', 13]);
+  assert.deepEqual(await ev(() => [slide().layout, slide().els[0].slot, deck.slides.length]), ['content', 'title', 19]);
   // contact sheet renders every slide
   await ev(() => sheetOpen());
-  assert.equal(await ev(() => document.querySelectorAll('#grid .cell').length), 13);
+  assert.equal(await ev(() => document.querySelectorAll('#grid .cell').length), 19);
   // pointer drag across cells never leaves a text selection behind (thumbnails are renders)
   { const [a, z] = await ev(() => [0, 4].map(k => { const r = document.querySelectorAll('#grid .cell')[k].getBoundingClientRect(); return { x: r.x, y: r.y }; }));
     await p.mouse.move(a.x + 20, a.y + 20); await p.mouse.down(); for (let k = 1; k <= 8; k++) await p.mouse.move(a.x + 20 + (z.x - a.x) * k / 8, a.y + 20 + (z.y - a.y) * k / 8); await p.waitForTimeout(50);
@@ -784,7 +784,7 @@ live('live: editor rules — nib, present backdrop, master fork + inline counter
   { const bad = await ev(() => [document.getElementById('autosave').dataset.state, document.getElementById('autosave').getAttribute('aria-label')]); assert.equal(bad[0], 'bad'); assert.match(bad[1], /^Not saved — edits will be lost on refresh( \(last saved \d\d:\d\d:\d\d\))?$/, 'bad tooltip names the last successful save time'); } await ev(() => { store.set = window.__set; save(); }); await p.waitForTimeout(400);
   // ⤓ PDF: in-file writer produces a real PDF with one W×H pt page per slide (Chromium rasterises foreignObject untainted)
   const pdf = await ev(async () => { const orig = URL.createObjectURL; let blob; URL.createObjectURL = b => { blob = b; return 'blob:x'; }; HTMLAnchorElement.prototype.click = () => {}; await exportPdf(); URL.createObjectURL = orig; const t = await blob.text(); return {type: blob.type, head: t.slice(0, 8), pages: (t.match(/\/Type \/Page\b/g) || []).length, box: /\/MediaBox \[0 0 960 540\]/.test(t), eof: /%%EOF\n$/.test(t), size: blob.size}; });
-  assert.deepEqual([pdf.type, pdf.head, pdf.pages, pdf.box, pdf.eof], ['application/pdf', '%PDF-1.4', 13, true, true]); assert.ok(pdf.size > 20000, 'rasters are real');
+  assert.deepEqual([pdf.type, pdf.head, pdf.pages, pdf.box, pdf.eof], ['application/pdf', '%PDF-1.4', 19, true, true]); assert.ok(pdf.size > 20000, 'rasters are real');
   assert.deepEqual(errs, []);
   // A4 document injects the a4 page rule; Letter decks do not
   const a4 = path.join(tmp, 'a4.html'); fs.writeFileSync(a4, create(example('one-pager').model, {style: example('one-pager').style, format: 'document-a4'}).html);
