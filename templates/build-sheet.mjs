@@ -41,7 +41,7 @@ export const KINDS = [
     templates: ['pad-tight-40', 'pad-default-60', 'pad-generous-96', 'pad-asymmetric-rail', 'density-speaker', 'density-reading'], layouts: [] },
   { id: 'quote', name: 'Quote', note: 'Someone else\'s words at display size.', templates: ['quote-pull'], layouts: ['quote'] },
   { id: 'data', name: 'Data', note: 'Numbers, KPIs and every chart.',
-    templates: ['stat-hero', 'stat-row-3', 'stat-row-4', 'kpi-scorecard', 'stat-plus-chart', 'delta-pair', 'progress-tracker', 'dashboard-composite',
+    templates: ['stat-hero', 'stat-row-3', 'stat-row-4', 'area-bubbles', 'area-bubbles-speaker', 'waffle', 'waffle-speaker', 'range-bar', 'range-bar-speaker', 'kpi-scorecard', 'stat-plus-chart', 'delta-pair', 'progress-tracker', 'dashboard-composite',
       'chart-column', 'chart-bar-ranked', 'chart-stacked-100', 'chart-grouped', 'chart-line-trend', 'chart-area-band', 'chart-waterfall', 'chart-donut', 'chart-donut-row', 'chart-gauge', 'chart-scatter', 'chart-heatmap', 'chart-histogram', 'chart-slope', 'chart-dumbbell', 'chart-small-multiples', 'chart-marimekko', 'chart-pareto'],
     layouts: ['fact', 'stat', 'kpi-grid', 'kpi-grid-4', 'chart'] },
   { id: 'process', name: 'Process', note: 'Steps, cycles and funnels.',
@@ -150,9 +150,10 @@ const fill = (name) => {
     if ((m = /^kpi(\d)$/.exec(slot))) return { slot, text: KPIS[name][m[1] - 1][0] };
     return { slot, text: TEXT[`${name}.${slot}`] ?? TEXT[slot] ?? slot };
   });
-  if (name === 'diagram') {   // a figure inside the frame: three boxes, two connectors
-    const box = (x, t) => ({ x, y: 250, w: 200, h: 72, box: 1, role: 'H2', text: t });
-    els.push(box(80, 'Sensor'), { x: 280, y: 286, line: [340, 286], h: 2.5, bg: 'var(--fg)', arrow: 'end', head: 'triangle' }, box(340, 'Gateway'), { x: 540, y: 286, line: [600, 286], h: 2.5, bg: 'var(--fg)', arrow: 'end', head: 'triangle' }, box(600, 'Dashboard'));
+  if (name === 'diagram') {   // a figure inside the frame: three boxes, two connector rows (K16: the engine keeps air at both ends)
+    const box = (x, t) => ({ id: t.toLowerCase(), x, y: 250, w: 200, h: 72, box: 1, role: 'H2', text: t });
+    const link = (from, to) => ({ from, to, style: 'arrow', h: 2.5, bg: 'var(--fg)' });
+    els.push(box(80, 'Sensor'), box(340, 'Gateway'), box(600, 'Dashboard'), link('sensor', 'gateway'), link('gateway', 'dashboard'));
   }
   if (name === 'cta') for (const e of els) if (e.slot === 'button' || e.slot === 'button-label') e.href = 'https://example.com';
   return els;
