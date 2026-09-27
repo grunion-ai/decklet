@@ -9,6 +9,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {create} from '../bin/create.mjs';
+import {validate} from '../bin/validate.mjs';
 import {TEMPLATES} from '../lib/templates.mjs';
 import {loadChecker} from '../lib/spell.mjs';
 import {KITS} from '../examples/styles/index.mjs';
@@ -53,5 +54,20 @@ test('sheet: every slide\'s foot band (y ≥ 496) carries the same set of rows �
     else assert.equal(o.x, undefined, `${s.name}: an undeclared slide leaves the foot on the margin`);
     const allow = inset.has(s.name) ? ['color', 'op', 'x', 'w'] : ['color', 'op'];   // a declared inset moves the LINE; the counter's corner is pinned either way
     assert.deepEqual(Object.keys(o).filter(k => !allow.includes(k)).sort(), ['override', 'text'], `${s.name}: the override changes the text (its paint, and its x only when the template declares an inset) — never the counter`);
+  }
+});
+
+// K6/K9 follow-up: the sheet is the shelf's own proof. Every density cut builds with zero coverage warnings — dividers and
+// words templates carry textOnly, every other slide draws a graphic the gate counts.
+test('sheet: the full sheet and both density cuts build with zero text-only coverage warnings', () => {
+  for (const d of [null, 'reading', 'speaker']) {
+    const r = spawnSync(process.execPath, [path.join(root, 'templates/build-sheet.mjs'), ...(d ? ['--density', d] : [])], {encoding: 'utf8'});
+    assert.equal(r.status, 0, r.stderr);
+    const stem = d ? `library-${d}` : 'candidates';
+    const model = JSON.parse(fs.readFileSync(path.join(root, `templates/${stem}.model.json`), 'utf8'));
+    const style = JSON.parse(fs.readFileSync(path.join(root, `templates/${stem}.style.json`), 'utf8'));
+    const {warnings} = validate(create(model, {style}).deck);
+    const loud = warnings.filter(m => /text only/.test(m)).map(m => model.slides[+/slides\[(\d+)\]/.exec(m)[1]].name);
+    assert.deepEqual(loud, [], `${stem}: ${loud.join(', ')}`);
   }
 });

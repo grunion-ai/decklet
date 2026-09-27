@@ -128,7 +128,9 @@ test('templates: stat-row-3 is the speaker cut — three Stat tiles, three label
   const tiles = t.els.filter(e => e.tile && e.role === 'Stat'), labels = t.els.filter(e => e.role === 'Label' && !e.slot);
   assert.equal(tiles.length, 3, 'three numbers'); assert.equal(labels.length, 3, 'one label each');
   assert.ok(!t.els.some(e => e.role === 'Body'), 'no paragraph — that is what makes it a speaker slide');
-  for (const [i, tl] of tiles.entries()) { assert.equal(tl.y, 200); assert.equal(tl.h, 150); assert.equal(labels[i].y, 366); assert.ok(tl.x + tl.w <= 900); }
+  for (const [i, tl] of tiles.entries()) { assert.equal(tl.y, 200); assert.equal(tl.h, 130); assert.equal(labels[i].y, 346); assert.ok(tl.x + tl.w <= 900); }
+  const bars = t.els.filter(e => e.bg && !e.tile && e.text == null);
+  assert.equal(bars.length, 6, 'a before/after pair under each tile — the number drawn at its size (K10)');
   const r = v(deck([{template: 'stat-row-3'}], {density: 'speaker'}));
   assert.deepEqual(r.errors, []);
   assert.deepEqual(r.warnings.filter(m => /density/.test(m)), [], 'within the speaker budget: 3 points, under 40 words');
@@ -481,4 +483,30 @@ test('templates: K14 — stat-row-4 with a longer tile body reflows nothing it s
   const r = v(deck([{template: 'stat-row-4', fill}]));
   assert.deepEqual(r.errors, [], r.errors.join(' | '));
   assert.deepEqual(r.warnings.filter(m => /overlaps/.test(m)), [], r.warnings.join(' | '));
+});
+
+// K6/K9 follow-up: the coverage gate asks every words-heavy slide for a graphic. A template either draws one the gate
+// counts in its own sample (a chart, a proportional figure, bars, logo marks) or declares textOnly: true in its
+// definition — the words-by-nature shelves: statements, lists, text columns, chrome and mark placement. The slide a
+// template expands into inherits the mark, so an author never sets it by hand.
+const TEXT_ONLY = t => v(deck([{template: t.id}], {draft: 1})).warnings.filter(m => /text only/.test(m));
+// Two templates draw the author's own media, so their bare sample is words until it is filled, and the gate is right to say
+// so: image-hero-overlay (the photo) and proof-strip (the five logos). The sheet binds a sample photo and monogram chips.
+test('templates: every template passes the coverage gate as sampled — a graphic, or textOnly: true in its definition', () => {
+  const loud = TEMPLATES.filter(t => TEXT_ONLY(t).length).map(t => t.id);
+  assert.deepEqual([...loud].sort(), ['image-hero-overlay', 'proof-strip'], 'text-only warnings on the samples of: ' + loud.join(', '));
+  const marks = v(deck([{template: 'proof-strip', fill: Object.fromEntries([1, 2, 3, 4, 5].map(i => ['m' + i, {logo: ''}]))}], {draft: 1}));
+  assert.deepEqual(marks.warnings.filter(m => /text only/.test(m)), [], 'five monogram chips are a logo group');
+});
+test('templates: textOnly is a boolean mark, never on a template whose job is to show a quantity (Numbers, charts, proportion)', () => {
+  for (const t of TEMPLATES) if (t.textOnly != null) assert.equal(t.textOnly, true, t.id);
+  const shows = TEMPLATES.filter(t => ['Numbers', 'Charts', 'Proportion'].includes(t.cat) && t.textOnly).map(t => t.id);
+  assert.deepEqual(shows, [], 'a numbers slide draws its values: ' + shows.join(', '));
+});
+test('templates: a slide made from a textOnly template inherits the mark; one made from a graphic template does not', () => {
+  const words = TEMPLATES.find(t => t.textOnly), shows = TEMPLATES.find(t => t.id === 'stat-row-4');
+  const d = expandTemplates(deck([{template: words.id}, {template: shows.id}, {template: words.id, textOnly: false}]));
+  assert.equal(d.slides[0].textOnly, true, words.id);
+  assert.equal(d.slides[1].textOnly, undefined, 'stat-row-4 draws its bars');
+  assert.equal(d.slides[2].textOnly, false, 'a slide that says otherwise keeps its own word');
 });

@@ -12,6 +12,7 @@ import {fileURLToPath} from 'node:url';
 import {create} from '../bin/create.mjs';
 import {verify} from '../bin/verify.mjs';
 import {LIBRARY} from '../lib/layouts.mjs';
+import {TEMPLATE} from '../lib/templates.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 let pw = null; try { pw = await import('playwright'); } catch {}
 const live = pw ? test : test.skip;
@@ -51,16 +52,16 @@ test('new: what it writes is a deck top level — format, canvas, margin and a m
 });
 
 test('new: the slide run climbs the shape ladder instead of repeating one layout, and scales from 3 to 12', () => {
-  const at = n => run(['--slides', String(n), '--density', 'reading']).model.slides.map(s => s.layout);
-  assert.deepEqual(at(8), ['cover', 'agenda', 'kpi-grid', 'chart', 'process-steps', 'diagram', 'comparison', 'end'],
+  const at = n => run(['--slides', String(n), '--density', 'reading']).model.slides.map(s => s.template || s.layout);
+  assert.deepEqual(at(8), ['cover', 'agenda', 'area-bubbles', 'chart', 'process-steps', 'diagram', 'comparison', 'end'],
     'opener · agenda · stats · chart · process · figure · comparison · close');
-  assert.deepEqual(at(3), ['cover', 'kpi-grid', 'end'], 'the shortest deck keeps the opener and the close');
+  assert.deepEqual(at(3), ['cover', 'area-bubbles', 'end'], 'the shortest deck keeps the opener and the close');
   for (const n of [3, 4, 5, 6, 7, 8, 9, 10, 11, 12]) {
     const run_ = at(n);
     assert.equal(run_.length, n, n + ' slides asked for, ' + run_.length + ' written');
     assert.equal(run_[0], 'cover'); assert.equal(run_[n - 1], 'end');
     assert.equal(new Set(run_).size, n, 'no layout is used twice: ' + run_.join(','));
-    for (const l of run_) assert.ok(LIBRARY[l], l + ' is a library layout');
+    for (const l of run_) assert.ok(LIBRARY[l] || TEMPLATE[l], l + ' is a library layout or template');
   }
   const bad = spawnSync(process.execPath, [path.join(root, 'bin/new.mjs'), '--out', path.join(tmp, 'x.json'), '--slides', '13'], {encoding: 'utf8'});
   assert.equal(bad.status, 2);
@@ -90,9 +91,22 @@ test('new: the placeholder is a fictional company and it says so on every slide,
   const {model} = run(['--slides', '12', '--density', 'reading']);
   assert.match(String(model.master.find(r => r.footer === 1).text), /PLACEHOLDER/, 'the footer carries the word on every slide');
   for (const s of model.slides) {
-    const texts = s.els.filter(r => r.text != null).map(r => String(r.text));
-    assert.ok(texts.some(t => /^Replace |PLACEHOLDER/.test(t)), `${s.layout}: no row tells the author what to replace — ${texts.join(' / ')}`);
+    const texts = [...(s.els || []).filter(r => r.text != null).map(r => String(r.text)), ...Object.values(s.fill || {}).filter(v => typeof v === 'string')];
+    assert.ok(texts.some(t => /^Replace |PLACEHOLDER/.test(t)), `${s.template || s.layout}: no row tells the author what to replace — ${texts.join(' / ')}`);
   }
+});
+
+// K10: a number slide draws its values at their size. The numbers rung is the proportional area-bubbles template (its
+// speaker cut at speaker density), so the coverage gate passes it on the graphic, with no textOnly mark to drop later.
+test('new: the numbers rung is a proportional template, not tiles marked textOnly (K10)', () => {
+  for (const density of ['reading', 'speaker']) {
+    const s = run(['--slides', '3', '--density', density]).model.slides.find(x => x.name === 'numbers');
+    assert.equal(s.template, density === 'speaker' ? 'area-bubbles-speaker' : 'area-bubbles', density);
+    assert.equal(s.textOnly, undefined, 'a graphic slide carries no textOnly mark');
+    assert.ok(Array.isArray(s.fill.data) && s.fill.data.length >= 2, 'the values are data the circles are drawn from');
+  }
+  const {dir} = run(['--slides', '8', '--density', 'reading']);
+  assert.match(fs.readFileSync(path.join(dir, 'MANIFEST.md'), 'utf8'), /\| area-bubbles \|/, 'the manifest names the template as the shape');
 });
 
 test('new: MANIFEST.md is the coverage table docs/building.md asks for, with its columns, its two rules and empty rows', () => {

@@ -22,7 +22,7 @@ const MARK = 'PLACEHOLDER';
 // comparison · close. Every rung builds its whole slide, because the answer to "does this shape survive speaker
 // density" differs per shape: reading carries ≤ 8 points and ≤ 140 words, speaker ≤ 3 and ≤ 40 (lib/layouts.mjs).
 // textOnly: a starter's words rungs say so, so the coverage gate (validate) stays quiet on the scaffold; the author drops the
-// flag when they give the slide its figure (a proportional template for the numbers rung, an img or diagram for the rest).
+// flag when they give the slide its figure (an img or diagram). The numbers rung is a proportional template and needs none.
 const RUNGS = [
   {rank: 6, build: d => ({name: 'agenda', layout: 'agenda', els: [
     {slot: 'supertitle', text: 'AGENDA'},
@@ -39,17 +39,20 @@ const RUNGS = [
     ...items(d === 'speaker' ? 3 : 5).map(([, i]) => ({slot: 'b' + i, text: d === 'speaker' ? `Replace · point ${i}` : `Replace · point ${i}, one line, no number`})),
     ...(d === 'speaker' ? [] : [{slot: 'note', text: 'Replace with what a reader should make of the list.'}]),
   ]})},
-  {rank: 1, build: d => ({name: 'numbers', layout: 'kpi-grid', textOnly: true, els: [
-    {slot: 'supertitle', text: 'NUMBERS'},
-    {slot: 'title', text: 'Replace with what the numbers say.'},
-    ...[1, 2, 3].flatMap(i => [
-      {slot: 'kpi' + i, text: '00'},
-      {slot: 'kpi' + i + '-label', text: `Replace · metric ${i}`},
-      {slot: 'kpi' + i + '-delta', text: '± 0'}]),
-    ...(d === 'speaker' ? [] : [
-      {slot: 'body', text: 'Replace with the reading of the three tiles — one sentence, not a repeat of the labels.'},
-      {slot: 'source', text: `${MARK} · name the source`}]),
-  ]})},
+  // K10: the numbers rung draws its values at their size — the proportional area-bubbles template (its speaker cut at
+  // speaker density), so the slide passes the coverage gate on its circles and carries no textOnly mark to drop later
+  {rank: 1, build: d => {
+    const data = [30, 20, 10].map((value, k) => ({label: `Replace · metric ${k + 1}`, value}));
+    const vals = data.flatMap(({label, value}) => [String(value), label]);
+    const keys = (from, list) => Object.fromEntries(list.map((v, k) => ['t' + (from + k), v]));
+    return {name: 'numbers', template: d === 'speaker' ? 'area-bubbles-speaker' : 'area-bubbles', fill: {
+      t1: 'NUMBERS', t2: 'Replace with what the numbers say.',
+      ...(d === 'speaker' ? keys(3, vals) : {
+        t3: 'Replace with the one line the three values add up to.',
+        t4: 'Circle area is the value. Replace with the reading of the circles, not a repeat of the labels.',
+        t5: `${MARK} · name the source`, ...keys(6, vals)}),
+      data}};
+  }},
   {rank: 2, build: d => ({name: 'trend', layout: 'chart', els: [
     {slot: 'supertitle', text: 'TREND'},
     {slot: 'title', text: 'Replace with what the series shows.'},
@@ -183,7 +186,7 @@ if (isMain(import.meta.url)) {
   const model = newModel({slides, density, space: o.space || null});
   fs.writeFileSync(o.out, JSON.stringify(model, null, 2) + '\n');
   const man = path.join(dir, 'MANIFEST.md');
-  fs.writeFileSync(man, manifest({slides, density, style: o.style || null, layouts: model.slides.map(s => s.layout)}));
+  fs.writeFileSync(man, manifest({slides, density, style: o.style || null, layouts: model.slides.map(s => s.template || s.layout)}));
   const wrote = [o.out, man];
   if (o.style) {
     const s = path.join(dir, 'style.json');
