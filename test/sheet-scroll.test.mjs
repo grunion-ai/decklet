@@ -39,6 +39,8 @@ const delta = async (p, ms = 200) => { const a = await top(p); await p.waitForTi
 // the per-frame step, read in the page: the median of ten consecutive frame-to-frame scrollTop differences
 const step = p => p.evaluate(() => new Promise(res => { const d = []; let last = sheet.scrollTop; const f = () => { const t = sheet.scrollTop; d.push(Math.abs(t - last)); last = t; if (d.length < 11) requestAnimationFrame(f); else { d.shift(); d.sort((a, b) => a - b); res(d[5]); } }; requestAnimationFrame(f); }));
 const grab = async (p, n) => { const c = await cell(p, n); await p.mouse.move(c.x, c.y); await p.mouse.down(); await p.mouse.move(c.x + 10, c.y + 10, {steps: 2}); return c; };
+// the drag's state, for a failure message: is it live, where the page thinks the pointer is, the speed there, the loop, the edges
+const why = p => p.evaluate(() => JSON.stringify({on: !!(pd && pd.on), ly: pd && pd.ly, v: pd && pd.on ? asSpeed(pd.ly) : null, loop: asId, max: pd && pd.max, top: sheet.scrollTop, sh: sheet.scrollHeight, ch: sheet.clientHeight, sheet: sheet.getBoundingClientRect().bottom, hud: document.getElementById('hud').getBoundingClientRect().top, ih: innerHeight}));
 const lifted = p => p.evaluate(() => !!document.querySelector('.cell.lift'));
 
 for (const bn of projects()) {
@@ -47,7 +49,7 @@ for (const bn of projects()) {
     assert.equal(await top(p), 0, 'the sheet opens at the top');
     const c = await grab(p, 0); const y = (await bottom(p)) - 4;
     await p.mouse.move(c.x, y, {steps: 4}); const ins0 = await p.evaluate(() => ins);
-    const d1 = await delta(p, 250); assert.ok(d1 > 0, `the sheet scrolls under a still pointer (${d1}px in 250ms)`);
+    const d1 = await delta(p, 250); assert.ok(d1 > 0, `the sheet scrolls under a still pointer (${d1}px in 250ms) ${d1 > 0 ? '' : await why(p)}`);
     const d2 = await delta(p, 250); assert.ok(d2 > 0, `and keeps scrolling (${d2}px)`);
     const ghost = await p.evaluate(() => { const r = document.querySelector('.cell.lift').getBoundingClientRect(); return r.top + r.height / 2; });
     assert.ok(Math.abs(ghost - y) < 4, `the lifted thumbnail stays under the pointer (${ghost} vs ${y})`);
@@ -68,7 +70,7 @@ for (const bn of projects()) {
     assert.ok(await top(p) > 1000, 'the sheet starts at the bottom');
     const c = await grab(p, 39);
     await p.mouse.move(c.x, 4, {steps: 4});
-    assert.ok((await delta(p, 250)) < 0, 'the sheet scrolls up under a still pointer');
+    { const d = await delta(p, 250); assert.ok(d < 0, `the sheet scrolls up under a still pointer (${d}) ${d < 0 ? '' : await why(p)}`); }
     await p.waitForFunction(() => sheet.scrollTop <= 0, null, {timeout: 10000});
     assert.equal(await delta(p, 200), 0, 'it stops at the top');
     const first = await slot(p, 0); await p.mouse.move(first.l + 10, first.y, {steps: 3}); await p.mouse.up(); await p.waitForTimeout(400);
