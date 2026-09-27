@@ -100,3 +100,26 @@ test('skill: START HERE is the front door, above INPUTS, twelve lines at most', 
     assert.ok(fs.existsSync(path.join(root, 'docs', m[1])), `docs/${m[1]} exists`);
   }
 });
+
+// v0.12.0 (FRICTION F7): the plan names a visual per slide and the companies that need logos; the image budget scales with
+// the deck type instead of "one image per slide, the file under ~1 MB"; every row the logo program landed is in the contract.
+test('skill: the plan names a visual per slide, and GRAPHICS budgets images by deck type', () => {
+  const doc = read('SKILL.md');
+  const step1 = doc.slice(doc.indexOf('### Step 1'), doc.indexOf('### Step 2'));
+  assert.match(step1, /visual/, 'Step 1 plans a visual column');
+  assert.match(step1, /one non-text/, 'one non-text visual per slide');
+  assert.match(step1, /deck\.entities/, 'and lists the companies that need logos');
+  assert.match(step1, /decklet-assets/, 'and fetches them');
+  const gfx = doc.slice(doc.indexOf('## GRAPHICS'), doc.indexOf('## MASTER'));
+  assert.doesNotMatch(gfx, /one per slide, never stretched/, 'the one-image-per-slide rule is gone');
+  assert.match(gfx, /several MB/, 'a landscape deck may run several MB');
+  assert.match(gfx, /asset table/, 'the asset table keeps repeats cheap');
+  assert.match(gfx, /\*\*Logos\*\*/, 'GRAPHICS has a Logos kind');
+});
+
+test('skill: the model contract carries logo, assets, entities, after, hbar, media keys and the ink rule', () => {
+  const doc = read('SKILL.md');
+  for (const re of [/^\| `logo` \|/m, /^\| `assets` \|/m, /^\| `entities` \|/m, /^\| `after` \|/m, /'#id'/, /`contain`/, /mark:'hbar'/,
+                    /`m1…mn`/, /`<item>-media`/, /all of Lucide/, /Ink is a rule/]) assert.match(doc, re, String(re));
+  assert.ok(doc.includes('(docs/assets.md)') && doc.includes('(docs/logo.md)'), 'links the asset and logo references');
+});
