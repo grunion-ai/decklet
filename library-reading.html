@@ -408,7 +408,7 @@ const ERRS=[],errPush=m=>{ERRS.push(scrub(String(m).replace(/\([^)]*\)/g,'(…)'
 window.addEventListener('error',e=>errPush((e.message||'error')+' · '+(e.lineno||0)+':'+(e.colno||0)));
 window.addEventListener('unhandledrejection',e=>errPush('rejection: '+String(e.reason&&e.reason.message||e.reason)));
 // the file's own edit log (create.mjs fills it; write-back rewrites it with the browser's)
-const ENGINE=/*ENGINE*/'0.11.0'/*/ENGINE*/; // the package version that built this file (create.mjs); the bug report leads with it
+const ENGINE=/*ENGINE*/'0.12.0'/*/ENGINE*/; // the package version that built this file (create.mjs); the bug report leads with it
 const LOG0=/*LOG*/[]/*/LOG*/;const SPELL0=/*SPELL*/{}/*/SPELL*/; // words the build's dictionary refused (lib/spell.mjs); the editor underlines them on every slide
 // storage namespace is per deck (create.mjs stamps it with deck.id — stable across versions, so a new file finds the old edits)
 const NS=/*KEY*/'decklet:90fddf4f57'/*/KEY*/,KEY=NS+':model',HKEY=NS+':hist',PKEY=NS+':pos',canvas=document.getElementById('canvas'),$=id=>document.getElementById(id);
@@ -536,6 +536,7 @@ function drawLogo(r,d){
 const res=(el,s)=>{const m=el.override&&(deck.master||[]).find(x=>x.id===el.override)||{};const sl=el.slot&&LAY(s)[el.slot]||{};const r={...sl,...m,...el};
   // one horizontal anchor: a row's own `right` retires the slot's x (and its own x retires the slot's right), so every consumer sees one edge
   if(el.right!=null)delete r.x;else if(el.x!=null)delete r.right;
+  if(r.after!=null)delete r.right; // `after` owns the left edge: placeAfter derives x once the named row is measured
   const R=deck.styles&&deck.styles.roles||{},t=R[r.role]||((r.text!=null||r.html!=null||isLogo(r))&&R.Body)||{};for(const k in t)if(r[k]==null||LOCK.includes(k))r[k]=t[k];return r};
 // motion vocabulary — the only four anims an element may carry; anything else is ignored (the validator rejects it upstream)
 const ANIM=['rise','fade','pop','wipe'];
@@ -620,12 +621,35 @@ function terminate(r,s){
     if(g>0){const t2=tAtLen(q,g,!!end);q=bezPart(q,end?0:t2,end?t2:1)}}
   r.x=q[0].x;r.y=q[0].y;r.curve=[q[1].x,q[1].y,q[2].x,q[2].y,q[3].x,q[3].y];
 }
+// `after:'<id>'`: the row's x is the named row's RENDERED right edge + gap (10 by default, the connector air; a logo row's own
+// gap is its column air, so it takes the default), on that row's top unless the row states y. Target = a row id on this slide,
+// a master id, or a slide row index — the same lookup as `to`/`from`. A stroke is translated whole: its authored x (0 when unset)
+// and far end move together, so line:[60,y] after a row is a 60px run starting there. Resolved after every row is in the DOM,
+// in dependency order, so a chain (text → arrow → chip) places left to right; an unknown id or a cycle stays where x says
+// (validate errors on both). A detached root (a print page, a sheet cell) is attached for the measurement and let go.
+const AGAP=10;
+function placeAfter(s,root,drawn){
+  const aft=drawn.filter(o=>o.r.after!=null);if(!aft.length)return;
+  const tmp=!root.isConnected&&document.body.appendChild(root);
+  const find=k=>typeof k==='number'?drawn.find(o=>o.n===k):drawn.find(o=>o.n!=null&&o.el.id===k)||drawn.find(o=>o.m===k);
+  const edge=o=>{const r=o.r;if(r.line)return Math.max(r.x||0,r.line[0]);if(r.curve)return Math.max(r.x||0,r.curve[0],r.curve[2],r.curve[4]);return o.d.offsetLeft+o.d.offsetWidth};
+  const top=o=>o.r.line||o.r.curve?(o.r.y||0):o.d.offsetTop;
+  const done=new Set(drawn.filter(o=>o.r.after==null));
+  for(let go=1;go;){go=0;for(const o of aft){if(done.has(o))continue;const t=find(o.r.after);if(!t||!done.has(t))continue;
+    const r=o.r,d=o.d,g=r.gap!=null&&!isLogo(r)?r.gap:AGAP,dx=edge(t)+g-(r.x||0),dy=r.y==null?top(t):0;
+    // every painter wrote left from r.x (a stroke's rotated shaft and a curve's hull offset from it), so one shift moves them all
+    d.style.right='';d.style.left=((parseFloat(d.style.left)||0)+dx)+'px';if(dy)d.style.top=((parseFloat(d.style.top)||0)+dy)+'px';
+    r.x=(r.x||0)+dx;r.y=(r.y||0)+dy;if(r.line)r.line=[r.line[0]+dx,r.line[1]+dy];if(r.curve)r.curve=r.curve.map((v,j)=>j%2?v+dy:v+dx);
+    if(d.dataset.seg)d.dataset.seg=[r.x,r.y,r.line[0],r.line[1],r.h||3].join(',');if(d.dataset.cur)d.dataset.cur=[r.x,r.y,...r.curve,r.h||3].join(','); // verify reads the stroke from these
+    d.dataset.at=JSON.stringify({x:r.x,y:r.y,line:r.line,curve:r.curve}); // the placed geometry: a drag or nudge starts from it
+    done.add(o);go=1}}
+  if(tmp)root.remove()}
 let uid=0; // marker ids must be unique per document — the contact sheet renders every slide at once
 // shared element painter — render(), the contact sheet and the print pipeline all use it
 function drawEls(s,root,animate){
   let a=0;
   root.style.background=s.bg||'var(--card)';
-  const items=[];
+  const items=[],drawn=[];
   (deck.master||[]).forEach(m=>{if((s.hide||[]).includes(m.id)||(s.els||[]).some(e=>e.override===m.id))return;items.push({el:m,m:m.id})});
   (s.els||[]).forEach((el,n)=>items.push({el,n}));
   items.forEach(({el,n,m})=>{
@@ -709,8 +733,9 @@ function drawEls(s,root,animate){
     if(el._src)d.dataset.snapped=1; // extractor metadata: the type scale changed this row (its line-count drift is scale crowding, not a parity failure)
     if(n!=null)d.dataset.n=n;else d.dataset.m=m;
     d.setAttribute('spellcheck',String(SPELL&&root===canvas&&!present())); // print pages, the sheet and the ⤓ clones are never checked
-    root.appendChild(d);
+    root.appendChild(d);drawn.push({el,n,m,r,d});
   });
+  placeAfter(s,root,drawn);
   if(root===canvas)paintSpell();
 }
 let lastAnim=-1; // anim replays on slide ENTRY only — drag/select re-renders of the same slide must not restagger
@@ -769,7 +794,9 @@ let drag=null;
 // the ONE translation: every point of a row travels by the same delta from its resolved origin `o` — x/y AND a connector's
 // far end (line:[x2,y2], curve:[c1,c2,end]); writing x/y alone dragged the tail and left the head pinned. Drag and nudge both use it.
 // a right-anchored row keeps its anchor: the drag writes `right`, never an x that would freeze a measured width into the model
-const moveBy=(el,o,dx,dy)=>{if(o.right!=null){el.right=o.right-dx;delete el.x}else el.x=(o.x||0)+dx;el.y=(o.y||0)+dy;if(o.line)el.line=[o.line[0]+dx,o.line[1]+dy];if(o.curve)el.curve=o.curve.map((v,j)=>j%2?v+dy:v+dx)};
+// an after-anchored row converts: the move starts from its placed geometry (at()) and writes x, never after
+const at=(k,o)=>{const d=o.after!=null&&canvas.querySelector(typeof k==='number'?`[data-n="${k}"]`:`[data-m="${k.slice(2)}"]`);return d&&d.dataset.at?{...o,...JSON.parse(d.dataset.at)}:o};
+const moveBy=(el,o,dx,dy)=>{if(o.after!=null){delete el.after;if(o.line||o.curve||el.gap==null||isLogo(el));else delete el.gap}if(o.right!=null){el.right=o.right-dx;delete el.x}else el.x=(o.x||0)+dx;el.y=(o.y||0)+dy;if(o.line)el.line=[o.line[0]+dx,o.line[1]+dy];if(o.curve)el.curve=o.curve.map((v,j)=>j%2?v+dy:v+dx)};
 // every row is its own object: a press takes the one row under the pointer. Several rows travel together only while the
 // human holds them together — ⌘-click adds one, a marquee takes what it contains — and the selection is gone at the next click.
 // guides: the slide's slot rectangles (its layout's content slots over the deck-wide ones), the content margin and the canvas
@@ -819,8 +846,10 @@ const selBox=items=>{const sc=canvas.getBoundingClientRect().width/W;let l=1e9,t
   if(!e.target.closest('[contenteditable="true"]'))commitEdit(); // flush a live text edit BEFORE any deselect/re-render destroys its node
   const scale=canvas.getBoundingClientRect().width/W;
   if(e.target.dataset.pt){ // connector point nib: drag moves THAT point only; an engine-clipped end (to:/from:) becomes the human's
-    let k=[...sel][0];snap();if(typeof k!=='number'){k=fork(k.slice(2));sel.clear();sel.add(k)}
-    const el=slide().els[k],r=res(el,slide());if(el.line==null&&r.line)el.line=[...r.line];if(el.curve==null&&r.curve)el.curve=[...r.curve];if(el.x==null)el.x=r.x||0;if(el.y==null)el.y=r.y||0;
+    let k=[...sel][0];const k0=k;snap();if(typeof k!=='number'){k=fork(k.slice(2));sel.clear();sel.add(k)}
+    const el=slide().els[k],r=at(k0,res(el,slide()));
+    if(r.after!=null){delete el.after;el.x=r.x;el.y=r.y;if(r.line)el.line=[...r.line];if(r.curve)el.curve=[...r.curve]} // an after-anchored stroke becomes the human's where it stands
+    if(el.line==null&&r.line)el.line=[...r.line];if(el.curve==null&&r.curve)el.curve=[...r.curve];if(el.x==null)el.x=r.x||0;if(el.y==null)el.y=r.y||0;
     drag={mode:'pt',el,pt:e.target.dataset.pt,o:JSON.parse(JSON.stringify({x:el.x,y:el.y,line:el.line,curve:el.curve})),sx:e.clientX/scale,sy:e.clientY/scale,moved:true};
     e.preventDefault();return;
   }
@@ -850,7 +879,7 @@ const selBox=items=>{const sc=canvas.getBoundingClientRect().width/W;let l=1e9,t
   // double-click handled via e.detail — the selection re-render on click 1 destroys the
   // node, so a real dblclick event never fires on it (this was the "can't edit" bug)
   if(e.detail>=2){edit(k);return}
-  drag={mode:'move',items:[...sel].map(m=>{const el=typeof m==='number'?slide().els[m]:deck.master.find(x=>x.id===m.slice(2));return {k:m,el,o:res(el,slide())}}),
+  drag={mode:'move',items:[...sel].map(m=>{const el=typeof m==='number'?slide().els[m]:deck.master.find(x=>x.id===m.slice(2));return {k:m,el,o:at(m,res(el,slide()))}}),
         sx:e.clientX/scale,sy:e.clientY/scale,moved:false};
   e.preventDefault(); // the press is a grab, not a text selection: without this the browser starts selecting the text under the moving pointer
   render();drag.sb=selBox(drag.items); // after the render, so an auto-width row has a node to measure
@@ -1094,7 +1123,7 @@ function nudgeSel(key,step){
   for(const k of [...sel]){let el;
     if(typeof k!=='number'){const n=fork(k.slice(2));sel.delete(k);sel.add(n);el=slide().els[n]}
     else el=slide().els[k];
-    moveBy(el,res(el,slide()),dx,dy);
+    moveBy(el,at(k,res(el,slide())),dx,dy);
   }
   save();render();
 }
@@ -1411,6 +1440,8 @@ $('sadd').onclick=()=>{commitEdit();menu(false);snap();const s=slide(),ns={els:[
 // (or 2 s pass — a hung open is a missing tier) hydrate() applies it and the toggles, and the dot settles.
 const settle=()=>autosave(store.set(KEY,JSON.stringify(deck))?(unsynced?'local':'ok'):'bad');
 fit();render();
+// an after-anchored row was placed against the widths measured at that paint: a face that lands later re-measures the chain
+if(document.fonts)document.fonts.addEventListener('loadingdone',()=>{if(deck.slides.some(x=>(x.els||[]).some(e=>e&&e.after!=null))&&!canvas.querySelector('[contenteditable="true"]'))render()});
 async function idbLoad(){try{const range=IDBKeyRange.bound(NS+':',NS+';'); // every key under this deck's namespace
   const r=await Promise.race([Promise.all([idbReq('kv','readonly',o=>o.getAllKeys(range)),idbReq('kv','readonly',o=>o.getAll(range))]),new Promise(r=>setTimeout(()=>r(null),2000))]);
   if(!r)return;r[0].forEach((k,n)=>mem.set(k,r[1][n]));TIER='idb';document.body.classList.remove('nostore');hydrate();setSpell(SPELL);setSnap(SNAP)}

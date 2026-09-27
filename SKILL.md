@@ -25,8 +25,8 @@ You produce a **model** (JSON). The toolchain produces a **deck** (one `.html` f
 `node bin/validate.mjs --layouts` prints every slot box and free band; `--templates` prints every fill key and the `fixed:` rows no key reaches.
 A first `VERIFY PASS` is half the job — the second pass is [docs/building.md](docs/building.md).
 
-- a figure → [docs/figures.md](docs/figures.md)
-- a chart → [docs/charts.md](docs/charts.md)
+- a figure → [docs/figures.md](docs/figures.md); a chart → [docs/charts.md](docs/charts.md)
+- logos, screenshots, the asset table → [docs/assets.md](docs/assets.md), [docs/logo.md](docs/logo.md)
 - what `verify` measures → [docs/verify.md](docs/verify.md)
 - the editor, PDF, versions → [docs/editor.md](docs/editor.md)
 - worked models → [docs/examples.md](docs/examples.md)
@@ -49,7 +49,7 @@ Outline, markdown, meeting notes, a transcript, a spreadsheet, a brief; finished
 
 Eight more are **experimental**, same model: `carousel` (1080×1080), `carousel-4x5` (1080×1350), `document-letter` / `document-a4` and their `-landscape` pairs, `slides-4x3` (960×720), `story` (1080×1920), `poster-a3` (1123×1587). The library is cut for 960×540 and stretches on the rest.
 
-Experimental means: canvas sizing, editing, contact sheet and PDF all work; **text does not flow across pages** — every page is a slide you lay out yourself, and a document longer than its page is your problem to split. Treat a document as N fixed pages. **Library stretches** means: every library layout and template is cut for 16:9, so on that canvas `validate` warns per slide that a library layout or a template will render stretched (ROADMAP D2) — define the deck's own layouts or draw free rows there.
+Experimental means: canvas sizing, editing, contact sheet and PDF all work; **text does not flow across pages**, so treat a document as N fixed pages and split it yourself. The library is cut for 16:9, so on other canvases `validate` warns per slide that it will stretch (ROADMAP D2): define the deck's own layouts or draw free rows there.
 
 ### 3. Style — a style guide, an inferred brand, or the neutral fallback
 `style.json` = `{tokens, roles, pad}` (STYLE CONTRACT below). Obtain it in this order:
@@ -66,16 +66,18 @@ Sizes in `roles` are **model pixels** for the chosen canvas: 960-wide ×1, 1600-
 ## PROCESS
 
 ### Step 1 — slide plan (write it down before any JSON)
-For each slide: `name · layout · supertitle · title · body elements (kind + count)`. Cap: ~60 words of `Body` per 16:9 slide, 3–4 tiles per row, 5 bars per chart, 4 boxes per flow. A content-slide title is one line at `H1`; a cover or closing headline uses `Title` (the display size), two lines at most.
+For each slide: `name · layout · supertitle · title · visual · body elements (kind + count)`. **The visual is one non-text thing per slide** (a logo row, an image, an icon, a chart, a figure, a drawn mark), named before any copy; `validate` warns on a free-row slide of three text rows and none (a slide naming a `layout` or `template` is exempt). **List every company the deck names** and mark which listings need a logo: put the names in `deck.entities` so `validate` warns on a label with no logo beside it, and fetch the files with `decklet-assets` before Step 2. Cap: ~60 words of `Body` per 16:9 slide, 3–4 tiles per row, 5 bars per chart, 4 boxes per flow. A content-slide title is one line at `H1`; a cover or closing headline uses `Title` (the display size), two lines at most.
 
 ### Step 2 — model rows
 Discipline, in order of importance:
 - **Role discipline.** Every text row has a `role` (or a `slot` whose layout slot has one). A row never sets `font`, `size`, `lh`, `ls` or `mono` — the validator rejects it. Rows may set `weight`, `color`, `tt`, `italic`, `align`.
 - **Slot discipline.** Supertitle and title geometry lives in `layouts.<name>`; the slide row is `{slot:'title', text:'…'}` with no x/y/w. Define one layout per slide family (`title`, `content`; add `section`, `two-col` as needed).
-- **Master discipline.** Anything that appears on every slide (footer, rule, mark) is a `master` row, once — chrome is deck-wide and never varies per layout. Exactly one master row has `footer:1` and the engine renders the page counter with it (§ MASTER layer): `{id:'foot', footer:1, right: 60, y: 506, w:'auto', role:'Label', nowrap:1}` puts the deck name and `· n / N` together at the right foot; `{… x: 60 …}` keeps the name at the left with the counter alone in the corner. Never type `3 / 9` into a row.
+- **Master discipline.** Anything that appears on every slide (footer, rule, mark) is a `master` row, once — chrome is deck-wide and never varies per layout. Exactly one master row has `footer:1` and carries the page counter (§ MASTER layer): `{id:'foot', footer:1, right: 60, y: 506, w:'auto', role:'Label', nowrap:1}`. Never type `3 / 9` into a row.
 - **Text-fit.** A label that must stay on one line gets `nowrap:1` and enough `w` (≈ `cw` × size × chars — the role's measured glyph width, 0.46 for the neutral sans, 0.69 for the mono Label), or `w:'auto'` to hug. Chips/pills: `w:'auto'` + `p:'chip'` (+ `bg`/`bd`/`radius`); one that sits on a right edge takes `right:` instead of `x`. Body copy gets a `w` that yields ≤ 3 lines at the role's size.
-- **Charts are rows.** A bar or line chart is one `chart` row that `create` expands into bars, lines, dots and `Label` rows with the drawing rules applied — write the data, not the geometry.
-- **Cards are painted, not nested.** There is no container row and no link between rows: a card is a painted rect — `{x,y,w,h,bg,bd,radius}` — with text rows drawn over it at their own canvas x/y. Each of them selects, drags and deletes alone, so put the paint row first (row order is z-order) and position every row once.
+- **Charts are rows.** A bar or line chart is one `chart` row that `create` expands into bars, lines, dots and `Label` rows with the drawing rules applied — write the data, not the geometry. A ranking is `mark:'hbar'`; a datum may carry a `logo`.
+- **Images are assets.** `node bin/assets.mjs logo "Xometry" --out assets/` (also `shot <url>`, `monogram <name>`) writes the file and its `{aspect, plate}` into `assets/manifest.json`. Put each file once in `deck.assets` and name it `'#id'` wherever it appears. A logo with its name is one `logo` row ([docs/logo.md](docs/logo.md)); a list template takes one per item (`m1…mn`).
+- **Follow, don't guess.** A row after an auto-width row takes `after:'<rowId>'`: x is that row's rendered right edge plus `gap` (10).
+- **Cards are painted, not nested.** A card is a painted rect — `{x,y,w,h,bg,bd,radius}` — with text rows drawn over it at their own canvas x/y, each moving alone. Put the paint row first (row order is z-order).
 - **Colour.** Use `var(--accent)`, `var(--fg)`, `var(--muted)`, `var(--line)`, `var(--card)` so a style swap re-themes the deck; literal hex only for chart series.
 
 ### Step 3 — validate (no browser)
@@ -84,7 +86,7 @@ node bin/validate.mjs model.json --style style.json [--strict]   # 0 errors requ
 ```
 **Always pass the same `--style` you will pass to `create`.** Text fit is only meaningful against the scale the deck will actually wear: without it the model is measured against the template's neutral roles, so `validate` can report 0 warnings on a model `create --style` then floods with overflow — and `verify` fails on. Omit `--style` only when there is none.
 
-**`--strict` is the pre-hand-off gate, and a `nowrap` width warning is what `verify` fails on.** `nowrap text "…" likely wider than w=168 — widen or use w:"auto"` is the same fit the parity check measures in the browser, so on ordinary copy the row comes back `overflows its box` and the build is dead. Fix it in the model — shorten the text, widen the row, or `w:'auto'` — before you create. Treat every warning `--strict` fails on the same way: fix it, or write the reason into the hand-off note. The class stays a warning because the estimate is `chars × size × cw` and an average glyph width can miss in both directions: measured in Chromium at Body 16/`cw` 0.46, `lillililliltililliltil` estimates 162px and renders 100, inside its box and warned about; `MMMWWWMM` estimates 59px and renders 114, over its 70px box and never warned. So a silent `validate` is not a pass either, which is why Step 5 is mandatory.
+**`--strict` is the pre-hand-off gate, and a `nowrap` width warning is what `verify` fails on.** `nowrap text "…" likely wider than w=168 — widen or use w:"auto"` is the same fit the parity check measures in the browser, so on ordinary copy the row comes back `overflows its box` and the build is dead. Fix it in the model — shorten the text, widen the row, or `w:'auto'` — before you create. Treat every warning `--strict` fails on the same way: fix it, or write the reason into the hand-off note. The class stays a warning because `chars × size × cw` is an average glyph width and misses in both directions (`MMMWWWMM` renders twice its estimate), so a silent `validate` is not a pass either: Step 5 is mandatory.
 
 ### Step 4 — create
 ```
@@ -100,7 +102,7 @@ node bin/verify.mjs deck.html                      # 3. verify the result
 ```
 `--from` inherits the deck id and the slide/row ids and replays every logged edit onto the new build. Full flow: [docs/editor.md](docs/editor.md#revising-an-edited-deck).
 
-**The deck names itself.** `--title` wins, else the model's own `title`, else `decklet`; the winner is written into the model and the runtime titles the document from it. One short, human name — you are the one who writes it — becomes the browser tab, the `⤓` PDF filename and the `⌘S` save-a-copy filename.
+**The deck names itself.** `--title` wins, else the model's `title`, else `decklet`. Write one short, human name: it becomes the browser tab and the `⤓`/`⌘S` filenames.
 
 ### Step 5 — verify (mandatory)
 ```
@@ -109,7 +111,7 @@ node bin/verify.mjs deck.html [--refs shots/] [--out verify-out/] [--threshold 0
 - **Contract** — always.
 - **Air** — always, in `validate`, with no browser: the `gap` gate below. It refuses the layout before it exists; parity measures what actually rendered.
 - **Layout parity** — always (needs Playwright): no text row overflows its box, every `nowrap` row renders one line, imported rows render their source line count, every element is inside the canvas, **no painted row is drawn through a text row**, zero page errors.
-  Five collision shapes fail it: **ink through text**; **text straddling a container**; **an arrow head inside a fill** (aim at the edge with `to:`); **text over text**; **text under paint** (occlusion — reorder `els`, paint first). Containment is not collision, and `over:1` opts a row out of all five.
+  Five collision shapes fail it: **ink through text**; **text straddling a container**; **an arrow head inside a fill** (aim at the edge with `to:`); **text over text**; **text under paint** (occlusion — reorder `els`, paint first). Containment is not collision, and `over:1` opts a row out of all five. Ink is a rule (one side ≤ 4px or 6:1) or a dot (≤ 12px): a logo plate beside its name is neither, so it never needs `over:1`.
 - **AE pixel diff** — when `--refs` exists (needs ImageMagick): `< 0.5%` of pixels differ at 2% fuzz. AE alone passes wrapped labels; parity is what catches them — that is why parity is not optional.
 
 Fix the model; re-run to `VERIFY PASS`, attach `verify-out/results.json`.
@@ -119,8 +121,7 @@ Fix the model; re-run to `VERIFY PASS`, attach `verify-out/results.json`.
 ### Step 6 — hand-off notes for the human editor
 Say, in this order:
 1. Where the file is and that it opens from disk in any browser, no install, no network.
-2. **The editor:** [docs/editor.md](docs/editor.md) — the HUD and its manifest, phones, the contact sheet, both PDF routes, PNG export (`node bin/export.mjs deck.html --png`), presenting, persistence and the bug door.
-   Quote the lines that matter — the save button (⌘S) writes the file in Chrome/Edge, a copy in Safari; ⤓ writes the PDF; Esc opens the contact sheet — and link the rest.
+2. **The editor:** [docs/editor.md](docs/editor.md). Quote the lines that matter (⌘S writes the file in Chrome/Edge, a copy in Safari; ⤓ writes the PDF; Esc opens the contact sheet; `node bin/export.mjs deck.html --png` for PNGs) and link the rest.
 3. To revise, run Step 4's two commands; everything a human applies in the editor — geometry, text, links, arrows — round-trips that way; the console `copy(JSON.stringify(deck))` still works for a raw model.
 4. What you inferred (style, layout choices) and anything marked experimental.
 
@@ -148,16 +149,18 @@ Top level:
 | `layouts` | `{name: {slot: geometry}}` | `{}` | `{content:{title:{x:60,y:76,w:840,role:'H1'}}}` |
 | `master` | row[] with `id` | `[]` | `[{id:'foot',footer:1,…}]` |
 | `slides` | slide[] (≥1) | — | |
+| `assets` | `{id: data URI}` | none | each image embedded once; any `img` or `logo` value (rows, masters, slots, template media, chart data) names one as `'#id'`. `validate` errors on an unknown id, warns on an unused one |
+| `entities` | string[] | none | the companies whose every short-label mention wants a logo within 120px; `validate` warns per slide on the ones without |
 
 Slot geometry: `{x, y, w, h?, role}` — or `right` in place of `x`; a slotted row's own `right` overrides the slot's `x` the way its own `x` would.
 
-Slide: `{id?, name?, layout?, bg?, hide?: masterId[], notes?: string, els: row[]}` — `notes` is the speaker's text for the slide, one string, kept in the file and in the edit log like any slide key (no panel renders it yet; `bin/edits.mjs` and the model carry it). `id` (unique per deck; `s1, s2…` when create stamps it) is how a tab remembers the slide it was on and how the edit log addresses a slide. Rows carry `id` (unique per slide; `r1, r2…`) for the same reason and for `to:`/`from:`.
+Slide: `{id?, name?, layout?, bg?, hide?: masterId[], notes?: string, els: row[]}`. `notes` is the speaker's text, kept in the file and the edit log (no panel renders it yet). `id` (unique per deck; `s1, s2…` when create stamps it) addresses the slide for the tab and the edit log. Rows carry `id` (unique per slide; `r1, r2…`) for the same reason and for `to:`/`from:`/`after:`.
 
 Row — every prop optional; a row is whatever its props make it:
 | prop | type | default | meaning |
 |---|---|---|---|
 | `x`,`y` | number | `0` | top-left, model px |
-| `right` | number | — | the row's right edge N px from the canvas right edge (canvas-space, like `x`); x is derived at render from the measured width, so a `w:'auto'` chip needs no guessed x. Exclusive with `x` (validate errors on both). A drag or nudge in the editor writes `right`, so the anchor survives edits |
+| `right` | number | — | the row's right edge N px from the canvas right edge; x is derived at render from the measured width, so a `w:'auto'` chip needs no guessed x. Exclusive with `x`. An editor drag writes `right`, so the anchor survives edits |
 | `w` | number \| `'auto'` | `0` | width; `'auto'` hugs content |
 | `h` | number | content | height; required for bar/tile/box-with-height |
 | `slot` | string | — | inherit geometry + role from the layout/deck slot; own x/y/w/h are overrides |
@@ -171,7 +174,7 @@ Row — every prop optional; a row is whatever its props make it:
 | `align` | css | `left` | `center`, `right` |
 | `valign` | `middle` \| `bottom` | top | vertical seat of the text inside a row that carries `h` — a label over a painted button, a floor caption; `box`/`tile` rows centre already |
 | `nowrap` | 1 | — | single line, never wraps (parity checks it) |
-| `bullet` | 1 | — | the engine draws this row's list marker: a half-em dot hanging 1.25em left of the row's box, sized and seated from the role. The declared box is unchanged, so parity and the gap gate read what the model says. Usually inherited from a `b1…bn` slot (`bullets`, `image-left`, `image-right`); an unbound bullet draws no row, and no dot |
+| `bullet` | 1 | — | the engine draws a half-em dot hanging 1.25em left of the row's box, seated from the role; the box is unchanged. Usually inherited from a `b1…bn` slot (`bullets`, `image-left`, `image-right`) |
 | `ws` | css | — | `pre-wrap` etc. (`\n` in text already pre-wraps) |
 | `p` | token \| css | — | padding: `'chip'`, `'pill'`, `'4px 10px'`, or a number |
 | `bg` | css | — | background (box/bar/rect) |
@@ -185,21 +188,23 @@ Row — every prop optional; a row is whatever its props make it:
 | `line` | `[x2,y2]` | — | straight line from (x,y) to (x2,y2); `h` = thickness (3), `bg` = colour |
 | `curve` | `[c1x,c1y,c2x,c2y,x2,y2]` | — | cubic bezier connector from (x,y); absolute coords like `line`; `h` = thickness, `bg` = colour |
 | `arrow` | `start`\|`end`\|`both` | — | arrow head on a `line` or a `curve` — never hand-build one out of three lines. **The head IS the terminus:** its tip lands on the stated end point and the stroke is shortened to make room, so a connector draws exactly as long as it was authored |
-| `to`, `from` | row id \| row index | — | terminate a connector **against another row**: the engine clips where the stroke crosses that row's box and backs off `gap`, so the tip stops clear of the border. Aim at the target, not at a hand-computed standoff. Prefer an id — indices shift when a row is inserted |
-| `gap` | number | `10` | the air `to:`/`from:` leaves between the tip and the target's border. `0` is flush (situational — K1) |
+| `to`, `from` | row id \| row index | — | terminate a connector **against another row**: the engine clips where the stroke crosses that row's box and backs off `gap`. Aim at the target, never a hand-computed standoff. Prefer an id; indices shift |
+| `gap` | number | `10` | the air `to:`/`from:` leaves between the tip and the target's border, or `after:` leaves after the named row. `0` is flush (situational — K1) |
+| `after` | row id | none | x = the named row's **rendered** right edge + `gap`; y = its top unless stated. A `line` is translated whole. Exclusive with `x` (box rows) and `right`. For a chip or arrow after auto-width text |
 | `head` | `triangle`\|`chevron`\|`dot`\|`bar` | `triangle` | what is drawn at the arrow ends. `arrow` says *which* ends, `head` says *what* — centred on the stroke axis by construction |
 | `dash` | `1` \| `[on,off]` | — | dashed stroke, **quantised to the run** so it always begins and ends on a whole dash (measured along arc length on a curve). Keeps its head |
 | `waive` | 1 | — | this connector breaks a shape rule on purpose — `validate` stays quiet about it (the `over:1` of connector geometry) |
 | `over` | 1 | — | declares a deliberate overlay: `validate`'s gap gate and `verify`'s collision check leave this row (and what it crosses) alone |
-| `href` | url \| `#slide` | — | http/https/mailto, or **into the deck**: `'#7'` (slide number, 1-based) or `'#<slide id>'` — a table of contents, a back-to-agenda button. Presenting, a click jumps to the slide and the URL hash follows; editing, ⌘-click jumps. `validate` fails a `#` that names no slide; `verify` lists every link with where it lands. In-deck targets get no `/Link` annotation in the PDF (a page is not a URL). Editing, **⌘K** (or the toolbar's link button) is one field for every selected row at once — select the painted button and its label, type once; empty removes it. Outward:  One inset anchor over the whole row (a painted CTA box + its label each carry it); presenting: a click opens it in a new tab; editing: a click selects the row, ⌘-click (Ctrl-click off Mac) opens it and the hover hint says so; a real `/Link` annotation in the `⤓` PDF and an anchor on every ⌘P page |
+| `href` | url \| `#slide` | — | http/https/mailto, or **into the deck**: `'#7'` (1-based) or `'#<slide id>'`. `validate` fails a `#` that names no slide; `verify` lists every link. Put it on a painted button **and** its label. Presenting, a click follows it; editing, ⌘-click does and ⌘K links the selection ([docs/editor.md](docs/editor.md)). Outward links become `/Link` annotations in the PDF |
 | `donut` | 0–100 | — | ring, `w` = diameter, `color` = fill |
 | `hole` | 0–99 | 55 | the ring's hollow in percent; `0` is a filled ball |
 | `svg` | string | — | inline SVG markup (no script, no external href) |
-| `icon` | name | — | a Lucide icon by name (see GRAPHICS; `--icons` lists them) — expands to an `svg` row at create, `color` paints it |
-| `img` | data: URI | — | image; `fit`, `pos` = object-fit/position |
-| `alt` | string | — | what the row shows, for a reader who cannot see it — an `img`, an `svg`, a chart's rows. Model-only today: nothing renders it yet; the editor field and the tagged-PDF export read it later |
+| `icon` | name | — | any Lucide icon name (see GRAPHICS; `--icons` lists them) — expands to an `svg` row at create, `color` paints it |
+| `img` | data: URI \| `'#id'` | — | image; `fit` (default `contain`, never stretched; `cover`/`fill` opt in), `pos` = object-position |
+| `logo` | data: URI \| `'#id'` \| `''` | none | a **logo row**: `{logo, name, x, y, h, col, gap, plate, aspect, monogram}`. The logo is contain-fit in a `col`-wide column (default `2×h`), `name` starts at `x + col + gap` whatever the logo's shape, `plate` (`light`/`dark`/`none`, from the manifest) paints its chip, `''` draws a monogram. Same `col` down a list and the names align ([docs/logo.md](docs/logo.md)) |
+| `alt` | string | — | what the row shows, for a reader who cannot see it — an `img`, an `svg`, a chart's rows. Model-only today |
 | `anim` | `rise`\|`fade`\|`pop`\|`wipe` | — | entrance motion on slide entry, staggered 120 ms in model order (see MOTION) |
-| `chart` | `{mark, data, …}` | — | a bar or line chart drawn into this row's x/y/w/h at create time ([docs/charts.md](docs/charts.md)) |
+| `chart` | `{mark, data, …}` | — | a `bar`, `hbar` (ranked, `sort`, one `highlight`, `lead` px) or `line` chart drawn into this row's x/y/w/h at create time; a bar or hbar datum may carry `logo`/`aspect`/`plate` ([docs/charts.md](docs/charts.md)) |
 | `css` | string | — | raw CSS escape hatch — validator warns |
 | `override` | masterId | — | partial row: only the props it carries replace the master's on this slide |
 | `footer` | 1 | — | master only: the page counter renders with this row (§ MASTER layer) |
@@ -230,7 +235,7 @@ Resolution order for any row: slot geometry ← master row (for `override` rows)
 - The eight roles are the whole type system — exactly these names: `Title` (display headline for cover/closing slides), `Supertitle` (kicker), `H1` (content-slide title), `H2`, `Body`, `Caption`, `Label` (mono, uppercase — chips, axis labels, footer), `Stat`. No H3, no Subtitle. One allowance: **`Stat2`**, an optional ninth role for the KPI tile — a hero "63%" and a card "$1.2M" cannot share one size. A style may define it; when it does not, `create` derives it from `Stat` at **0.6** (size, line height, tracking) and only when a row or slot asks for it, so a deck that never uses `Stat2` never carries it. The `kpi-grid` tiles wear it; the hero `stat` layout keeps `Stat`. A role is a complete treatment: `font`, `size`, `weight`, `lh`, `ls`, `color`, optional `tt`. One font and one size per role — never two sizes of "Body". A row may add `weight`, `color`, `tt`, `italic`; it can never carry `font`, `size`, `lh`, `ls` or `mono` (the validator rejects it, the engine ignores it).
 - `margin` is the content inset the chrome sits on (footer counter's right edge, default 6% of `w`). Set it to match your layouts' left edge.
 - `gap` is the air every row owes its neighbours (default 4px, the offset the chart library itself uses between a bar and its value). Raise it for a roomier deck; `validate` enforces it on declared boxes.
-- `cw` on a role is the measured average glyph width in em (`width / chars / size` of a representative sentence in that font, weight and case). `validate` sizes `w:'auto'` rows and line counts with it; without it the blanket 0.55 stands, which runs ~20% wide on a sans and ~20% narrow on an uppercase mono. Measure it with `node bin/measure-cw.mjs <style.json> --write`; the neutral roles carry theirs.
+- `cw` on a role is the measured average glyph width in em. `validate` sizes `w:'auto'` rows and line counts with it; without it a blanket 0.55 runs ~20% off. Measure it with `node bin/measure-cw.mjs <style.json> --write`.
 - The model's own `styles.roles` win over `style.json` per role; a model with no roles inherits the template's neutral scale.
 
 ## LAYOUTS (slots)
@@ -243,7 +248,7 @@ Resolution order for any row: slot geometry ← master row (for `override` rows)
 ## LAYOUT LIBRARY
 
 Thirty-two named layouts ship with the engine (`lib/layouts.mjs`), in the same shape as a `layouts` entry. Name one on a slide the deck does not define and `create` merges it into `deck.layouts`, scaled from its 960×540 cut to the canvas (1600×900 = ×1.67). `node bin/validate.mjs --layouts` prints it: name, group, density, use and every slot's box (`x y w h`).
-Read that instead of inventing geometry, and instead of `lib/layouts.mjs`: each layout prints a `free:` band, under its lowest chrome slot and above its foot, which is where a free row goes. The library is an accelerant, never a fence: a slide may mix library slots with free rows (`layout:'kpi-grid'` plus a caption and a rule at y 400 is a normal slide), and a deck-defined layout of the same name wins. A slotted row still takes its own x/y/w/h — the `override` path — so a brand with a display role taller than the neutral scale (Title 64/68, Stat 40/44 — what the library is cut for) nudges a slot without redefining the layout. An unknown name is an error that lists the library.
+Read that instead of inventing geometry: each layout prints a `free:` band, under its chrome and above its foot, where a free row goes. The library is an accelerant, never a fence: a slide may mix library slots with free rows, and a deck-defined layout of the same name wins. A slotted row still takes its own x/y/w/h (the `override` path), so a brand with a taller display role nudges a slot without redefining the layout. An unknown name is an error that lists the library.
 
 - **openers** — `cover` · `agenda` · `section`
 - **chrome** — `content` · `title`
@@ -277,8 +282,8 @@ Picking a layout by what the content is:
 | the ask | `cta` |
 
 ## TEMPLATE LIBRARY
-Seventy-four finished slides ship with the engine (`lib/templates.mjs`, sources in `lib/templates/cat-*.mjs`), surveyed across the open-source slide catalogs and promoted whole. A template is a layout PLUS sample rows — an issue tree, a Sankey, a scorecard, a bento grid — so the agent binds content instead of drawing. `node bin/validate.mjs --templates` prints it: id · tier · density · note and every text key with its sample.
-A slide names one and fills its keys: `{template: 'three-up-cards', fill: {t1: 'What you get', t2: 'Three things, one price.', t3: '01', …}}`. Every text row of the template is a key, `t1`…`tn` in row order; a key left out keeps the sample text (so fill them all before shipping). Two kinds of key: a text row takes a string, and **value keys** take a number in the range `--templates` prints beside them — `harvey-balls` `r1c1`…`r3c4` (0–4 quarters), `progress-tracker` `p1`…`p4`, the gauge and donuts' `v1`… (0–100). `chart-column`, `chart-grouped` and `chart-line-trend` take `data` — the chart row's own `[{label, value, compare?}]`. Out of range is an error; `fixed:` counts the rows no key reaches. `create` expands the slide into the template's rows, scaled from the 960×540 cut to the canvas, sets the slide's `layout` to the template's chrome (`content` or `title` from the library — a deck-defined layout of that name wins) and its `density`, and keeps any free `els` after the template rows. An unknown template or fill key is a validate error listing what exists. A **scorecard cell** (`scorecard-grid`, role `Cell`) takes a short string OR a `0`–`4` rating, which draws the same ball. A template is an accelerant like a layout: edit the rows it produced, add rows beside them, or draw free — nothing here is a fence.
+109 finished slides ship with the engine (`lib/templates.mjs`, sources in `lib/templates/cat-*.mjs`), surveyed across the open-source slide catalogs and promoted whole. A template is a layout PLUS sample rows — an issue tree, a Sankey, a scorecard, a bento grid — so the agent binds content instead of drawing. `node bin/validate.mjs --templates` prints it: id · tier · density · note and every text key with its sample.
+A slide names one and fills its keys: `{template: 'three-up-cards', fill: {t1: 'What you get', t2: 'Three things, one price.', t3: '01', …}}`. Every text row of the template is a key, `t1`…`tn` in row order; a key left out keeps the sample text (so fill them all before shipping). Two kinds of key: a text row takes a string, and **value keys** take a number in the range `--templates` prints beside them — `harvey-balls` `r1c1`…`r3c4` (0–4 quarters), `progress-tracker` `p1`…`p4`, the gauge and donuts' `v1`… (0–100). `chart-column`, `chart-grouped` and `chart-line-trend` take `data` — the chart row's own `[{label, value, compare?}]`. Out of range is an error; `fixed:` counts the rows no key reaches. `create` expands the slide into the template's rows scaled to the canvas, sets its `layout` (`content` or `title`) and `density`, and keeps any free `els` after them. An unknown template or key is an error listing what exists. A **scorecard cell** (`scorecard-grid`, role `Cell`) takes a short string OR a `0`–`4` rating. **Media keys:** twenty list templates take `m1…mn`, one per item, each `{logo, plate, aspect, monogram, col, h}`, `{img, fit, w, h}` or `{icon, color, h}` (`logo`/`img` may be `'#id'`); the media sits beside the item's lead text, and a logo turns the lead into a logo row. The layouts `agenda`, `process-steps`, `timeline`, `three-up-cards` and `proof-strip` take `<item>-media` slots. `--templates` prints the media keys. A template is an accelerant like a layout: edit the rows it produced, add rows beside them, or draw free — nothing here is a fence.
 The starting rungs: `bullet-page` (a title and five points on `bullets`, a dot each), `image-bullets` (a photo and three points on `image-left`), `process-flow-3` · `-4` · `-5` (one block-arrow shape whose box width falls out of the count — 251, 180, 138), and `stat-row-3` (three numbers at **speaker** density, where the other numbers templates are reading).
 Tiers: **core** (in 4+ surveyed catalogs), **standard** (consulting catalogs), **fringe** (dataviz literature, rare on slides). Categories: Narrative · Numbers · Comparison · Frameworks · Process · Charts · Modern · Figures.
 
@@ -296,18 +301,19 @@ Two densities, in `lib/layouts.mjs` (`DENSITY`), so "dense" and "fluffy" build t
 The dense chrome is four optional slots every H1-titled library layout carries (`DENSE`): `subtitle` (H2, muted, under the title), `note` (Body, muted, above the foot), `source` (Caption, left foot), `legend` (Label, right foot via `right: 168`, clear of the counter); the subtitle is `nowrap` — parity fails a wrap. A layout that cannot seat one says so (`dense: {note: false}` on `chart`, whose `takeaway` is the note; all four on `diagram`). A reading slide binds at least one; a speaker slide none. **The counting rule:** a *point* is a text row whose slot is not `supertitle/title/subtitle/note/source/legend/caption/number` and role not Supertitle/Title/H1/Caption/Label; the word cap counts every text row, chrome included; over budget `validate` lists what it counted.
 ## GRAPHICS
 Five kinds of picture, one rule each. Colour is always a token; nothing loads from the network.
-- **Icons** — `{icon: 'shield-check', x, y, w: 24, h: 24, color: 'var(--accent)'}`. The set is Lucide (ISC), 169 names, `node bin/validate.mjs --icons` prints them; `create` inlines the svg (stroke `currentColor`, so `color` paints it) and only the icons a deck uses reach the file. One icon per point, on the 24 grid (24/32/40 px), left of its label on the label's cap line, the same weight throughout. An icon says what the label says — never decoration, never a second idea, never a filled emoji.
+- **Icons** — `{icon: 'factory', x, y, w: 24, h: 24, color: 'var(--accent)'}`. The set is all of Lucide (ISC), 2,147 names with the deprecated aliases, `node bin/validate.mjs --icons` prints them; `create` inlines the svg (stroke `currentColor`, so `color` paints it) and only the icons a deck uses reach the file. One icon per point, on the 24 grid (24/32/40 px), left of its label on the label's cap line, the same weight throughout. An icon says what the label says — never decoration, never a second idea, never a filled emoji.
 - **Glyphs** — a number in a circle, a letter chip, a status dot: rows, not images. A step glyph is a `dot` (or a `radius:'50%'` box) with a `Label` centred in it (`valign:'middle'`); a status dot is a 10px `bg` circle in `var(--ok)`/`var(--bad)`. Group the glyph with its text.
-- **Images and GIFs** — `img` is a data: URI (an animated GIF plays as-is), `fit:'cover'`, explicit `w`/`h`, one per slide, never stretched, never behind text unless a tint band (`bg` with `op`) sits between. Budget ≈ 100 KB an image, the file under ~1 MB. Photographs carry the `image-left`/`image-right`/`image-hero-overlay`/`image-split` layouts; a screenshot gets `annotated-shot` with callout rows.
-- **Figures** — nodes, connectors, timelines, trees as rows (`lib/diagram.mjs`, the `diagram` layout, the framework and process templates), so every box and edge stays editable. Build one through the spec API — `diagramSlide(spec, {supertitle, title, caption})` from `@grunion/decklet/diagram`, or `diagramRows(spec, frame)` for a free frame — which routes the connectors: [docs/figures.md](docs/figures.md). An `svg` row is for a fill the engine has no primitive for (a Sankey ribbon, an area band) — never for text, never for a whole figure.
+- **Logos** — one `logo` row per company: file and `plate` from `decklet-assets`, the file in `deck.assets`, the row naming `'#id'`. A landscape slide carries five to sixteen; give each list one `col` and one `h`. In a template it is a media key, in a chart a datum's `logo`.
+- **Images and GIFs** — `img` is a data: URI or `'#id'` (an animated GIF plays as-is), explicit `w`/`h`, `contain` by default (`fit:'cover'` to crop), never behind text unless a tint band (`bg` with `op`) sits between. A photograph wants one per slide; screenshots and logos run several. The budget scales with the deck: ~100 KB an image and ~1 MB a file for a talk, several MB for a landscape or competitive deck, where the asset table keeps a repeated logo to one copy. `decklet-assets shot <url> --crop x,y,w,h` writes a webp. Photographs carry `image-left`/`image-right`/`image-hero-overlay`/`image-split`; a screenshot gets `annotated-shot` with callout rows.
+- **Figures** — nodes, connectors, timelines, trees as rows, so every box and edge stays editable. Build one with `diagramSlide(spec, {supertitle, title, caption})` from `@grunion/decklet/diagram`, or `diagramRows(spec, frame)` for a free frame, which routes the connectors: [docs/figures.md](docs/figures.md). An `svg` row is for a fill the engine has no primitive for (a Sankey ribbon), never for text or a whole figure.
 - **Clips** — a short cropped GIF of a real interaction (`docs/record-clips.mjs`), ≤ 3 s, ≤ 48 colours, ~10 fps; the same inline rule. A clip of the thing working beats a screenshot of it.
 
-**Charts** are one `chart` row that `create` expands into bars, lines, dots and labels — bars from zero, one explicit max, direct value labels, no legend: [docs/charts.md](docs/charts.md). **Connectors** are strokes with a head, and `diagramRows()` already routes them to the rules (orthogonal runs, 96px S-curve channels, air at both ends, 2.5px or heavier); draw one by hand and read [docs/connectors.md](docs/connectors.md) first.
+**Charts** are one `chart` row that `create` expands into bars, lines, dots and labels (bars from zero, one explicit max, direct value labels, no legend); `mark:'hbar'` ranks with a logo per datum: [docs/charts.md](docs/charts.md). **Connectors** are strokes with a head, and `diagramRows()` already routes them to the rules (orthogonal runs, 96px S-curve channels, air at both ends, 2.5px or heavier); draw one by hand and read [docs/connectors.md](docs/connectors.md) first.
 
 ## MASTER layer
 - Drawn under every slide, in array order, identically — chrome is deck-wide and never varies per layout. Rows need a unique `id`.
 - A slide hides one with `hide:['id']`; overrides one with a **partial** row carrying `override:'id'` plus only the props that change — everything else keeps reading from the master (the editor creates these when a human edits chrome on one slide; "Apply to all slides" merges them back).
-- Exactly one `footer:1` row. The row is anchored to the content edge and grows inward: **right-anchored** when it declares `right` (whatever the value, the engine snaps it to `w − styles.margin`) or when an `x`+numeric `w` put its centre past W/2, **left-anchored** otherwise — left edge at `margin`. `w:'auto'` is the right width for both; a right-anchored row needs no `x` and a left-anchored one needs no `right`. **The corner is the counter's:** a right-anchored row carries `· n / N` inline, inheriting its font and baseline; a left-anchored row keeps its text at the left and the counter detaches to the corner on the same top, wearing the row's font — either way the counter's right edge is `w − margin` on every slide, and `verify` fails parity when it moves off that corner or differs between slides (a slide that hides the footer is exempt from the slide-to-slide check: it gets the pin). With no footer row the counter renders as a pin at the same margin.
+- Exactly one `footer:1` row, anchored to the content edge: **right-anchored** when it declares `right` (snapped to `w − styles.margin`) or its centre sits past W/2, **left-anchored** otherwise. `w:'auto'` suits both. **The corner is the counter's:** a right-anchored row carries `· n / N` inline; a left-anchored row keeps its text at the left and the counter sits alone in the corner on the same top. Either way the counter's right edge is `w − margin` on every slide, and `verify` fails parity when it moves (a slide that hides the footer gets the pin). With no footer row the counter renders as a pin at the same margin.
 
 ## MOTION (`anim`)
 Four words, and no fifth: `rise` (text — the default), `fade` (quiet chrome), `pop` (stats, tiles, images), `wipe` (bars, lines, rules). Anything else is an error in `validate`. **Entry only:** animated rows enter in model order, staggered 120 ms, and only when a slide is *entered* — print, the contact sheet, the ⤓ PDF and `verify` all draw the settled frame, and `prefers-reduced-motion: reduce` turns every anim off, so a deck reads exactly the same standing still. When to animate: [docs/editor.md](docs/editor.md#motion).
@@ -324,9 +330,11 @@ Four words, and no fifth: `rise` (text — the default), `fade` (quiet chrome), 
 - **Touching boxes.** A chip 2px from the next chip, a caption resting on the rule under it, a value label on its bar's top edge. `validate` names the pair and the distance; give it `styles.gap` of air, or state the relationship (containment, `over:1`).
 - **Guessed x for an auto-width row.** A chip on a card's right edge is `right:`, never a guessed `x` — a `w:'auto'` row has no width until it renders, and the guess runs under its neighbour.
 - **Hand-built arrow heads.** Three `line` rows and a trig helper to draw one arrow. `arrow:'end'` on a `line` or a `curve`. Stiff diagonals where the source had a spline: that is what `curve` is for.
-- **Connectors aimed at a centre.** Giving a connector the target's coordinate puts the head inside its fill, floating. Give the target itself — `to: 'grade'` — and the engine stops the tip on the border. Hand-computed standoffs ("end it 10px short") are the thing `to` exists to delete: the head no longer overshoots, so paying it back by hand now *under*-shoots.
-- **A dead CTA.** A painted button with no `href` looks like a link and is not one — no click in the deck, no annotation in the PDF, and a LinkedIn document post has nothing to follow. Put the `href` on the box **and** on its label row.
+- **Connectors aimed at a centre.** The target's coordinate puts the head inside its fill. Give the target itself (`to: 'grade'`) and the tip stops on the border; a hand-computed standoff now *under*-shoots.
+- **A dead CTA.** A painted button with no `href`: no click in the deck, no annotation in the PDF. Put the `href` on the box **and** on its label row.
 - **Leader lines through labels.** Route the line, or declare the overlay with `over:1`. `verify` fails it either way until you decide.
+- **Hand-built logos and rankings.** Three rows per logo with the name's x worked out from its aspect; rects computed into a bar ranking; the same data: URI pasted on nine slides. A `logo` row, `mark:'hbar'`, `deck.assets`.
+- **Text-only slides.** Three text rows and no visual. `validate` warns; plan the visual in Step 1.
 - **Hardcoded counters.** `"3 / 9"` typed into a row. The footer master renders the counter.
 - **Font pickers / ad-hoc colours.** No per-row font families, no rainbow of hexes. Tokens and roles only; literal hex is for chart series.
 - **Walls of text.** More than ~60 Body words on a 16:9 slide, or Body wrapping past 3 lines. Split the slide.

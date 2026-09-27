@@ -87,6 +87,7 @@ node bin/pdf.mjs deck.html [out.pdf]                              # vector PDF, 
 node bin/edits.mjs deck.html                                       # what the human changed in the editor (read before revising)
 node bin/create.mjs --model model.json --out deck.html --from deck.html   # revise: keep ids, replay human edits (human wins)
 node bin/import-html.mjs --w 1600 --h 900 --out model.json 'pages/*.html'   # finished HTML → model
+node bin/assets.mjs logo "Xometry" --out assets/                    # a logo file + manifest.json (aspect, plate) for deck.assets
 ```
 
 [`llms.txt`](llms.txt) is the machine summary and file map. [`deck.html`](deck.html) is the engine explaining itself — twelve slides built from [`examples/explainer/model.json`](examples/explainer/model.json) by the same CLI, including the motion vocabulary and three GIF clips of the editor filmed from the deck itself.
@@ -136,7 +137,13 @@ A row is text by default; `box`, `tile`, `bar`, `line`, `donut`, `svg`, `img` ar
 | inline text editing + B/I/U/S + colour runs | supported | stored as `html` on the row |
 | roles · slots · master layer · footer counter | supported | see SKILL.md |
 | bars, lines, donuts, tiles, boxes | supported | one row each, no SVG layer |
-| SVG / raster images | supported | inline `svg`, data: `img` |
+| SVG / raster images | supported | inline `svg`, data: `img`, `contain` by default |
+| logos | supported | `logo` row: fixed column, contain fit, light/dark plate, aligned name, monogram fallback ([docs/logo.md](docs/logo.md)); a logo per template item (`m1…mn`) and per chart datum |
+| asset table | supported | `deck.assets` embeds each image once, rows name it `'#id'` |
+| logo and screenshot gathering | supported | `decklet-assets logo / shot / monogram` writes files plus `manifest.json` with aspect and plate ([docs/assets.md](docs/assets.md)) |
+| icons | supported | every Lucide name (2,147), inlined at create |
+| ranked bars | supported | `chart` `mark:'hbar'`: label column, sort, highlight, a logo per row |
+| row placement after a row | supported | `after:'<rowId>'` puts x at the named row's rendered right edge plus a gap |
 | entrance motion | supported | `anim`: `rise`\|`fade`\|`pop`\|`wipe`, 120 ms stagger on slide entry, respects reduced-motion, never in print/PDF/parity |
 | animated GIF clips | supported | `img` data: URI plays as-is; `docs/record-clips.mjs` films them from the deck and writes them back into the model |
 | contact sheet (select, reorder, dup, delete) | supported | 3-across live thumbnails; pointer-drag reorder (mouse + touch), also in present mode |
@@ -159,8 +166,9 @@ bin/create.mjs       model (+style) → deck.html; format presets
 bin/verify.mjs       parity + AE + contract proof (Playwright optional)
 bin/import-html.mjs  finished HTML pages → model.json (Playwright)
 bin/bug.mjs          a prefilled bug report (mailto) — the deck's bug button and dialog use the same builder
+bin/assets.mjs       decklet-assets: a company name to a logo file, a URL to a screenshot, a monogram; writes manifest.json
 SKILL.md             the agent authoring skill
-docs/                the references it links: building.md, editor.md, verify.md, charts.md, connectors.md, figures.md, examples.md, import-html.md
+docs/                the references it links: building.md, editor.md, verify.md, charts.md, connectors.md, figures.md, examples.md, import-html.md, assets.md, logo.md
 llms.txt             machine summary
 examples/            explainer, quarterly-update, launch-carousel, one-pager (brief → model + style)
 test/gate.test.mjs   engine + validator + create + import + live proofs

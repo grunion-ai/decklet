@@ -408,7 +408,7 @@ const ERRS=[],errPush=m=>{ERRS.push(scrub(String(m).replace(/\([^)]*\)/g,'(…)'
 window.addEventListener('error',e=>errPush((e.message||'error')+' · '+(e.lineno||0)+':'+(e.colno||0)));
 window.addEventListener('unhandledrejection',e=>errPush('rejection: '+String(e.reason&&e.reason.message||e.reason)));
 // the file's own edit log (create.mjs fills it; write-back rewrites it with the browser's)
-const ENGINE=/*ENGINE*/'0.11.0'/*/ENGINE*/; // the package version that built this file (create.mjs); the bug report leads with it
+const ENGINE=/*ENGINE*/'0.12.0'/*/ENGINE*/; // the package version that built this file (create.mjs); the bug report leads with it
 const LOG0=/*LOG*/[]/*/LOG*/;const SPELL0=/*SPELL*/{}/*/SPELL*/; // words the build's dictionary refused (lib/spell.mjs); the editor underlines them on every slide
 // storage namespace is per deck (create.mjs stamps it with deck.id — stable across versions, so a new file finds the old edits)
 const NS=/*KEY*/'decklet:0553b6c4c2'/*/KEY*/,KEY=NS+':model',HKEY=NS+':hist',PKEY=NS+':pos',canvas=document.getElementById('canvas'),$=id=>document.getElementById(id);
