@@ -151,7 +151,183 @@ test('K22: a template whose graphic no key reaches yet refuses a fill, naming th
     assert.ok(e.some(m => m.includes(id) && m.includes(what) && /sample/.test(m)), `${id}: ${e.join(' | ')}`);
     assert.deepEqual(errs(id, {}), [], `${id}: the bare sample still expands`);
   }
-  assert.match(templateCatalogue(), /sample-bound/);
+  assert.equal(/sample-bound/.test(templateCatalogue()), Object.keys(SAMPLE_BOUND).length > 0, 'the catalogue names a sample-bound template, and only then');
+});
+
+// ── the 20 templates PR #133 left sample-bound: every bar, ring, point, cell and series now comes from the fill
+const FORMER_BOUND = ['chart-stacked-100', 'chart-area-band', 'chart-waterfall', 'chart-scatter', 'chart-heatmap', 'chart-histogram', 'chart-slope',
+  'chart-dumbbell', 'chart-small-multiples', 'chart-marimekko', 'chart-pareto', 'funnel-stages', 'gantt-lanes', 'quad-growth-share', 'quad-movement',
+  'quad-risk-heat', 'quad-with-panel', 'pad-default-60', 'density-reading', 'chrome-dots'];
+const sampleOf = id => Object.fromEntries(templateVals(id).map(v => [v.key, v.sample]));
+const fillOf = (id, over) => rows(id, {...sampleOf(id), ...over});
+const centreOf = r => [r.x + r.w / 2, r.y + r.h / 2];
+const round = n => Math.round(n);
+
+test('K22: nothing is sample-bound any more, and each former one declares value keys', () => {
+  assert.deepEqual(SAMPLE_BOUND, {});
+  for (const id of FORMER_BOUND) {
+    assert.ok(templateVals(id).length, `${id} declares value keys`);
+    assert.deepEqual(errs(id, {t1: 'Filled', ...sampleOf(id)}), [], `${id}: its own sample fills clean`);
+  }
+});
+
+test('K22: chart-stacked-100 draws each column as the shares of its own c#s# keys', () => {
+  assert.deepEqual(keys('chart-stacked-100'), [1, 2, 3, 4].flatMap(c => [1, 2, 3].map(s => `c${c}s${s}`)));
+  const fill = Object.fromEntries([1, 2, 3, 4].flatMap(c => [[`c${c}s1`, 1], [`c${c}s2`, 1], [`c${c}s3`, 2]]));
+  const els = rows('chart-stacked-100', fill), segs = els.filter(r => r.w === 108 && r.h != null && r.text == null);
+  assert.equal(segs.length, 12);
+  assert.deepEqual(segs.slice(0, 3).map(r => r.h), [53, 53, 105], 'a quarter, a quarter, a half of 210px');
+  assert.ok(texts(els).includes('50%') && texts(els).includes('25%'), 'the labels read the shares');
+});
+
+test('K22: chart-area-band draws the band and the median line from data, on one scale', () => {
+  const data = [10, 20, 30, 40, 50, 60].map((m, i) => ({label: 'P' + (i + 1), value: m, low: m - 5, high: m + 5}));
+  const els = rows('chart-area-band', {data}), band = els.filter(r => r.op === 0.16);
+  const Y = v => 400 - 210 * v / 65;
+  assert.equal(band.length, 6);
+  assert.equal(round(band[5].y), round(Y(65)), 'the highest high reaches the top of the plot');
+  assert.equal(round(band[0].h), round(Y(5) - Y(15)), 'each band spans low to high');
+  const med = els.filter(r => Array.isArray(r.line) && r.bg === 'var(--accent)');
+  assert.equal(round(med[0].y), round(Y(10)));
+  assert.ok(texts(els).includes('P6'), 'the axis reads the data labels');
+  assert.ok(errs('chart-area-band', {data: data.slice(0, 5)}).some(m => /6/.test(m)), 'six periods');
+  assert.ok(errs('chart-area-band', {data: data.map(p => ({...p, low: p.high + 1}))}).some(m => /low/.test(m)));
+});
+
+test('K22: chart-waterfall builds the bridge from a start, three drivers and an end', () => {
+  const data = [{label: 'Start', value: 100}, {label: 'Up', value: 50}, {label: 'Down', value: -30}, {label: 'Down 2', value: -20}, {label: 'End', value: 100}];
+  const els = rows('chart-waterfall', {data}), bars = els.filter(r => r.w === 108 && r.radius === 3);
+  const k = 190 / 150, Y = v => 400 - v * k;
+  assert.deepEqual(bars.map(r => [round(r.y), round(r.h)]), [[round(Y(100)), round(100 * k)], [round(Y(150)), round(50 * k)],
+    [round(Y(150)), round(30 * k)], [round(Y(120)), round(20 * k)], [round(Y(100)), round(100 * k)]]);
+  assert.ok(texts(els).includes('+50') && texts(els).includes('−30'), 'drivers print signed');
+  assert.ok(errs('chart-waterfall', {data: data.map((p, i) => i === 4 ? {...p, value: 90} : p)}).some(m => /100/.test(m)), 'the end is start plus drivers');
+});
+
+test('K22: chart-scatter places, sizes and names its bubbles from x#, y#, s#', () => {
+  const fill = Object.fromEntries([1, 2, 3, 4, 5, 6, 7, 8].flatMap(i => [[`x${i}`, i * 10], [`y${i}`, i * 10], [`s${i}`, i === 2 ? 400 : 100]]));
+  const els = rows('chart-scatter', fill), dots = els.filter(r => r.radius != null && r.w === r.h);
+  const [cx, cy] = centreOf(dots[0]);   // an odd diameter lands the box on a half pixel, which the canvas scale rounds
+  assert.ok(Math.abs(cx - round(240 + 10 * 6.6)) <= 1 && Math.abs(cy - round(410 - 10 * 2.34)) <= 1, `${cx},${cy}`);
+  const big = dots.filter(r => r.w === 46);
+  assert.equal(big.length, 2, 'the largest balance draws at 46px, lit on top');
+  assert.equal(dots.find(r => r.w === 23).w, 23, 'a quarter of the area is half the diameter');
+  const name = els.find(r => r.text === 'Harbor');
+  assert.equal(name.x, centreOf(big[0])[0] + 23 + 13, 'the name follows the largest bubble');
+});
+
+test('K22: chart-heatmap tints each cell from its r#c# value', () => {
+  const fill = Object.fromEntries([1, 2, 3].flatMap(r => [1, 2, 3, 4, 5].map(c => [`r${r}c${c}`, r === 2 && c === 3 ? 4 : 1])));
+  const cells = rows('chart-heatmap', fill).filter(r => r.w === 100 && r.h === 62);
+  assert.equal(cells.length, 15);
+  assert.equal(cells[7].op, 0.95, 'the largest is the darkest tint');
+  assert.equal(cells[0].op, 0.24);
+});
+
+test('K22: chart-histogram draws b1..b10 on one scale and the median where it is filled', () => {
+  const fill = {...Object.fromEntries(Array.from({length: 10}, (_, i) => [`b${i + 1}`, i === 5 ? 2 : 1])), median: 5.5};
+  const els = rows('chart-histogram', fill), bars = els.filter(r => r.w === 64);
+  assert.deepEqual(bars.map(r => round(r.h)), [99, 99, 99, 99, 99, 197, 99, 99, 99, 99]);
+  assert.equal(bars[5].bg, 'var(--accent)', 'the median bin is lit');
+  assert.equal(els.find(r => r.dash && Array.isArray(r.line)).x, round(220 + 5.5 * 68));
+});
+
+test('K22: chart-slope draws each line from its two values, and lights the biggest riser', () => {
+  const data = [{label: 'A', from: 10, value: 40}, {label: 'B', from: 40, value: 20}, {label: 'C', from: 20, value: 20}];
+  const els = rows('chart-slope', {data}), lines = els.filter(r => Array.isArray(r.line) && r.x === 340 && r.h > 2);
+  const Y = v => round(400 - 190 * v / 40);
+  assert.deepEqual(lines.map(r => [r.y, r.line[1]]), [[Y(10), Y(40)], [Y(40), Y(20)], [Y(20), Y(20)]]);
+  assert.equal(lines[0].bg, 'var(--accent)');
+  assert.ok(texts(els).includes('40') && texts(els).includes('A'));
+});
+
+test('K22: chart-dumbbell places both dots of each row and prints the gap', () => {
+  const data = [{label: 'a', value: 10, target: 20}, {label: 'b', value: 0, target: 40}, {label: 'c', value: 30, target: 20}, {label: 'd', value: 5, target: 10}];
+  const els = rows('chart-dumbbell', {data}), X = v => round(280 + 480 * v / 40);
+  const lines = els.filter(r => Array.isArray(r.line) && r.h === 3);
+  assert.deepEqual(lines.map(r => [r.x, r.line[0]]), [[X(10), X(20)], [X(0), X(40)], [X(30), X(20)], [X(5), X(10)]]);
+  assert.ok(texts(els).includes('+40') && texts(els).includes('−10'));
+  assert.equal(els.find(r => r.text === '+40').color, 'var(--accent)', 'the largest gap is lit');
+});
+
+test('K22: chart-small-multiples draws six panels from p1..p6 on one shared scale', () => {
+  const s = (...v) => v.map((value, i) => ({label: 'Q' + (i + 1), value}));
+  const fill = {p1: s(10, 20, 30, 40), p2: s(80, 80, 80, 80), p3: s(1, 1, 1, 1), p4: s(1, 1, 1, 1), p5: s(1, 1, 1, 1), p6: s(1, 1, 1, 1)};
+  const bars = rows('chart-small-multiples', fill).filter(r => r.w === 44);
+  assert.deepEqual(bars.slice(0, 8).map(r => r.h), [9, 19, 28, 37, 74, 74, 74, 74], 'the tallest bar of all six fills 74px');
+  assert.ok(errs('chart-small-multiples', {...fill, p2: s(1, 2)}).some(m => /4/.test(m)));
+});
+
+test('K22: chart-marimekko sizes columns from w# and segments from c#s#', () => {
+  const fill = {w1: 1, w2: 1, w3: 1, w4: 1, ...Object.fromEntries([1, 2, 3, 4].flatMap(c => [[`c${c}s1`, 50], [`c${c}s2`, 25], [`c${c}s3`, 25]]))};
+  const els = rows('chart-marimekko', fill), segs = els.filter(r => r.bg && r.h != null && r.text == null && r.y >= 190);
+  assert.deepEqual([...new Set(segs.map(r => r.w))], [179], 'four equal columns share 740px');
+  assert.deepEqual(segs.slice(0, 3).map(r => r.h), [100, 50, 50]);
+  assert.ok(texts(els).includes('1 deals'));
+});
+
+test('K22: chart-pareto draws bars and the cumulative line from data, lighting the causes up to 80%', () => {
+  const data = [50, 30, 10, 5, 3, 2].map((value, i) => ({label: 'c' + i, value}));
+  const els = rows('chart-pareto', {data}), bars = els.filter(r => r.w === 92);
+  assert.deepEqual(bars.map(r => r.h), [210, 126, 42, 21, 13, 8]);
+  assert.deepEqual(bars.map(r => r.bg === 'var(--accent)'), [true, true, false, false, false, false], 'lit until the running total reaches 80%');
+  const pts = els.filter(r => r.w === 8 && r.radius === 8).map(r => round(centreOf(r)[1]));
+  assert.deepEqual(pts, [50, 80, 90, 95, 98, 100].map(p => round(240 - 1.1 * p)));
+  assert.ok(errs('chart-pareto', {data: [...data].reverse()}).some(m => /largest first/.test(m)));
+});
+
+test('K22: funnel-stages sizes each band from data and names the biggest drop', () => {
+  const data = [{label: 'a', value: 1000}, {label: 'b', value: 900}, {label: 'c', value: 300}, {label: 'd', value: 200}];
+  const els = rows('funnel-stages', {data}), bands = els.filter(r => r.h === 52);
+  assert.deepEqual(bands.map(r => r.w), [480, 432, 144, 96]);
+  const drop = els.find(r => /here$/.test(r.text || ''));
+  assert.equal(drop.text, '−67% here', 'the most lost between two stages, as a share of the first');
+  assert.equal(drop.y, 176 + 2 * 66 - 8);
+  assert.ok(texts(els).includes('1,000'));
+});
+
+test('K22: gantt-lanes places each lane bar from start#/span# and the today line from today', () => {
+  const els = rows('gantt-lanes', {start1: 0, span1: 1, start2: 1, span2: 4, start3: 4.5, span3: 0.5, today: 1.5});
+  const bars = els.filter(r => r.h === 34);
+  assert.deepEqual(bars.map(r => [r.x, r.w]), [[308, 104], [428, 464], [848, 44]]);
+  assert.equal(els.find(r => r.dash).x, 480);
+  assert.ok(errs('gantt-lanes', {...sampleOf('gantt-lanes'), start1: 4, span1: 2}).some(m => /start1/.test(m) && /5/.test(m)), 'a bar ends by the grid\'s last month');
+});
+
+test('K22: quad-growth-share, quad-risk-heat and quad-with-panel place every mark from x#/y#', () => {
+  const g = rows('quad-growth-share', {x1: 50, y1: 50, s1: 100, x2: 0, y2: 0, s2: 25, x3: 100, y3: 100, s3: 25, x4: 25, y4: 75, s4: 25});
+  const dots = g.filter(r => r.radius != null && r.w === r.h);
+  assert.deepEqual(centreOf(dots[0]), [560, 303]); assert.equal(dots[0].w, 52); assert.equal(dots[1].w, 26);
+  const risk = rows('quad-risk-heat', Object.fromEntries([1, 2, 3, 4, 5].flatMap(i => [[`x${i}`, i * 20 - 10], [`y${i}`, 50]])));
+  assert.deepEqual(risk.filter(r => r.w === 26 && r.radius).map(r => centreOf(r)), [10, 30, 50, 70, 90].map(x => [round(60 + x * 6.4), 303]));
+  assert.deepEqual(risk.filter(r => /^[1-5]$/.test(r.text)).map(r => r.x + 13), [10, 30, 50, 70, 90].map(x => round(60 + x * 6.4)), 'each number rides its disc');
+  const p = rows('quad-with-panel', {x1: 0, y1: 0, x2: 50, y2: 50, x3: 100, y3: 100}).filter(r => r.radius != null && r.w === r.h);
+  assert.deepEqual(p.map(centreOf), [[60, 420], [320, 298], [580, 176]]);
+});
+
+test('K22: quad-movement draws each player from where it was to where it is', () => {
+  const els = rows('quad-movement', {fx1: 10, fy1: 10, x1: 30, y1: 30, fx2: 60, fy2: 20, x2: 70, y2: 40, fx3: 90, fy3: 90, x3: 90, y3: 90});
+  const arrows = els.filter(r => r.arrow && r.waive);
+  assert.equal(arrows.length, 2, 'a player that did not move draws no arrow');
+  const ends = els.filter(r => r.radius != null && r.w === r.h && r.w >= 14).map(centreOf);
+  assert.deepEqual(ends, [[456, 354], [664, 328], [768, 201]]);
+});
+
+test('K22: pad-default-60 and density-reading draw their bars from data, or drop them', () => {
+  for (const id of ['pad-default-60', 'density-reading']) {
+    const data = [1, 2, 3, 4].map((value, i) => ({label: 'Y' + i, value, text: value + 'x'}));
+    const bars = rows(id, {data}).filter(r => r.bar);
+    assert.deepEqual(bars.map(r => r.h), [38, 75, 113, 150], id);
+    assert.equal(rows(id, {t1: 'x'}).filter(r => r.bar).length, 0, `${id}: no data, no bars`);
+  }
+  assert.ok(!texts(rows('density-reading', {t1: 'x'})).includes('Late'), 'the legend drops with the bars it explains');
+});
+
+test('K22: chrome-dots draws count dots and lights the at-th', () => {
+  const dots = rows('chrome-dots', {at: 4, count: 4}).filter(r => r.w === 9);
+  assert.equal(dots.length, 4);
+  assert.deepEqual(dots.map(r => r.bg === 'var(--accent)'), [false, false, false, true]);
+  assert.ok(errs('chrome-dots', {at: 5, count: 4}).some(m => /at/.test(m)));
 });
 
 // the net under the audit: no template outside SAMPLE_BOUND keeps a bar, ring or chart series fill cannot reach

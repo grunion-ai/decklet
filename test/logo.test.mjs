@@ -5,10 +5,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import {logoGeom, plateOf, monogramOf, PLATE_BG} from '../lib/logo.mjs';
+import {logoGeom, plateOf, monogramOf, PLATE_BG, autoCol} from '../lib/logo.mjs';
 import {validate} from '../bin/validate.mjs';
 import {create} from '../bin/create.mjs';
 import {verify} from '../bin/verify.mjs';
+import {withBrowser, raceOrExit} from './helpers/browser.mjs';
 let pw = null; try { pw = await import('playwright'); } catch {}
 const live = pw ? test : test.skip;
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'decklet-logo-'));
@@ -48,6 +49,41 @@ test('geometry: a missing logo draws a monogram chip from the name, or the monog
   assert.equal(m.name.x, 98, 'the name sits at slot + gap, same as a real logo');
 });
 
+// K26: col:'auto' — the column is the painted logo, so the name sits one GAP after the plate's right edge and the caller never
+// re-derives the plate padding (v4's build.mjs did, per row: (h − 2·pad)·aspect + 2·pad)
+test('geometry: col auto hugs the plate, so the name starts one gap after the painted logo', () => {
+  for (const [aspect, plate] of [[4.44, 'light'], [1, 'dark'], [6, 'none']]) {
+    const g = logoGeom({logo: WIDE, aspect, h: 28, col: 'auto', plate});
+    const right = g.plate ? g.plate.x + g.plate.w : g.img.x + g.img.w;
+    assert.ok(Math.abs(g.name.x - (right + 8)) < 1e-9, `aspect ${aspect} ${plate}: name at ${g.name.x}, logo ends ${right}`);
+    assert.ok(Math.abs(g.img.w / g.img.h - aspect) < 1e-9, 'the mark keeps its full height: auto never shrinks it');
+    assert.equal(g.img.h, 28 - 2 * (plate === 'none' ? 0 : Math.max(2, Math.round(28 * 0.14))));
+  }
+  assert.equal(autoCol({logo: '', name: 'Hubb', h: 30, col: 'auto'}), 30, 'a monogram chip: its square');
+  assert.equal(autoCol({logo: WIDE, h: 30, col: 'auto'}), 60, 'no aspect: the 2h default');
+  assert.equal(autoCol({logo: WIDE, aspect: 2, h: 30, col: 80}), 80, 'a stated col stands');
+});
+
+live('runtime: col auto is resolved before validate and create, so the drawn name sits one gap after each logo', {timeout: 40000}, async () => {
+  const auto = LIST.slice(0, 4).map(r => ({...r, col: 'auto'}));
+  const m = deck([{x: 80, y: 48, w: 800, role: 'H1', text: 'Names right after their logos'}, ...auto]);
+  assert.deepEqual(validate(structuredClone(m)).errors, []);
+  const built = create(structuredClone(m)), f = path.join(tmp, 'auto.html'); fs.writeFileSync(f, built.html);
+  const cols = built.deck.slides[0].els.filter(r => r.logo != null).map(r => r.col);
+  assert.ok(cols.every(c => typeof c === 'number' && c > 0), 'create writes the number: ' + cols);
+  await withBrowser(pw.chromium, async b => {
+    const p = await b.newPage(); await p.goto('file://' + f);
+    await p.waitForFunction(() => [...document.querySelectorAll('#canvas img')].every(i => i.complete));
+    const got = await p.evaluate(() => [...document.querySelectorAll('#canvas .el[data-logo]')].map(d => {
+      const k = d.getBoundingClientRect().width / d.offsetWidth, n = d.querySelector('.lname').getBoundingClientRect();
+      const im = d.querySelector('.lplate') || d.querySelector('img'), e = im.getBoundingClientRect();
+      return (n.left - e.right) / k;
+    }));
+    assert.equal(got.length, 4);
+    for (const gap of got) assert.ok(Math.abs(gap - 8) <= 0.5, `name starts ${gap.toFixed(1)}px after the painted logo`);
+  }, {timeout: 30000});
+});
+
 test('validate: a logo row is a first-class row — checked fields, a box for the gap gate, a visual for coverage', () => {
   const ok = validate(deck([{logo: SQUARE, aspect: 1, name: 'Xometry', x: 60, y: 60, h: 32, col: 120, role: 'Body'}]));
   assert.deepEqual(ok.errors, []);
@@ -83,11 +119,12 @@ const LIST = [
 ].map((r, k) => ({x: 80, y: 110 + k * 64, h: 32, col: 120, role: 'Body', alt: r.name + ' logo', ...r}));
 const SAMPLE = deck([{x: 80, y: 48, w: 800, role: 'H1', text: 'Five logos, one name column'}, ...LIST]);
 
-live('runtime: names align down the list, first line centred on the slot, image contained, plates painted', async () => {
+live('runtime: names align down the list, first line centred on the slot, image contained, plates painted', {timeout: 40000}, async () => {
   assert.deepEqual(validate(structuredClone(SAMPLE)).errors, []);
   const f = path.join(tmp, 'sample.html'); fs.writeFileSync(f, create(SAMPLE).html);
-  const b = await pw.chromium.launch();
-  try {
+  // withBrowser races the page work against 30s and always closes the browser after — a hung
+  // waitForFunction under WebKit/Linux fails the test instead of leaving the browser open (K21).
+  await withBrowser(pw.chromium, async b => {
     const p = await b.newPage(); await p.goto('file://' + f);
     await p.waitForFunction(() => [...document.querySelectorAll('#canvas img')].every(i => i.complete));
     const rows = await p.evaluate(() => [...document.querySelectorAll('#canvas .el[data-logo]')].map(d => {
@@ -116,11 +153,15 @@ live('runtime: names align down the list, first line centred on the slot, image 
     assert.equal(rows[0].plate, 'rgb(255, 255, 255)'); assert.equal(rows[1].plate, 'rgb(255, 255, 255)');
     assert.equal(rows[2].plate, 'rgb(21, 23, 27)'); assert.equal(rows[3].plate, null);
     assert.equal(rows[4].img, null); assert.equal(rows[4].mono, 'HG');
-  } finally { await b.close(); }
+  }, {timeout: 30000});
 });
 
-live('verify: the sample logo slide passes layout parity', async () => {
+live('verify: the sample logo slide passes layout parity', {timeout: 70000}, async () => {
   const f = path.join(tmp, 'verify.html'); fs.writeFileSync(f, create(SAMPLE).html);
-  const r = await verify(f, {out: path.join(tmp, 'v'), log: () => {}});
+  // verify() launches and closes its own browsers (chromium + webkit) internally — this file has
+  // no handle to force-close if one of them hangs, so raceOrExit ends this file's process on a
+  // genuine timeout rather than let it sit past the CI job cap (K21; node --test runs each test
+  // file as its own child process, so this never touches a sibling test file).
+  const r = await raceOrExit(verify(f, {out: path.join(tmp, 'v'), log: () => {}}), 60000, 'verify: sample logo slide');
   assert.deepEqual(r.errors, [], JSON.stringify(r.parity));
 });

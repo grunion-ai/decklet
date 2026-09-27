@@ -623,7 +623,7 @@ URL-hash deep links, the fourth entry on that list, shipped in 0.5.0. P1.3 remov
 1. **Does CI get a browser?** 45 of 128 tests skip today. The mobile lane is entirely editor-interaction work, and its natural home, `editor.test.mjs`, has zero CI-provable coverage. Either install Chromium in CI, or state plainly that layout proof is a local pre-push obligation.
 2. **`templates/`: re-cut, or fence?** 59 templates, 16:9-locked, with no test and no doc surface. D2 assumes re-cutting. Fencing them to 16:9 and shipping other formats without template support is the cheaper answer.
 3. **Id stability under pagination.** D3.1. Decide before anyone writes a paginator.
-4. **Does the explainer deck grow?** Repo convention puts every shipped capability into `deck.html`, and `gate.test.mjs:242` asserts exactly 12 slides. Adding notes and presenter controls also makes the three filmed GIF clips stale.
+4. **Does the explainer deck grow?** Repo convention puts every shipped capability into `deck.html`, and `gate.test.mjs:242` asserts exactly 18 slides. Adding notes and presenter controls also makes the three filmed GIF clips stale.
 
 ---
 
