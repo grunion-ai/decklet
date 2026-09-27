@@ -32,7 +32,7 @@ const build = name => { const f = path.join(tmp, name);
   fs.writeFileSync(f, create(model).html.replace('</style>', '@supports (hanging-punctuation:first){#canvas .el[data-n="0"]{letter-spacing:24px!important}}</style>')); return f; };
 
 live('a WebKit-only wrap fails verify: Chromium passes, WebKit reports the collision per engine, the font-stack warning fires', async () => {
-  const r = await verify(build('wrap.html'), {webkit: true, log: () => {}});   // forced: CI is Linux, where the default is off
+  const r = await verify(build('wrap.html'), {log: () => {}});   // default: WebKit runs on every OS now (K20)
   assert.ok(r.parity.every(s => s.pass), 'Chromium parity passes');
   assert.ok(r.engines.webkit.some(s => !s.pass), 'WebKit parity fails');
   const row = r.engines.webkit[0].rows.find(o => o.n === '0'); assert.ok(row.lines > 1, 'the label wraps in WebKit'); assert.match(row.problems.join(), /overlaps text 1/);
@@ -43,13 +43,10 @@ live('a WebKit-only wrap fails verify: Chromium passes, WebKit reports the colli
   assert.ok(fs.existsSync(path.join(path.dirname(r.file), 'verify-out', 'webkit', '01-slide-1.png')), 'WebKit shots land in their own folder');
 });
 
-test('the default runs WebKit on macOS only; elsewhere it is skipped and says why', {skip: !hasWebkit || process.platform === 'darwin'}, async () => {
+// K20: the default runs WebKit on every OS whenever it is installed — CI is Linux, and parity has to hold there, not only on a
+// laptop before push.
+live('the default runs WebKit on every OS', async () => {
   const r = await verify(build('auto.html'), {log: () => {}});
-  assert.equal(r.engines.webkit, undefined); assert.equal(r.ok, true, r.errors.join(' | '));
-  assert.ok(r.skipped.some(s => /outside macOS/.test(s)));
-});
-test('the default runs WebKit on macOS', {skip: !hasWebkit || process.platform !== 'darwin'}, async () => {
-  const r = await verify(build('auto-mac.html'), {log: () => {}});
   assert.ok(r.engines.webkit, 'WebKit ran'); assert.equal(r.ok, false);
 });
 

@@ -8,8 +8,8 @@
 //        counter's box is the same on every slide that shows the footer (the corner is the counter's; a `hide` of the footer is exempt)
 //   3. AE pixel diff vs reference PNGs (ImageMagick `magick`/`compare`)  only when --refs is given
 // usage: node bin/verify.mjs deck.html [--refs dir] [--out dir] [--threshold 0.5] [--fuzz 2%] [--report model.report.json] [--fonts <css url>] [--strict] [--webkit | --no-webkit]
-//   parity runs in Chromium and, on macOS when installed, WebKit (per-engine results; --webkit forces it on any OS, --no-webkit
-//   skips it). WebKit shots go to <out>/webkit/
+//   parity runs in Chromium and, when installed, WebKit on every OS (per-engine results; --no-webkit skips it, --webkit is the
+//   same as the default). WebKit shots go to <out>/webkit/
 //   --report: the importer's drift report (default: model.report.json beside the deck) — masks where the mockup drew its chrome
 //   --fonts: a webfont stylesheet injected at TEST time only (the deck stays self-contained) so the AE shot uses the reference's font build
 //   refs: <slide.name>.png, <n>.png (1-based) or slide-<n>.png
@@ -44,16 +44,15 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
   let pw; try { pw = await import('playwright'); } catch { res.skipped.push('layout parity + AE: Playwright not installed (npm i -D playwright && npx playwright install chromium)'); }
   if (pw) {
     out = out || path.join(path.dirname(path.resolve(file)), 'verify-out');
-    // K5: parity runs in WebKit too, because Safari lays text out differently (ui-monospace is SF Mono there, Menlo in Chromium).
-    // Chromium stays the primary engine: res.parity, the AE diff and the top-level PNGs are its. WebKit adds parity only, under
-    // res.engines.webkit and <out>/webkit/. One browser per engine, reused across every slide.
+    // K5/K20: parity runs in WebKit too, because Safari (and Linux WebKit, fonts aside) lays text out differently (ui-monospace is
+    // SF Mono there, Menlo in Chromium). Chromium stays the primary engine: res.parity, the AE diff and the top-level PNGs are its.
+    // WebKit adds parity only, under res.engines.webkit and <out>/webkit/. One browser per engine, reused across every slide.
     const engines = [['chromium', pw.chromium]];
     const wkInstalled = (() => { try { return fs.existsSync(pw.webkit.executablePath()); } catch { return false; } })();
-    // 'auto' (the default) runs WebKit on macOS only: Safari exists only on Apple platforms, and Playwright's Linux WebKit resolves
-    // fonts through fontconfig, like neither Safari nor Chromium (the explainer's H1 wrapped there and nowhere a reader looks).
-    // `webkit: true` / --webkit forces it on any OS; false / --no-webkit skips it.
+    // 'auto' (the default) runs WebKit whenever it is installed, on any OS — CI is Linux, so parity has to hold there too.
+    // `webkit: false` / --no-webkit skips it; `webkit: true` / --webkit is now equivalent to the default but stays for callers
+    // that want to fail loud when WebKit is missing instead of skipping (it still just skips — the flag only forces the intent).
     if (webkit === false) res.skipped.push('webkit parity: skipped (--no-webkit)');
-    else if (webkit === 'auto' && process.platform !== 'darwin') res.skipped.push('webkit parity: off by default outside macOS, where WebKit fonts are not Safari\'s (--webkit forces it)');
     else if (!wkInstalled) res.skipped.push('webkit parity: WebKit not installed (npx playwright install webkit)');
     else engines.push(['webkit', pw.webkit]);
     const pageErrors = [];
