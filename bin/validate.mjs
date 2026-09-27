@@ -13,6 +13,7 @@ import {TEMPLATE, templateKeys, fillErrors, expandTemplates, templateCatalogue} 
 import {ICONS, iconNames, expandIcons} from '../lib/icons.mjs';
 import {checkChart, expandCharts} from '../lib/chart.mjs';
 import {stampIds} from '../lib/edits.mjs';
+import {PLATES, isLogoRow, logoGeom} from '../lib/logo.mjs';
 
 export const ROLES = ['Title', 'Supertitle', 'H1', 'H2', 'Body', 'Caption', 'Label', 'Stat'];
 // the KPI allowance: `Stat2` is an OPTIONAL ninth role — a second, smaller stat size for tiles, so a hero "63%" and a card
@@ -290,6 +291,19 @@ export function validate(deck) {
     if (r.css) Wn(`${where}: raw css escape hatch used`);
     if (r.chart != null) for (const m of checkChart(r.chart)) E(`${where}: ${m}`);   // a chart row create() could not expand
     if (r.img && !/^data:/.test(r.img)) E(`${where}: img must be a data: URI (single file, zero network)`);
+    // the logo row (docs/logo.md): a fixed column, a contain-fit image on a plate or a monogram chip, the name at col + gap
+    if (isLogoRow(r)) {
+      if (r.logo && !/^data:/.test(r.logo)) E(`${where}: logo must be a data: URI (single file, zero network), or '' for a monogram chip`);
+      if (!(isNum(r.h) && r.h > 0)) E(`${where}: h must be a positive number — the logo row's height`);
+      if (r.col != null && !(isNum(r.col) && r.col > 0)) E(`${where}: col must be a positive number — the logo column's width; give every row in a list the same col`);
+      if (r.gap != null && !(isNum(r.gap) && r.gap >= 0)) E(`${where}: gap must be a number of px ≥ 0 — the air between the logo column and the name`);
+      if (r.aspect != null && !(isNum(r.aspect) && r.aspect > 0)) E(`${where}: aspect must be a positive number — width over height, the manifest's aspect`);
+      if (r.plate != null && !PLATES.includes(r.plate)) E(`${where}: plate "${r.plate}" not one of ${PLATES.join('|')}`);
+      if (r.name != null && typeof r.name !== 'string') E(`${where}: name must be a string`);
+      if (r.monogram != null && !(typeof r.monogram === 'string' && r.monogram.trim())) E(`${where}: monogram must be the initials to draw`);
+      if (!r.logo && !r.monogram && !(typeof r.name === 'string' && r.name.trim())) E(`${where}: no logo, no monogram and no name — a monogram chip needs initials or a name to take them from`);
+      if (r.img != null) E(`${where}: a logo row carries its image in logo, not img`);
+    }
     if (r.alt != null && typeof r.alt !== 'string') E(`${where}: alt must be a string — what the row shows, for a reader who cannot see it`);
     if (r.svg && /<script|href\s*=\s*["']https?:/i.test(r.svg)) E(`${where}: svg contains script or external href`);
     // a stand-in mark is a drawing aid, never a shipped brand: a real deck must replace it, a sample sheet says deck.draft
@@ -347,6 +361,13 @@ export function validate(deck) {
       return {x: dx > 2 ? x0 : x0 - th / 2, y: dy > 2 ? y0 : y0 - th / 2, w: dx > 2 ? dx : th, h: dy > 2 ? dy : th, text: false, boxy: true, estW, estH, r};
     }
     if (r.curve) return null;
+    if (isLogoRow(r)) {   // the column, then the name at col + gap: its width estimated from the role unless w is stated
+      const x = r.x ?? slot.x, lr = roleOf(rn || 'Body'), cw = cwOf(rn || 'Body');
+      if (!isNum(r.h) || !isNum(x) || !isNum(y)) return null;
+      const g = logoGeom(r, lr ? lr.lh ?? lr.size * 1.25 : r.h), named = typeof r.name === 'string' && !!r.name.trim();
+      const w = isNum(r.w) ? r.w : named ? g.name.x + r.name.length * (lr ? lr.size : 14) * cw : g.slot;
+      return {x, y: y + g.top, w, h: g.bottom - g.top, text: named, boxy: true, logo: true, estW: named && !isNum(r.w), estH: false, r};
+    }
     if (textual) {
       if (!role || !plain(r).trim()) return null;   // an empty text row paints nothing
       const [px, py] = padPx(r.p), chars = plain(r).length + (r.footer && footRight(r) ? 8 : 0);   // a right-anchored footer grows by its inline counter
@@ -361,7 +382,7 @@ export function validate(deck) {
     if (!isNum(x)) return null;
     return {x, y, w, h, text: textual, boxy: !textual || painted, estW, estH, r};
   };
-  const label = (r, i) => `${i}${isText(r) ? ` "${plain(r).replace(/\s+/g, ' ').slice(0, 24)}"` : r.line ? ' (line)' : r.svg || r.icon ? ' (svg)' : r.img ? ' (img)' : ' (box)'}`;
+  const label = (r, i) => `${i}${isLogoRow(r) ? ` (logo${r.name ? ` "${String(r.name).slice(0, 24)}"` : ''})` : isText(r) ? ` "${plain(r).replace(/\s+/g, ' ').slice(0, 24)}"` : r.line ? ' (line)' : r.svg || r.icon ? ' (svg)' : r.img ? ' (img)' : ' (box)'}`;
   const inside = (a, b) => a.x >= b.x - 1 && a.y >= b.y - 1 && a.x + a.w <= b.x + b.w + 1 && a.y + a.h <= b.y + b.h + 1;
   // containment on what the model DECLARES: the origin inside the box, and each side that the row states (not the sides guessed
   // from its text) inside it too. A card holds its own copy even when the line-count estimate runs past the card's bottom edge —
@@ -372,11 +393,11 @@ export function validate(deck) {
     const R = rows.map(({r, i}) => ({...(rectOf(r, s) || {}), i, r})).filter(o => isNum(o.x));
     // a text row wholly inside a painted box is SHELTERED: the box owns the air around it, so the text is judged only against
     // what enters the box. A connector stopped on the card's edge, a neighbouring tile 4px away — those are the box's business.
-    const shelter = A => A.text && !A.boxy ? R.find(P => P !== A && P.boxy && held(A, P)) : null;
+    const shelter = A => A.text && !A.boxy ? R.find(P => P !== A && P.boxy && !P.logo && held(A, P)) : null;   // a logo row's name is not a card
     for (let a = 0; a < R.length; a++) for (let b = a + 1; b < R.length; b++) {
       const A = R[a], B = R[b];
       if (!A.text && !B.text) continue;                                                   // two graphics touching is layout, not collision
-      if ((B.boxy && held(A, B)) || (A.boxy && held(B, A))) continue;                      // text on its card
+      if ((B.boxy && !B.logo && held(A, B)) || (A.boxy && !A.logo && held(B, A))) continue;                      // text on its card
       const sa = shelter(A), sb = shelter(B);
       if ((sa && sa !== B && overlap(sa, B) <= 0.5) || (sb && sb !== A && overlap(sb, A) <= 0.5)) continue;
       const g = A.r.line || B.r.line ? 0 : A.boxy || B.boxy ? gap : 0;                    // a stroke may TOUCH a box (termination); two bare text rows carry their own air in their line boxes
@@ -445,7 +466,7 @@ export function validate(deck) {
   const ents = Array.isArray(deck.entities) ? deck.entities.filter(n => typeof n === 'string' && n.trim()) : [];
   const esc = n => n.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const entRe = ents.map(n => [n.trim(), new RegExp(`(^|[^\\p{L}\\p{N}])${esc(n)}($|[^\\p{L}\\p{N}])`, 'iu')]);
-  const isLogo = r => r && !isText(r) && (r.img != null || r.logo != null || r.placeholder != null);
+  const isLogo = r => r && !isText(r) && (r.img != null || isLogoRow(r) || r.placeholder != null);
   const far = (a, b) => Math.hypot(Math.max(b.x - (a.x + a.w), a.x - (b.x + b.w), 0), Math.max(b.y - (a.y + a.h), a.y - (b.y + b.h), 0));
   for (const [si, s] of (Array.isArray(deck.slides) ? deck.slides : []).entries()) {
     if (!s || typeof s !== 'object' || !Array.isArray(s.els)) continue;
@@ -453,7 +474,7 @@ export function validate(deck) {
     const texts = els.filter(r => isText(r) && plain(r).trim());
     const rt = texts.map(r => rectOf({...r, over: 0}, s)).filter(Boolean);
     const mark = r => {
-      if (r.img != null || r.svg != null || r.icon != null || r.logo != null || r.chart != null || r.donut != null || r.bar || r.placeholder != null || r.curve) return true;
+      if (r.img != null || r.svg != null || r.icon != null || isLogoRow(r) || r.chart != null || r.donut != null || r.bar || r.placeholder != null || r.curve) return true;
       if (r.line) { const d = Array.isArray(r.line) ? [Math.abs(r.line[0] - (r.x ?? 0)), Math.abs(r.line[1] - (r.y ?? 0))] : [0, 0]; return !!r.arrow || (d[0] > 2 && d[1] > 2); }
       const b = rectOf({...r, over: 0}, s); if (!b || Math.min(b.w, b.h) <= 3) return false;   // a hairline is a rule
       return !rt.some(t => t.x >= b.x - 1 && t.y >= b.y - 1 && t.x <= b.x + b.w && t.y <= b.y + b.h);   // holds text → a card
