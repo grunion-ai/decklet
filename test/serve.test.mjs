@@ -119,7 +119,7 @@ test('a PUT splices {model, log} into the file through splice() (the function fi
     const dir = path.dirname(f), hist = fs.readdirSync(path.join(dir, '.decklet-history'));
     assert.equal(hist.length, 1); assert.match(hist[0], new RegExp(`^${rev}-\\d+\\.html$`));
     assert.equal(fs.readFileSync(path.join(dir, '.decklet-history', hist[0]), 'utf8'), before, 'the history copy is the file as it was');
-    assert.deepEqual(fs.readdirSync(dir).sort(), ['.decklet-history', 'deck.html'], 'no temp file left behind');
+    assert.deepEqual(fs.readdirSync(dir).sort(), ['.decklet-history', '.decklet-host.json', 'deck.html'], 'no temp file left behind (.decklet-host.json is the running server\'s, test/checkout.test.mjs)');
     assert.equal((await put(s, {nope: 1}, {rev})).status, 400, 'a body without model + log is refused');
   } finally { await stop(s); }
 });
