@@ -31,7 +31,7 @@ export const KINDS = [
     templates: ['cover-hero', 'cover-split', 'section-numeral'], layouts: ['cover', 'title', 'section', 'content'] },
   { id: 'agenda', name: 'Agenda', note: 'What the deck covers.', templates: ['agenda-ruled'], layouts: ['agenda'] },
   { id: 'concept', name: 'Concept', note: 'Claims, comparisons, frameworks, cards: the slide that carries an argument.',
-    templates: ['bullet-page', 'exec-summary', 'statement', 'three-up-cards', 'bento-grid', 'two-col-compare', 'pros-cons', 'benchmark-table', 'harvey-balls', 'scorecard-grid', 'two-by-two', 'swot', 'temple', 'venn-3', 'pyramid-layers', 'value-chain', 'table-insight', 'proof-strip', 'team-grid', 'quad-growth-share', 'quad-effort-impact', 'quad-risk-heat', 'quad-stakeholder', 'quad-movement', 'quad-where-we-play', 'quad-conceptual', 'quad-nine-box', 'quad-with-panel'],
+    templates: ['bullet-page', 'exec-summary', 'statement', 'three-up-cards', 'bento-grid', 'two-col-compare', 'pros-cons', 'benchmark-table', 'harvey-balls', 'scorecard-grid', 'two-by-two', 'swot', 'temple', 'venn-3', 'pyramid-layers', 'value-chain', 'table-panel', 'table-insight', 'proof-strip', 'team-grid', 'quad-growth-share', 'quad-effort-impact', 'quad-risk-heat', 'quad-stakeholder', 'quad-movement', 'quad-where-we-play', 'quad-conceptual', 'quad-nine-box', 'quad-with-panel'],
     layouts: ['bullets', 'statement', 'two-cols', 'two-cols-header', 'comparison'] },
   { id: 'chrome', name: 'Chrome', note: 'Where the header, the footer and the page counter sit.',
     templates: ['chrome-foot-band', 'chrome-hairline-foot', 'chrome-header-kicker', 'chrome-side-rail', 'chrome-tabs', 'chrome-dots', 'chrome-brand-bar', 'chrome-none'], layouts: [] },

@@ -9,6 +9,7 @@ import {fileURLToPath} from 'node:url';
 import {KITS} from '../examples/styles/index.mjs';
 import {create} from '../bin/create.mjs';
 import {validate, mergeStyle} from '../bin/validate.mjs';
+import {modelOf, fontWarnings} from '../bin/verify.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export { KITS } from '../examples/styles/index.mjs';   // the shelf itself names its kits; this file gates them
 const TOKENS = ['bg', 'fg', 'muted', 'accent', 'card', 'line', 'sel', 'box'];
@@ -65,5 +66,17 @@ test('styles: the explainer validates with zero errors and builds under every ki
     for (const k of TOKENS) assert.ok(html.includes(`--${k}:${s.tokens[k]}`), `examples/styles/${n}: token ${k} reaches the file`);
     assert.equal(deck.styles.roles.Title.font, s.roles.Title.font, `examples/styles/${n}: the kit's roles are the deck's`);
     assert.doesNotMatch(html, /@import|<link[^>]+stylesheet|fonts\.googleapis/i, `examples/styles/${n}: no webfont`);
+  }
+});
+
+// K26: the engine's own default roles (unbranded — no style kit) used to lead Supertitle and Label with ui-monospace,
+// which trips verify's font-stack warning (Safari resolves it to SF Mono, Chromium falls through) on every deck that
+// never names a style. A named family up front — this repo settled on Menlo — measures the same in both engines.
+test('styles: the engine default carries no font-stack warning, and Supertitle/Label lead with a named family', () => {
+  const deck = modelOf(fs.readFileSync(path.join(root, 'template.html'), 'utf8'));
+  assert.deepEqual(fontWarnings(deck), [], 'the engine default styles.roles trips no engine-family warning');
+  for (const role of ['Supertitle', 'Label']) {
+    const first = deck.styles.roles[role].font.split(',')[0].trim();
+    assert.doesNotMatch(first, /^(ui-monospace|ui-sans-serif|ui-serif|ui-rounded|system-ui)$/, `role ${role} leads with a named family, not an engine keyword`);
   }
 });

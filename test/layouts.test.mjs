@@ -392,3 +392,25 @@ test('library: media — binding an icon, an img or a logo in place of every mar
     assert.deepEqual(r.warnings.filter(w => /from els|overlaps/.test(w)), [], `${name} ${kind}: ${r.warnings.join(' | ')}`);
   }
 });
+
+// K26: the table-insight TEMPLATE (lib/templates/cat-modern.mjs) and the table-insight LAYOUT above shared one id with two
+// different slot sets — the template binds no note, so a deck that assumed the layout's note slot got a bare "not in
+// layout" error with no hint the names were two different things. The template renamed to 'table-panel'; 'table-insight'
+// stays as a deprecated alias (same rows) so an old deck still builds, and the error a bound note now gets names the
+// layout it actually resolves to ('content'), not the ambiguous template id.
+test('library: table-insight the LAYOUT still has a note slot; table-panel the TEMPLATE (ex table-insight) does not share it', () => {
+  assert.ok(LIBRARY['table-insight'] && LIBRARY['table-insight'].slots.note, 'the layout table-insight keeps its note slot');
+});
+test('library: the table-panel template resolves via layout "content", which has no note — a bound note names that layout', () => {
+  const d = {w: 960, h: 540, title: 't', styles: {roles: Object.fromEntries(ROLES.map(r => [r, {font: 'sans-serif', size: 16, weight: 400, lh: 20, ls: 0, color: '#000'}]))},
+    slides: [{template: 'table-panel', els: [{slot: 'note', text: 'a note', role: 'Label'}]}]};
+  const r = validate(d);
+  assert.ok(r.errors.some(m => /slot "note" not in layout "content"/.test(m)), `names the resolved layout: ${r.errors.join(' | ')}`);
+});
+test('library: template "table-insight" is a deprecated alias for "table-panel" — same rows, still builds', async () => {
+  const {TEMPLATE} = await import('../lib/templates.mjs');
+  assert.equal(TEMPLATE['table-insight'].deprecated, 'table-panel');
+  assert.deepEqual(TEMPLATE['table-insight'].els, TEMPLATE['table-panel'].els, 'the alias draws exactly what table-panel draws');
+  const r = validate(create({w: 960, h: 540, title: 'alias', slides: [{template: 'table-insight'}]}).deck);
+  assert.deepEqual(r.errors, [], `an old deck naming table-insight still validates: ${r.errors.join(' | ')}`);
+});
