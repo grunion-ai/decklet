@@ -1,5 +1,5 @@
 // decklet checkout, live: the page against a real `node bin/serve.mjs` child and the real --checkout / --checkin CLI, in
-// Chromium AND WebKit. A checkout turns the page read-only within 1 s (state `agent`: lock + the agent's name, a toast names the
+// every project of the browser matrix (test/helpers/projects.mjs). A checkout turns the page read-only within 1 s (state `agent`: lock + the agent's name, a toast names the
 // holder when you try to edit); a rebuild under the lease shows `agent-edit` (bot + dots); checkin rebases the page onto the
 // agent's version with the person's earlier edit kept, and the page edits and saves again.
 import {test} from 'node:test';
@@ -11,6 +11,7 @@ import {spawn, execFile} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {create} from '../bin/create.mjs';
 import {blockOf} from '../lib/edits.mjs';
+import {projects, withProject} from './helpers/projects.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const bin = path.join(root, 'bin', 'serve.mjs');
@@ -36,10 +37,10 @@ const editRow = (p, n, text) => p.evaluate(([n, text]) => { snap(); deck.slides[
 const texts = p => p.evaluate(() => deck.slides.map(s => s.els[0].text));
 const stateIs = (p, st, ms) => p.waitForFunction(st => document.getElementById('autosave').dataset.state === st, st, {timeout: ms});
 
-for (const engine of ['chromium', 'webkit']) live(`${engine}: checkout makes the page read-only within 1 s, a rebuild under it shows agent-edit, checkin rebases and keeps the earlier edit`, async () => {
+for (const engine of projects()) live(`${engine}: checkout makes the page read-only within 1 s, a rebuild under it shows agent-edit, checkin rebases and keeps the earlier edit`, async () => {
   const dir = path.join(tmp, engine); fs.mkdirSync(dir); const f = path.join(dir, 'deck.html'); fs.writeFileSync(f, create(model()).html);
-  const s = await start(f), b = await pw[engine].launch(), ctx = await b.newContext({reducedMotion: 'reduce'});
-  try {
+  const s = await start(f);
+  try { await withProject(pw, engine, async ({context}) => { const ctx = await context({reducedMotion: 'reduce'});
     const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(String(e)));
     await p.goto(s.origin + '/'); await hostOn(p);
     await editRow(p, 0, 'Before checkout');
@@ -80,7 +81,7 @@ for (const engine of ['chromium', 'webkit']) live(`${engine}: checkout makes the
     await editRow(p, 1, 'After checkin');
     await diskHas(f, d => d.slides[0].els[0].text === 'Before checkout' && d.slides[1].els[0].text === 'After checkin');
     assert.deepEqual(errs, []);
-  } finally { await b.close(); await new Promise(r => { s.child.on('exit', r); s.child.kill('SIGTERM'); }); }
+  }, {timeout: 90000}); } finally { await new Promise(r => { s.child.on('exit', r); s.child.kill('SIGTERM'); }); }
 });
 
 test.after(() => fs.rmSync(tmp, {recursive: true, force: true}));

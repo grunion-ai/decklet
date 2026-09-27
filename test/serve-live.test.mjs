@@ -1,5 +1,6 @@
-// decklet serve, live: the page against a real `node bin/serve.mjs` child, in Chromium AND WebKit (Safari has no File System
-// Access, which is the reason the host exists). An edit reaches the file within 2 s; a reload mid-edit and a closed window keep
+// decklet serve, live: the page against a real `node bin/serve.mjs` child, in every project of the browser matrix (Chromium,
+// WebKit, Firefox and the embedded Chromium pane: test/helpers/projects.mjs; Safari and the panes have no File System Access,
+// which is the reason the host exists). An edit reaches the file within 2 s; a reload mid-edit and a closed window keep
 // the edit (the store is the journal, re-sent on the next open); an agent's `create --from` landing while the page holds an
 // unacknowledged edit ends with both changes in the file and a history copy; the dot plays `cap` on the edit and settles on ok.
 import {test} from 'node:test';
@@ -11,6 +12,7 @@ import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {create} from '../bin/create.mjs';
 import {blockOf} from '../lib/edits.mjs';
+import {projects, withProject} from './helpers/projects.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 let pw = null; try { pw = await import('playwright'); } catch {}
@@ -33,11 +35,12 @@ const hostOn = p => p.waitForFunction(() => typeof HOST !== 'undefined' && HOST 
 const editRow = (p, n, text) => p.evaluate(([n, text]) => { snap(); deck.slides[n].els[0].text = text; save(); return document.getElementById('autosave').classList.contains('cap'); }, [n, text]);
 const texts = p => p.evaluate(() => deck.slides.map(s => s.els[0].text));
 
-for (const engine of ['chromium', 'webkit']) live(`${engine}: hosted deck, edits reach the file, survive reload and close, and ride on top of an agent rebuild`, async () => {
+for (const engine of projects()) live(`${engine}: hosted deck, edits reach the file, survive reload and close, and ride on top of an agent rebuild`, async () => {
   const dir = path.join(tmp, engine); fs.mkdirSync(dir); const f = path.join(dir, 'deck.html'); fs.writeFileSync(f, create(model()).html);
-  const s = await start(f), b = await pw[engine].launch(), ctx = await b.newContext();
-  try {
+  const s = await start(f);
+  try { await withProject(pw, engine, async ({context}) => { const ctx = await context();
     let p = await ctx.newPage(); await p.goto(s.origin + '/'); await hostOn(p);
+    assert.equal(await p.evaluate(() => route()), 'host', 'served: the host route, whatever the browser can or cannot do');
     assert.equal(await p.evaluate(() => !!document.querySelector('meta[name="decklet-host"]')), false, 'the page takes the token and drops the meta, so no copy ever carries it');
     await new Promise(r => setTimeout(r, 1000));
     assert.equal(fs.existsSync(path.join(dir, '.decklet-history')), false, 'opening the deck writes nothing');
@@ -95,7 +98,7 @@ for (const engine of ['chromium', 'webkit']) live(`${engine}: hosted deck, edits
     assert.equal((await texts(p))[0], 'Edit four', 'the human edit rides along (create --from replayed it)');
     await new Promise(r => setTimeout(r, 1200));
     assert.equal(fs.readdirSync(path.join(dir, '.decklet-history')).length, hist1, 'nothing written back');
-  } finally { await b.close(); await new Promise(r => { s.child.on('exit', r); s.child.kill('SIGTERM'); }); }
+  }, {timeout: 90000}); } finally { await new Promise(r => { s.child.on('exit', r); s.child.kill('SIGTERM'); }); }
 });
 
 test.after(() => fs.rmSync(tmp, {recursive: true, force: true}));

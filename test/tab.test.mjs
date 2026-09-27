@@ -1,5 +1,6 @@
 // decklet with no host, in any browser: the save route is chosen at load by capability (host → file handle → durable store →
-// tab only), never by browser name. Live proofs (Playwright, skipped when absent), Chromium and WebKit with storage refused:
+// tab only), never by browser name. Live proofs (Playwright, skipped when absent), in every project of the browser matrix
+// (test/helpers/projects.mjs: Chromium, WebKit, Firefox, the embedded pane) with storage refused:
 // the tab route says "Not saving" on the save button and in a one-time banner, keeps the working copy in window.name (and
 // history.state) so a reload in the same tab restores it, ignores a window.name another deck left, and asks before leaving
 // while edits are not durable. The file-handle route checks lastModified before every write: a file someone else rewrote is
@@ -13,6 +14,7 @@ import {pathToFileURL} from 'node:url';
 import {create} from '../bin/create.mjs';
 import {blockOf} from '../lib/edits.mjs';
 import {withBrowser} from './helpers/browser.mjs';
+import {projects, withProject} from './helpers/projects.mjs';
 
 let pw = null; try { pw = await import('playwright'); } catch {}
 const live = pw ? test : test.skip;
@@ -28,8 +30,8 @@ const refuse = () => { for (const k of ['localStorage', 'indexedDB']) Object.def
 const TABMSG = f => `This browser cannot save here. Edits survive reload in this tab only. Host it: node bin/serve.mjs ${f}`;
 const text0 = p => p.evaluate(() => deck.slides[0].els[0].text);
 
-for (const bn of ['chromium', 'webkit']) live(`tab route (${bn}): storage refused, "Not saving" pill and banner, a reload restores the edit from window.name or history.state, another deck's copy is ignored`, async () => withBrowser(pw[bn], async b => { const f = write(`tab-${bn}.html`, create(model()).html), g = write(`other-${bn}.html`, create(model('Other one', 'Other two', 'other')).html);
-  const ctx = await b.newContext(); await ctx.addInitScript(refuse);
+for (const bn of projects()) live(`tab route (${bn}): storage refused, "Not saving" pill and banner, a reload restores the edit from window.name or history.state, another deck's copy is ignored`, async () => withProject(pw, bn, async ({context}) => { const f = write(`tab-${bn}.html`, create(model()).html), g = write(`other-${bn}.html`, create(model('Other one', 'Other two', 'other')).html);
+  const ctx = await context(); await ctx.addInitScript(refuse);
   const p = watch(await ctx.newPage()); await p.goto(pathToFileURL(f).href);
   assert.equal(await settled(p), 'tab', 'the amber tab state, never red');
   const ui = () => p.evaluate(() => { const a = $('autosave'), nb = $('nosave');
@@ -42,7 +44,7 @@ for (const bn of ['chromium', 'webkit']) live(`tab route (${bn}): storage refuse
   await p.evaluate(() => { snap(); deck.slides[0].els[0].text = 'Kept in the tab'; save(); });
   const copies = await p.evaluate(() => [window.name.slice(0, 9), typeof window.history.state?.decklet]);
   assert.deepEqual(copies, ['decklet:{', 'string'], 'window.name and history.state both carry the copy');
-  assert.equal(await p.evaluate(() => { const e = new Event('beforeunload', {cancelable: true}); dispatchEvent(e); return e.defaultPrevented; }), true, 'unsaved edits: the page asks before it goes');
+  assert.equal(await p.evaluate(() => { const e = new Event('beforeunload', {cancelable: true}); dispatchEvent(e); return e.defaultPrevented; }), bn !== 'embedded', 'unsaved edits: the page asks before it goes (the embedded pane ignores beforeunload, which is fine)');
   await p.reload(); assert.equal(await settled(p), 'tab');
   assert.deepEqual([await text0(p), await p.evaluate(() => log.length)], ['Kept in the tab', 1], 'the reload restored the edit and its log entry from window.name');
   assert.notEqual((await ui()).banner, null, 'the banner shows until it is dismissed');
@@ -66,18 +68,21 @@ for (const bn of ['chromium', 'webkit']) live(`tab route (${bn}): storage refuse
 }, {timeout: 60000}));
 
 // durable store: the route says so and never asks before leaving
-for (const bn of ['chromium', 'webkit']) live(`store route (${bn}): localStorage works on file:// — route store, no banner, no prompt`, async () => withBrowser(pw[bn], async b => { const f = write(`store-${bn}.html`, create(model()).html);
-  const p = watch(await b.newPage()); await p.goto(pathToFileURL(f).href); await p.evaluate(() => localStorage.clear()); await p.reload();
+for (const bn of projects()) live(`store route (${bn}): localStorage works on file:// — route store whether or not File System Access exists, no banner, no prompt, the edit survives a reload`, async () => withProject(pw, bn, async ({context}) => { const f = write(`store-${bn}.html`, create(model()).html);
+  const p = watch(await (await context()).newPage()); await p.goto(pathToFileURL(f).href); await p.evaluate(() => localStorage.clear()); await p.reload();
   assert.equal(await settled(p), 'ok');
   await p.evaluate(() => { snap(); deck.slides[0].els[0].text = 'Stored'; save(); });
   assert.deepEqual(await p.evaluate(() => { const e = new Event('beforeunload', {cancelable: true}); dispatchEvent(e); return [route(), $('nosave').hidden, e.defaultPrevented, window.name]; }), ['store', true, false, ''], 'durable: no tab copy, no banner, no prompt');
+  assert.equal(await p.evaluate(() => 'showOpenFilePicker' in window), bn === 'chromium', 'the capability differs by project (only desktop Chromium has File System Access); the route does not, because no file is linked');
+  await p.reload(); await settled(p);
+  assert.equal(await text0(p), 'Stored', 'no edit lost on reload');
   assert.deepEqual(p.errs, []);
 }, {timeout: 60000}));
 
 // localStorage that stops taking writes (a full quota): the edit goes to the tab copy, and the next load puts it back in the store
-live('store full (chromium): a write localStorage refuses lands on the tab copy; the reload restores it into localStorage and drops the copy', async () => withBrowser(pw.chromium, async b => {
-  const f = write('full.html', create(model()).html);
-  const p = watch(await b.newPage()); await p.goto(pathToFileURL(f).href); await p.evaluate(() => localStorage.clear()); await p.reload();
+for (const bn of projects()) live(`store full (${bn}): a write localStorage refuses lands on the tab copy; the reload restores it into localStorage and drops the copy`, async () => withProject(pw, bn, async ({context}) => {
+  const f = write(`full-${bn}.html`, create(model()).html);
+  const p = watch(await (await context()).newPage()); await p.goto(pathToFileURL(f).href); await p.evaluate(() => localStorage.clear()); await p.reload();
   assert.equal(await settled(p), 'ok');
   await p.evaluate(() => { Storage.prototype.setItem = () => { throw new DOMException('full', 'QuotaExceededError'); }; snap(); deck.slides[0].els[0].text = 'Past the quota'; save(); });
   await p.waitForFunction(() => document.getElementById('autosave').dataset.state === 'tab');

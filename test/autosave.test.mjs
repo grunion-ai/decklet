@@ -1,6 +1,7 @@
 // decklet autosave — 0.9.0: the version history left the file (it lives in weave now); what stays is a deck that saves itself,
 // everywhere. Static gates on the template, then live proofs (Playwright, skipped when absent): continuous write-back with no
-// ⌘S, the storage tier chain (localStorage → IndexedDB → memory) in Chromium and WebKit, and two windows of one browser converging.
+// ⌘S (Chromium: the one project with File System Access), the storage tier chain (localStorage → IndexedDB → memory) and two
+// windows of one browser converging, in every project of the browser matrix (test/helpers/projects.mjs).
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -11,6 +12,7 @@ import http from 'node:http';
 import {create} from '../bin/create.mjs';
 import {blockOf, hasBlock} from '../lib/edits.mjs';
 import {edits} from '../bin/edits.mjs';
+import {projects, withProject} from './helpers/projects.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const tpl = fs.readFileSync(path.join(root, 'template.html'), 'utf8');
@@ -107,39 +109,39 @@ live('continuous write-back: the dot links the file once; a burst of edits is ON
   assert.deepEqual(p.errs, []); await b.close();
 });
 
-for (const bn of ['chromium', 'webkit']) live(`storage tier 2 (${bn}): localStorage refused, IndexedDB open — edits persist across a reload, the dot is never red`, async () => {
-  const b = await pw[bn].launch(); const f = write(`idb-${bn}.html`, create(model()).html);
-  const ctx = await b.newContext(); await ctx.addInitScript(() => { Object.defineProperty(window, 'localStorage', {get() { throw new Error('blocked'); }}); });
+for (const bn of projects()) live(`storage tier 2 (${bn}): localStorage refused, IndexedDB open — edits persist across a reload, the dot is never red`, async () => withProject(pw, bn, async ({context}) => {
+  const f = write(`idb-${bn}.html`, create(model()).html);
+  const ctx = await context(); await ctx.addInitScript(() => { Object.defineProperty(window, 'localStorage', {get() { throw new Error('blocked'); }}); });
   const p = watch(await ctx.newPage()); await p.goto(pathToFileURL(f).href);
   assert.equal(await settled(p), 'ok', 'green once the IndexedDB copy is in');
   assert.deepEqual(await p.evaluate(() => [TIER, document.body.classList.contains('nostore')]), ['idb', false]);
   await p.evaluate(() => { snap(); slide().els[1].x = 321; save(); nav(1); });
   await p.waitForTimeout(200);
   await p.reload(); assert.equal(await settled(p), 'local', 'amber: saved here, not yet in a file');
-  assert.deepEqual(await p.evaluate(() => [deck.slides[0].els[1].x, log.length, TIER, i]), [321, 1, 'idb', 1], 'the edit and its log entry came back from IndexedDB; the slide too (sessionStorage)');
-  assert.deepEqual(p.errs, []); await b.close();
-});
+  assert.deepEqual(await p.evaluate(() => [deck.slides[0].els[1].x, log.length, TIER, i, route()]), [321, 1, 'idb', 1, 'store'], 'the edit and its log entry came back from IndexedDB; the slide too (sessionStorage)');
+  assert.deepEqual(p.errs, []);
+}));
 
-live('storage tier 3 (webkit): nothing persists (Safari on file://) — the tab state at load, edits hold for the session, no errors', async () => {
-  const b = await pw.webkit.launch(); const f = write('mem.html', create(model()).html);
-  const ctx = await b.newContext(); await ctx.addInitScript(() => {
+for (const bn of projects()) live(`storage tier 3 (${bn}): nothing persists (Safari on file://) — the tab state at load, edits hold for the session, no errors`, async () => withProject(pw, bn, async ({context}) => {
+  const f = write(`mem-${bn}.html`, create(model()).html);
+  const ctx = await context(); await ctx.addInitScript(() => {
     Object.defineProperty(window, 'localStorage', {get() { throw new Error('blocked'); }});
     Object.defineProperty(window, 'indexedDB', {get() { throw new Error('blocked'); }});
   });
   const p = watch(await ctx.newPage()); await p.goto(pathToFileURL(f).href);
   assert.equal(await settled(p), 'tab', 'amber "Not saving": nothing persists beyond this tab');
   assert.deepEqual(await p.evaluate(() => [TIER, route(), document.body.classList.contains('nostore'), $('savebad').hidden]), ['mem', 'tab', true, true], 'the pill says it in words; no badge');
-  assert.match(await p.getAttribute('#autosave', 'aria-label'), /^This browser cannot save here\. Edits survive reload in this tab only\. Host it: node bin\/serve\.mjs mem\.html$/, 'the full sentence names the cause and the way out');
+  assert.match(await p.getAttribute('#autosave', 'aria-label'), /^This browser cannot save here\. Edits survive reload in this tab only\. Host it: node bin\/serve\.mjs mem-[a-z]+\.html$/, 'the full sentence names the cause and the way out');
   await p.evaluate(() => { snap(); slide().els[1].x = 7; save(); nav(1); nav(-1); });
   assert.equal(await p.evaluate(() => slide().els[1].x), 7, 'edits still hold in memory for the session');
-  assert.deepEqual(p.errs, []); await b.close();
-});
+  assert.deepEqual(p.errs, []);
+}));
 
 // two windows share storage only on one origin: served over http (WebKit hands every file:// load its own origin, so neither a storage event nor a channel crosses windows there)
 const served = create(model()).html, server = http.createServer((req, res) => { res.setHeader('content-type', 'text/html; charset=utf-8'); res.end(served); });
 await new Promise(r => server.listen(0, '127.0.0.1', r)); test.after(() => server.close());
-for (const bn of ['chromium', 'webkit']) live(`two windows (${bn}): an edit in one shows in the other with no reload, the reader writes nothing, logs converge; an edit in flight lands on top`, async () => {
-  const b = await pw[bn].launch(); const url = `http://127.0.0.1:${server.address().port}/sync.html`; const ctx = await b.newContext();
+for (const bn of projects()) live(`two windows (${bn}): an edit in one shows in the other with no reload, the reader writes nothing, logs converge; an edit in flight lands on top`, async () => withProject(pw, bn, async ({context}) => {
+  const url = `http://127.0.0.1:${server.address().port}/sync-${bn}.html`; const ctx = await context();
   const A = watch(await ctx.newPage()); await A.goto(url); await A.evaluate(() => localStorage.clear()); await A.reload(); await settled(A);
   const B = watch(await ctx.newPage()); await B.goto(url); await settled(B);
   await B.evaluate(() => { window.__sets = 0; const o = Storage.prototype.setItem; Storage.prototype.setItem = function (...a) { if (this === localStorage) window.__sets++; return o.apply(this, a); }; });
@@ -158,5 +160,5 @@ for (const bn of ['chromium', 'webkit']) live(`two windows (${bn}): an edit in o
   assert.deepEqual(await A.evaluate(() => [slide().els[1].x, slide().els[1].y, log.length]), [123, 250, 3], 'A converged; three entries, every one of them once');
   assert.deepEqual(await B.evaluate(() => [log.length, canvas.querySelector('.el[contenteditable="true"]')]), [3, null], 'B: same log, the edit committed');
   assert.deepEqual(JSON.parse(await A.evaluate(() => localStorage.getItem(KEY))).slides[0].els.map(e => [e.text, e.x, e.y]).slice(0, 2), [['typed in B', 60, 80], ['body one', 123, 250]], 'the store has both windows\' edits');
-  assert.deepEqual([...A.errs, ...B.errs], []); await b.close();
-});
+  assert.deepEqual([...A.errs, ...B.errs], []);
+}));
