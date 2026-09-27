@@ -65,11 +65,18 @@ for (const engine of ['chromium', 'webkit']) live(`${engine}: hosted deck, edits
     await diskHas(f, d => d.slides[0].els[0].text === 'Edit three');
 
     // the agent rebuilds (create --from, a different row) while the page holds an unacknowledged edit: the first PUT is held
-    // until the agent's file is on disk, so it meets a 412; the page takes the agent's version, replays its edit, PUTs again
-    let release, first = true; const held = new Promise(r => { release = r; });
-    await p.route('**/__decklet/file', async route => { if (first) { first = false; await held; } await route.continue(); });
+    // until the agent's file is on disk, so it meets a 412; the page takes the agent's version, replays its edit, PUTs again.
+    // Idle first: the reopened page re-sends its journal on open, and a re-send caught by the route would be the held PUT.
+    await p.waitForFunction(() => !writing && !unsynced, null, {timeout: 3000});
+    let release, first = true, caught; const held = new Promise(r => { release = r; }), put = new Promise(r => { caught = r; });
+    await p.route('**/__decklet/file', async route => { if (first) { first = false; caught(); await held; } await route.continue(); });
     await editRow(p, 0, 'Edit four');
-    await p.waitForFunction(() => document.getElementById('autosave').dataset.state === 'busy', null, {timeout: 3000});
+    await put;
+    assert.deepEqual(await p.evaluate(() => [document.getElementById('autosave').dataset.state, writing]), ['busy', true], 'one write in flight: the flag is up and the button pulses until it answers');
+    await editRow(p, 1, 'Two, typed during the write');
+    await new Promise(r => setTimeout(r, 1000));
+    assert.equal(await p.evaluate(() => wq), 1, 'an edit during the write queues one more write instead of starting a second PUT');
+    await editRow(p, 1, 'Two');
     const hist0 = fs.existsSync(path.join(dir, '.decklet-history')) ? fs.readdirSync(path.join(dir, '.decklet-history')).length : 0;
     fs.writeFileSync(f, create(model('Two, by the agent'), {from: f}).html);
     const agentRev = disk(f).rev;

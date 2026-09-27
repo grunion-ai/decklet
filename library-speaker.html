@@ -1505,7 +1505,7 @@ async function linkFile(){ // a user gesture is required: called from ⌘S / the
 }
 let wq=null; // one write in flight; a save during a write queues exactly one more
 async function writeBack(){
-  clearTimeout(wbT);wbT=null;if(!fileH||LEASE)return;if(writing){wq=1;return} // leased: the journal keeps the edits; checkin writes themwriting=true;autosave('busy');
+  clearTimeout(wbT);wbT=null;if(!fileH||LEASE)return;if(writing){wq=1;return}writing=true;autosave('busy'); // leased: the journal keeps the edits; checkin writes them
   if(hosted()){try{await hostWrite();store.set(LKEY,JSON.stringify(log));fileAt=new Date()}catch(err){console.warn('decklet: host write failed; the edits wait in this browser and go on the next save or open',err)}
     finally{writing=false;unsynced=log.filter(e=>!e.rev).length;autosave(unsynced?'local':'ok');if(wq){wq=null;writeBack()}}return}
   // changed on disk since this page last read or wrote it (an agent's create --from, another editor): never write over it.
