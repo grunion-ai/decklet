@@ -144,7 +144,8 @@ export function validate(deck) {
   const libCut = Array.isArray(deck.slides) ? libraryFor({w: W, h: H, slides: deck.slides.filter(s => s && typeof s === 'object'), layouts: {}}) : {};
   const isLibrary = name => !!libCut[name] && JSON.stringify((deck.layouts || {})[name] ?? libCut[name]) === JSON.stringify(libCut[name]);
   const kinds = [];   // the layout or template each slide named, read before templates expand — the coverage gate's exemptions
-  if (deck.entities != null && !(Array.isArray(deck.entities) && deck.entities.every(n => typeof n === 'string' && n.trim()))) E('deck.entities must be an array of names — the companies whose every mention wants a logo beside it');
+  const nameOk = n => typeof n === 'string' && !!n.trim();
+  if (deck.entities != null && !(Array.isArray(deck.entities) && deck.entities.every(n => nameOk(n) || (Array.isArray(n) && n.length && n.every(nameOk))))) E('deck.entities must be an array of names — the companies whose every mention wants a logo — where an entry may be a list of aliases, [name, alias, …]');
   for (const [si, s] of (Array.isArray(deck.slides) ? deck.slides : []).entries()) {
     if (!s || typeof s !== 'object') continue;
     kinds[si] = String(s.template || s.layout || '');
@@ -498,9 +499,14 @@ export function validate(deck) {
   // never coverage. A slide that names a layout or template has declared its kind (cover, section, statement, bullets…), so
   // the gate judges free-row slides only: hand geometry is where a one-shot deck drops its pictures.
   const NEAR = 120;   // px: a logo this close to a name is beside it
-  const ents = Array.isArray(deck.entities) ? deck.entities.filter(n => typeof n === 'string' && n.trim()) : [];
-  const esc = n => n.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const entRe = ents.map(n => [n.trim(), new RegExp(`(^|[^\\p{L}\\p{N}])${esc(n)}($|[^\\p{L}\\p{N}])`, 'iu')]);
+  // deck.entities: 'Xometry' or ['nTop', 'nTopology'] (the first name reports, any alias matches), whole words, any case
+  const ents = (Array.isArray(deck.entities) ? deck.entities : []).map(n => (Array.isArray(n) ? n : [n]).filter(a => typeof a === 'string' && a.trim()).map(a => a.trim())).filter(a => a.length);
+  const esc = n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const entRe = ents.map(a => [a[0], new RegExp(`(^|[^\\p{L}\\p{N}])(${a.map(esc).join('|')})($|[^\\p{L}\\p{N}])`, 'iu')]);
+  const namesIn = t => typeof t === 'string' ? entRe.map(([n, re]) => [n, t.search(re)]).filter(([, i]) => i >= 0).sort((a, b) => a[1] - b[1]).map(([n]) => n) : [];   // in reading order
+  // whose logo a row is: its asset key ('#misumi'), else its alt, else a logo row's name — the first that names a listed company.
+  // A logo row reading "buys Fictiv" beside '#misumi' is MISUMI's logo; an img with none of these is nobody's.
+  const logoOf = r => { for (const t of [[r.logo, r.img].find(k => typeof k === 'string' && k[0] === '#')?.slice(1), r.alt, isLogoRow(r) ? r.name : null]) { const n = namesIn(t); if (n.length) return n; } return []; };
   const isLogo = r => r && !isText(r) && (r.img != null || isLogoRow(r) || r.placeholder != null);
   const far = (a, b) => Math.hypot(Math.max(b.x - (a.x + a.w), a.x - (b.x + b.w), 0), Math.max(b.y - (a.y + a.h), a.y - (b.y + b.h), 0));
   for (const [si, s] of (Array.isArray(deck.slides) ? deck.slides : []).entries()) {
@@ -519,14 +525,17 @@ export function validate(deck) {
       Wn(`slides[${si}]: text only — ${texts.length} text rows and no image, icon, chart, diagram or drawn mark; add an icon row, an img or logo, a chart or a diagram (or name a layout, such as statement or section, if the slide is words by design)`);
     if (!entRe.length) continue;
     const logos = els.filter(isLogo).map(r => rectOf({...r, over: 0}, s) || (isNum(r.x) && isNum(r.y) ? {x: r.x, y: r.y, w: isNum(r.w) ? r.w : (r.h ?? 24) * 2, h: r.h ?? 24} : null)).filter(Boolean);
-    const named = new Set();
-    for (const r of texts) {
-      if (/^(Title|Supertitle|H1)$/.test(roleName(r)) || plain(r).trim().length > 40) continue;   // a listing is a short label; headings and sentences name companies in prose
-      const hits = entRe.filter(([, re]) => re.test(plain(r))).map(([n]) => n); if (!hits.length) continue;
-      const b = rectOf({...r, over: 0}, s);
-      if (b && logos.some(l => far(b, l) <= NEAR)) continue;
-      hits.forEach(n => named.add(n));
+    const named = new Set(), prose = new Set();
+    const owned = new Set(els.filter(r => (isLogoRow(r) && r.logo) || (!isLogoRow(r) && r.img != null && !isText(r))).flatMap(logoOf));
+    for (const r of els) if (isLogoRow(r) && !r.logo) for (const n of namesIn(r.name)) Wn(`slides[${si}]: monogram for ${n} — a listed company wants its real logo; fetch it with decklet-assets (deck.entities asks for this)`);
+    for (const r of [...texts, ...els.filter(r => isLogoRow(r) && r.logo)]) {
+      const t = isText(r) ? plain(r) : r.name, hits = namesIn(t); if (!hits.length) continue;
+      if (isText(r) && !/^(Title|Supertitle|H1)$/.test(roleName(r)) && t.trim().length <= 40) {   // a listing is a short label: its logo sits beside it
+        const b = rectOf({...r, over: 0}, s);
+        if (!(b && logos.some(l => far(b, l) <= NEAR))) hits.forEach(n => named.add(n));
+      } else hits.filter(n => !owned.has(n)).forEach(n => prose.add(n));   // a heading or a sentence: the company's own logo, anywhere on the slide
     }
+    if (prose.size) Wn(`slides[${si}]: names ${[...prose].join(', ')} in prose with no logo for it on the slide — add a logo row (or an img with alt) for each company named`);
     if (named.size) Wn(`slides[${si}]: names ${[...named].join(', ')} with no logo within ${NEAR}px — add an img (or logo) row beside each name (deck.entities asks for this)`);
   }
   // the asset table (FRICTION F4): deck.assets = {id: data URI}, embedded once; any img or logo key anywhere in the model
