@@ -451,7 +451,8 @@ test('validator: connector shape rules are loud warnings, and waive:1 is the dec
 test('validator: a connector leaves air, and the same amount at both ends', () => {
   const boxes = [{x: 0, y: 0, w: 132, h: 62, bg: '#111', bd: '2px solid #333'}, {x: 252, y: 0, w: 132, h: 62, bg: '#111', bd: '2px solid #333'}];
   const one = els => validate(withRoles({w: 960, h: 540, slides: [{els: [...boxes, ...els]}]})).warnings;
-  assert.ok(one([{x: 132, y: 31, line: [252, 31], bg: '#fff', h: 3, arrow: 'end'}]).some(w => /touches the box/.test(w)), 'flush against both borders (K1/D1)');
+  // flush is an ERROR since K3/K16: the edge-on pass let arrows start and end on the boxes they join
+  assert.ok(validate(withRoles({w: 960, h: 540, slides: [{els: [...boxes, {x: 132, y: 31, line: [252, 31], bg: '#fff', h: 3, arrow: 'end'}]}]})).errors.some(w => /touches the box/.test(w)), 'flush against both borders (K1/D1)');
   assert.ok(one([{x: 136, y: 31, line: [236, 31], bg: '#fff', h: 3, arrow: 'end'}]).some(w => /uneven air/.test(w)), '4px vs 16px (K5)');
   assert.deepEqual(one([{x: 142, y: 31, line: [242, 31], bg: '#fff', h: 3, arrow: 'end'}]), [], '10px both ends (K3) is clean');
   assert.deepEqual(one([{x: 134, y: 31, line: [250, 31], bg: '#fff', h: 3, arrow: 'end'}]), [], 'the rule is about touching a border, not about being tight');
@@ -500,7 +501,7 @@ test('validator: a connector is a stroke with a HEAD — headless rules, leaders
   assert.deepEqual(validate(withRoles({w: 960, h: 540, slides: [{els: [...boxes, ...shapes]}]})).warnings, [],
     'headless strokes must not be judged as connectors — a validator that flags a chart for being diagonal teaches agents to ignore it');
   // the identical geometry WITH a head is a connector, and every rule applies
-  const headed = validate(withRoles({w: 960, h: 540, slides: [{els: [...boxes, ...shapes.map(r => ({...r, arrow: 'end'}))]}]})).warnings;
+  const hv = validate(withRoles({w: 960, h: 540, slides: [{els: [...boxes, ...shapes.map(r => ({...r, arrow: 'end'}))]}]})), headed = [...hv.warnings, ...hv.errors];   // a flush end is an error (K3)
   for (const re of [/diagonal straight run/, /spanning 60px/, /past the endpoints/, /% of the run/, /touches the box/, /uneven air/, /too light/])
     assert.ok(headed.some(w => re.test(w)), String(re) + ' — ' + JSON.stringify(headed));
 });

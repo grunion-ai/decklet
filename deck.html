@@ -628,6 +628,36 @@ function terminate(r,s){
 // in dependency order, so a chain (text → arrow → chip) places left to right; an unknown id or a cycle stays where x says
 // (validate errors on both). A detached root (a print page, a sheet cell) is attached for the measurement and let go.
 const AGAP=10;
+// the connector row (K3, K4, K16): {from:'rowId', to:'rowId', style:'arrow'|'dashed'|'blocked', gap}. Routed AFTER every other row
+// is drawn and placed, between the two rows' RENDERED boxes (a w:'auto' chip is measured, never guessed), both ends inset by
+// gap (styles.gap, else 6). ROUTE is lib/connector.mjs route() — test/connector.test.mjs holds the two equal.
+const CONN=['arrow','dashed','blocked'],CGAP=6,isConn=r=>!!r&&CONN.includes(r.style)&&r.line==null&&r.curve==null;
+const ROUTE=(A,B,g)=>{
+  if(!A||!B)return null;
+  const gx=Math.max(B.x-(A.x+A.w),A.x-(B.x+B.w)),gy=Math.max(B.y-(A.y+A.h),A.y-(B.y+B.h));
+  if(gx<=0&&gy<=0)return null;
+  const mid=(a0,a1,b0,b1,ca,cb)=>{const lo=Math.max(a0,b0),hi=Math.min(a1,b1);return lo<=hi?[(lo+hi)/2,(lo+hi)/2]:[ca,cb]};
+  let x,y,x2,y2;
+  if(gx>=gy){const d=B.x>A.x?1:-1;[y,y2]=mid(A.y,A.y+A.h,B.y,B.y+B.h,A.y+A.h/2,B.y+B.h/2);x=d>0?A.x+A.w+g:A.x-g;x2=d>0?B.x-g:B.x+B.w+g}
+  else{const d=B.y>A.y?1:-1;[x,x2]=mid(A.x,A.x+A.w,B.x,B.x+B.w,A.x+A.w/2,B.x+B.w/2);y=d>0?A.y+A.h+g:A.y-g;y2=d>0?B.y-g:B.y+B.h+g}
+  return {x,y,line:[x2,y2],len:Math.max(gx,gy)>2*g?Math.hypot(x2-x,y2-y):0};
+};
+const STROKE=r=>r.style==='arrow'?{arrow:r.arrow??'end'}:{dash:r.dash??1,...(r.arrow?{arrow:r.arrow}:{})};
+const MARK=len=>Math.max(14,Math.min(40,Math.round(len*.6)));
+function routeConns(s,root,drawn,later,paint){
+  if(!later.length)return;
+  const tmp=!root.isConnected&&document.body.appendChild(root);
+  const find=k=>typeof k==='number'?drawn.find(o=>o.n===k):drawn.find(o=>o.n!=null&&o.el.id===k)||drawn.find(o=>o.m===k);
+  const box=k=>{const o=find(k);if(!o)return null;if(o.r.line||o.r.curve)return boxOf(k,s);const d=o.d;return {x:d.offsetLeft,y:d.offsetTop,w:d.offsetWidth,h:d.offsetHeight}};
+  for(const c of later){const r=c.r,gap=typeof r.gap==='number'?r.gap:deck.styles&&typeof deck.styles.gap==='number'?deck.styles.gap:CGAP,g=ROUTE(box(r.from),box(r.to),gap);
+    if(!g||!(g.len>0)){c.at.remove();continue} // overlapping boxes or a gutter narrower than the air: nothing to draw (validate says so)
+    Object.assign(r,STROKE(r),{x:g.x,y:g.y,line:g.line});delete r.from;delete r.to;delete r.gap;
+    const d=paint(c,r,c.at);
+    // blocked: a ⊘ marker on the midpoint, sized to the run — the gutter decides its size, never a hand-placed disc
+    if(r.style==='blocked'){const D=MARK(g.len),col=r.bg||'var(--accent)',k=document.createElementNS('http://www.w3.org/2000/svg','svg');
+      k.setAttribute('class','cmark');k.setAttribute('viewBox','0 0 20 20');k.innerHTML=`<circle cx="10" cy="10" r="8.5" fill="var(--card)" stroke="${col}" stroke-width="2"/><path d="M4.6 15.4L15.4 4.6" stroke="${col}" stroke-width="2" stroke-linecap="round"/>`;
+      k.style.cssText=`position:absolute;left:${(parseFloat(d.style.width)/2-D/2).toFixed(2)}px;top:50%;width:${D}px;height:${D}px;overflow:visible;transform:translateY(-50%);pointer-events:none`;d.appendChild(k)}}
+  if(tmp)root.remove()}
 function placeAfter(s,root,drawn){
   const aft=drawn.filter(o=>o.r.after!=null);if(!aft.length)return;
   const tmp=!root.isConnected&&document.body.appendChild(root);
@@ -649,11 +679,11 @@ let uid=0; // marker ids must be unique per document — the contact sheet rende
 function drawEls(s,root,animate){
   let a=0;
   root.style.background=s.bg||'var(--card)';
-  const items=[],drawn=[];
+  const items=[],drawn=[],later=[];
   (deck.master||[]).forEach(m=>{if((s.hide||[]).includes(m.id)||(s.els||[]).some(e=>e.override===m.id))return;items.push({el:m,m:m.id})});
   (s.els||[]).forEach((el,n)=>items.push({el,n}));
-  items.forEach(({el,n,m})=>{
-    const r=res(el,s),d=document.createElement('div');
+  const paint=({el,n,m},r,at)=>{
+    const d=document.createElement('div');
     terminate(r,s); // `to`/`from` clip the stroke before anything reads r.x/r.y/r.line/r.curve
     const an=animate&&ANIM.includes(r.anim)?r.anim:'';
     d.className='el'+(r.box?' box':'')+(r.tile?' tile':'')+(r.bullet?' bul':'')+(an?' '+an:'');
@@ -733,9 +763,11 @@ function drawEls(s,root,animate){
     if(el._src)d.dataset.snapped=1; // extractor metadata: the type scale changed this row (its line-count drift is scale crowding, not a parity failure)
     if(n!=null)d.dataset.n=n;else d.dataset.m=m;
     d.setAttribute('spellcheck',String(SPELL&&root===canvas&&!present())); // print pages, the sheet and the ⤓ clones are never checked
-    root.appendChild(d);drawn.push({el,n,m,r,d});
-  });
+    if(at)root.replaceChild(d,at);else root.appendChild(d);drawn.push({el,n,m,r,d});return d};
+  // a connector row keeps its place in the paint order (a comment holds it) and is routed once every box it joins is measured
+  items.forEach(it=>{const r=res(it.el,s);if(isConn(r)){const at=document.createComment('connector');root.appendChild(at);later.push({...it,r,at})}else paint(it,r)});
   placeAfter(s,root,drawn);
+  routeConns(s,root,drawn,later,paint);
   if(root===canvas)paintSpell();
 }
 let lastAnim=-1; // anim replays on slide ENTRY only — drag/select re-renders of the same slide must not restagger
@@ -796,7 +828,8 @@ let drag=null;
 // a right-anchored row keeps its anchor: the drag writes `right`, never an x that would freeze a measured width into the model
 // an after-anchored row converts: the move starts from its placed geometry (at()) and writes x, never after
 const at=(k,o)=>{const d=o.after!=null&&canvas.querySelector(typeof k==='number'?`[data-n="${k}"]`:`[data-m="${k.slice(2)}"]`);return d&&d.dataset.at?{...o,...JSON.parse(d.dataset.at)}:o};
-const moveBy=(el,o,dx,dy)=>{if(o.after!=null){delete el.after;if(o.line||o.curve||el.gap==null||isLogo(el));else delete el.gap}if(o.right!=null){el.right=o.right-dx;delete el.x}else el.x=(o.x||0)+dx;el.y=(o.y||0)+dy;if(o.line)el.line=[o.line[0]+dx,o.line[1]+dy];if(o.curve)el.curve=o.curve.map((v,j)=>j%2?v+dy:v+dx)};
+const moveBy=(el,o,dx,dy)=>{if(isConn(o))return; // a connector follows the rows it joins: it has no x of its own to move
+if(o.after!=null){delete el.after;if(o.line||o.curve||el.gap==null||isLogo(el));else delete el.gap}if(o.right!=null){el.right=o.right-dx;delete el.x}else el.x=(o.x||0)+dx;el.y=(o.y||0)+dy;if(o.line)el.line=[o.line[0]+dx,o.line[1]+dy];if(o.curve)el.curve=o.curve.map((v,j)=>j%2?v+dy:v+dx)};
 // every row is its own object: a press takes the one row under the pointer. Several rows travel together only while the
 // human holds them together — ⌘-click adds one, a marquee takes what it contains — and the selection is gone at the next click.
 // guides: the slide's slot rectangles (its layout's content slots over the deck-wide ones), the content margin and the canvas
@@ -1441,7 +1474,7 @@ $('sadd').onclick=()=>{commitEdit();menu(false);snap();const s=slide(),ns={els:[
 const settle=()=>autosave(store.set(KEY,JSON.stringify(deck))?(unsynced?'local':'ok'):'bad');
 fit();render();
 // an after-anchored row was placed against the widths measured at that paint: a face that lands later re-measures the chain
-if(document.fonts)document.fonts.addEventListener('loadingdone',()=>{if(deck.slides.some(x=>(x.els||[]).some(e=>e&&e.after!=null))&&!canvas.querySelector('[contenteditable="true"]'))render()});
+if(document.fonts)document.fonts.addEventListener('loadingdone',()=>{if(deck.slides.some(x=>(x.els||[]).some(e=>e&&(e.after!=null||isConn(e))))&&!canvas.querySelector('[contenteditable="true"]'))render()});
 async function idbLoad(){try{const range=IDBKeyRange.bound(NS+':',NS+';'); // every key under this deck's namespace
   const r=await Promise.race([Promise.all([idbReq('kv','readonly',o=>o.getAllKeys(range)),idbReq('kv','readonly',o=>o.getAll(range))]),new Promise(r=>setTimeout(()=>r(null),2000))]);
   if(!r)return;r[0].forEach((k,n)=>mem.set(k,r[1][n]));TIER='idb';document.body.classList.remove('nostore');hydrate();setSpell(SPELL);setSnap(SNAP)}

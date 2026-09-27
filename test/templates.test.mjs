@@ -103,15 +103,14 @@ test('templates: process-flow-3 · -4 · -5 are one shape — the box width fall
   for (const [id, n, w] of [['process-flow-3', 3, 251], ['process-flow-4', 4, 180], ['process-flow-5', 5, 138]]) {
     const t = TEMPLATE[id]; assert.ok(t, id + ' ships');
     assert.equal(t.layout, 'content'); assert.equal(t.cat, 'Process'); assert.equal(t.tier, 'core');
-    const boxes = t.els.filter(e => /^st\d$/.test(e.id || '')), arrows = t.els.filter(e => e.arrow === 'end' && e.to);
+    const boxes = t.els.filter(e => /^st\d$/.test(e.id || '')), arrows = t.els.filter(e => e.style === 'arrow' && e.to);   // connector rows (K16)
     assert.equal(boxes.length, n, id + ': one box per step');
     assert.equal(arrows.length, n - 1, id + ': an arrow between each pair, none after the last');
     for (const b of boxes) { assert.equal(b.w, w, `${id}: ${w}px boxes`); assert.equal(b.y, 200); assert.equal(b.h, 132); }
     for (let i = 0; i < n; i++) assert.equal(boxes[i].x, 60 + i * (w + 32), `${id}: box ${i} on the ${w + 32}px pitch`);
     for (let i = 0; i < n - 1; i++) {
       assert.equal(arrows[i].to, `st${i + 1}`, `${id}: arrow ${i} terminates on the next box`);
-      assert.equal(arrows[i].x, boxes[i].x + w, `${id}: arrow ${i} leaves the box border`);
-      assert.equal(arrows[i].line[0], boxes[i + 1].x, `${id}: arrow ${i} reaches the next border`);
+      assert.equal(arrows[i].from, `st${i}`, `${id}: arrow ${i} leaves this box — the engine insets both ends`);
     }
     assert.ok(boxes.at(-1).x + w <= 900, `${id}: the row stays inside the margins (ends ${boxes.at(-1).x + w})`);
     assert.equal(t.els[0].slot, 'supertitle'); assert.equal(t.els[1].slot, 'title');
