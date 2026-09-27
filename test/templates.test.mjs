@@ -50,7 +50,7 @@ test('templates: the catalogue names the rows fill cannot reach, per template', 
   assert.deepEqual(templateFixed('harvey-balls'), ['4 rules'], 'the twelve balls are value keys since U4.1 — only the rules are fixed');
   assert.deepEqual(templateFixed('progress-tracker'), ['4 shapes'], 'the bar fills follow p1…p4; the tracks behind them are fixed');
   assert.deepEqual(templateFixed('statement'), [], 'a text-only template has nothing fixed');
-  assert.ok(templateFixed('pad-default-60').some(s => /bars?$/.test(s)), 'a template whose series is literal names its bars');
+  assert.ok(!templateFixed('pad-default-60').some(s => /bars?$/.test(s)), 'pad-default-60 takes its bars from a data key since K22');
   assert.ok(!templateFixed('stat-plus-chart').some(s => /bars?|chart/.test(s)), 'stat-plus-chart hands its series to a chart row since K22');
   assert.deepEqual(templateFixed('chart-column'), [], 'a chart template whose series is a `data` key has nothing fixed (U4.2)');
   assert.equal(templateFixed('no-such'), null);
