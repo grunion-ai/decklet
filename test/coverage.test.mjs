@@ -18,6 +18,7 @@ const three = [txt(60, 'Market map', 'H1'), txt(140, 'Instant quoting is consoli
 const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 const textOnly = v => v.warnings.filter(w => /text only/.test(w));
 const unlogoed = v => v.warnings.filter(w => /no logo/.test(w));
+const prose = v => v.warnings.filter(w => /no logo for/.test(w));
 
 test('coverage: a slide of text rows only warns, naming the slide and the fix', () => {
   const v = validate(deck([{els: three}]));
@@ -162,4 +163,41 @@ test('coverage: deck.entities must be a list of names; warnings fail only under 
   assert.equal(spawnSync(process.execPath, [bin, f]).status, 0, 'the CLI passes a text-only slide');
   const strict = spawnSync(process.execPath, [bin, f, '--strict']);
   assert.equal(strict.status, 1, 'and fails it under --strict'); assert.match(String(strict.stderr), /text only/);
+});
+
+// K24: a logo is matched to its company through the deck.entities entry and its aliases — the asset id is compared as a slug
+// ('#leo' is Leo AI, '#3dsystems' is 3D Systems), a logo row may say entity:'<name>' outright, a template's logo group carries
+// alt. A company named only in the source line (the source slot, or a Caption in the foot band) needs no logo on the slide.
+test('coverage: deck.entities (K24) — a logo matches its company through the entry and its aliases', () => {
+  const entities = ['Leo AI', '3D Systems', ['nTop', 'nTopology'], 'Xometry'];
+  const assets = {leo: PNG, '3dsystems': PNG, 'leo-ai': PNG, leopard: PNG, mark1: PNG, ntopology: PNG};
+  const said = t => txt(300, t + ' The teams we met buy it this year.');   // a sentence, not a short listing
+  const logo = (k, extra = {}) => ({x: 700, y: 60, h: 24, logo: '#' + k, ...extra});
+  for (const [k, t] of [['leo', 'Leo AI drafts parts from a prompt.'], ['leo-ai', 'Leo AI drafts parts from a prompt.'], ['3dsystems', '3D Systems sells printers and software.'], ['ntopology', 'nTop ships implicit modeling.']])
+    assert.deepEqual(prose(validate(deck([{els: [said(t), logo(k)]}], {entities, assets}))), [], `#${k} is the company's logo`);
+  assert.equal(prose(validate(deck([{els: [said('Leo AI drafts parts from a prompt.'), logo('leopard')]}], {entities, assets}))).length, 1, '#leopard is not Leo AI');
+  assert.deepEqual(prose(validate(deck([{els: [said('Leo AI drafts parts from a prompt.'), logo('mark1', {entity: 'Leo AI'})]}], {entities, assets}))), [], 'entity: declares whose logo it is');
+  assert.deepEqual(prose(validate(deck([{els: [said('nTopology ships implicit modeling.'), logo('mark1', {entity: 'ntop'})]}], {entities, assets}))), [], 'entity: matches any alias, any case');
+  assert.equal(prose(validate(deck([{els: [said('Leo AI drafts parts from a prompt.'), logo('leo', {entity: 'Xometry'})]}], {entities, assets}))).length, 1, 'entity: outranks the asset id');
+  const stray = validate(deck([{els: [said('Leo AI drafts parts.'), logo('leo', {entity: 'Acme'})]}], {entities, assets}));
+  assert.ok(stray.warnings.some(w => /entity "Acme"/.test(w) && /deck\.entities/.test(w)), stray.warnings.join(' | '));
+  assert.ok(validate(deck([{els: [logo('leo', {entity: 7})]}], {assets})).errors.some(e => /entity must be/.test(e)));
+});
+
+test('coverage: deck.entities (K24) — a template logo group (kind logos) owns its companies by alt', () => {
+  const entities = ['Leo AI', 'Xometry'], assets = {mark1: PNG, mark2: PNG};
+  const d = deck([{template: 'exec-summary', fill: {l1: [{logo: '#mark1', aspect: 1, alt: 'Leo AI'}, {logo: '#mark2', aspect: 1, alt: 'Xometry'}]}, els: [txt(300, 'Leo AI and Xometry split the market.')]}], {entities, assets});
+  assert.ok(d.slides[0].els.some(r => r.alt === 'Leo AI'), 'the group expands to logo rows carrying alt');
+  assert.deepEqual(prose(validate(d)).filter(w => /Leo AI|Xometry/.test(w)), [], prose(validate(d)).join(' | '));
+});
+
+test('coverage: deck.entities (K24) — a company named only in the source line needs no logo', () => {
+  const entities = ['Xometry', 'Protolabs'];
+  const src = {slot: 'source', text: 'Source · Xometry and Protolabs pricing pages, Sep 2026'};
+  const base = [txt(60, 'Quoting is consolidating', 'H1'), {x: 640, y: 140, w: 260, h: 160, img: PNG}];   // a figure far from the text rows
+  assert.deepEqual(unlogoed(validate(deck([{layout: 'content', density: 'reading', els: [...base, src]}], {entities}))), [], 'the source slot is exempt');
+  const caption = {x: 60, y: 490, w: 300, role: 'Caption', text: 'Source · Xometry pricing page'};
+  assert.deepEqual(unlogoed(validate(deck([{els: [...base, caption]}], {entities}))), [], 'a Caption in the foot band is a source line');
+  assert.equal(unlogoed(validate(deck([{els: [...base, {...caption, y: 360}]}], {entities}))).length, 1, 'a Caption up in the content area still names the company');
+  assert.equal(unlogoed(validate(deck([{els: [...base, txt(360, 'Xometry buys demand with instant quotes and a partner network.')]}], {entities}))).length, 1, 'prose is still prose');
 });
