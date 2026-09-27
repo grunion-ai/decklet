@@ -222,7 +222,7 @@ const divider = (k, i, n = k.templates.length + k.layouts.length) => ({ name: `k
 // a words template's slide carries its textOnly mark (the coverage gate's opt-out). A list of companies shows its marks: the
 // sheet fills proof-strip's media keys with monogram chips ({logo: ''}, initials from each name) as a `template:` slide, so
 // create() draws them the way a deck that fills m1..m5 gets them — the logo twin of MEDIA's photos above
-const MARKS = { 'proof-strip': { logo: '' } };
+const MARKS = { 'proof-strip': { logo: '' }, 'three-up-cards': { logo: '' } };
 const marked = t => Object.fromEntries(t.media.map((_, i) => ['m' + (i + 1), MARKS[t.id]]));
 const tslide = (t) => ({ name: t.id, layout: t.layout || undefined, hide: FULL_BLEED.includes(t.id) ? ['foot'] : undefined, textOnly: t.textOnly,
   ...(MARKS[t.id] ? { template: t.id, layout: undefined, fill: marked(t) } : {}),

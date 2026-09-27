@@ -4,6 +4,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {validate} from '../bin/validate.mjs';
 import {create} from '../bin/create.mjs';
+import * as templates from '../lib/templates.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -80,6 +81,23 @@ test('coverage (K6): a template or layout slide is judged too — no exemption f
     assert.deepEqual(textOnly(validate(deck([{template: t}]))), [], `${t} draws a real graphic`);
   assert.deepEqual(textOnly(validate(deck([{...bullets, textOnly: true}]))), [], 'textOnly: true declares a words slide');
   assert.ok(validate(deck([{...bullets, textOnly: 1}])).errors.some(e => /textOnly/.test(e)), 'textOnly is a boolean');
+});
+
+// K19 guard: Kyle rejected the exec-summary slide twice as words with nothing to look at (v1, v3 slide 2). The template
+// draws a graphic now and carries no textOnly mark, so a slide expanded from it that loses the graphic warns.
+test('coverage (K19): exec-summary draws a graphic, and a slide from it with no graphic warns', () => {
+  const {TEMPLATE} = templates;
+  assert.equal(TEMPLATE['exec-summary'].textOnly, undefined, 'exec-summary is not a words template');
+  assert.deepEqual(textOnly(validate(deck([{template: 'exec-summary'}]))), [], 'the sample draws its graphic');
+  const d = deck([{template: 'exec-summary'}]);
+  const s = d.slides[0];
+  s.els = s.els.filter(r => r.text != null || r.slot || (r.bg === 'var(--box)'));   // words and the claim strip, no graphic
+  const v = validate(d);
+  assert.equal(textOnly(v).length, 1, JSON.stringify(v.warnings));
+  assert.equal(TEMPLATE['bullet-page'].textOnly, true, 'bullet-page is for words, by its own note');
+  assert.equal(TEMPLATE['three-up-cards'].textOnly, undefined, 'three-up-cards carries cohorts of companies: its media carry the logos');
+  const marks = validate(deck([{template: 'three-up-cards', fill: {m1: {logo: ''}, m2: {logo: ''}, m3: {logo: ''}}}]));
+  assert.deepEqual(textOnly(marks), [], 'three logo marks on the cards satisfy the gate');
 });
 
 test('coverage: deck.entities warns on a named company with no logo nearby, and a logo beside it clears it', () => {
