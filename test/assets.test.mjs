@@ -7,10 +7,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
-import {execFileSync} from 'node:child_process';
+import {execFileSync, execFile} from 'node:child_process';
+import {promisify} from 'node:util';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {slugOf, domainOf, pathBBox, svgBBox, fitViewBox, svgPlate, decodePng, pngPlate, logoCandidates,
-        upsertManifest, monogram, initials} from '../lib/assets.mjs';
+        upsertManifest, monogram, initials, namesOther, alphaBBox, trimBox, cropImg, encodePng, writeManifestRow,
+        HIDE_CONSENT_CSS} from '../lib/assets.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const cli = path.join(root, 'bin', 'assets.mjs');
@@ -113,11 +115,84 @@ test('logoCandidates ranks the site header logo (SVG first), then icon links, al
   const c = logoCandidates(html, 'https://formlabs.com/', 'Formlabs');
   assert.deepEqual(c.slice(0, 2).map(x => x.url), ['https://formlabs.com/logo_white.svg', 'https://formlabs.com/assets/logo.png']);
   assert.ok(c.findIndex(x => x.url.endsWith('/icon.svg')) < c.findIndex(x => x.url.endsWith('apple-touch-icon.png')));
-  assert.ok(c.findIndex(x => x.url.includes('partner-logo')) > 1, 'a logo that does not name the company ranks below ones that do');
+  const partner = c.findIndex(x => x.url.includes('partner-logo'));
+  assert.ok(partner === -1 || partner > 1, 'a logo that does not name the company ranks below ones that do, or is dropped');
   assert.ok(!c.some(x => x.url.endsWith('.ico') || x.url.endsWith('hero.jpg')), 'ico and non-logo images are not candidates');
   assert.ok(c.every(x => x.kind), 'each candidate says where it came from');
   const data = logoCandidates('<link rel="icon" href="data:image/png;base64,AAAA">', 'https://x.com/', 'x');
   assert.equal(data[0].url, 'data:image/png;base64,AAAA');
+});
+
+// K12: a vendor homepage whose own mark is an inline SVG in the header, above a strip of customer logos (the SendCutSend case)
+const VENDOR_HOME = `<html><head><link rel="apple-touch-icon" href="/apple-touch-icon.png"></head><body>
+  <section class="trusted-by"><h2>Trusted by</h2>
+    <img src="/wp-content/uploads/2024/03/cisco-logo.svg" alt="Cisco logo">
+    <img src="/wp-content/uploads/2024/03/Dell_Logo.svg" alt="Dell">
+    <img src="/wp-content/uploads/customer-logo-3.svg" alt="SpaceX logo"></section>
+  <header class="site-header"><a href="/" class="brand" aria-label="Home">
+    <svg viewBox="0 0 200 40"><title>SendCutSend</title><path d="M0 0h200v40H0z" fill="#e5561c"/></svg></a>
+    <nav><a href="/materials">Materials</a><img src="/img/search.svg" alt="Search"></nav></header>
+  <main><img src="/img/hero.jpg" alt="Laser cut parts"></main></body></html>`;
+
+test('logoCandidates: the header logo linked to home beats a customer-logo strip, and customer logos are dropped (K12)', () => {
+  const c = logoCandidates(VENDOR_HOME, 'https://sendcutsend.com/', 'SendCutSend');
+  assert.match(c[0].url, /^data:image\/svg\+xml,/, 'the inline header SVG ranks first');
+  assert.match(decodeURIComponent(c[0].url.split(',')[1]), /<title>SendCutSend<\/title>/);
+  assert.equal(c[0].kind, 'site');
+  assert.ok(!c.some(x => /cisco|dell|customer-logo/i.test(x.url)), 'a logo whose file or alt names another company is never a candidate');
+  assert.ok(c.some(x => x.url.endsWith('apple-touch-icon.png')), 'icon links still follow');
+});
+
+test('logoCandidates: a header <img> in a home link beats an earlier named strip image (the Vizcom/Dell case)', () => {
+  const html = `<div class="logos"><img src="/logos/dell-technologies.svg" alt="Dell Technologies"></div>
+    <header><a href="https://www.vizcom.ai/"><img src="/_next/static/media/logo.8f3a9b21.svg" alt="Home"></a></header>`;
+  const c = logoCandidates(html, 'https://www.vizcom.ai/', 'Vizcom');
+  assert.equal(c[0].url, 'https://www.vizcom.ai/_next/static/media/logo.8f3a9b21.svg');
+  assert.ok(!c.some(x => /dell/.test(x.url)));
+});
+
+test('namesOther: a file name, alt or title naming another company rejects; generic words and hashes do not', () => {
+  const who = ['sendcutsend'];
+  assert.equal(namesOther(['cisco-logo.svg'], who), true);
+  assert.equal(namesOther(['logo', 'Dell'], who), true);
+  assert.equal(namesOther(['logo_white.8f3a9b21.svg', 'Home'], who), false);
+  assert.equal(namesOther(['send-cut-send-logo.svg', 'SendCutSend logo'], who), false);
+  assert.equal(namesOther(['sc.svg', 'Go to homepage'], who), false, 'two letters is too short to name anyone');
+  assert.equal(namesOther(['', undefined], who), false);
+});
+
+test('alphaBBox + trimBox: a logo drawn at a third of its box is re-fitted to what it paints (the Protolabs case)', () => {
+  // a 90×30 render of a viewBox 0 0 1305 416 where only a band is painted
+  const img = {width: 90, height: 30, data: new Uint8Array(90 * 30 * 4)};
+  for (let y = 10; y < 16; y++) for (let x = 20; x < 45; x++) img.data.set([0, 0, 0, 255], (y * 90 + x) * 4);
+  assert.deepEqual(alphaBBox(img), [20, 10, 25, 6]);
+  const b = trimBox([0, 0, 1305, 416], alphaBBox(img), 90, 30);
+  assert.ok(Math.abs(b[0] - 20 * 1305 / 90) < 1305 / 90 + 0.01 && b[2] < 1305 / 2, 'trimmed ' + b);
+  assert.equal(alphaBBox({width: 4, height: 4, data: new Uint8Array(64)}), null, 'a blank image paints nothing');
+});
+
+test('cropImg + encodePng: a PNG with transparent padding is trimmed and still decodes', () => {
+  const img = decodePng(png(40, 20, (x, y) => x >= 10 && x < 30 && y >= 5 && y < 15 ? [200, 30, 30, 255] : [0, 0, 0, 0]));
+  const box = alphaBBox(img);
+  assert.deepEqual(box, [10, 5, 20, 10]);
+  const back = decodePng(encodePng(cropImg(img, box)));
+  assert.equal(back.width, 20); assert.equal(back.height, 10);
+  assert.deepEqual([...back.data.slice(0, 4)], [200, 30, 30, 255]);
+});
+
+test('writeManifestRow keeps every row when many processes write at once (K12)', async () => {
+  const out = path.join(tmp, 'parallel'), run = promisify(execFile), names = Array.from({length: 16}, (_, i) => 'Co' + i);
+  await Promise.all(names.map(n => run(process.execPath, [cli, 'monogram', n, '--out', out])));
+  const m = JSON.parse(fs.readFileSync(path.join(out, 'manifest.json'), 'utf8'));
+  assert.deepEqual(m.map(r => r.name).sort(), names.map(n => slugOf(n)).sort());
+  assert.ok(!fs.existsSync(path.join(out, 'manifest.json.lock')), 'the lock is released');
+  writeManifestRow(out, {name: 'co0', file: 'co0.svg', source: 'monogram', aspect: 1, plate: 'any'});
+  assert.equal(JSON.parse(fs.readFileSync(path.join(out, 'manifest.json'), 'utf8')).length, 16, 'in-process writes upsert too');
+});
+
+test('HIDE_CONSENT_CSS never hides html or body', () => {
+  assert.match(HIDE_CONSENT_CSS, /onetrust/i);
+  assert.match(HIDE_CONSENT_CSS, /:not\(html\):not\(body\)/);
 });
 
 test('upsertManifest keys rows by name: re-running a logo replaces its row, never duplicates it', () => {
@@ -151,6 +226,19 @@ test('cli monogram writes the file and a manifest row, offline', () => {
   assert.match(fs.readFileSync(path.join(out, 'hexagonab.svg'), 'utf8'), />HA</);
 });
 
+test('cli logo: an unreachable company falls back to a monogram flagged fallback:true, listed as missed; --strict exits 1 (K18)', () => {
+  const out = path.join(tmp, 'missed'), env = {...process.env, DECKLET_ASSETS_OFFLINE: '1'};
+  const r = execFileSync(process.execPath, [cli, 'logo', 'MISUMI', 'Hexagon', '--out', out], {stdio: 'pipe', env});
+  const rows = r.toString().trim().split('\n').map(l => JSON.parse(l));
+  assert.deepEqual(rows.map(x => [x.name, x.source, x.fallback]), [['misumi', 'monogram', true], ['hexagon', 'monogram', true]]);
+  const m = JSON.parse(fs.readFileSync(path.join(out, 'manifest.json'), 'utf8'));
+  assert.ok(m.every(x => x.fallback === true));
+  assert.throws(() => execFileSync(process.execPath, [cli, 'logo', 'MISUMI', '--out', out, '--strict'], {stdio: 'pipe', env}),
+    e => e.status === 1 && /missed: MISUMI/.test(e.stderr));
+  const soft = execFileSync(process.execPath, [cli, 'logo', 'MISUMI', '--out', out], {stdio: ['ignore', 'pipe', 'pipe'], env});
+  assert.ok(soft, 'without --strict a miss still exits 0');
+});
+
 test('cli with no command prints usage and exits 2', () => {
   assert.throws(() => execFileSync(process.execPath, [cli], {stdio: 'pipe'}), e => e.status === 2 && /usage/.test(e.stderr));
 });
@@ -166,6 +254,18 @@ test('cli shot crops a page region to webp and records the source URL', {skip: p
   assert.deepEqual(m[0], {name: 'quote', file: 'quote.webp', source: url, aspect: 1.5, plate: 'any', crop: [100, 50, 300, 200], width: 800});
   execFileSync(process.execPath, [cli, 'shot', url, '--out', path.join(tmp, 'shots', 'quote.png'), '--crop', '100,50,300,200'], {stdio: 'pipe'});
   assert.equal(decodePng(fs.readFileSync(path.join(tmp, 'shots', 'quote.png'))).width, 300);
+});
+
+test('cli shot hides a cookie banner before capture (K12)', {skip: pw ? false : 'playwright not installed'}, () => {
+  const page = path.join(tmp, 'cookie.html');
+  fs.writeFileSync(page, `<body style="margin:0;background:#fff"><div style="height:2000px"></div>
+    <div class="cc-banner" style="position:fixed;left:0;right:0;bottom:0;height:200px;background:#0a0"><p>We use cookies to improve your experience.</p><button>Accept</button></div>
+    <div style="position:fixed;left:0;top:0;width:100px;height:100px;background:#00f"><p>Menu</p></div></body>`);
+  const file = path.join(tmp, 'shots2', 'c.png');
+  execFileSync(process.execPath, [cli, 'shot', pathToFileURL(page).href, '--out', file, '--width', '800', '--wait', '0'], {stdio: 'pipe'});
+  const img = decodePng(fs.readFileSync(file)), at = (x, y) => [...img.data.slice((y * img.width + x) * 4, (y * img.width + x) * 4 + 3)];
+  assert.deepEqual(at(400, 850), [255, 255, 255], 'the banner is gone');
+  assert.deepEqual(at(50, 50), [0, 0, 255], 'a fixed element that is not a consent banner stays');
 });
 
 test('cli logo: a simple-icons mark comes back re-fitted, with a manifest row', {skip: online ? false : 'offline'}, () => {
