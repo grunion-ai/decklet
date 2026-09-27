@@ -227,6 +227,19 @@ test('library: the free band starts under the lowest chrome slot and ends at the
   }
 });
 
+test('library: the dense subtitle is regular weight, independent of H2 (K8) — size, colour and nowrap stay put', () => {
+  const roles = JSON.parse(fs.readFileSync(path.join(root, 'template.html'), 'utf8').match(/\/\*DECK\*\/([\s\S]*?)\/\*\/DECK\*\//)[1]).styles.roles;
+  assert.equal(DENSE.subtitle.weight, 400, 'DENSE.subtitle carries its own weight');
+  assert.notEqual(DENSE.subtitle.weight, roles.H2.weight, `a bound weight must not equal the role's own (H2 is ${roles.H2.weight})`);
+  assert.equal(DENSE.subtitle.role, 'H2', 'still the H2 role for size and leading');
+  assert.equal(DENSE.subtitle.color, 'var(--muted)', 'still muted');
+  assert.equal(DENSE.subtitle.nowrap, 1, 'still one line');
+  for (const [name, lay] of Object.entries(LIBRARY)) {
+    const sl = lay.slots.subtitle;
+    if (sl) assert.equal(sl.weight, 400, `${name}.subtitle is regular weight, not the bold H2 default`);
+  }
+});
+
 test('library: NEUTRAL_LH is the template scale — the printed geometry cannot drift from the runtime', () => {
   const roles = JSON.parse(fs.readFileSync(path.join(root, 'template.html'), 'utf8').match(/\/\*DECK\*\/([\s\S]*?)\/\*\/DECK\*\//)[1]).styles.roles;
   for (const [r, v] of Object.entries(roles)) assert.equal(NEUTRAL_LH[r], v.lh, r + ' leading');
