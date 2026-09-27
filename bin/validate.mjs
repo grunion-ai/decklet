@@ -140,8 +140,11 @@ export function validate(deck) {
   // (merged by create or by the CLI, or copied verbatim), and stretches the same way off 16:9
   const libCut = Array.isArray(deck.slides) ? libraryFor({w: W, h: H, slides: deck.slides.filter(s => s && typeof s === 'object'), layouts: {}}) : {};
   const isLibrary = name => !!libCut[name] && JSON.stringify((deck.layouts || {})[name] ?? libCut[name]) === JSON.stringify(libCut[name]);
+  const kinds = [];   // the layout or template each slide named, read before templates expand — the coverage gate's exemptions
+  if (deck.entities != null && !(Array.isArray(deck.entities) && deck.entities.every(n => typeof n === 'string' && n.trim()))) E('deck.entities must be an array of names — the companies whose every mention wants a logo beside it');
   for (const [si, s] of (Array.isArray(deck.slides) ? deck.slides : []).entries()) {
     if (!s || typeof s !== 'object') continue;
+    kinds[si] = String(s.template || s.layout || '');
     if (s.template != null && !TEMPLATE[s.template]) E(`slides[${si}]: template "${s.template}" not in the library (${Object.keys(TEMPLATE).join(', ')})`);
     else if (s.template != null) for (const m of fillErrors(s.template, s.fill || {})) E(`slides[${si}]: ${m}`);
     if (s.density != null && !DENSITY[s.density]) E(`slides[${si}]: density "${s.density}" not one of ${Object.keys(DENSITY).join('|')}`);
@@ -432,6 +435,44 @@ export function validate(deck) {
       seen.push(a0);
     }
   });
+  // ── COVERAGE: words with nothing to look at. A slide of three or more text rows and no image, icon, chart, diagram or
+  // drawn mark reads as a document page; every other gate passes it, so nothing told the author it was a defect. A painted
+  // rect that holds a text row is a card (still text); one that holds none is a mark (a bar, a dot, a swatch). A straight
+  // orthogonal line is a rule; a headed, curved or diagonal one is a diagram. A Stat row is a figure. Master rows are chrome,
+  // never coverage. A slide that names a layout or template has declared its kind (cover, section, statement, bullets…), so
+  // the gate judges free-row slides only: hand geometry is where a one-shot deck drops its pictures.
+  const NEAR = 120;   // px: a logo this close to a name is beside it
+  const ents = Array.isArray(deck.entities) ? deck.entities.filter(n => typeof n === 'string' && n.trim()) : [];
+  const esc = n => n.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const entRe = ents.map(n => [n.trim(), new RegExp(`(^|[^\\p{L}\\p{N}])${esc(n)}($|[^\\p{L}\\p{N}])`, 'iu')]);
+  const isLogo = r => r && !isText(r) && (r.img != null || r.logo != null || r.placeholder != null);
+  const far = (a, b) => Math.hypot(Math.max(b.x - (a.x + a.w), a.x - (b.x + b.w), 0), Math.max(b.y - (a.y + a.h), a.y - (b.y + b.h), 0));
+  for (const [si, s] of (Array.isArray(deck.slides) ? deck.slides : []).entries()) {
+    if (!s || typeof s !== 'object' || !Array.isArray(s.els)) continue;
+    const els = s.els.filter(r => r && typeof r === 'object');
+    const texts = els.filter(r => isText(r) && plain(r).trim());
+    const rt = texts.map(r => rectOf({...r, over: 0}, s)).filter(Boolean);
+    const mark = r => {
+      if (r.img != null || r.svg != null || r.icon != null || r.logo != null || r.chart != null || r.donut != null || r.bar || r.placeholder != null || r.curve) return true;
+      if (r.line) { const d = Array.isArray(r.line) ? [Math.abs(r.line[0] - (r.x ?? 0)), Math.abs(r.line[1] - (r.y ?? 0))] : [0, 0]; return !!r.arrow || (d[0] > 2 && d[1] > 2); }
+      const b = rectOf({...r, over: 0}, s); if (!b || Math.min(b.w, b.h) <= 3) return false;   // a hairline is a rule
+      return !rt.some(t => t.x >= b.x - 1 && t.y >= b.y - 1 && t.x <= b.x + b.w && t.y <= b.y + b.h);   // holds text → a card
+    };
+    const roleName = r => r.role || ((r.slot && ((deck.slots || {})[r.slot] || (layouts[s.layout] || {})[r.slot])) || {}).role || '';
+    if (!kinds[si] && texts.length >= 3 && !els.some(r => isText(r) ? /^Stat/.test(roleName(r)) : mark(r)))
+      Wn(`slides[${si}]: text only — ${texts.length} text rows and no image, icon, chart, diagram or drawn mark; add an icon row, an img or logo, a chart or a diagram (or name a layout, such as statement or section, if the slide is words by design)`);
+    if (!entRe.length) continue;
+    const logos = els.filter(isLogo).map(r => rectOf({...r, over: 0}, s) || (isNum(r.x) && isNum(r.y) ? {x: r.x, y: r.y, w: isNum(r.w) ? r.w : (r.h ?? 24) * 2, h: r.h ?? 24} : null)).filter(Boolean);
+    const named = new Set();
+    for (const r of texts) {
+      if (/^(Title|Supertitle|H1)$/.test(roleName(r)) || plain(r).trim().length > 40) continue;   // a listing is a short label; headings and sentences name companies in prose
+      const hits = entRe.filter(([, re]) => re.test(plain(r))).map(([n]) => n); if (!hits.length) continue;
+      const b = rectOf({...r, over: 0}, s);
+      if (b && logos.some(l => far(b, l) <= NEAR)) continue;
+      hits.forEach(n => named.add(n));
+    }
+    if (named.size) Wn(`slides[${si}]: names ${[...named].join(', ')} with no logo within ${NEAR}px — add an img (or logo) row beside each name (deck.entities asks for this)`);
+  }
   if (stands.size) Wn(`draft sheet: ${stands.size} stand-in mark(s) — ${[...stands].sort().join(', ')} — shown under deck.draft; validate errors on them in any deck without it`);
   return {ok: !errors.length, errors, warnings};
 }
