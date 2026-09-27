@@ -12,7 +12,10 @@ import {promisify} from 'node:util';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {slugOf, domainOf, pathBBox, svgBBox, fitViewBox, svgPlate, decodePng, pngPlate, logoCandidates,
         upsertManifest, monogram, initials, namesOther, alphaBBox, trimBox, cropImg, encodePng, writeManifestRow,
-        HIDE_CONSENT_CSS} from '../lib/assets.mjs';
+        HIDE_CONSENT_CSS, sameOrSubdomain, nearUniformColor} from '../lib/assets.mjs';
+import {logo, closeBrowser} from '../bin/assets.mjs';
+import {after} from 'node:test';
+after(closeBrowser); // logo() calls in this file open a browser directly, outside the CLI's own finally
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const cli = path.join(root, 'bin', 'assets.mjs');
@@ -65,6 +68,8 @@ test('pathBBox measures the painted extent: lines, curve extrema, arcs, relative
 
 test('svgBBox unions every path and refuses shapes it cannot measure honestly', () => {
   near(svgBBox('<svg viewBox="0 0 24 24"><path d="M2 2h4v4H2z"/><path d="M10 10h2v2h-2z"/></svg>'), [2, 2, 10, 10], 'union');
+  // two blocks sharing a y-range: the second fold must not re-add x0/y0 into the running x1/y1 (found building K25's blank guard)
+  near(svgBBox('<svg><path d="M20 40h20v20H20z"/><path d="M60 40h20v20H60z"/></svg>'), [20, 40, 60, 20], 'two blocks, same y-range, wide x gap');
   assert.equal(svgBBox('<svg><g transform="scale(2)"><path d="M0 0h1v1H0z"/></g></svg>'), null, 'transforms need a browser');
   assert.equal(svgBBox('<svg><circle cx="5" cy="5" r="2"/></svg>'), null, 'non-path shapes need a browser');
 });
@@ -103,6 +108,30 @@ test('decodePng reads RGBA and palette PNGs; pngPlate reads what it paints', () 
   const d = decodePng(p);
   assert.deepEqual([...d.data], [0, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]);
   assert.equal(decodePng(Buffer.from('not a png')), null);
+});
+
+test('sameOrSubdomain: the redirect-host guard (K25 Altair→Siemens)', () => {
+  assert.equal(sameOrSubdomain('altair.com', 'altair.com'), true, 'same host');
+  assert.equal(sameOrSubdomain('www.altair.com', 'altair.com'), true, 'www is not a foreign host');
+  assert.equal(sameOrSubdomain('damassets.altair.com', 'altair.com'), true, 'a real subdomain');
+  assert.equal(sameOrSubdomain('siemens.com', 'altair.com'), false, 'a different company entirely');
+  assert.equal(sameOrSubdomain('notaltair.com', 'altair.com'), false, 'a suffix match on the label is not a subdomain match');
+  assert.equal(sameOrSubdomain('altair.com.evil.com', 'altair.com'), false, 'altair.com as a prefix of someone else\'s domain');
+});
+
+test('nearUniformColor: a flat plate rejects, a real mark with negative space does not, even when it is itself one colour', () => {
+  const w = 16, h = 16;
+  const flatSquare = {width: w, height: h, data: new Uint8Array(w * h * 4)};
+  for (let i = 0; i < flatSquare.data.length; i += 4) flatSquare.data.set([10, 10, 10, 255], i); // K25 Plasticity: currentColor, no stylesheet
+  assert.equal(nearUniformColor(flatSquare), true, 'edge-to-edge single colour is blank');
+  const disc = {width: w, height: h, data: new Uint8Array(w * h * 4)}; // a black disc on transparent: one colour, but not a plate
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if ((x - 8) ** 2 + (y - 8) ** 2 < 25) disc.data.set([10, 10, 10, 255], (y * w + x) * 4);
+  assert.equal(nearUniformColor(disc), false, 'a shaped mark leaves negative space around it');
+  const twoTone = {width: w, height: h, data: new Uint8Array(w * h * 4)}; // full coverage but two colours, neither dominant
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) twoTone.data.set(x < w / 2 ? [255, 255, 255, 255] : [10, 10, 10, 255], (y * w + x) * 4);
+  assert.equal(nearUniformColor(twoTone), false, 'a genuine two-colour wordmark is not near-uniform');
+  assert.equal(nearUniformColor({width: 4, height: 4, data: new Uint8Array(64)}), false, 'a fully transparent image is alphaBBox\'s job, not this one\'s');
+  assert.equal(nearUniformColor(null), false);
 });
 
 test('logoCandidates ranks the site header logo (SVG first), then icon links, all absolute', () => {
@@ -237,6 +266,128 @@ test('cli logo: an unreachable company falls back to a monogram flagged fallback
     e => e.status === 1 && /missed: MISUMI/.test(e.stderr));
   const soft = execFileSync(process.execPath, [cli, 'logo', 'MISUMI', '--out', out], {stdio: ['ignore', 'pipe', 'pipe'], env});
   assert.ok(soft, 'without --strict a miss still exits 0');
+});
+
+// ---------- K25: --file, the redirect guard, the blank-image guard ----------
+const fixtures = path.join(tmp, 'fixtures');
+fs.mkdirSync(fixtures, {recursive: true});
+// two disjoint blocks, like a wordmark's letters: tight bbox [20,40,60,20] with real negative space inside it, so it
+// stays well under the blank guard's coverage floor even though (like plenty of real marks) it is itself one flat colour
+const wordmarkSvg = path.join(fixtures, 'wordmark.svg');
+fs.writeFileSync(wordmarkSvg, '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path fill="#0a5" d="M20 40h20v20H20z"/><path fill="#0a5" d="M60 40h20v20H60z"/></svg>');
+const blankSvg = path.join(fixtures, 'blank.svg'); // K25 Plasticity: currentColor with no stylesheet, paints one flat square
+fs.writeFileSync(blankSvg, '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100" fill="currentColor"/></svg>');
+const wordmarkPng = path.join(fixtures, 'wordmark.png');
+fs.writeFileSync(wordmarkPng, png(40, 20, disc([200, 30, 30])));
+const blankPng = path.join(fixtures, 'blank.png');
+fs.writeFileSync(blankPng, png(40, 20, () => [12, 12, 12, 255])); // K25: a solid tile saved as a "logo"
+
+test('logo --file normalises a local SVG the same way as any other source: bbox fit, plate, manifest row, source:file', async () => {
+  const out = path.join(tmp, 'file-svg');
+  const {row, tried} = await logo('Acme', {out, file: wordmarkSvg});
+  assert.equal(row.source, 'file');
+  assert.equal(row.url, path.resolve(wordmarkSvg));
+  assert.equal(row.fallback, undefined);
+  const fitted = fs.readFileSync(path.join(out, row.file), 'utf8'), vb = /viewBox="([^"]*)"/.exec(fitted)[1].split(' ').map(Number);
+  [20, 40, 60, 20].forEach((v, i) => assert.ok(Math.abs(vb[i] - v) < 1, `re-fitted to the painted bbox: ${vb} ≈ [20,40,60,20]`));
+  assert.equal(row.plate, 'any');
+  assert.deepEqual(tried, []);
+});
+
+test('logo --file normalises a local PNG the same way: transparent padding trimmed, manifest row written', async () => {
+  const out = path.join(tmp, 'file-png');
+  const {row} = await logo('Acme', {out, file: wordmarkPng});
+  assert.equal(row.source, 'file');
+  assert.equal(row.file, 'acme.png');
+  const img = decodePng(fs.readFileSync(path.join(out, row.file)));
+  assert.ok(img.width < 40 && img.height < 20, 'cropped to the painted disc, not the full canvas');
+});
+
+test('logo --file rejects a near-uniform SVG as blank and falls back to a monogram (K25 Plasticity)', async () => {
+  const out = path.join(tmp, 'file-blank-svg');
+  const {row, tried} = await logo('Plasticity', {out, file: blankSvg});
+  assert.equal(row.source, 'monogram'); assert.equal(row.fallback, true);
+  assert.ok(tried.some(t => /file unusable/.test(t)), tried.join(' | '));
+});
+
+test('logo --file rejects a near-uniform PNG as blank and falls back to a monogram', async () => {
+  const out = path.join(tmp, 'file-blank-png');
+  const {row} = await logo('Solid', {out, file: blankPng});
+  assert.equal(row.source, 'monogram'); assert.equal(row.fallback, true);
+});
+
+test('logo --file: an unsupported extension and a missing file both fall back to a monogram with the reason recorded', async () => {
+  const out = path.join(tmp, 'file-bad');
+  const bad = await logo('Acme', {out, file: path.join(fixtures, 'logo.gif')});
+  assert.equal(bad.row.source, 'monogram');
+  assert.ok(bad.tried.some(t => /unsupported extension/.test(t)), bad.tried.join(' | '));
+  const missing = await logo('Acme', {out, file: path.join(fixtures, 'does-not-exist.svg')});
+  assert.equal(missing.row.source, 'monogram');
+  assert.ok(missing.tried.some(t => /^file:/.test(t)), missing.tried.join(' | '));
+});
+
+test('cli logo --file wires through the CLI arg parser', () => {
+  const out = path.join(tmp, 'file-cli');
+  const r = execFileSync(process.execPath, [cli, 'logo', 'Acme', '--file', wordmarkSvg, '--out', out], {stdio: 'pipe'});
+  const row = JSON.parse(r.toString().trim());
+  assert.equal(row.source, 'file');
+  const m = JSON.parse(fs.readFileSync(path.join(out, 'manifest.json'), 'utf8'));
+  assert.equal(m[0].source, 'file');
+});
+
+// a minimal fetch mock: home page + one absolute site candidate, offline and deterministic (no real network, no TLS)
+function mockFetch(routes) {
+  return async (url) => {
+    url = String(url);
+    for (const [prefix, make] of routes) if (url.startsWith(prefix)) return make(url);
+    throw new Error('unmocked url: ' + url);
+  };
+}
+const notFound = () => ({ok: false, status: 404, url: '', text: async () => '', arrayBuffer: async () => new ArrayBuffer(0)});
+const wordmarkSvgText = fs.readFileSync(wordmarkSvg, 'utf8');
+
+test('logo refuses a site candidate whose fetch redirects off the company domain (K25 Altair→Siemens)', async (t) => {
+  const real = globalThis.fetch;
+  t.after(() => { globalThis.fetch = real; });
+  const home = `<header><a href="/"><img src="https://cdn.attacker.test/logo.svg" alt="Acme logo"></a></header>`;
+  globalThis.fetch = mockFetch([
+    ['https://cdn.jsdelivr.net/', notFound],
+    ['https://acme-redirect.test', async () => ({ok: true, status: 200, url: 'https://acme-redirect.test/', text: async () => home})],
+    ['https://cdn.attacker.test/logo.svg', async () => ({ok: true, status: 200, url: 'https://cdn.attacker.test/logo.svg', arrayBuffer: async () => new TextEncoder().encode(wordmarkSvgText).buffer})],
+    ['https://www.google.com/s2/', notFound],
+  ]);
+  const out = path.join(tmp, 'redirect-candidate');
+  const {row, tried} = await logo('Acme', {out, domain: 'acme-redirect.test'});
+  assert.equal(row.source, 'monogram', 'the off-domain candidate is refused, and nothing else lands');
+  assert.ok(tried.some(x => /redirect host mismatch/.test(x)), tried.join(' | '));
+});
+
+test('logo refuses the whole site when the home page itself redirects off-domain, but accepts a real subdomain', async (t) => {
+  const real = globalThis.fetch;
+  t.after(() => { globalThis.fetch = real; });
+  const home = `<header><a href="/"><img src="https://static.acme-sub.test/logo.svg" alt="Acme logo"></a></header>`;
+  globalThis.fetch = mockFetch([
+    ['https://cdn.jsdelivr.net/', notFound],
+    // the apex itself 301s off-domain (a company that sold its old domain, K25's actual Altair case)
+    ['https://acme-sub.test', async () => ({ok: true, status: 200, url: 'https://not-acme-anymore.test/', text: async () => 'irrelevant'})],
+    ['https://www.google.com/s2/', notFound],
+  ]);
+  const out = path.join(tmp, 'redirect-home');
+  const {row, tried} = await logo('Acme', {out, domain: 'acme-sub.test'});
+  assert.equal(row.source, 'monogram');
+  assert.ok(tried.some(x => /redirects off-domain/.test(x)), tried.join(' | '));
+
+  // now the home page answers on-domain, and its candidate lives on a real subdomain: no guard trip
+  globalThis.fetch = mockFetch([
+    ['https://cdn.jsdelivr.net/', notFound],
+    ['https://acme-sub.test', async () => ({ok: true, status: 200, url: 'https://acme-sub.test/', text: async () => home})],
+    ['https://static.acme-sub.test/logo.svg', async () => ({ok: true, status: 200, url: 'https://static.acme-sub.test/logo.svg', arrayBuffer: async () => new TextEncoder().encode(wordmarkSvgText).buffer})],
+    ['https://www.google.com/s2/', notFound],
+  ]);
+  const out2 = path.join(tmp, 'redirect-subdomain-ok');
+  const {row: row2} = await logo('Acme', {out: out2, domain: 'acme-sub.test'});
+  assert.equal(row2.source, 'site');
+  assert.equal(row2.url, 'https://static.acme-sub.test/logo.svg');
 });
 
 test('cli with no command prints usage and exits 2', () => {
