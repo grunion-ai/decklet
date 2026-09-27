@@ -66,9 +66,13 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
           for (let k = 0; k <= 80; k++) { const u = k / 80; pts.push(pt(bez(x1, c1x, c2x, x2, u), bez(y1, c1y, c2y, y2, u))); }
           return {key, pts, t: th / 2 + 1}; }
         const b = d.getBoundingClientRect();   // a thin rule or dot: axis-aligned, sample its own footprint
+        // the engine tags any small painted rect; only a RULE (one side <= 4px, or 6:1) or a DOT (both sides <= 12px) is ink.
+        // A 56x22 logo plate or chip is a surface text sits beside, not a stroke through it.
+        const lo = Math.min(b.width, b.height), hi = Math.max(b.width, b.height);
+        if (!(lo <= 4 || hi >= 6 * lo || hi <= 12)) return null;
         for (let k = 0; k <= 40; k++) { const u = k / 40; pts.push({x: b.left + b.width * u, y: b.top + b.height * u}, {x: b.left + b.width * u, y: b.bottom - b.height * u}); }
         return {key, pts, t: Math.min(b.width, b.height) / 2 + 1};
-      }).map(q => { const d = [...document.querySelectorAll('#canvas .el[data-seg],#canvas .el[data-cur],#canvas .el[data-ink]')].find(x => (x.dataset.n ?? ('m:' + x.dataset.m)) === q.key);
+      }).filter(Boolean).map(q => { const d = [...document.querySelectorAll('#canvas .el[data-seg],#canvas .el[data-cur],#canvas .el[data-ink]')].find(x => (x.dataset.n ?? ('m:' + x.dataset.m)) === q.key);
         return {...q, head: d && d.dataset.head};   // which end carries an arrow, so the gate can ask where the head landed
       });
       // container edges the engine declared. `over:1` opts a row out of both new checks, as it does for stroke-over-text.
