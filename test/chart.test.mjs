@@ -150,6 +150,13 @@ test('chart: an hbar logo can be an asset "#id" reference — chart.mjs passes i
   assert.ok(rows.find(r => r.img === '#xometry'), 'the asset ref lands verbatim on the img row');
 });
 
+test('chart: an hbar datum logo as deck.assets "#id" validates clean end to end, expands, and resolves against the asset table', () => {
+  const m = {w: 960, h: 540, assets: {xometry: XOM}, slides: [{els: [{...BOX, chart: {...funding, lead: 60, sort: undefined, data: funding.data.map((d, k) => k === 0 ? {...d, logo: '#xometry'} : d)}}]}]};
+  const {deck} = create(m);
+  assert.deepEqual(validate(deck).errors, []);
+  assert.ok(deck.slides[0].els.some(e => e.img === '#xometry'), 'the datum logo survives expansion as an ordinary #id img row');
+});
+
 test('chart: a bar datum with a logo draws it under the bar, in the band reserved by lead, sized like a logo row', () => {
   const data = [{label: 'Zoo', value: 10}, {label: 'Vizcom', value: 52, logo: VIZ}, {label: 'Adam', value: 4}, {label: 'Backflip', value: 30}];
   const c = {mark: 'bar', data, lead: 40};
