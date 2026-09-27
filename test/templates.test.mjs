@@ -50,7 +50,8 @@ test('templates: the catalogue names the rows fill cannot reach, per template', 
   assert.deepEqual(templateFixed('harvey-balls'), ['4 rules'], 'the twelve balls are value keys since U4.1 — only the rules are fixed');
   assert.deepEqual(templateFixed('progress-tracker'), ['4 shapes'], 'the bar fills follow p1…p4; the tracks behind them are fixed');
   assert.deepEqual(templateFixed('statement'), [], 'a text-only template has nothing fixed');
-  assert.ok(templateFixed('stat-plus-chart').some(s => /bars?$/.test(s)), 'a template whose series is literal names its bars');
+  assert.ok(templateFixed('pad-default-60').some(s => /bars?$/.test(s)), 'a template whose series is literal names its bars');
+  assert.ok(!templateFixed('stat-plus-chart').some(s => /bars?|chart/.test(s)), 'stat-plus-chart hands its series to a chart row since K22');
   assert.deepEqual(templateFixed('chart-column'), [], 'a chart template whose series is a `data` key has nothing fixed (U4.2)');
   assert.equal(templateFixed('no-such'), null);
   assert.deepEqual(templateFixed('scorecard-grid'), ['5 rules'], 'a cell\'s rating ring is a key, so only the rules are fixed');
@@ -252,16 +253,19 @@ test('templates: the logo family ships stand-in marks, and a deck without draft 
 // The media sits BESIDE the item's lead text, centred on that text's first line, one fixed gutter (lib/logo.mjs GAP) between;
 // a centred lead row keeps the pair centred. A logo turns the lead row into a logo row (docs/logo.md) whose name is the text.
 // A template with no media filled expands exactly as before.
-import {templateMedia, MEDIA_TEMPLATES} from '../lib/templates.mjs';
+import {templateMedia, MEDIA_TEMPLATES, SAMPLE_BOUND, templateVals as valsOf} from '../lib/templates.mjs';
 import {GAP} from '../lib/logo.mjs';
 import {NEUTRAL_LH} from '../lib/layouts.mjs';
 import {scale} from '../lib/templates/kit.mjs';
-const LIST = ['agenda-ruled', 'exec-summary', 'stat-row-3', 'stat-row-4', 'kpi-scorecard', 'two-col-compare', 'benchmark-table', 'harvey-balls',
+const LIST = ['agenda-ruled', 'stat-row-3', 'stat-row-4', 'kpi-scorecard', 'two-col-compare', 'benchmark-table', 'harvey-balls',
   'scorecard-grid', 'value-chain', 'process-flow-3', 'process-flow-4', 'process-flow-5', 'timeline-horizontal', 'gantt-lanes', 'vertical-steps',
   'funnel-stages', 'three-up-cards', 'table-insight', 'proof-strip'];
 const PNG = 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 20"><rect width="40" height="20" fill="#123"/></svg>').toString('base64');
 const MEDIA = {logo: {logo: PNG, aspect: 2}, img: {img: PNG, fit: 'cover'}, icon: {icon: 'factory'}, monogram: {logo: ''}};
-const mediaFill = (id, m) => Object.fromEntries(templateMedia(id).map(e => [e.key, m]));
+// a filled slide names its quantities (K22), so a media fill carries every value key at its sample; a sample-bound template
+// refuses any fill, so the media tests that fill run over the rest
+const mediaFill = (id, m) => ({...Object.fromEntries(valsOf(id).map(v => [v.key, v.sample])), ...Object.fromEntries(templateMedia(id).map(e => [e.key, m]))});
+const FILLABLE = LIST.filter(id => !SAMPLE_BOUND[id]);
 
 test('templates: media — every list-shaped template declares one media key per item, m1..mn, and the catalogue prints them', () => {
   assert.deepEqual([...MEDIA_TEMPLATES].sort(), [...LIST].sort(), 'the list-shaped templates are exactly the ones that take media');
@@ -286,7 +290,7 @@ test('templates: media — no template row carries the item marker, and a templa
 
 const lhOf = r => NEUTRAL_LH[r.role];
 test('templates: media — an icon or image sits beside its item, centred on the first line, one gutter before the text', () => {
-  for (const id of LIST) for (const kind of ['icon', 'img']) {
+  for (const id of FILLABLE) for (const kind of ['icon', 'img']) {
     const d = deck([{template: id, fill: mediaFill(id, MEDIA[kind])}]); expandTemplates(d);
     const els = d.slides[0].els, marks = els.filter(r => r[kind] != null);
     assert.equal(marks.length, templateMedia(id).length, `${id} ${kind}: one per item`);
@@ -303,7 +307,7 @@ test('templates: media — an icon or image sits beside its item, centred on the
 });
 
 test('templates: media — a logo makes the lead row a logo row; its name is the text, its first line where the text was', () => {
-  for (const id of LIST) {
+  for (const id of FILLABLE) {
     const plain = deck([{template: id}]); expandTemplates(plain);
     const d = deck([{template: id, fill: mediaFill(id, MEDIA.logo)}]); expandTemplates(d);
     const logos = d.slides[0].els.filter(r => r.logo != null);
@@ -320,7 +324,7 @@ test('templates: media — a logo makes the lead row a logo row; its name is the
 });
 
 test('templates: media — every list template validates with media filled: zero errors, no air finding the plain slide lacks', () => {
-  for (const id of LIST) {
+  for (const id of FILLABLE) {
     const base = new Set(v(deck([{template: id}])).warnings);
     for (const [kind, m] of Object.entries(MEDIA)) {
       const r = v(deck([{template: id, fill: mediaFill(id, m)}]));
@@ -348,8 +352,8 @@ const expanded = (id, fill) => { const d = deck([{template: id, fill}]); expandT
 test('templates: media — a logo is at least MEDIA_MIN tall and fills its chip: a small h is raised, a wide mark grows the column', () => {
   assert.equal(MEDIA_MIN, 20);
   let refused = 0;
-  for (const id of LIST) for (const aspect of [0.5, 1, 2, 6.8]) for (const h of [undefined, 12]) {
-    const fill = Object.fromEntries(templateMedia(id).map((e, i) => [e.key, {logo: PNG, aspect: i ? aspect : 1, plate: 'light', ...(h ? {h} : {})}]));
+  for (const id of FILLABLE) for (const aspect of [0.5, 1, 2, 6.8]) for (const h of [undefined, 12]) {
+    const fill = {...mediaFill(id, null), ...Object.fromEntries(templateMedia(id).map((e, i) => [e.key, {logo: PNG, aspect: i ? aspect : 1, plate: 'light', ...(h ? {h} : {})}]))};
     const tag = `${id} aspect ${aspect} h ${h}`, why = fillErrors(id, fill);
     if (why.length) { assert.match(why.join(' '), /needs \d+px beside .* at 20px tall/, tag); assert.equal(aspect, 6.8, tag + ': only a very wide mark is refused'); refused++; continue; }   // a centred box too narrow: refused, never shrunk
     const logos = expanded(id, fill).filter(r => r.logo != null);
@@ -364,7 +368,7 @@ test('templates: media — a logo is at least MEDIA_MIN tall and fills its chip:
   }
 });
 test('templates: media — an item taller than its first line moves the rows under it down; the slide still validates clean', () => {
-  for (const id of LIST) for (const m of [{logo: PNG, aspect: 6.8, h: 32}, {icon: 'factory', h: 32}]) {
+  for (const id of FILLABLE) for (const m of [{logo: PNG, aspect: 6.8, h: 32}, {icon: 'factory', h: 32}]) {
     const tag = `${id} ${Object.keys(m)[0]}`, why = fillErrors(id, mediaFill(id, m));
     if (why.length) { assert.match(why.join(' '), /centred box leaves/, tag); continue; }
     const els = expanded(id, mediaFill(id, m));
@@ -414,6 +418,7 @@ const rowsOf = (id, fill, extra) => { const d = deck([{template: id, fill}], ext
 
 test('templates: K14 — every template filled with its own sample expands to exactly its unfilled rows', () => {
   for (const t of TEMPLATES) {
+    if (SAMPLE_BOUND[t.id]) continue;   // K22: any fill is refused there (template-values.test.mjs)
     const fill = sampleFill(t.id);
     assert.deepEqual(rowsOf(t.id, fill), rowsOf(t.id, undefined), t.id + ': a sample fill changes nothing');
   }
@@ -454,7 +459,7 @@ test('templates: K14 — chart-bar-ranked draws every bar from its filled value,
   const b = bars(els), labs = els.filter(r => /^\d+$/.test(r.text || ''));
   labs.forEach((l, i) => assert.equal(l.x, b[i].x + b[i].w + 12, 'each value label sits past its own bar'));
   assert.ok(!templateFixed('chart-bar-ranked').some(s => /shape/.test(s)), 'the bars are no longer fixed: ' + templateFixed('chart-bar-ranked').join(' · '));
-  assert.deepEqual(v(deck([{template: 'chart-bar-ranked', fill: {v1: 1200, v2: 0}}])).errors, [], 'a value over the sample scale, and a zero, are legal');
+  assert.deepEqual(v(deck([{template: 'chart-bar-ranked', fill: {v1: 1200, v2: 0, v3: 5, v4: 5, v5: 5}}])).errors, [], 'a value over the sample scale, and a zero, are legal');
 });
 
 const LONG = 'Who ships design-for-manufacture today';

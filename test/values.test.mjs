@@ -46,9 +46,9 @@ test('values: a filled harvey-balls carries the filled ratings, not the sample\'
   assert.equal(s.template, undefined, 'consumed');
   assert.deepEqual(donuts(s).map(r => r.donut), Object.values(RATINGS).map(v => v * 25), 'every ring is the rating the author gave it');
   assert.ok(s.els.some(r => r.text === 'Coverage') && s.els.some(r => r.text === 'Support'), 'the text keys still fill');
-  // a rating left out keeps the sample's — the same rule text keys follow
+  // K22: a rating left out would draw the sample's, so the fill is refused and the slide stays for validate to report
   const one = expandTemplates(deckOf([{template: 'harvey-balls', fill: {r1c1: 0}}]));
-  assert.deepEqual(donuts(one.slides[0]).map(r => r.donut), [0, 50, 25, 100, 50, 25, 50, 50, 100, 100, 100, 75]);
+  assert.equal(one.slides[0].template, 'harvey-balls', 'not expanded');
 });
 
 test('values: validate range-checks a value key and lists them when a fill key is unknown', () => {
@@ -63,14 +63,14 @@ test('values: validate range-checks a value key and lists them when a fill key i
 });
 
 test('values: progress and gauge fills move the fill AND the number printed on it', () => {
-  const p = expandTemplates(deckOf([{template: 'progress-tracker', fill: {p1: 50, p3: 100}}])).slides[0];
+  const p = expandTemplates(deckOf([{template: 'progress-tracker', fill: {p1: 50, p2: 94, p3: 100, p4: 92}}])).slides[0];
   const fills = p.els.filter(r => r.bg === 'var(--accent)' && r.h === 16).map(r => r.w);
   assert.deepEqual(fills, [260, 520 * 0.94, 520, 520 * 0.92].map(Math.round), 'the bar is the value: ' + fills.join(','));
   assert.ok(p.els.some(r => r.text === '50%') && p.els.some(r => r.text === '100%'), 'the label agrees with the bar');
   const g = expandTemplates(deckOf([{template: 'chart-gauge', fill: {v1: 71}}])).slides[0];
   assert.deepEqual(donuts(g).map(r => r.donut), [71]);
   assert.ok(g.els.some(r => r.text === '71%'), 'the number in the ring follows the ring');
-  const d = expandTemplates(deckOf([{template: 'chart-donut-row', fill: {v2: 12}}])).slides[0];
+  const d = expandTemplates(deckOf([{template: 'chart-donut-row', fill: {v1: 94, v2: 12, v3: 38}}])).slides[0];
   assert.deepEqual(donuts(d).map(r => r.donut), [94, 12, 38]);
 });
 

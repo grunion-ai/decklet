@@ -71,3 +71,18 @@ test('sheet: the full sheet and both density cuts build with zero text-only cove
     assert.deepEqual(loud, [], `${stem}: ${loud.join(', ')}`);
   }
 });
+
+// K22: the sheet shows every template as its sample. A `template:` slide on it (the monogram fills) must pass the value-key
+// guard, and the sample-bound templates show only as their bare sample, never filled.
+import {fillErrors, SAMPLE_BOUND} from '../lib/templates.mjs';
+test('sheet: every template slide the sheet fills passes the K22 guard; no sample-bound template is filled', () => {
+  const r = spawnSync(process.execPath, [path.join(root, 'templates/build-sheet.mjs')], {encoding: 'utf8'});
+  assert.equal(r.status, 0, r.stderr);
+  const model = JSON.parse(fs.readFileSync(path.join(root, 'templates/candidates.model.json'), 'utf8'));
+  const filled = model.slides.filter(s => s.template);
+  assert.ok(filled.length >= 2, 'the monogram slides are template slides');
+  for (const s of filled) {
+    assert.deepEqual(fillErrors(s.template, s.fill), [], s.template);
+    assert.ok(!SAMPLE_BOUND[s.template], s.template + ' is sample-bound');
+  }
+});
