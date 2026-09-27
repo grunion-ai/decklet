@@ -63,6 +63,7 @@ export function resolveCanvas(deck, {format, space, fallback} = {}) {
 export const PAGES = ['letter', 'a4', 'letter-landscape', 'a4-landscape', 'a3'];   // named @page sizes the runtime knows (template PAGES)
 export const ARROWS = ['start', 'end', 'both'];          // WHICH ends carry a head
 export const HEADS = ['triangle', 'chevron', 'dot', 'bar'];   // WHAT is drawn there row
+export const IMGSRC = /^(data:|#)/;                      // an image source: an inline data: URI, or '#id' into deck.assets
 export const HREF = /^(https?:|mailto:)/i;               // href is model content: navigable schemes only, never javascript:/data:
 // an href may point INTO the deck: '#7' (1-based slide number) or '#<slide id>'. slideNo resolves it to the slide number, 0 when
 // it names no slide. A slide with no id yet resolves as the id create WILL stamp (the same stampIds, on a throwaway copy), so a
@@ -290,10 +291,10 @@ export function validate(deck) {
     if (r.group != null) E(`${where}: \`group\` is gone — every row moves on its own; delete it (a card is a painted row with text rows over it, each one independent)`);
     if (r.css) Wn(`${where}: raw css escape hatch used`);
     if (r.chart != null) for (const m of checkChart(r.chart)) E(`${where}: ${m}`);   // a chart row create() could not expand
-    if (r.img && !/^data:/.test(r.img)) E(`${where}: img must be a data: URI (single file, zero network)`);
+    if (r.img && !IMGSRC.test(r.img)) E(`${where}: img must be a data: URI (single file, zero network), or '#id' naming a deck.assets entry`);
     // the logo row (docs/logo.md): a fixed column, a contain-fit image on a plate or a monogram chip, the name at col + gap
     if (isLogoRow(r)) {
-      if (r.logo && !/^data:/.test(r.logo)) E(`${where}: logo must be a data: URI (single file, zero network), or '' for a monogram chip`);
+      if (r.logo && !IMGSRC.test(r.logo)) E(`${where}: logo must be a data: URI (single file, zero network), '#id' naming a deck.assets entry, or '' for a monogram chip`);
       if (!(isNum(r.h) && r.h > 0)) E(`${where}: h must be a positive number — the logo row's height`);
       if (r.col != null && !(isNum(r.col) && r.col > 0)) E(`${where}: col must be a positive number — the logo column's width; give every row in a list the same col`);
       if (r.gap != null && !(isNum(r.gap) && r.gap >= 0)) E(`${where}: gap must be a number of px ≥ 0 — the air between the logo column and the name`);
@@ -494,6 +495,26 @@ export function validate(deck) {
     }
     if (named.size) Wn(`slides[${si}]: names ${[...named].join(', ')} with no logo within ${NEAR}px — add an img (or logo) row beside each name (deck.entities asks for this)`);
   }
+  // the asset table (FRICTION F4): deck.assets = {id: data URI}, embedded once; any img or logo key anywhere in the model
+  // (a row, a master row, a layout slot, a chart datum) may name one as '#id'. The runtime resolves it when it draws.
+  const assets = deck.assets ?? {}, used = new Set();
+  if (typeof assets !== 'object' || Array.isArray(assets)) E('deck.assets must be an object of {id: data URI}');
+  else for (const [id, v] of Object.entries(assets)) {
+    if (!/^[\w-]+$/.test(id)) E(`deck.assets.${id}: id must be letters, digits, _ or - (rows reference it as '#${id}')`);
+    if (!(typeof v === 'string' && /^data:/.test(v))) E(`deck.assets.${id} must be a data: URI (single file, zero network)`);
+  }
+  const walk = (v, where) => {
+    if (Array.isArray(v)) return v.forEach((x, k) => walk(x, `${where}[${k}]`));
+    if (!v || typeof v !== 'object') return;
+    for (const [k, x] of Object.entries(v)) {
+      if ((k === 'img' || k === 'logo') && typeof x === 'string' && x[0] === '#') {
+        const id = x.slice(1); used.add(id);
+        if (!Object.hasOwn(assets, id)) E(`${where}.${k}: "${x}" is not in deck.assets (${Object.keys(assets).join(', ') || 'none defined'})`);
+      } else walk(x, `${where}.${k}`);
+    }
+  };
+  for (const k of ['slides', 'master', 'layouts', 'slots']) walk(deck[k], k);
+  for (const id of Object.keys(typeof assets === 'object' && assets || {})) if (!used.has(id)) Wn(`deck.assets.${id} is unused — nobody references '#${id}'; delete it or point a row at it`);
   if (stands.size) Wn(`draft sheet: ${stands.size} stand-in mark(s) — ${[...stands].sort().join(', ')} — shown under deck.draft; validate errors on them in any deck without it`);
   return {ok: !errors.length, errors, warnings};
 }
