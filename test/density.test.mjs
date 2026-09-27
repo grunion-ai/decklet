@@ -99,3 +99,40 @@ test('density: SKILL.md states the counting rule beside the table', () => {
   assert.match(sec, /Supertitle.*Title.*H1.*Caption.*Label/, 'the five chrome roles are named in DENSITY');
   assert.match(sec, /number/, 'the chrome slot list is complete (the `number` slot is chrome too)');
 });
+// ── K19. A summary or a number slide says less: reading density keeps 140 words for a slide that argues, and caps a slide
+// whose content is an executive summary (kind: 'summary') or a number template (the Numbers shelf: stat rows, kpi, the
+// proportional figures) lower. The CAD/DFM v2 deck carried 115 words on its summary and 88 on its market-size slide; Kyle
+// read both as too much text, so the cap sits well under both.
+test('density: reading caps summary and number slides lower; speaker is unchanged', () => {
+  const r = DENSITY.reading.max;
+  assert.ok(r.summary && r.numbers, 'reading names a summary cap and a numbers cap');
+  assert.ok(r.summary < 88 && r.numbers < 88 && r.summary < r.words && r.numbers < r.words, 'both sit under the v2 slides (115, 88 words)');
+  assert.deepEqual(DENSITY.speaker.max, {points: 3, words: 40}, 'speaker density is untouched');
+});
+const claim = extra => ({layout: 'content', ...extra, els: [{slot: 'supertitle', text: 'Summary'}, {slot: 'title', text: 'The market has no owner'},
+  {slot: 'subtitle', text: 'One line'}, {slot: 'source', text: 'Source · filings'}, {x: 60, y: 200, w: 840, role: 'Body', text: lorem(70)}]});
+test('density: a kind: summary slide over the summary cap warns, names the cap and the words it counted', () => {
+  const r = v(deck([claim({kind: 'summary'})], {density: 'reading'}));
+  const m = r.warnings.find(w => /summary/.test(w) && /words/.test(w));
+  assert.ok(m, r.warnings.join(' | '));
+  assert.match(m, new RegExp(`≤ ${DENSITY.reading.max.summary} words`)); assert.match(m, /this slide has 80/);
+  assert.match(m, /Body "word0 word1/, 'the rows it counted are listed'); assert.match(m, /\b70\b/, 'with their counts');
+  assert.ok(!v(deck([claim({})], {density: 'reading'})).warnings.some(w => /density carries/.test(w)), 'the same 80 words pass on an unmarked slide');
+});
+test('density: a number template slide is capped lower; a Stat-led free slide counts as one too', () => {
+  const tpl = v(deck([{template: 'waffle', els: [{x: 60, y: 420, w: 840, role: 'Body', text: lorem(40)}]}], {density: 'reading'}));
+  assert.ok(tpl.warnings.some(w => /number slide/.test(w) && /words/.test(w)), tpl.warnings.join(' | '));
+  const stats = deck([{layout: 'content', els: [{slot: 'title', text: 'Market size'}, {slot: 'source', text: 'Source · analysts'},
+    ...[0, 1, 2].map(k => ({x: 60 + k * 300, y: 200, w: 260, role: 'Stat', text: '$' + (k + 1) + 'B'})),
+    {x: 60, y: 320, w: 840, role: 'Body', text: lorem(40)}, {x: 60, y: 380, w: 840, role: 'Body', text: lorem(30)}]}], {density: 'reading'});
+  assert.ok(v(stats).warnings.some(w => /number slide/.test(w)), v(stats).warnings.join(' | '));
+});
+test('density: kind is summary or nothing; a speaker summary keeps the speaker cap', () => {
+  assert.ok(v(deck([claim({kind: 'sumary'})], {density: 'reading'})).errors.some(e => /kind/.test(e)));
+  const rep = densityReport(claim({kind: 'summary'}), LIBRARY, 'speaker', 'summary');
+  assert.match(rep, /speaker density carries ≤ 40 words/);
+});
+test('density: a separator is not a word — "·", "→" and "–" standing alone are not counted', () => {
+  const m = densityReport({layout: 'quote', els: [{slot: 'quote', text: lorem(40) + ' · → –'}, {slot: 'attribution', text: 'a · b'}]}, LIBRARY, 'speaker');
+  assert.match(m, /this slide has 42/);
+});

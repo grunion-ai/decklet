@@ -156,6 +156,7 @@ export function validate(deck) {
     if (s.textOnly != null && typeof s.textOnly !== 'boolean') E(`slides[${si}]: textOnly must be true or false — true declares a words slide the coverage gate skips`);
     if (s.template != null && !TEMPLATE[s.template]) E(`slides[${si}]: template "${s.template}" not in the library (${Object.keys(TEMPLATE).join(', ')})`);
     else if (s.template != null) for (const m of fillErrors(s.template, s.fill || {})) E(`slides[${si}]: ${m}`);
+    if (s.kind != null && s.kind !== 'summary') E(`slides[${si}]: kind "${s.kind}" — the one slide kind is "summary" (an executive summary: reading density caps it at ${DENSITY.reading.max.summary} words)`);
     if (s.density != null && !DENSITY[s.density]) E(`slides[${si}]: density "${s.density}" not one of ${Object.keys(DENSITY).join('|')}`);
     // the library and the templates are cut for 16:9 (lib/layouts.mjs, templates/): on any other canvas they stretch until D2
     if (isNum(W) && isNum(H) && Math.abs(W / H - 16 / 9) > 0.01) {
@@ -490,7 +491,8 @@ export function validate(deck) {
   else deck.slides.forEach((s, si) => {
     if (!s || typeof s !== 'object') return E(`slides[${si}]: not an object`);
     if (s.layout && !layouts[s.layout]) E(`slides[${si}]: layout "${s.layout}" not in deck.layouts or the library (${Object.keys(LIBRARY).join(', ')})`);
-    const dm = densityReport(s, layouts, s.density || deck.density); if (dm) Wn(`slides[${si}]: ${dm}`);
+    const tpl = TEMPLATE[kinds[si]] || TEMPLATE[s.name];   // a Numbers-shelf template is a number slide (K19), read before or after create expands it
+    const dm = densityReport(s, layouts, s.density || deck.density, tpl && tpl.cat === 'Numbers' ? 'numbers' : null); if (dm) Wn(`slides[${si}]: ${dm}`);
     if (!Array.isArray(s.els)) return E(`slides[${si}]: els must be an array`);
     for (const id of s.hide || []) if (!mids.has(id)) E(`slides[${si}]: hide "${id}" is not a master id`);
     // an after chain that comes back to itself has no left edge to start from: one error per cycle
