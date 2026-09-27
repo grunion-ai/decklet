@@ -1,6 +1,9 @@
 // library.html is the whole slide library built from templates/build-sheet.mjs — served beside deck.html on Pages.
 // It is a build artifact, so the gate checks it is current: rebuilding the sheet must reproduce it byte for byte.
 // The sheet builds under templates/candidates.style.json (the neutral tokens + every kit's prefixed set, written by build-sheet).
+// K21: spawnSync had no `timeout`, so a hung build-sheet.mjs child would block this file forever;
+// both it and the enclosing test now carry a cap so a stuck build fails fast instead of riding
+// the 15-minute CI job cap (K7) in silence.
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -14,8 +17,8 @@ import {TEMPLATES} from '../lib/templates.mjs';
 import {loadChecker} from '../lib/spell.mjs';
 import {KITS} from '../examples/styles/index.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-test('library.html == create(build-sheet): every template and layout, by kind, current', async () => {
-  const r = spawnSync(process.execPath, [path.join(root, 'templates/build-sheet.mjs')], {encoding: 'utf8'});
+test('library.html == create(build-sheet): every template and layout, by kind, current', {timeout: 40000}, async () => {
+  const r = spawnSync(process.execPath, [path.join(root, 'templates/build-sheet.mjs')], {encoding: 'utf8', timeout: 30000});
   assert.equal(r.status, 0, r.stderr);
   const model = JSON.parse(fs.readFileSync(path.join(root, 'templates/candidates.model.json'), 'utf8'));
   const styled = 6 * KITS.length;   // the Styles section: the same six templates under every kit on the shelf
@@ -59,9 +62,9 @@ test('sheet: every slide\'s foot band (y ≥ 496) carries the same set of rows �
 
 // K6/K9 follow-up: the sheet is the shelf's own proof. Every density cut builds with zero coverage warnings — dividers and
 // words templates carry textOnly, every other slide draws a graphic the gate counts.
-test('sheet: the full sheet and both density cuts build with zero text-only coverage warnings', () => {
+test('sheet: the full sheet and both density cuts build with zero text-only coverage warnings', {timeout: 40000}, () => {
   for (const d of [null, 'reading', 'speaker']) {
-    const r = spawnSync(process.execPath, [path.join(root, 'templates/build-sheet.mjs'), ...(d ? ['--density', d] : [])], {encoding: 'utf8'});
+    const r = spawnSync(process.execPath, [path.join(root, 'templates/build-sheet.mjs'), ...(d ? ['--density', d] : [])], {encoding: 'utf8', timeout: 30000});
     assert.equal(r.status, 0, r.stderr);
     const stem = d ? `library-${d}` : 'candidates';
     const model = JSON.parse(fs.readFileSync(path.join(root, `templates/${stem}.model.json`), 'utf8'));
@@ -75,8 +78,8 @@ test('sheet: the full sheet and both density cuts build with zero text-only cove
 // K22: the sheet shows every template as its sample. A `template:` slide on it (the monogram fills) must pass the value-key
 // guard, and the sample-bound templates show only as their bare sample, never filled.
 import {fillErrors, SAMPLE_BOUND} from '../lib/templates.mjs';
-test('sheet: every template slide the sheet fills passes the K22 guard; no sample-bound template is filled', () => {
-  const r = spawnSync(process.execPath, [path.join(root, 'templates/build-sheet.mjs')], {encoding: 'utf8'});
+test('sheet: every template slide the sheet fills passes the K22 guard; no sample-bound template is filled', {timeout: 40000}, () => {
+  const r = spawnSync(process.execPath, [path.join(root, 'templates/build-sheet.mjs')], {encoding: 'utf8', timeout: 30000});
   assert.equal(r.status, 0, r.stderr);
   const model = JSON.parse(fs.readFileSync(path.join(root, 'templates/candidates.model.json'), 'utf8'));
   const filled = model.slides.filter(s => s.template);

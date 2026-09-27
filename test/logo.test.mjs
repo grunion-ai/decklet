@@ -9,6 +9,7 @@ import {logoGeom, plateOf, monogramOf, PLATE_BG} from '../lib/logo.mjs';
 import {validate} from '../bin/validate.mjs';
 import {create} from '../bin/create.mjs';
 import {verify} from '../bin/verify.mjs';
+import {withBrowser, raceOrExit} from './helpers/browser.mjs';
 let pw = null; try { pw = await import('playwright'); } catch {}
 const live = pw ? test : test.skip;
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'decklet-logo-'));
@@ -83,11 +84,12 @@ const LIST = [
 ].map((r, k) => ({x: 80, y: 110 + k * 64, h: 32, col: 120, role: 'Body', alt: r.name + ' logo', ...r}));
 const SAMPLE = deck([{x: 80, y: 48, w: 800, role: 'H1', text: 'Five logos, one name column'}, ...LIST]);
 
-live('runtime: names align down the list, first line centred on the slot, image contained, plates painted', async () => {
+live('runtime: names align down the list, first line centred on the slot, image contained, plates painted', {timeout: 40000}, async () => {
   assert.deepEqual(validate(structuredClone(SAMPLE)).errors, []);
   const f = path.join(tmp, 'sample.html'); fs.writeFileSync(f, create(SAMPLE).html);
-  const b = await pw.chromium.launch();
-  try {
+  // withBrowser races the page work against 30s and always closes the browser after — a hung
+  // waitForFunction under WebKit/Linux fails the test instead of leaving the browser open (K21).
+  await withBrowser(pw.chromium, async b => {
     const p = await b.newPage(); await p.goto('file://' + f);
     await p.waitForFunction(() => [...document.querySelectorAll('#canvas img')].every(i => i.complete));
     const rows = await p.evaluate(() => [...document.querySelectorAll('#canvas .el[data-logo]')].map(d => {
@@ -116,11 +118,15 @@ live('runtime: names align down the list, first line centred on the slot, image 
     assert.equal(rows[0].plate, 'rgb(255, 255, 255)'); assert.equal(rows[1].plate, 'rgb(255, 255, 255)');
     assert.equal(rows[2].plate, 'rgb(21, 23, 27)'); assert.equal(rows[3].plate, null);
     assert.equal(rows[4].img, null); assert.equal(rows[4].mono, 'HG');
-  } finally { await b.close(); }
+  }, {timeout: 30000});
 });
 
-live('verify: the sample logo slide passes layout parity', async () => {
+live('verify: the sample logo slide passes layout parity', {timeout: 70000}, async () => {
   const f = path.join(tmp, 'verify.html'); fs.writeFileSync(f, create(SAMPLE).html);
-  const r = await verify(f, {out: path.join(tmp, 'v'), log: () => {}});
+  // verify() launches and closes its own browsers (chromium + webkit) internally — this file has
+  // no handle to force-close if one of them hangs, so raceOrExit ends this file's process on a
+  // genuine timeout rather than let it sit past the CI job cap (K21; node --test runs each test
+  // file as its own child process, so this never touches a sibling test file).
+  const r = await raceOrExit(verify(f, {out: path.join(tmp, 'v'), log: () => {}}), 60000, 'verify: sample logo slide');
   assert.deepEqual(r.errors, [], JSON.stringify(r.parity));
 });
