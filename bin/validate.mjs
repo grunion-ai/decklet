@@ -14,6 +14,7 @@ import {checkChart, expandCharts} from '../lib/chart.mjs';
 import {stampIds} from '../lib/edits.mjs';
 import {PLATES, isLogoRow, logoGeom} from '../lib/logo.mjs';
 import {isMain} from '../lib/is-main.mjs';
+import {STYLES as CSTYLES, isConnector, route, gapOf, strokeOf} from '../lib/connector.mjs';
 
 export const ROLES = ['Title', 'Supertitle', 'H1', 'H2', 'Body', 'Caption', 'Label', 'Stat'];
 // the KPI allowance: `Stat2` is an OPTIONAL ninth role — a second, smaller stat size for tiles, so a hero "63%" and a card
@@ -241,13 +242,24 @@ export function validate(deck) {
     if (r.arrow && !ARROWS.includes(r.arrow)) E(`${where}: arrow "${r.arrow}" not one of ${ARROWS.join('|')}`);
     else if (r.arrow && !r.line && !r.curve) E(`${where}: arrow needs a line or a curve to sit on`);
     // to/from: terminate a connector against another row, so the engine — not the author — computes where the head stops
+    // a connector row ({from, to, style, gap}): the engine routes it between the two rows' edges, inset by gap at both ends
+    if (isConnector(r)) {
+      if (!CSTYLES.includes(r.style)) E(`${where}: style "${r.style}" not one of ${CSTYLES.join('|')}`);
+      if (r.from == null || r.to == null) E(`${where}: a connector needs both from and to — the rows it joins`);
+      if (r.x != null || r.y != null || r.after != null) E(`${where}: a connector takes its geometry from from/to — drop x, y and after`);
+      if (r.gap != null && !(isNum(r.gap) && r.gap >= 0)) E(`${where}: gap must be a number of px ≥ 0 — the air at each end (default styles.gap, else 6)`);
+      for (const p of ['to', 'from']) if (r[p] != null && isConnector(findRow(s, r[p]))) E(`${where}: ${p} "${r[p]}" is a connector — join two boxes`);
+      const c = s && CSTYLES.includes(r.style) && r.from != null && r.to != null && findRow(s, r.from) && findRow(s, r.to) && routed(r, s);
+      if (c === null) E(`${where}: ${r.from} and ${r.to} overlap or have no resolvable box — nothing to route between`);
+      else if (c && c.len < 1) E(`${where}: the gutter between ${r.from} and ${r.to} is too narrow for a connector with ${gapOf(r, deck.styles)}px of air at each end`);
+    }
     for (const p of ['to', 'from']) {
       if (r[p] == null) continue;
-      if (!r.line && !r.curve) { E(`${where}: ${p} needs a line or a curve to terminate`); continue; }
+      if (!r.line && !r.curve && !isConnector(r)) { E(`${where}: ${p} needs a line or a curve to terminate`); continue; }
       const tgt = typeof r[p] === 'number' ? (s && s.els || [])[r[p]] : ((s && s.els || []).find(x => x.id === r[p]) || master.find(m => m.id === r[p]));
       if (!tgt) { E(`${where}: ${p} "${r[p]}" is not a row id on this slide, a master id, or a row index`); continue; }
       const sl = (tgt.slot && ((deck.slots || {})[tgt.slot] || (s && layouts[s.layout] && layouts[s.layout][tgt.slot]))) || {};
-      if (!['x', 'y', 'w', 'h'].every(k => isNum(tgt[k] ?? sl[k]))) Wn(`${where}: ${p} "${r[p]}" has no resolvable x/y/w/h — the connector cannot be clipped to it`);
+      if (!isConnector(r) && !['x', 'y', 'w', 'h'].every(k => isNum(tgt[k] ?? sl[k]))) Wn(`${where}: ${p} "${r[p]}" has no resolvable x/y/w/h — the connector cannot be clipped to it`);
     }
     if (r.head != null) {
       if (!HEADS.includes(r.head)) E(`${where}: head "${r.head}" not one of ${HEADS.join('|')}`);
@@ -371,8 +383,17 @@ export function validate(deck) {
     if (Array.isArray(r.curve)) row.curve = r.curve.map((v, j) => j % 2 ? v + dy : v + dx);
     return {row, est: !!tr.estW};
   };
+  // a connector row as the runtime draws it: a line between the two rows' declared boxes (the runtime measures the rendered
+  // ones), both ends inset by the gap. null when either end has no box or the boxes overlap.
+  const routed = (r, s) => {
+    const box = k => { const t = findRow(s, k); return t && !isConnector(t) ? rectOf({...t, over: 0}, s) : null; };
+    const g = route(box(r.from), box(r.to), gapOf(r, deck.styles)); if (!g) return null;
+    const row = {...r, ...strokeOf(r), x: g.x, y: g.y, line: g.line, len: g.len, _conn: 1}; delete row.style; delete row.from; delete row.to;
+    return row;
+  };
   const rectOf = (r, s, seen) => {
     if (!r || typeof r !== 'object') return null;
+    if (isConnector(r)) { const c = routed(r, s); return c && rectOf(c, s); }
     if (r.after != null) { const p = placed(r, s, seen); const o = p && rectOf(p.row, s); return o && {...o, estW: o.estW || p.est, r}; }
     const slot = (r.slot && ((deck.slots || {})[r.slot] || (s && layouts[s.layout] && layouts[s.layout][r.slot]))) || {};
     if (r.over ?? slot.over) return null;
@@ -426,7 +447,23 @@ export function validate(deck) {
       if ((B.boxy && !B.logo && held(A, B)) || (A.boxy && !A.logo && held(B, A))) continue;                      // text on its card
       const sa = shelter(A), sb = shelter(B);
       if ((sa && sa !== B && overlap(sa, B) <= 0.5) || (sb && sb !== A && overlap(sb, A) <= 0.5)) continue;
-      const g = A.r.line || B.r.line ? 0 : A.boxy || B.boxy ? gap : 0;                    // a stroke may TOUCH a box (termination); two bare text rows carry their own air in their line boxes
+      // a headless stroke may TOUCH a box (a rail ending on a dot, a leader on a label); an arrowhead or a connector end owes a
+      // painted box the gap like any chip (K3) — unless the stroke is terminated against that very row by to:/from:, or says butt:1
+      // a headless stroke may TOUCH a box (a rail ending on a dot, a leader on a label). An arrow's or a connector's END may not:
+      // it owes a painted box the gap like any chip (K3) — unless the engine terminates it against that very row (to:/from:),
+      // or the stroke says butt:1. The shaft running past a box is still judged as the thin rect it is.
+      const st = P => !!(P.r.line || isConnector(P.r)), head = (P, Q) => st(P) && (P.r.arrow || isConnector(P.r)) && !P.r.butt && Q.boxy && !st(Q)
+        && ![P.r.to, P.r.from].some(k => k != null && !isConnector(P.r) && findRow(s, k) === Q.r);
+      for (const [P, Q] of [[A, B], [B, A]]) if (head(P, Q)) {
+        const o = isConnector(P.r) ? routed(P.r, s) : P.r.after != null ? (placed(P.r, s) || {}).row : P.r; if (!o || !Array.isArray(o.line)) continue;
+        for (const [px, py] of [[o.x ?? 0, o.y ?? 0], o.line]) {
+          const dx = Math.max(Q.x - px, px - (Q.x + Q.w), 0), dy = Math.max(Q.y - py, py - (Q.y + Q.h), 0), d = dx || dy ? Math.hypot(dx, dy) : 0;
+          if (d > gap - 0.5) continue;
+          const est = Q.estW || Q.estH;
+          (est ? Wn : E)(`${where}: ${label(P.r, P.i)} ends ${est ? '~' : ''}${Math.round(d)}px from ${label(Q.r, Q.i)} — an arrow or connector end touches the box; styles.gap is ${gap} (a connector row {from, to, style} routes it clear; butt:1 marks a stroke that deliberately butts a frame)`);
+        }
+      }
+      const g = st(A) || st(B) ? 0 : A.boxy || B.boxy ? gap : 0;   // two bare text rows carry their own air in their line boxes
       const ox = Math.min(A.x + A.w, B.x + B.w) - Math.max(A.x, B.x), oy = Math.min(A.y + A.h, B.y + B.h) - Math.max(A.y, B.y);
       if (ox + g <= 0.5 || oy + g <= 0.5) continue;                                      // half a pixel is antialiasing, not air
       const onX = ox < oy, est = onX ? A.estW || B.estW : A.estH || B.estH, sep = -Math.min(ox, oy);   // the axis the pair nearly separates on decides
@@ -461,11 +498,14 @@ export function validate(deck) {
     // ── connector AIR, across the slide: a connector leaves the same visible gap at both ends and never touches a
     // container. `to:`/`from:` hand that to the engine, so ends it terminates are not second-guessed here.
     // Headed strokes only — see the note above: a chart series or a decorative path has nothing to leave air FROM.
-    const pl = r => r && r.after != null ? ((placed(r, s) || {}).row || r) : r;   // an after row, where the runtime puts it
-    const conn = s.els.map((r, ei) => ({r: pl(r), ei})).filter(o => o.r && (o.r.line || o.r.curve) && o.r.arrow && !o.r.waive && connLen(o.r) >= 40);
+    // A connector row is routed first (its ends are inset by construction, and checked like any other); an end that meets a
+    // painted box is an ERROR since K3/K16 — the old edge-on pass let arrows start flush on the box they leave. The one named
+    // exemption is butt:1, a stroke that deliberately butts a frame.
+    const pl = r => isConnector(r) ? routed(r, s) : r && r.after != null ? ((placed(r, s) || {}).row || r) : r;   // where the runtime puts it
+    const conn = s.els.map((r, ei) => ({r: pl(r), ei})).filter(o => o.r && (o.r.line || o.r.curve) && o.r.arrow && !o.r.waive && !o.r.butt && (o.r._conn || connLen(o.r) >= 40));
     // containers only — the same shape the collision gate calls chrome. A tint band with no border is a backdrop a chart
     // line may legitimately run inside; the rule is about terminating on or inside a BORDER.
-    const rects = s.els.filter(e => e && !isText(e) && (e.bd || e.bt || e.br || e.bb || e.bl || e.box || e.tile)
+    const rects = s.els.filter(e => e && !isText(e) && !isConnector(e) && (e.bd || e.bt || e.br || e.bb || e.bl || e.box || e.tile)
       && ['x', 'y', 'w', 'h'].every(k => isNum(e[k])) && Math.min(e.w, e.h) > 24);
     const holds = (b, p) => p[0] >= b.x && p[0] <= b.x + b.w && p[1] >= b.y && p[1] <= b.y + b.h;
     // a box holding BOTH ends is the container the diagram lives in, not something the connector terminates against
@@ -482,8 +522,9 @@ export function validate(deck) {
     for (const {r, ei} of conn) {
       const w = `slides[${si}].els[${ei}]`, a0 = [r.x ?? 0, r.y ?? 0];
       const z0 = r.line ? [r.line[0], r.line[1]] : [r.curve[4], r.curve[5]];
-      const ends = [[a0, r.from, z0], [z0, r.to, a0]].map(([pt, term, other]) => term != null ? null : clear(pt, other));
-      for (const g of ends) if (g !== null && g <= 1) Wn(`${w}: touches the box — a connector stops clear of it (10px is the default; to:/from: does it for you)`);
+      // a to:/from: end is clipped by the engine and backs off its gap — flush only when it asks for gap:0
+      const ends = [[a0, r.from, z0], [z0, r.to, a0]].map(([pt, term, other]) => term != null ? (r.gap === 0 ? 0 : null) : clear(pt, other));
+      for (const g of ends) if (g !== null && g <= 1) E(`${w}: touches the box — an arrow or connector end stops clear of a painted box (a connector row {from, to, style} or to:/from: leaves the gap for you; butt:1 marks a stroke that deliberately butts a frame)`);
       const [g1, g2] = ends;
       if (g1 !== null && g2 !== null && g1 > 2 && g2 > 2 && g1 < 60 && g2 < 60 && Math.abs(g1 - g2) > 4)
         Wn(`${w}: uneven air — ${Math.round(g1)}px at one end, ${Math.round(g2)}px at the other; use the same gap at both`);
@@ -515,7 +556,7 @@ export function validate(deck) {
     const texts = els.filter(r => isText(r) && plain(r).trim());
     const rt = texts.map(r => rectOf({...r, over: 0}, s)).filter(Boolean);
     const mark = r => {
-      if (r.img != null || r.svg != null || r.icon != null || isLogoRow(r) || r.chart != null || r.donut != null || r.bar || r.placeholder != null || r.curve) return true;
+      if (isConnector(r) || r.img != null || r.svg != null || r.icon != null || isLogoRow(r) || r.chart != null || r.donut != null || r.bar || r.placeholder != null || r.curve) return true;
       if (r.line) { const d = Array.isArray(r.line) ? [Math.abs(r.line[0] - (r.x ?? 0)), Math.abs(r.line[1] - (r.y ?? 0))] : [0, 0]; return !!r.arrow || (d[0] > 2 && d[1] > 2); }
       const b = rectOf({...r, over: 0}, s); if (!b || Math.min(b.w, b.h) <= 3) return false;   // a hairline is a rule
       return !rt.some(t => t.x >= b.x - 1 && t.y >= b.y - 1 && t.x <= b.x + b.w && t.y <= b.y + b.h);   // holds text → a card
