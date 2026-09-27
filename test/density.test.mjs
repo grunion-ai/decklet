@@ -127,6 +127,19 @@ test('density: a number template slide is capped lower; a Stat-led free slide co
     {x: 60, y: 320, w: 840, role: 'Body', text: lorem(40)}, {x: 60, y: 380, w: 840, role: 'Body', text: lorem(30)}]}], {density: 'reading'});
   assert.ok(v(stats).warnings.some(w => /number slide/.test(w)), v(stats).warnings.join(' | '));
 });
+// K19 guard: a slide expanded from exec-summary IS a summary slide, before create expands it or after (create keeps the
+// template id in name), so the reading cap for a summary applies without the author setting kind.
+test('density: a slide from exec-summary is a summary slide — capped at the summary words at reading density', () => {
+  const extra = {x: 60, y: 420, w: 840, role: 'Caption', text: lorem(30)};
+  const model = () => deck([{template: 'exec-summary', els: [extra, {slot: 'source', text: 'Source · board pack'}]}], {density: 'reading'});
+  for (const r of [v(model()), validate(create(model()).deck), validate(model())]) {   // after create, and before it expands
+    const m = r.warnings.find(w => /summary slide/.test(w) && /words/.test(w));
+    assert.ok(m, r.warnings.join(' | '));
+    assert.match(m, new RegExp(`≤ ${DENSITY.reading.max.summary} words`));
+  }
+  const bare = v(deck([{template: 'exec-summary'}], {density: 'reading'}));
+  assert.ok(!bare.warnings.some(w => /density carries/.test(w)), 'the sample itself fits the summary cap: ' + bare.warnings.join(' | '));
+});
 test('density: kind is summary or nothing; a speaker summary keeps the speaker cap', () => {
   assert.ok(v(deck([claim({kind: 'sumary'})], {density: 'reading'})).errors.some(e => /kind/.test(e)));
   const rep = densityReport(claim({kind: 'summary'}), LIBRARY, 'speaker', 'summary');

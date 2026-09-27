@@ -490,11 +490,12 @@ test('templates: K14 — stat-row-4 with a longer tile body reflows nothing it s
 // definition — the words-by-nature shelves: statements, lists, text columns, chrome and mark placement. The slide a
 // template expands into inherits the mark, so an author never sets it by hand.
 const TEXT_ONLY = t => v(deck([{template: t.id}], {draft: 1})).warnings.filter(m => /text only/.test(m));
-// Two templates draw the author's own media, so their bare sample is words until it is filled, and the gate is right to say
-// so: image-hero-overlay (the photo) and proof-strip (the five logos). The sheet binds a sample photo and monogram chips.
+// Three templates draw the author's own media, so their bare sample is words until it is filled, and the gate is right to say
+// so: image-hero-overlay (the photo), proof-strip (the five logos) and three-up-cards (a logo per cohort card, K19). The
+// sheet binds a sample photo and monogram chips.
 test('templates: every template passes the coverage gate as sampled — a graphic, or textOnly: true in its definition', () => {
   const loud = TEMPLATES.filter(t => TEXT_ONLY(t).length).map(t => t.id);
-  assert.deepEqual([...loud].sort(), ['image-hero-overlay', 'proof-strip'], 'text-only warnings on the samples of: ' + loud.join(', '));
+  assert.deepEqual([...loud].sort(), ['image-hero-overlay', 'proof-strip', 'three-up-cards'], 'text-only warnings on the samples of: ' + loud.join(', '));
   const marks = v(deck([{template: 'proof-strip', fill: Object.fromEntries([1, 2, 3, 4, 5].map(i => ['m' + i, {logo: ''}]))}], {draft: 1}));
   assert.deepEqual(marks.warnings.filter(m => /text only/.test(m)), [], 'five monogram chips are a logo group');
 });

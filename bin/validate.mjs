@@ -492,7 +492,8 @@ export function validate(deck) {
     if (!s || typeof s !== 'object') return E(`slides[${si}]: not an object`);
     if (s.layout && !layouts[s.layout]) E(`slides[${si}]: layout "${s.layout}" not in deck.layouts or the library (${Object.keys(LIBRARY).join(', ')})`);
     const tpl = TEMPLATE[kinds[si]] || TEMPLATE[s.name];   // a Numbers-shelf template is a number slide (K19), read before or after create expands it
-    const dm = densityReport(s, layouts, s.density || deck.density, tpl && tpl.cat === 'Numbers' ? 'numbers' : null); if (dm) Wn(`slides[${si}]: ${dm}`);
+    // a template may name its slide kind (exec-summary is a summary slide, K19); a Numbers-shelf template is a number slide
+    const dm = densityReport(s, layouts, s.density || deck.density, tpl && (tpl.kind || (tpl.cat === 'Numbers' ? 'numbers' : null))); if (dm) Wn(`slides[${si}]: ${dm}`);
     if (!Array.isArray(s.els)) return E(`slides[${si}]: els must be an array`);
     for (const id of s.hide || []) if (!mids.has(id)) E(`slides[${si}]: hide "${id}" is not a master id`);
     // an after chain that comes back to itself has no left edge to start from: one error per cycle
