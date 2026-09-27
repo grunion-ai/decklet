@@ -1,8 +1,8 @@
 // decklet embedded — live proofs (Playwright, skipped when absent) for a deck hosted inside another page. A node:http server
 // inside the test serves the built deck and three hosts: an iframe on the same origin, an iframe from a second site
 // (localhost hosting 127.0.0.1 — a cross-site frame, where browsers partition or refuse storage), and a srcdoc frame.
-// Same origin and srcdoc: an edit survives a reload of the host. Cross-site: the deck lands on a tier that persists or says
-// red — never an error, in Chromium and WebKit alike.
+// Same origin and srcdoc: an edit survives a reload of the host. Cross-site: the deck lands on a tier that persists or on the
+// tab route ("Not saving") — never an error, in Chromium and WebKit alike.
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
@@ -42,15 +42,15 @@ for (const bn of ['chromium', 'webkit']) live(`same-origin iframe (${bn}): an ed
   assert.deepEqual(p.errs, []); await b.close();
 });
 
-for (const bn of ['chromium', 'webkit']) live(`cross-site iframe (${bn}): localhost hosting 127.0.0.1 — a tier that persists, or an honest red dot; never an error`, async () => {
+for (const bn of ['chromium', 'webkit']) live(`cross-site iframe (${bn}): localhost hosting 127.0.0.1 — a tier that persists, or the honest tab state; never an error`, async () => {
   const b = await pw[bn].launch(); const p = watch(await b.newPage({viewport: {width: 1200, height: 800}}));
   await p.goto(at('localhost', '/host.html?src=' + encodeURIComponent(at('127.0.0.1', '/deck.html')))); let fr = await frameOf(p);
   assert.notEqual(await fr.evaluate(() => location.hostname), await p.evaluate(() => location.hostname), 'fixture: two sites');
-  const s0 = await state(fr); assert.ok(['ok', 'bad'].includes(s0[0]), `settled: ${s0}`);
+  const s0 = await state(fr); assert.ok(['ok', 'tab'].includes(s0[0]), `settled: ${s0}`);
   await fr.evaluate(() => { snap(); slide().els[1].x = 333; save(); }); await p.waitForTimeout(300);
   await p.reload(); fr = await frameOf(p);
   const s1 = await state(fr), x = await fr.evaluate(() => slide().els[1].x);
-  if (s1[1] === 'mem') assert.deepEqual([s1[0], s1[2], x], ['bad', true, 60], `the deck says so: ${s1}`);
+  if (s1[1] === 'mem') assert.deepEqual([s1[0], s1[2]], ['tab', true], `the deck says so: ${s1}`);
   else assert.deepEqual([x, ['ok', 'local'].includes(s1[0])], [333, true], `the ${s1[1]} tier kept the edit (${s1})`);
   assert.deepEqual(p.errs, []); await b.close();
 });

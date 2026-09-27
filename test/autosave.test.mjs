@@ -74,9 +74,11 @@ test('create --from reads past the VERSIONS block a 0.5–0.8 file carries; the 
 });
 
 // ── live ──
-const fsaInit = () => { // File System Access, mocked: a granted handle whose writes land in window.__writes
-  window.__writes = []; const h = {kind: 'file', name: 'wb.html', queryPermission: async () => 'granted', requestPermission: async () => 'granted',
-    createWritable: async () => ({write: async s => { window.__writes.push(s); }, close: async () => {}})};
+const fsaInit = () => { // File System Access, mocked: a granted handle whose writes land in window.__writes; getFile() reports the
+  // last write with a stable lastModified, so the changed-on-disk guard (test/tab.test.mjs) sees nobody else wrote it
+  window.__writes = []; let mod = 1; const h = {kind: 'file', name: 'wb.html', queryPermission: async () => 'granted', requestPermission: async () => 'granted',
+    getFile: async () => ({lastModified: mod, text: async () => window.__writes.at(-1) || document.documentElement.outerHTML}),
+    createWritable: async () => ({write: async s => { window.__writes.push(s); }, close: async () => { mod++; }})};
   window.showOpenFilePicker = async () => [h];
 };
 live('continuous write-back: the dot links the file once; a burst of edits is ONE write ~800 ms later, no ⌘S; a hidden tab writes at once', async () => {
@@ -116,16 +118,16 @@ for (const bn of ['chromium', 'webkit']) live(`storage tier 2 (${bn}): localStor
   assert.deepEqual(p.errs, []); await b.close();
 });
 
-live('storage tier 3 (webkit): nothing persists (Safari on file://) — red at load, Save a copy shows, edits hold for the session, no errors', async () => {
+live('storage tier 3 (webkit): nothing persists (Safari on file://) — the tab state at load, edits hold for the session, no errors', async () => {
   const b = await pw.webkit.launch(); const f = write('mem.html', create(model()).html);
   const ctx = await b.newContext(); await ctx.addInitScript(() => {
     Object.defineProperty(window, 'localStorage', {get() { throw new Error('blocked'); }});
     Object.defineProperty(window, 'indexedDB', {get() { throw new Error('blocked'); }});
   });
   const p = watch(await ctx.newPage()); await p.goto(pathToFileURL(f).href);
-  assert.equal(await settled(p), 'bad', 'red: nothing persists');
-  assert.deepEqual(await p.evaluate(() => [TIER, document.body.classList.contains('nostore'), !$('savebad').hidden]), ['mem', true, true], 'the save button wears its red ! — the copy door is that button');
-  assert.match(await p.getAttribute('#autosave', 'aria-label'), /blocks storage for local files/, 'the full sentence names the cause and the way out');
+  assert.equal(await settled(p), 'tab', 'amber "Not saving": nothing persists beyond this tab');
+  assert.deepEqual(await p.evaluate(() => [TIER, route(), document.body.classList.contains('nostore'), $('savebad').hidden]), ['mem', 'tab', true, true], 'the pill says it in words; no badge');
+  assert.match(await p.getAttribute('#autosave', 'aria-label'), /^This browser cannot save here\. Edits survive reload in this tab only\. Host it: node bin\/serve\.mjs mem\.html$/, 'the full sentence names the cause and the way out');
   await p.evaluate(() => { snap(); slide().els[1].x = 7; save(); nav(1); nav(-1); });
   assert.equal(await p.evaluate(() => slide().els[1].x), 7, 'edits still hold in memory for the session');
   assert.deepEqual(p.errs, []); await b.close();

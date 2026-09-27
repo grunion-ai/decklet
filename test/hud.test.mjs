@@ -90,9 +90,10 @@ test('hud: save is one button — a Lucide glyph the size of its siblings, state
   assert.doesNotMatch(tpl, /id="savecopy"|#savecopy|\$\('savecopy'\)/, 'the second button is gone — markup, CSS and handler');
   assert.match(tpl, /function saveCopy\(\)\{/, 'the copy itself stays: saveFile falls to it when there is no file handle');
   assert.match(tpl, /#autosave\[data-state=local\]\{color:#d29922\}/, 'amber: edits not in the file yet');
-  assert.match(tpl, /#autosave\[data-state=bad\]\{color:#f85149\}/, 'red: nothing persists');
+  assert.match(tpl, /#autosave\[data-state=tab\]\{color:#d29922\}/, 'amber, labelled: nothing persists here, the tab keeps the edits');
+  assert.doesNotMatch(tpl, /data-state=bad|autosave\('bad'\)/, 'the red state is gone: tab replaced it');
   assert.match(tpl, /#autosave\[data-state=busy\]\{[^}]*animation:asave \.6s ease-in-out infinite alternate/, 'the pulse while a write is in flight survives');
-  assert.match(tpl, /bad:'Save a copy · ⌘S — this browser blocks storage, so edits only survive in a copy'/, 'the red state says the way out, where the lost button used to say it');
+  assert.equal((tpl.match(/tab:TABMSG\(\)/g) || []).length, 2, 'the tab state says the way out (host it), as tooltip and aria-label');
   assert.doesNotMatch(tpl, /#autosave i\{/, 'the bare dot is gone');
 });
 
@@ -107,9 +108,9 @@ live('hud: the save button reads its state — calm with no badge, amber with th
     await p.evaluate(() => { snap(); slide().els[1].x = 99; save(); }); await p.waitForTimeout(350);
     const local = await read();
     assert.equal(local.state, 'local'); assert.equal(local.badge, '1', 'amber wears the count of edits not in the file');
-    await p.evaluate(() => { unsynced = 0; autosave('bad'); }); await p.waitForTimeout(50);
-    const bad = await read();
-    assert.equal(bad.badge, '!', 'red wears a mark, not a number');
+    await p.evaluate(() => { unsynced = 0; autosave('tab'); }); await p.waitForTimeout(50);
+    const tab = await read();
+    assert.equal(tab.badge, null, 'the tab state says "Not saving" in words, so it wears no badge');
     assert.deepEqual(p.errs, []);
   } finally { await b.close(); }
 });
@@ -123,9 +124,9 @@ live('hud: storage blocked (Safari on file://) — red, the copy sentence, and a
     await p.goto(pathToFileURL(f).href); await p.waitForSelector('#canvas .el');
     await p.waitForFunction(() => document.getElementById('autosave').dataset.state !== 'busy');
     const s = await p.evaluate(() => ({state: $('autosave').dataset.state, tip: $('autosave').dataset.tip, full: $('autosave').getAttribute('aria-label'), badge: $('savebad').hidden ? null : $('savebad').textContent}));
-    assert.equal(s.state, 'bad'); assert.equal(s.badge, '!');
-    assert.equal(s.tip, 'Save a copy · ⌘S — this browser blocks storage, so edits only survive in a copy', 'the tooltip the lost button carried now rides the only button left');
-    assert.match(s.full, /blocks storage for local files/, 'the full sentence still names the cause');
+    assert.equal(s.state, 'tab'); assert.equal(s.badge, null);
+    assert.equal(s.tip, 'This browser cannot save here. Edits survive reload in this tab only. Host it: node bin/serve.mjs blocked.html', 'the tooltip names the cause and the fix');
+    assert.equal(s.full, s.tip, 'the full sentence is the same one');
     const copy = await p.evaluate(async () => { let blob = null; URL.createObjectURL = x => { blob = x; return 'blob:x'; }; HTMLAnchorElement.prototype.click = () => {};
       document.getElementById('autosave').click(); await new Promise(r => setTimeout(r, 200)); return blob ? (await blob.text()).slice(0, 200) : null; });
     assert.match(String(copy), /^<!DOCTYPE html>/, 'a click in the blocked state downloads the deck as a copy — the Safari path');
