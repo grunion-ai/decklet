@@ -18,11 +18,11 @@ let pw = null; try { pw = await import('playwright'); } catch {}
 const live = pw ? test : test.skip;
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'decklet-kpi-'));
 const grid = {w: 960, h: 540, slides: [
-  {name: 'kpis', layout: 'kpi-grid', els: [{slot: 'supertitle', text: 'Renewal Radar'}, {slot: 'title', text: 'Three numbers'},
+  {name: 'kpis', layout: 'kpi-grid', textOnly: true, els: [{slot: 'supertitle', text: 'Renewal Radar'}, {slot: 'title', text: 'Three numbers'},
     {slot: 'kpi1', text: '63%'}, {slot: 'kpi1-delta', text: '↑ 8 pts'}, {slot: 'kpi1-label', text: 'Renewed'},
     {slot: 'kpi2', text: '41 d'}, {slot: 'kpi2-delta', text: '↓ 3%', color: 'var(--bad,var(--accent))'}, {slot: 'kpi2-label', text: 'Days early'},
     {slot: 'kpi3', text: '$1.2M'}, {slot: 'kpi3-delta', text: '↑ $180K'}, {slot: 'kpi3-label', text: 'Renewed volume'}]},
-  {name: 'hero', layout: 'stat', els: [{slot: 'title', text: 'One number'}, {slot: 'stat', text: '63%'}, {slot: 'caption', text: 'of the book renewed'}]},
+  {name: 'hero', layout: 'stat', textOnly: true, els: [{slot: 'title', text: 'One number'}, {slot: 'stat', text: '63%'}, {slot: 'caption', text: 'of the book renewed'}]},
 ]};
 
 test('kpi: Stat2 is optional — eight roles stay the scale, the template keeps eight, and Stat2 is derived from Stat only when used', () => {

@@ -8,12 +8,12 @@
     { "id": "foot", "footer": 1, "x": 60, "y": 500, "w": 300, "role": "Label", "text": "Q3 update" }
   ],
   "slides": [
-    { "name": "cover", "layout": "title", "els": [
+    { "name": "cover", "textOnly": true, "layout": "title", "els": [
       { "slot": "supertitle", "text": "Quarterly update" },
       { "slot": "title", "text": "Q3 in one page." },
       { "x": 60, "y": 280, "w": 700, "role": "Body", "color": "var(--muted)", "text": "What moved, what didn't, and what we do next quarter." }
     ]},
-    { "name": "numbers", "layout": "content", "els": [
+    { "name": "numbers", "textOnly": true, "layout": "content", "els": [
       { "slot": "supertitle", "text": "The numbers" },
       { "slot": "title", "text": "Growth held. Time-to-value halved." },
       { "x": 60,  "y": 170, "w": 195, "h": 110, "tile": 1, "role": "Stat", "text": "1,240" },
@@ -40,7 +40,7 @@
       { "x": 420, "y": 430, "w": 120, "role": "Label", "align": "center", "text": "Aug" },
       { "x": 600, "y": 430, "w": 120, "role": "Label", "align": "center", "text": "Sep" }
     ]},
-    { "name": "next", "layout": "content", "els": [
+    { "name": "next", "textOnly": true, "layout": "content", "els": [
       { "slot": "supertitle", "text": "Next quarter" },
       { "slot": "title", "text": "Three commitments." },
       { "x": 60,  "y": 170, "w": 260, "h": 200, "tile": 1, "role": "Body", "text": "Ship onboarding v2" },

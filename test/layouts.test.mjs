@@ -37,7 +37,7 @@ export const fill = (name, k = 0) => {
   return {name: `${name}-${k}`, layout: name, els, ...(name === 'image-hero-overlay' ? {hide: ['foot']} : {})};   // a full-bleed hero hides the footer
 };
 export const everyLayout = (w = 960, h = 540) => ({w, h, title: 'library', styles: {margin: 60}, master: [{id: 'foot', footer: 1, x: 60, y: 500, w: 300, role: 'Label', text: 'library'}],
-  slides: NAMES.map((n, k) => fill(n, k))});
+  slides: NAMES.map((n, k) => ({...fill(n, k), textOnly: true}))});   // the catalogue shows each layout's words; coverage is judged in coverage.test
 
 test('library: diagram — title chrome, one 840×320 figure frame, a caption that states the claim', () => {
   const d = LIBRARY.diagram;
@@ -116,7 +116,7 @@ test('library: no dense slot collides — subtitle · note · source · legend c
 });
 
 test('library: a bullet page binds only the points it has — four bullets, four dot-bearing rows, no fifth', () => {
-  const m = {w: 960, h: 540, slides: [{layout: 'bullets', els: [{slot: 'supertitle', text: 'The close'}, {slot: 'title', text: 'Four things the close waits on'},
+  const m = {w: 960, h: 540, slides: [{layout: 'bullets', textOnly: true, els: [{slot: 'supertitle', text: 'The close'}, {slot: 'title', text: 'Four things the close waits on'},
     {slot: 'subtitle', text: 'Each one is a person waiting for a file.'},
     {slot: 'b1', text: 'The bank feed posts overnight.'}, {slot: 'b2', text: 'Card statements land on the third day.'},
     {slot: 'b3', text: 'Two subsidiaries send spreadsheets.'}, {slot: 'b4', text: 'Sign-off needs two directors.'},
@@ -179,7 +179,7 @@ test('library: an unknown layout still errors, and the error lists the library n
 });
 
 test('library: a slide mixes a library layout with free rows (and nudges a slot with its own x/y)', () => {
-  const m = {w: 960, h: 540, slides: [{layout: 'kpi-grid', els: [
+  const m = {w: 960, h: 540, slides: [{layout: 'kpi-grid', textOnly: true, els: [
     {slot: 'title', text: 'Renewals'},
     {slot: 'kpi1', text: '63%'}, {slot: 'kpi1-label', text: 'renewed'},
     {slot: 'kpi2', text: '41'}, {slot: 'kpi2-label', text: 'days early', y: 296},
@@ -269,7 +269,7 @@ test('library: SKILL.md documents the catalogue and the mixing rule', () => {
 });
 
 live('live: four bullets draw four dots and no fifth — in chromium and in webkit, the dot outside the row\'s own box', async () => {
-  const m = {w: 960, h: 540, title: 'dots', slides: [{layout: 'bullets', els: [{slot: 'title', text: 'Four things the close waits on'},
+  const m = {w: 960, h: 540, title: 'dots', slides: [{layout: 'bullets', textOnly: true, els: [{slot: 'title', text: 'Four things the close waits on'},
     ...[1, 2, 3, 4].map(n => ({slot: `b${n}`, text: `A wait on somebody else, number ${n}.`}))]}]};
   const f = path.join(tmp, 'dots.html'); fs.writeFileSync(f, create(m).html);
   for (const name of ['chromium', 'webkit']) {
@@ -290,7 +290,7 @@ live('live: four bullets draw four dots and no fifth — in chromium and in webk
 });
 
 live('live: a deck using every library layout renders — parity holds, zero page errors; so does the mixed slide', async () => {
-  for (const [n, m] of [['every-layout', everyLayout()], ['mixed', {w: 960, h: 540, slides: [{layout: 'kpi-grid', els: [
+  for (const [n, m] of [['every-layout', everyLayout()], ['mixed', {w: 960, h: 540, slides: [{layout: 'kpi-grid', textOnly: true, els: [
     {slot: 'title', text: 'Renewals'}, {slot: 'kpi1', text: '63%'}, {slot: 'kpi1-label', text: 'renewed'}, {slot: 'kpi1-delta', text: '↑ 8 pts'},
     {x: 60, y: 400, w: 400, role: 'Caption', text: 'a free caption row beside the tiles'}, {x: 500, y: 400, line: [900, 400], h: 1, bg: 'var(--line)'}]}]}]]) {
     const f = path.join(tmp, n + '.html'); fs.writeFileSync(f, create(m).html);
