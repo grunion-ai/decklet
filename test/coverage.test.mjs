@@ -67,12 +67,48 @@ test('coverage: deck.entities warns on a named company with no logo nearby, and 
   assert.deepEqual(unlogoed(validate(deck([{els: [...rows, ...logos]}], {entities}))), []);
   const far = [{x: 820, y: 460, w: 48, h: 24, img: PNG}];
   assert.equal(unlogoed(validate(deck([{els: [...rows, ...far]}], {entities}))).length, 1, 'a logo across the slide is not beside the name');
-  assert.deepEqual(unlogoed(validate(deck([{els: [txt(60, 'Xometry leads quoting', 'H1'), {x: 700, y: 300, w: 100, h: 60, img: PNG}]}], {entities}))), [], 'a heading may name a company in prose');
-  assert.deepEqual(unlogoed(validate(deck([{els: [txt(300, 'Xometry and Protolabs both cut quoting to seconds this year.')]}], {entities}))), [], 'so may a sentence: the rule is for listings');
+});
+
+test('coverage: deck.entities (K18) — a company named in prose needs its own logo somewhere on the slide', () => {
+  const entities = ['Xometry', 'Protolabs', 'MISUMI', 'Fictiv', ['nTop', 'nTopology']];
+  const prose = v => v.warnings.filter(w => /no logo for/.test(w));
+  const sentence = txt(300, 'MISUMI buys Fictiv, and Xometry cuts quoting to seconds this year.');
+  const v = validate(deck([{els: [sentence]}], {entities}));
+  assert.equal(prose(v).length, 1, JSON.stringify(v.warnings));
+  assert.match(prose(v)[0], /^slides\[0\]: .*MISUMI.*Fictiv.*Xometry/);
+  assert.match(unlogoed(v)[0], /img|logo/, 'the message names the fix');
+  assert.equal(prose(validate(deck([{els: [txt(60, 'Xometry leads quoting', 'H1')]}], {entities}))).length, 1, 'a heading is prose too');
+  // a logo for that company, anywhere on the slide: by asset key, by alt, or by the logo row's name; an unnamed img is nobody's logo
+  const assets = {misumi: PNG};
+  const els = [sentence,
+    {x: 700, y: 60, h: 24, logo: '#misumi', name: 'buys Fictiv'},
+    {x: 700, y: 120, h: 24, logo: PNG, name: 'Fictiv'},
+    {x: 700, y: 400, w: 100, h: 40, img: PNG, alt: 'Xometry logo'}];
+  assert.deepEqual(unlogoed(validate(deck([{els}], {entities, assets}))), [], 'every named company has its logo');
+  const partial = validate(deck([{els: [sentence, {x: 700, y: 60, h: 24, logo: '#misumi', name: 'buys Fictiv'}, {x: 700, y: 400, w: 100, h: 40, img: PNG}]}], {entities, assets}));
+  assert.equal(prose(partial).length, 1, JSON.stringify(partial.warnings));
+  assert.match(prose(partial)[0], /Fictiv, Xometry/); assert.doesNotMatch(prose(partial)[0], /MISUMI/, 'the row names Fictiv, but its logo is MISUMI\'s');
+  // aliases: an array entry is one company under several names; whole words only
+  assert.equal(prose(validate(deck([{els: [txt(300, 'nTopology ships implicit modeling to aerospace teams.')]}], {entities}))).length, 1, 'an alias is a mention');
+  assert.match(prose(validate(deck([{els: [txt(300, 'nTopology ships implicit modeling to aerospace teams.')]}], {entities})))[0], /nTop/);
+  assert.deepEqual(prose(validate(deck([{els: [txt(300, 'nTopology ships implicit modeling.'), {x: 700, y: 60, h: 24, logo: PNG, name: 'nTop'}]}], {entities}))), [], 'a logo under any alias clears it');
+  assert.deepEqual(prose(validate(deck([{els: [txt(300, 'Fictivity is not a company we listed.')]}], {entities}))), [], 'whole words only');
+});
+
+test('coverage: deck.entities (K18) — a monogram chip for a listed company warns', () => {
+  const entities = ['Xometry', 'Protolabs'];
+  const mono = v => v.warnings.filter(w => /monogram for/.test(w));
+  const v = validate(deck([{els: [{x: 60, y: 200, h: 24, logo: '', name: 'Xometry'}, {x: 60, y: 260, h: 24, monogram: 'PL', name: 'Protolabs'}]}], {entities}));
+  assert.equal(mono(v).length, 2, JSON.stringify(v.warnings));
+  assert.match(mono(v)[0], /^slides\[0\]: monogram for Xometry/);
+  assert.deepEqual(mono(validate(deck([{els: [{x: 60, y: 200, h: 24, logo: '', name: 'Acme Tools'}]}], {entities}))), [], 'an unlisted company may wear a monogram');
+  assert.ok(validate(deck([{els: [{x: 60, y: 200, h: 24, logo: '', name: 'Xometry'}]}], {entities})).ok, 'a warning, not an error');
 });
 
 test('coverage: deck.entities must be a list of names; warnings fail only under --strict', () => {
   assert.ok(validate(deck([{els: three}], {entities: 'Xometry'})).errors.some(e => /entities/.test(e)));
+  assert.ok(validate(deck([{els: three}], {entities: [['nTop', 3]]})).errors.some(e => /entities/.test(e)), 'an alias list holds names only');
+  assert.deepEqual(validate(deck([{els: three}], {entities: ['Xometry', ['nTop', 'nTopology']]})).errors, []);
   const v = validate(deck([{els: three}]));
   assert.ok(v.ok, 'a warning is not an error');
   const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'decklet-cov-')), 'model.json');
