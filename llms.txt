@@ -24,7 +24,7 @@ PDF: the ⤓ button writes a true slide-sized PDF inside the file (foreignObject
 - docs/assets.md: decklet-assets (bin/assets.mjs): logo <name|domain>, shot <url>, monogram <name>; manifest.json with aspect and plate
 - docs/examples.md, docs/import-html.md: four worked briefs end to end, and finished HTML pages into a model
 - README.md: what/for whom/guarantees/feature matrix/roadmap
-- deck.html: the engine with its own explainer deck (12 slides, incl. the motion vocabulary and three inlined GIF clips of the editor) — live at https://grunion-ai.github.io/decklet/deck.html
+- deck.html: the engine with its own explainer deck (18 slides, incl. the type set, spacing defaults, logo and figure galleries, the motion vocabulary and three inlined GIF clips of the editor) — live at https://grunion-ai.github.io/decklet/deck.html
 - docs/demo.gif, docs/demo-poster.png: README demo recording, a build product of deck.html via docs/record-demo.mjs (Playwright + ffmpeg)
 - docs/record-clips.mjs: films the three editor clips on the explainer's "filmed" slide from deck.html and writes them into examples/explainer/model.json as data: URIs (Playwright + ffmpeg)
 - docs/editor.md: the editor reference — the HUD manifest (a machine-checked list the gate compares with the template), phones, the contact sheet, both PDF routes, PNG export, presenting, persistence, the flagged-word panel and the bug door
