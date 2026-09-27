@@ -337,6 +337,58 @@ test('templates: media — a text fill and a media fill on the same item compose
   assert.equal(a.col, Math.round(b.col * 1600 / 960)); assert.equal(a.h, Math.round(b.h * 1600 / 960));
 });
 
+// K11: a logo in a media slot is never under MEDIA_MIN (20px at the 960 cut) and never shrunk by its column: a small `h` is raised,
+// a wide mark grows the column (one column per slide, so the names still align), and the rows under a taller item move down.
+import {logoGeom, padOf, plateOf} from '../lib/logo.mjs';
+import {fillErrors} from '../lib/templates.mjs';
+import {MEDIA_MIN} from '../lib/layouts.mjs';
+const expanded = (id, fill) => { const d = deck([{template: id, fill}]); expandTemplates(d); return d.slides[0].els; };
+test('templates: media — a logo is at least MEDIA_MIN tall and fills its chip: a small h is raised, a wide mark grows the column', () => {
+  assert.equal(MEDIA_MIN, 20);
+  let refused = 0;
+  for (const id of LIST) for (const aspect of [0.5, 1, 2, 6.8]) for (const h of [undefined, 12]) {
+    const fill = Object.fromEntries(templateMedia(id).map((e, i) => [e.key, {logo: PNG, aspect: i ? aspect : 1, plate: 'light', ...(h ? {h} : {})}]));
+    const tag = `${id} aspect ${aspect} h ${h}`, why = fillErrors(id, fill);
+    if (why.length) { assert.match(why.join(' '), /needs \d+px beside .* at 20px tall/, tag); assert.equal(aspect, 6.8, tag + ': only a very wide mark is refused'); refused++; continue; }   // a centred box too narrow: refused, never shrunk
+    const logos = expanded(id, fill).filter(r => r.logo != null);
+    assert.equal(logos.length, templateMedia(id).length, tag);
+    for (const r of logos) {
+      assert.ok(r.h >= MEDIA_MIN, `${tag}: logo ${r.h}px tall, under ${MEDIA_MIN}`);
+      const g = logoGeom(r), inner = r.h - 2 * padOf(r.h, plateOf(r.plate));
+      assert.ok(g.img.h >= inner - 0.01, `${tag}: the column shrank the mark to ${g.img.h.toFixed(1)}px of ${inner}`);
+    }
+    const left = logos.filter(r => r.w != null);   // a centred pair has no w: it is centred on its own box, so there is no x to share
+    assert.ok(new Set(left.map(r => r.col)).size <= 1, `${tag}: one column per slide, so the names align`);
+  }
+});
+test('templates: media — an item taller than its first line moves the rows under it down; the slide still validates clean', () => {
+  for (const id of LIST) for (const m of [{logo: PNG, aspect: 6.8, h: 32}, {icon: 'factory', h: 32}]) {
+    const tag = `${id} ${Object.keys(m)[0]}`, why = fillErrors(id, mediaFill(id, m));
+    if (why.length) { assert.match(why.join(' '), /centred box leaves/, tag); continue; }
+    const els = expanded(id, mediaFill(id, m));
+    for (const mk of els.filter(r => r.logo != null || r.icon != null)) {
+      const bottom = mk.y + mk.h, x1 = mk.x + (mk.col ?? mk.w);
+      const under = els.filter(r => r !== mk && typeof r.y === 'number' && r.y > mk.y + mk.h / 2 && r.y < bottom - 0.5 && !r.slot
+        && typeof r.x === 'number' && r.x < x1 && r.x + (typeof r.w === 'number' ? r.w : 0) > mk.x && (r.text != null || r.logo != null));
+      assert.deepEqual(under.map(r => r.text ?? r.name), [], `${tag}: text starts inside the media box (${mk.y}..${bottom})`);
+    }
+    const r = v(deck([{template: id, fill: mediaFill(id, m)}]));
+    assert.deepEqual(r.errors, [], `${tag}: ${r.errors.join(' | ')}`);
+  }
+});
+// K2: an icon a template places beside text by hand obeys the media rule too: centred on the text's first line, one GAP before it
+test('templates: every icon beside text is centred on its first line with one fixed gutter, never top-aligned', () => {
+  let n = 0;
+  for (const t of TEMPLATES) for (const ic of t.els.filter(r => r.icon && typeof r.y === 'number')) {
+    const txt = t.els.find(r => r.text != null && typeof r.x === 'number' && r.x >= ic.x + ic.w && r.x - (ic.x + ic.w) <= 32
+      && r.y < ic.y + ic.h && r.y + lhOf(r) > ic.y);
+    if (!txt) continue; n++;
+    assert.ok(Math.abs((ic.y + ic.h / 2) - (txt.y + lhOf(txt) / 2)) <= 0.5, `${t.id} ${ic.icon}: centre ${ic.y + ic.h / 2} vs first line ${txt.y + lhOf(txt) / 2}`);
+    assert.equal(txt.x - (ic.x + ic.w), GAP, `${t.id} ${ic.icon}: gutter`);
+  }
+  assert.ok(n >= 10, `the icon-beside-text templates are found (${n})`);
+});
+
 test('templates: media — fill errors name what a media key takes', () => {
   const bad = [[{m9: {icon: 'factory'}}, /fill key "m9"/], [{m1: 'factory'}, /takes one of \{logo\}, \{img\} or \{icon\}/],
     [{m1: {icon: 'factory', img: PNG}}, /one of/], [{m1: {icon: 'no-such-icon'}}, /icon "no-such-icon"/],

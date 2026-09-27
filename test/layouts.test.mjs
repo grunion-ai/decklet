@@ -10,7 +10,7 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 import {validate, ROLES} from '../bin/validate.mjs';
 import {create} from '../bin/create.mjs';
 import {verify} from '../bin/verify.mjs';
-import {LIBRARY, GROUPS, DENSE, COUNTER, NEUTRAL_LH, libraryFor, catalogue, densityReport, freeArea} from '../lib/layouts.mjs';
+import {LIBRARY, GROUPS, DENSE, COUNTER, NEUTRAL_LH, MEDIA_MIN, libraryFor, catalogue, densityReport, freeArea} from '../lib/layouts.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 let pw = null; try { pw = await import('playwright'); } catch {}
@@ -373,6 +373,8 @@ test('library: media — each list layout carries one <item>-media slot per item
       if (name === 'agenda') assert.equal(slots[`item${i + 1}`].x - (sl.x + sl.w), 8, 'agenda: one 8px gutter before the item');
     }
   }
+  for (const [name, l] of Object.entries(LIBRARY)) for (const [s, sl] of Object.entries(l.slots || {}))
+    if (/-media$/.test(s)) assert.ok(sl.h >= MEDIA_MIN && sl.w >= MEDIA_MIN, `${name}.${s}: a media slot is at least ${MEDIA_MIN}px (K11)`);
   const cat = catalogue();
   assert.match(cat, /item1-media +media +78 +150 +24 +24/);
 });
