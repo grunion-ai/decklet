@@ -19,9 +19,10 @@ const read = f => fs.readFileSync(path.join(root, f), 'utf8');
 const v = m => validate(create(m).deck);   // validate what create() judges: the neutral roles filled in
 const deck = (slides, extra = {}) => ({w: 960, h: 540, title: 'tpl', ...extra, slides});
 
-test('templates: 115 ship, every id unique, every one names a tier, a category and a density', () => {
-  assert.equal(TEMPLATES.length, 115);
-  assert.equal(new Set(TEMPLATES.map(t => t.id)).size, 115);
+test('templates: 116 ship, every id unique, every one names a tier, a category and a density', () => {
+  // K26: 116 = 115 + the deprecated 'table-insight' alias for 'table-panel'
+  assert.equal(TEMPLATES.length, 116);
+  assert.equal(new Set(TEMPLATES.map(t => t.id)).size, 116);
   for (const t of TEMPLATES) {
     assert.ok(['core', 'standard', 'fringe'].includes(t.tier), t.id + ' tier');
     assert.ok(t.cat && t.note, t.id + ' cat + note');
@@ -259,7 +260,7 @@ import {NEUTRAL_LH} from '../lib/layouts.mjs';
 import {scale} from '../lib/templates/kit.mjs';
 const LIST = ['agenda-ruled', 'stat-row-3', 'stat-row-4', 'kpi-scorecard', 'two-col-compare', 'benchmark-table', 'harvey-balls',
   'scorecard-grid', 'value-chain', 'process-flow-3', 'process-flow-4', 'process-flow-5', 'timeline-horizontal', 'gantt-lanes', 'vertical-steps',
-  'funnel-stages', 'three-up-cards', 'table-insight', 'proof-strip'];
+  'funnel-stages', 'three-up-cards', 'table-insight', 'table-panel', 'proof-strip'];
 const PNG = 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 20"><rect width="40" height="20" fill="#123"/></svg>').toString('base64');
 const MEDIA = {logo: {logo: PNG, aspect: 2}, img: {img: PNG, fit: 'cover'}, icon: {icon: 'factory'}, monogram: {logo: ''}};
 // a filled slide names its quantities (K22), so a media fill carries every value key at its sample; a sample-bound template

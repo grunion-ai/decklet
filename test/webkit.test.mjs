@@ -25,7 +25,12 @@ test('fontWarnings flags a role whose stack starts with an engine-resolved famil
 
 // a label that fits one line in Chromium and wraps onto the caption under it in WebKit only. The WebKit-only width comes from
 // a feature query Chromium fails (hanging-punctuation), standing in for SF Mono so the test holds on any OS.
-const model = {w: 960, h: 540, title: 'webkit', slides: [{els: [
+// K26: the engine default Label no longer leads with ui-monospace (it trips this very warning on every unbranded deck), so
+// Kyle's case is reproduced here explicitly instead of riding the default — the rest of the roles are the engine's own.
+const model = {w: 960, h: 540, title: 'webkit', styles: {roles: {
+  Label: {font: 'ui-monospace,Menlo,Consolas,monospace', size: 11, weight: 500, lh: 14, ls: 1, color: 'var(--muted)', tt: 'uppercase', cw: 0.69},
+  Caption: {font: "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif", size: 13, weight: 400, lh: 18, ls: 0, color: 'var(--muted)', cw: 0.47}}},
+  slides: [{els: [
   {x: 60, y: 100, w: 320, role: 'Label', text: 'part library'},
   {x: 60, y: 112, w: 600, role: 'Caption', text: 'the caption sitting right under the label'}]}]};
 const build = name => { const f = path.join(tmp, name);
