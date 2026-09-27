@@ -21,6 +21,8 @@ const MARK = 'PLACEHOLDER';
 // numbers page and an eight-slide deck gets the study's own run: opener · agenda · stats · chart · process · figure ·
 // comparison · close. Every rung builds its whole slide, because the answer to "does this shape survive speaker
 // density" differs per shape: reading carries ≤ 8 points and ≤ 140 words, speaker ≤ 3 and ≤ 40 (lib/layouts.mjs).
+// textOnly: a starter's words rungs say so, so the coverage gate (validate) stays quiet on the scaffold; the author drops the
+// flag when they give the slide its figure (a proportional template for the numbers rung, an img or diagram for the rest).
 const RUNGS = [
   {rank: 6, build: d => ({name: 'agenda', layout: 'agenda', els: [
     {slot: 'supertitle', text: 'AGENDA'},
@@ -31,13 +33,13 @@ const RUNGS = [
     // title box within 2px of the subtitle's y on the library's chrome pitch, and a starter must be clean on every kit
     ...(d === 'speaker' ? [] : [{slot: 'note', text: 'Replace with the one sentence that frames the list.'}]),
   ]})},
-  {rank: 7, build: d => ({name: 'points', layout: 'bullets', els: [
+  {rank: 7, build: d => ({name: 'points', layout: 'bullets', textOnly: true, els: [
     {slot: 'supertitle', text: 'POINTS'},
     {slot: 'title', text: 'Replace with the claim these points carry.'},
     ...items(d === 'speaker' ? 3 : 5).map(([, i]) => ({slot: 'b' + i, text: d === 'speaker' ? `Replace · point ${i}` : `Replace · point ${i}, one line, no number`})),
     ...(d === 'speaker' ? [] : [{slot: 'note', text: 'Replace with what a reader should make of the list.'}]),
   ]})},
-  {rank: 1, build: d => ({name: 'numbers', layout: 'kpi-grid', els: [
+  {rank: 1, build: d => ({name: 'numbers', layout: 'kpi-grid', textOnly: true, els: [
     {slot: 'supertitle', text: 'NUMBERS'},
     {slot: 'title', text: 'Replace with what the numbers say.'},
     ...[1, 2, 3].flatMap(i => [
@@ -56,7 +58,7 @@ const RUNGS = [
     {slot: 'takeaway', text: 'Replace with the takeaway. The bars above are a placeholder ramp, not data.'},
     ...(d === 'speaker' ? [] : [{slot: 'source', text: `${MARK} · name the source`}]),
   ]})},
-  {rank: 3, build: d => ({name: 'process', layout: 'process-steps', els: [
+  {rank: 3, build: d => ({name: 'process', layout: 'process-steps', textOnly: true, els: [
     {slot: 'supertitle', text: 'PROCESS'},
     {slot: 'title', text: 'Replace with the name of the process.'},
     ...items(d === 'speaker' ? 3 : 4).flatMap(([n, i]) => [
@@ -72,7 +74,7 @@ const RUNGS = [
   ], edges: [{from: 'a', to: 'b'}, {from: 'b', to: 'c', state: 'chosen'}]}, {
     name: 'figure', supertitle: 'FIGURE', title: 'Replace with the name of the figure.',
     caption: 'Replace with the sentence this figure proves.'})},
-  {rank: 5, build: d => ({name: 'options', layout: 'comparison', els: [
+  {rank: 5, build: d => ({name: 'options', layout: 'comparison', textOnly: true, els: [
     {slot: 'supertitle', text: 'OPTIONS'},
     {slot: 'title', text: 'Replace with the choice being made.'},
     {slot: 'left-head', text: 'Replace · option A'},
@@ -90,7 +92,7 @@ const RUNGS = [
       {slot: 'd' + i}, {slot: 't' + i, text: `Q${i}`}, {slot: 'e' + i, text: `Replace · milestone ${i}`}]),
     ...(d === 'speaker' ? [] : [{slot: 'note', text: 'Replace with what has to be true by the last date.'}]),
   ]})},
-  {rank: 9, build: d => ({name: 'cards', layout: 'three-up-cards', els: [
+  {rank: 9, build: d => ({name: 'cards', layout: 'three-up-cards', textOnly: true, els: [
     {slot: 'supertitle', text: 'CARDS'},
     {slot: 'title', text: 'Replace with what the three cards have in common.'},
     // the tile is a paint slot: bind it as well as its text, and before it, or the words sit on an empty canvas

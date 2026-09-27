@@ -9,7 +9,7 @@
     { "id": "foot", "footer": 1, "x": 444, "y": 990, "w": 300, "align": "right", "role": "Label", "text": "one-pager" }
   ],
   "slides": [
-    { "name": "page-1", "layout": "page", "els": [
+    { "name": "page-1", "textOnly": true, "layout": "page", "els": [
       { "slot": "supertitle", "text": "Overview" },
       { "slot": "title", "text": "First drafts, faster." },
       { "x": 72, "y": 150, "w": 672, "role": "Body", "text": "Teams lose the first day of every project to a blank page. The draft that unblocks everyone is the one nobody has time to write." },
@@ -21,7 +21,7 @@
       { "x": 72, "y": 442, "w": 300, "role": "Label", "text": "less time to first draft" },
       { "x": 400, "y": 400, "w": 344, "role": "Body", "color": "var(--muted)", "text": "Measured across 40 projects in the pilot: time from kickoff to a reviewable draft dropped from 2.7 days to 1.7." }
     ]},
-    { "name": "page-2", "layout": "page", "els": [
+    { "name": "page-2", "textOnly": true, "layout": "page", "els": [
       { "slot": "supertitle", "text": "How it works" },
       { "slot": "title", "text": "Three steps." },
       { "x": 72, "y": 150, "w": 672, "role": "H2", "text": "1 · Paste the source" },

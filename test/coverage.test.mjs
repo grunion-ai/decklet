@@ -31,27 +31,54 @@ test('coverage: a plain card behind the text is still text only', () => {
   assert.equal(textOnly(v).length, 1, JSON.stringify(v.warnings));
 });
 
-test('coverage: an icon, an image, a chart or a drawn mark clears it', () => {
-  const cases = {
-    icon: {x: 700, y: 60, w: 48, h: 48, icon: 'award'},
-    img: {x: 700, y: 60, w: 160, h: 90, img: PNG},
-    bar: {x: 700, y: 60, w: 120, h: 24, bg: '#36c'},
-    arrow: {x: 700, y: 300, line: [860, 300], arrow: 'end', h: 3},
+test('coverage (K9): a visual clears it only by its area — about 8% of the content box; an icon is decoration', () => {
+  const pass = {
+    img: {x: 600, y: 60, w: 300, h: 170, img: PNG},
     chart: {x: 680, y: 60, w: 240, h: 200, chart: {mark: 'bar', data: [{label: 'A', value: 3}, {label: 'B', value: 5}]}},
+    bars: [0, 1, 2, 3].map(k => ({x: 700 + k * 50, y: 120 + k * 20, w: 40, h: 200 - k * 20, bg: '#36c'})),
+    diagram: [{id: 'a', x: 60, y: 300, w: 200, h: 80, bg: '#eee'}, {x: 70, y: 320, w: 180, role: 'Label', text: 'Quote'},
+      {id: 'b', x: 400, y: 300, w: 200, h: 80, bg: '#eee'}, {x: 410, y: 320, w: 180, role: 'Label', text: 'Make'},
+      {from: 'a', to: 'b', style: 'arrow'}],
+    logos: [0, 1, 2, 3, 4, 5].map(k => ({x: 660 + (k % 2) * 130, y: 280 + Math.floor(k / 2) * 60, h: 40, logo: PNG, name: 'Mk' + k})),
   };
-  for (const [k, r] of Object.entries(cases)) {
-    const v = validate(deck([{els: [...three, r]}]));
+  for (const [k, r] of Object.entries(pass)) {
+    const v = validate(deck([{els: [...three, ...[r].flat()]}]));
     assert.deepEqual(textOnly(v), [], `${k}: ${JSON.stringify(v.warnings)}`);
+  }
+  const fail = {
+    icon: {x: 700, y: 60, w: 48, h: 48, icon: 'award'},
+    'icon row': [0, 1, 2].map(k => ({x: 60 + k * 300, y: 300, w: 32, h: 32, icon: 'award'})),
+    'small img': {x: 820, y: 60, w: 80, h: 45, img: PNG},
+    'one bar': {x: 700, y: 60, w: 120, h: 24, bg: '#36c'},
+    arrow: {x: 700, y: 300, line: [860, 300], arrow: 'end', h: 3},
+    'wide rule': {x: 60, y: 120, line: [900, 120], h: 2, bg: '#36c'},
+  };
+  for (const [k, r] of Object.entries(fail)) {
+    const v = validate(deck([{els: [...three, ...[r].flat()]}]));
+    assert.equal(textOnly(v).length, 1, `${k} is decoration, not the visual: ${JSON.stringify(v.warnings)}`);
+    assert.match(textOnly(v)[0], /\d+%/, 'the message names the coverage it found');
   }
 });
 
-test('coverage: cover, section and statement slides, short slides and big-number slides are exempt', () => {
-  for (const layout of ['cover', 'section', 'statement']) {
-    const v = validate(deck([{layout, els: [{slot: 'title', text: 'A title'}, {slot: layout === 'statement' ? 'caption' : 'body', text: 'A line under it'}]}]));
-    assert.deepEqual(textOnly(v), [], layout);
-  }
-  assert.deepEqual(textOnly(validate(deck([{els: three.slice(0, 2)}]))), [], 'a title and one line is a statement by form');
-  assert.deepEqual(textOnly(validate(deck([{els: [...three, {x: 700, y: 60, w: 200, role: 'Stat', text: '63%'}]}]))), [], 'a big number is a figure');
+test('coverage (K9): a chart of 10% of the content box passes, one of 5% warns', () => {
+  const chart = (w, h) => ({x: 600, y: 200, w, h, chart: {mark: 'bar', data: [{label: 'A', value: 3}, {label: 'B', value: 5}, {label: 'C', value: 4}]}});
+  // the content box on 960×540 is the canvas inside the 60px margin: 840 × 420
+  assert.deepEqual(textOnly(validate(deck([{els: [...three, chart(210, 168)]}]))), [], '210×168 is 10% of 840×420');
+  assert.equal(textOnly(validate(deck([{els: [...three, chart(150, 120)]}]))).length, 1, '150×120 is 5%');
+});
+
+test('coverage (K6): a template or layout slide is judged too — no exemption for naming one', () => {
+  const bullets = {layout: 'bullets', els: [{slot: 'title', text: 'Four things the close waits on'},
+    {slot: 'b1', text: 'The bank feed posts overnight.'}, {slot: 'b2', text: 'Card statements land on the third day.'},
+    {slot: 'b3', text: 'Two subsidiaries send spreadsheets.'}]};
+  assert.equal(textOnly(validate(deck([bullets]))).length, 1, 'a bullet layout with no graphic warns');
+  assert.equal(textOnly(validate(deck([{template: 'bullet-page'}]))).length, 1, 'a text template warns');
+  assert.equal(textOnly(validate(deck([{template: 'stat-row-4'}]))).length, 1, 'stat tiles are words in boxes, not a graphic (K10)');
+  assert.equal(textOnly(validate(deck([{template: 'icon-bullets'}]))).length, 1, 'icons beside the points are decoration');
+  for (const t of ['area-bubbles', 'waffle', 'range-bar', 'chart-column', 'chart-line-trend', 'figure-flow'])
+    assert.deepEqual(textOnly(validate(deck([{template: t}]))), [], `${t} draws a real graphic`);
+  assert.deepEqual(textOnly(validate(deck([{...bullets, textOnly: true}]))), [], 'textOnly: true declares a words slide');
+  assert.ok(validate(deck([{...bullets, textOnly: 1}])).errors.some(e => /textOnly/.test(e)), 'textOnly is a boolean');
 });
 
 test('coverage: deck.entities warns on a named company with no logo nearby, and a logo beside it clears it', () => {

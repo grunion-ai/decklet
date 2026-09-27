@@ -81,6 +81,9 @@ const ROLE_REQ = ['font', 'size', 'weight', 'color'];   // lh is strongly recomm
 const isNum = v => typeof v === 'number' && Number.isFinite(v);
 const plain = r => (r.text ?? r.html ?? '').replace(/<[^>]+>/g, '');
 const isText = r => r.text != null || r.html != null;
+// the kinds that are words by design: the coverage gate never asks them for a graphic (any other slide says textOnly: true)
+const TEXT_KINDS = new Set(['cover', 'agenda', 'section', 'statement', 'quote', 'cta', 'end',
+  'cover-hero', 'cover-split', 'section-numeral', 'agenda-ruled', 'quote-pull', 'closing-cta', 'logo-cover-lockup']);
 export const AGAP = 10;   // `after` air when a row states no gap — the connector's own default air (template AGAP)
 // end-to-end span of a connector row; below ~40px a line is an icon stroke (a tick, a cross), not a run between boxes
 const connLen = r => { const x0 = r.x ?? 0, y0 = r.y ?? 0, e = r.line ? r.line : r.curve ? [r.curve[4], r.curve[5]] : null;
@@ -144,12 +147,13 @@ export function validate(deck) {
   // (merged by create or by the CLI, or copied verbatim), and stretches the same way off 16:9
   const libCut = Array.isArray(deck.slides) ? libraryFor({w: W, h: H, slides: deck.slides.filter(s => s && typeof s === 'object'), layouts: {}}) : {};
   const isLibrary = name => !!libCut[name] && JSON.stringify((deck.layouts || {})[name] ?? libCut[name]) === JSON.stringify(libCut[name]);
-  const kinds = [];   // the layout or template each slide named, read before templates expand — the coverage gate's exemptions
+  const kinds = [];   // the layout or template each slide named, read before templates expand — TEXT_KINDS are words by kind
   const nameOk = n => typeof n === 'string' && !!n.trim();
   if (deck.entities != null && !(Array.isArray(deck.entities) && deck.entities.every(n => nameOk(n) || (Array.isArray(n) && n.length && n.every(nameOk))))) E('deck.entities must be an array of names — the companies whose every mention wants a logo — where an entry may be a list of aliases, [name, alias, …]');
   for (const [si, s] of (Array.isArray(deck.slides) ? deck.slides : []).entries()) {
     if (!s || typeof s !== 'object') continue;
     kinds[si] = String(s.template || s.layout || '');
+    if (s.textOnly != null && typeof s.textOnly !== 'boolean') E(`slides[${si}]: textOnly must be true or false — true declares a words slide the coverage gate skips`);
     if (s.template != null && !TEMPLATE[s.template]) E(`slides[${si}]: template "${s.template}" not in the library (${Object.keys(TEMPLATE).join(', ')})`);
     else if (s.template != null) for (const m of fillErrors(s.template, s.fill || {})) E(`slides[${si}]: ${m}`);
     if (s.density != null && !DENSITY[s.density]) E(`slides[${si}]: density "${s.density}" not one of ${Object.keys(DENSITY).join('|')}`);
@@ -556,12 +560,75 @@ export function validate(deck) {
       seen.push(a0);
     }
   });
-  // ── COVERAGE: words with nothing to look at. A slide of three or more text rows and no image, icon, chart, diagram or
-  // drawn mark reads as a document page; every other gate passes it, so nothing told the author it was a defect. A painted
-  // rect that holds a text row is a card (still text); one that holds none is a mark (a bar, a dot, a swatch). A straight
-  // orthogonal line is a rule; a headed, curved or diagonal one is a diagram. A Stat row is a figure. Master rows are chrome,
-  // never coverage. A slide that names a layout or template has declared its kind (cover, section, statement, bullets…), so
-  // the gate judges free-row slides only: hand geometry is where a one-shot deck drops its pictures.
+  // ── COVERAGE (K6, K9): words with nothing to look at. A slide of three or more text rows passes only when a real graphic
+  // covers ~8% of its content box (the canvas inside the margin): an img, a logo group, a chart, a diagram, a drawn svg, a
+  // proportional figure, painted data shapes. The graphic's footprint is its cluster's box: marks within GAP px of each other
+  // join; a cluster takes in the cards its strokes join, the rules (axes) and the Label rows (ticks, values) around it. A
+  // lone mark sizes itself, so a 16px icon, a chip or one bar is decoration, not the visual. Cards (painted boxes that hold
+  // text), orthogonal rules, Stat rows and master rows are never coverage. Naming a layout or template exempts nothing;
+  // a words slide says so: the opener, statement and closer kinds (TEXT_KINDS), or textOnly: true on the slide.
+  const COVER = 0.08, GAP = 24, REACH = 60;
+  const MG = deck.styles && isNum(deck.styles.margin) ? deck.styles.margin : Math.round((isNum(W) ? W : 960) * 0.0625);
+  const content = isNum(W) && isNum(H) ? {x: MG, y: MG, w: W - 2 * MG, h: H - 2 * MG} : null;
+  const coverage = (s, els, rt) => {
+    if (!content || content.w <= 0 || content.h <= 0) return 1;
+    const res = row => row.slot ? {...((deck.slots || {})[row.slot] || (layouts[s.layout] || {})[row.slot] || {}), ...row} : row;   // a slot row wears its slot's paint
+    const box = row => {
+      const r = res(row);
+      if (Array.isArray(r.line) && r.line.every(isNum) && isNum(r.x) && isNum(r.y)) { const t = (r.h ?? 3) / 2; return {x: Math.min(r.x, r.line[0]) - t, y: Math.min(r.y, r.line[1]) - t, w: Math.abs(r.line[0] - r.x) + 2 * t, h: Math.abs(r.line[1] - r.y) + 2 * t}; }
+      if (Array.isArray(r.curve) && r.curve.every(isNum) && isNum(r.x) && isNum(r.y)) { const xs = [r.x, ...r.curve.filter((_, k) => k % 2 === 0)], ys = [r.y, ...r.curve.filter((_, k) => k % 2)]; return {x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys)}; }
+      return rectOf({...r, over: 0, ...(r.donut != null && isNum(r.w) && !isNum(r.h) ? {h: r.w} : {})}, s);   // a donut is w square
+    };
+    const near = (a, b, g) => a.x - g <= b.x + b.w && b.x - g <= a.x + a.w && a.y - g <= b.y + b.h && b.y - g <= a.y + a.h;
+    const within = (a, b, g) => a.x >= b.x - g && a.y >= b.y - g && a.x + a.w <= b.x + b.w + g && a.y + a.h <= b.y + b.h + g;
+    const holds = b => rt.some(t => t.x >= b.x - 1 && t.y >= b.y - 1 && t.x <= b.x + b.w && t.y <= b.y + b.h);
+    const isRule = r => Array.isArray(r.line) && !r.arrow && !r.to && !r.from && !(Math.abs(r.line[0] - (r.x ?? 0)) > 2 && Math.abs(r.line[1] - (r.y ?? 0)) > 2);
+    const marks = [], rules = [], cards = [], labels = [];
+    for (const row of els) {
+      const b = box(row); if (!b) continue;
+      const r = res(row);
+      if (isText(r)) { if (/^(Label|Caption)$/.test(r.role || '')) labels.push(b); continue; }
+      if (isRule(r)) { rules.push(b); continue; }
+      const painted = r.img != null || r.svg != null || isLogoRow(r) || r.placeholder != null || r.bar || r.chart != null || r.donut != null || r.line || r.curve || isConnector(r);
+      if (painted || Math.min(b.w, b.h) > 3) (!painted && holds(b) ? cards : marks).push({b, r: row});
+    }
+    // a box that holds its value label and abuts another box is a data shape (a stacked segment, a heatmap cell), not a card
+    const abut = (a, b) => a !== b && near(a, b, 1) && (Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x) > 3 || Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y) > 3);
+    const shapes = cards.filter(c => [...cards, ...marks].some(o => abut(c.b, o.b) && !(within(c.b, o.b, 0) || within(o.b, c.b, 0))));
+    marks.push(...shapes);
+    const join = (a, b) => { const x = Math.min(a.x, b.x), y = Math.min(a.y, b.y); return {x, y, w: Math.max(a.x + a.w, b.x + b.w) - x, h: Math.max(a.y + a.h, b.y + b.h) - y}; };
+    const clusters = [];   // union-find by proximity, the lazy way: merge until nothing moves
+    for (const m of marks) {
+      let c = {b: m.b, rows: [m.r]};
+      for (let k = clusters.length - 1; k >= 0; k--) if (near(clusters[k].b, c.b, GAP)) { c = {b: join(clusters[k].b, c.b), rows: [...clusters[k].rows, ...c.rows]}; clusters.splice(k, 1); }
+      clusters.push(c);
+    }
+    // logos read as one group: three or more logo rows (or stand-in marks) are one cluster, with the tiles that frame them
+    const logoRows = new Set(els.filter(r => isLogoRow(r) || (r.placeholder != null && !isText(r))));
+    if (logoRows.size >= 3) {
+      const inG = clusters.filter(c => c.rows.some(r => logoRows.has(r)));
+      let b = inG.map(c => c.b).reduce(join);
+      for (const cd of cards) if (inG.some(c => c.rows.some(r => logoRows.has(r) && within(box(r), cd.b, 0)))) b = join(b, cd.b);
+      clusters.splice(0, clusters.length, ...clusters.filter(c => !inG.includes(c)), {b, rows: inG.flatMap(c => c.rows)});
+    }
+    for (let moved = true; moved;) { moved = false; for (let i = 0; i < clusters.length && !moved; i++) for (let j = i + 1; j < clusters.length; j++) if (near(clusters[i].b, clusters[j].b, GAP)) { clusters[i] = {b: join(clusters[i].b, clusters[j].b), rows: [...clusters[i].rows, ...clusters[j].rows]}; clusters.splice(j, 1); moved = true; break; } }
+    for (const c of clusters) {
+      for (const r of c.rows) for (const k of [r.from, r.to]) { const t = k != null && findRow(s, k), b = t && box(t); if (b) c.b = join(c.b, b); }   // a diagram spans the boxes its strokes join
+      for (const r of c.rows) if (res(r).line || res(r).curve) for (const cd of cards) if (near(cd.b, box(r), 8)) c.b = join(c.b, cd.b);
+      // axes and gridlines cross the data or sit beside it; ticks and value labels sit within REACH — to a fixpoint
+      for (let pool = [...rules.map(b => [b, 1]), ...labels.map(b => [b, 0])], moved = true; moved;) {
+        moved = false;
+        pool = pool.filter(([b, rule]) => (rule && near(b, c.b, 0)) || within(b, c.b, REACH) ? (c.b = join(c.b, b), moved = true, false) : true);
+      }
+    }
+    const CELL = 4, cols = Math.ceil(content.w / CELL), hit = new Uint8Array(cols * Math.ceil(content.h / CELL));
+    for (const {b} of clusters) {
+      const x0 = Math.max(0, Math.floor((b.x - content.x) / CELL)), x1 = Math.min(cols, Math.ceil((b.x + b.w - content.x) / CELL));
+      const y0 = Math.max(0, Math.floor((b.y - content.y) / CELL)), y1 = Math.min(hit.length / cols, Math.ceil((b.y + b.h - content.y) / CELL));
+      for (let y = y0; y < y1; y++) hit.fill(1, y * cols + x0, Math.max(y * cols + x0, y * cols + x1));
+    }
+    return hit.reduce((n, v) => n + v, 0) / hit.length;
+  };
   const NEAR = 120;   // px: a logo this close to a name is beside it
   // deck.entities: 'Xometry' or ['nTop', 'nTopology'] (the first name reports, any alias matches), whole words, any case
   const ents = (Array.isArray(deck.entities) ? deck.entities : []).map(n => (Array.isArray(n) ? n : [n]).filter(a => typeof a === 'string' && a.trim()).map(a => a.trim())).filter(a => a.length);
@@ -578,15 +645,10 @@ export function validate(deck) {
     const els = s.els.filter(r => r && typeof r === 'object');
     const texts = els.filter(r => isText(r) && plain(r).trim());
     const rt = texts.map(r => rectOf({...r, over: 0}, s)).filter(Boolean);
-    const mark = r => {
-      if (isConnector(r) || r.img != null || r.svg != null || r.icon != null || isLogoRow(r) || r.chart != null || r.donut != null || r.bar || r.placeholder != null || r.curve) return true;
-      if (r.line) { const d = Array.isArray(r.line) ? [Math.abs(r.line[0] - (r.x ?? 0)), Math.abs(r.line[1] - (r.y ?? 0))] : [0, 0]; return !!r.arrow || (d[0] > 2 && d[1] > 2); }
-      const b = rectOf({...r, over: 0}, s); if (!b || Math.min(b.w, b.h) <= 3) return false;   // a hairline is a rule
-      return !rt.some(t => t.x >= b.x - 1 && t.y >= b.y - 1 && t.x <= b.x + b.w && t.y <= b.y + b.h);   // holds text → a card
-    };
     const roleName = r => r.role || ((r.slot && ((deck.slots || {})[r.slot] || (layouts[s.layout] || {})[r.slot])) || {}).role || '';
-    if (!kinds[si] && texts.length >= 3 && !els.some(r => isText(r) ? /^Stat/.test(roleName(r)) : mark(r)))
-      Wn(`slides[${si}]: text only — ${texts.length} text rows and no image, icon, chart, diagram or drawn mark; add an icon row, an img or logo, a chart or a diagram (or name a layout, such as statement or section, if the slide is words by design)`);
+    if (!s.textOnly && ![kinds[si], s.layout, TEMPLATE[s.name] && s.name].some(k => TEXT_KINDS.has(k)) && texts.length >= 3) {   // name: create() keeps the template id there
+      if (coverage(s, els, rt) < COVER) Wn(`slides[${si}]: text only — words and no graphic over ${COVER * 100}% of the content box (icons, chips and a lone bar are decoration); add an img or logo group, a chart, a diagram or a proportional figure (or set textOnly: true if the slide is words by design)`);
+    }
     if (!entRe.length) continue;
     const logos = els.filter(isLogo).map(r => rectOf({...r, over: 0}, s) || (isNum(r.x) && isNum(r.y) ? {x: r.x, y: r.y, w: isNum(r.w) ? r.w : (r.h ?? 24) * 2, h: r.h ?? 24} : null)).filter(Boolean);
     const named = new Set(), prose = new Set();

@@ -55,9 +55,11 @@ test('validate: a logo row is a first-class row — checked fields, a box for th
   for (const m of [/logo must be a data: URI/, /plate "grey"/, /aspect/, /col/, /h must be/]) assert.ok(bad.errors.some(e => m.test(e)), m + ' in ' + bad.errors.join(' | '));
   assert.ok(validate(deck([{logo: '', x: 60, y: 60, h: 30}])).errors.some(e => /monogram/.test(e)), 'no logo, no name, no monogram');
   assert.ok(validate(deck([{logo: SQUARE, name: 'X', x: 60, y: 60, h: 30, role: 'Nope'}])).errors.some(e => /role "Nope"/.test(e)));
-  // coverage: three text rows and a logo row are not a text-only slide
+  // coverage (K9): a logo group is a visual; one logo row beside three text rows is decoration
   const t = y => ({x: 400, y, w: 400, role: 'Body', text: 'A line of body text ' + y});
-  assert.ok(!validate(deck([t(100), t(200), t(300), {logo: '', name: 'Hubb', x: 60, y: 60, h: 28}])).warnings.some(w => /text only/.test(w)));
+  const wall = [60, 120, 180, 240, 300, 360].map(y => ({logo: '', name: 'Hubb ' + y, x: 60, y, h: 40}));
+  assert.ok(!validate(deck([t(100), t(200), t(300), ...wall])).warnings.some(w => /text only/.test(w)));
+  assert.ok(validate(deck([t(100), t(200), t(300), wall[0]])).warnings.some(w => /text only/.test(w)));
   // entities: a logo row beside a listing clears the no-logo warning
   const listed = validate(deck([{x: 200, y: 64, w: 200, role: 'Body', text: 'Xometry'}, {logo: SQUARE, x: 60, y: 60, h: 28, col: 40}], {entities: ['Xometry']}));
   assert.ok(!listed.warnings.some(w => /no logo/.test(w)), listed.warnings.join(' | '));

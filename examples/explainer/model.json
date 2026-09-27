@@ -11,13 +11,13 @@
     { "id": "foot", "footer": 1, "x": 660, "y": 500, "w": 240, "align": "right", "role": "Label", "text": "decklet" }
   ],
   "slides": [
-    { "name": "cover", "layout": "title", "els": [
+    { "name": "cover", "textOnly": true, "layout": "title", "els": [
       { "slot": "supertitle", "text": "DECKLET · A SELF-EXPLAINING DECK", "anim": "fade" },
       { "slot": "title", "text": "The renderer\nis the editor.", "anim": "rise" },
       { "x": 60, "y": 318, "w": 780, "role": "Body", "color": "var(--muted)", "text": "Agent-generated, brand-true, real-time editable presentations and assets — one portable HTML file, no office suite.", "anim": "rise" },
       { "x": 60, "y": 410, "w": 840, "role": "Caption", "text": "Drag anything · double-click to retype · ⌘Z undoes · → next slide · Esc contact sheet · F present · ⤓ PDF", "anim": "fade" }
     ]},
-    { "name": "model", "layout": "content", "els": [
+    { "name": "model", "textOnly": true, "layout": "content", "els": [
       { "slot": "supertitle", "text": "THE MODEL", "anim": "fade" },
       { "slot": "title", "text": "Every slide is rows in a JSON array.", "anim": "rise" },
       { "x": 60,  "y": 160, "w": 140, "role": "Body", "box": 1, "text": "deck\n{w, h}" },
@@ -33,7 +33,7 @@
       { "x": 60, "y": 370, "w": 840, "role": "Body", "color": "var(--muted)", "text": "Geometry is in model pixels on a fixed canvas (960×540 here). The editor scales the canvas to the window; print scales it to the page. Nothing reflows, so what you verify is what everyone sees." },
       { "x": 60, "y": 446, "w": 840, "role": "Caption", "text": "Check a model without a browser:  node bin/validate.mjs model.json" }
     ]},
-    { "name": "roles", "layout": "content", "els": [
+    { "name": "roles", "textOnly": true, "layout": "content", "els": [
       { "slot": "supertitle", "text": "ROLES", "anim": "fade" },
       { "slot": "title", "text": "Eight roles. One font and size per role.", "anim": "rise" },
       { "x": 60, "y": 136, "w": 560, "role": "Title", "text": "Title 64" },
@@ -48,7 +48,7 @@
       { "x": 660, "y": 240, "w": 240, "role": "Caption", "text": "Title is the display size for cover and closing headlines only; H1 titles every content slide. No H3, no Subtitle." },
       { "x": 60, "y": 396, "w": 840, "role": "Body", "text": "A row never sets font, size, leading or tracking — the validator rejects it. Rows may carry weight, color, case and italics; inline runs carry bold, italic, underline, strike, sub/superscript and color. Retheme by editing the roles; every deck follows." }
     ]},
-    { "name": "layouts", "layout": "content", "els": [
+    { "name": "layouts", "textOnly": true, "layout": "content", "els": [
       { "slot": "supertitle", "text": "LAYOUTS & SLOTS", "anim": "fade" },
       { "slot": "title", "text": "Geometry lives in the layout. Content lives in the slide.", "anim": "rise" },
       { "x": 60, "y": 150, "w": 840, "role": "Body", "text": "This slide's supertitle and title are bound to slots — {slot:'title', text:'…'} with no x, y or w on the row. The layout named 'content' owns that geometry for every slide that uses it." },
@@ -58,14 +58,14 @@
       { "x": 60, "y": 330, "w": 840, "role": "Body", "text": "Move a slotted row and the slide keeps a local override. The toolbar's “Apply to layout” promotes that geometry to the slot — every sibling slide follows." },
       { "x": 60, "y": 420, "w": 840, "role": "Caption", "text": "Deck-scope slots (deck.slots) sit under every layout — for chrome shared by all layouts, such as a supertitle." }
     ]},
-    { "name": "master", "layout": "content", "els": [
+    { "name": "master", "textOnly": true, "layout": "content", "els": [
       { "slot": "supertitle", "text": "MASTER LAYER", "anim": "fade" },
       { "slot": "title", "text": "Chrome is drawn once, under every slide.", "anim": "rise" },
       { "x": 60, "y": 150, "w": 840, "role": "Body", "text": "The rule and the footer at the bottom of this slide are master rows. The page counter renders inline inside the footer — same font, baseline and edge — never a hardcoded pin." },
       { "x": 60, "y": 230, "w": 840, "role": "Body", "text": "Edit a master row on one slide and the engine forks a slide-local override (override:'foot'). “Apply to all slides” pushes it back into the master. Delete it on one slide and only that slide hides it (hide:['foot'])." },
       { "x": 60, "y": 330, "w": 840, "role": "Caption", "box": 1, "align": "left", "text": "master: [\n  {id:'rule', x:60, y:486, h:1, line:[900,486], bg:'var(--line)'},\n  {id:'foot', footer:1, x:660, y:500, w:240, align:'right', role:'Label', text:'decklet'}\n]" }
     ]},
-    { "name": "editing", "layout": "content", "els": [
+    { "name": "editing", "textOnly": true, "layout": "content", "els": [
       { "slot": "supertitle", "text": "EDITING", "anim": "fade" },
       { "slot": "title", "text": "The renderer is the editor.", "anim": "rise" },
       { "x": 60,  "y": 150, "w": 400, "role": "Body", "text": "Drag a row. ⌘-click to multi-select and drag together." },
@@ -116,7 +116,7 @@
       { "x": 730, "y": 368, "w": 150, "role": "Label", "align": "center", "text": "coverage" },
       { "x": 60, "y": 446, "w": 840, "role": "Caption", "text": "bar:1 with h and bg · line:[x2,y2] · donut:72 · tile:1 — each is one row, draggable like any other. No SVG layer: a line is one rotated div, a donut one conic gradient." }
     ]},
-    { "name": "motion", "layout": "content", "els": [
+    { "name": "motion", "textOnly": true, "layout": "content", "els": [
       { "slot": "supertitle", "text": "MOTION", "anim": "fade" },
       { "slot": "title", "text": "Four anims. Entry only.", "anim": "rise" },
       { "x": 60, "y": 142, "w": 840, "role": "Body", "text": "anim is one prop on a row. Animated rows enter in model order, staggered 120 ms, and only when a slide is entered — dragging, selecting or retyping never restaggers them. Press ← then → to replay this slide." },
@@ -131,14 +131,14 @@
       { "x": 60, "y": 366, "w": 840, "role": "Body", "text": "Print, the contact sheet, the ⤓ PDF and verify all draw the settled frame, so motion never changes what is measured or exported." },
       { "x": 60, "y": 446, "w": 840, "role": "Caption", "text": "prefers-reduced-motion turns every anim off. Any other anim name is rejected by node bin/validate.mjs and ignored by the renderer." }
     ]},
-    { "name": "sheet-pdf", "layout": "content", "els": [
+    { "name": "sheet-pdf", "textOnly": true, "layout": "content", "els": [
       { "slot": "supertitle", "text": "CONTACT SHEET · PDF · PRESENT", "anim": "fade" },
       { "slot": "title", "text": "Manage slides. Write real pages.", "anim": "rise" },
       { "x": 60, "y": 150, "w": 840, "role": "Body", "text": "⊞ or Esc opens the contact sheet: live thumbnails, three across. Click, ⌘-click and shift-click select; double-click opens; grab a cell and drag — the others slide aside (mouse or touch); ⌫ deletes (never the last slide); ⌘C ⌘V ⌘D ⌘Z work as expected." },
       { "x": 60, "y": 246, "w": 840, "role": "Body", "text": "⤓ writes a true slide-sized PDF in the file itself — no library, no server: each slide is rasterised from its live DOM (foreignObject → canvas → JPEG) onto a W×H pt page, so 16:9 stays 16:9. ⌘P is the paper path: named Letter/A4 pages (Safari ignores pixel page sizes), the slide zoomed to the printable width." },
       { "x": 60, "y": 354, "w": 840, "role": "Body", "text": "F or ⛶ enters fullscreen presentation: chrome hides, the backdrop takes the current slide's background, the HUD peeks back at the bottom edge and stays pinned while a menu or the contact sheet is open." }
     ]},
-    { "name": "agents", "layout": "content", "els": [
+    { "name": "agents", "textOnly": true, "layout": "content", "els": [
       { "slot": "supertitle", "text": "FOR AGENTS", "anim": "fade" },
       { "slot": "title", "text": "validate → create → verify", "anim": "rise" },
       { "x": 60, "y": 150, "w": 840, "role": "Supertitle", "tt": "none", "color": "var(--fg)", "text": "node bin/validate.mjs model.json" },
@@ -148,7 +148,7 @@
       { "x": 60, "y": 282, "w": 840, "role": "Body", "text": "SKILL.md is the authoring contract: inputs (content, format, style), the process, the model and style contracts, anti-patterns and three worked examples. Layout-parity verification is mandatory; the AE pixel diff runs whenever reference shots exist." },
       { "x": 60, "y": 380, "w": 840, "role": "Caption", "text": "Formats: slides (16:9) is fully supported. carousel (1:1, 4:5) and document (Letter, A4) are page-size presets of the same model space — experimental: sizing, editing and PDF work; text does not flow across pages." }
     ]},
-    { "name": "close", "layout": "title", "els": [
+    { "name": "close", "textOnly": true, "layout": "title", "els": [
       { "slot": "supertitle", "text": "DECKLET", "anim": "fade" },
       { "slot": "title", "text": "One file.\nEdit it anywhere.", "anim": "rise" },
       { "x": 60, "y": 318, "w": 780, "role": "Body", "color": "var(--muted)", "text": "Eight roles, one margin, one master layer. Title is the display size for slides like this one; H1 is the content-slide title.", "anim": "rise" },
