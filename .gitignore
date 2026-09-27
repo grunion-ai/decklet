@@ -22,3 +22,5 @@ templates/library-*.model.json
 templates/library-*.index.json
 templates/library-*.style.json
 templates/landed.index.json
+.decklet-host.json
+.decklet-history/
