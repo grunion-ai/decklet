@@ -518,6 +518,8 @@ const MG=()=>deck.styles&&deck.styles.margin!=null?deck.styles.margin:Math.round
 const LOCK=['font','size','lh','ls'];
 // the logo row (docs/logo.md): a fixed column of width `col` holding a contain-fit logo on a plate, or a monogram chip, and the
 // name at col + gap with its FIRST line centred on the column. The same numbers as lib/logo.mjs logoGeom; test/logo.test.mjs holds both.
+// the asset table: '#id' names deck.assets[id], embedded once in DECK; resolved here, so the DOM, the ⤓ PDF and the saved file agree
+const asset=s=>typeof s==='string'&&s[0]==='#'?((deck.assets||{})[s.slice(1)]||''):s;
 const isLogo=r=>r.logo!==undefined||r.monogram!=null,PLATE={light:'#FFFFFF',dark:'#15171B'};
 const initials=n=>String(n||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0].toUpperCase()).join('');
 function drawLogo(r,d){
@@ -525,7 +527,7 @@ function drawLogo(r,d){
   if(r.logo){const k=r.plate==null||r.plate==='auto'||r.plate==='light'?'light':r.plate==='dark'?'dark':'none',p=k==='none'?0:Math.max(2,Math.round(h*.14));
     let iw=col-2*p,ih=h-2*p;if(r.aspect>0){iw=Math.min(iw,ih*r.aspect);ih=Math.min(ih,iw/r.aspect)}
     if(k!=='none')box('lplate',`left:0;top:0;width:${iw+2*p}px;height:${h}px;background:${PLATE[k]};border-radius:${Math.round(h*.22)}px`);
-    const im=new Image();im.src=r.logo;im.alt=r.alt||(r.name?r.name+' logo':'');im.style.cssText=`position:absolute;left:${p}px;top:${(h-ih)/2}px;width:${iw}px;height:${ih}px;object-fit:contain;pointer-events:none`;d.appendChild(im)}
+    const im=new Image();im.src=asset(r.logo);im.alt=r.alt||(r.name?r.name+' logo':'');im.style.cssText=`position:absolute;left:${p}px;top:${(h-ih)/2}px;width:${iw}px;height:${ih}px;object-fit:contain;pointer-events:none`;d.appendChild(im)}
   else{const s=Math.min(h,col),t=String(r.monogram||initials(r.name)).slice(0,3);
     box('lmono',`left:0;top:${Math.round((h-s)/2)}px;width:${s}px;height:${s}px;border-radius:${Math.round(s*.22)}px;background:var(--fg);color:var(--card);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:${Math.round(s*(t.length>1?.38:.47))}px;line-height:1;letter-spacing:0;white-space:nowrap`).textContent=t}
   // the name is the row's one in-flow child: the row's own width is col + gap + the name (w, when stated, is the whole row)
@@ -633,7 +635,7 @@ function drawEls(s,root,animate){
     d.className='el'+(r.box?' box':'')+(r.tile?' tile':'')+(r.bullet?' bul':'')+(an?' '+an:'');
     if(isLogo(r));   // drawn after its box is styled: drawLogo below
     else if(r.svg)d.innerHTML=r.svg;
-    else if(r.img){const im=new Image();im.src=r.img;im.style.cssText=`display:block;width:100%;height:100%;object-fit:${r.fit||'contain'};object-position:${r.pos||'50% 50%'};pointer-events:none`;d.appendChild(im)}
+    else if(r.img){const im=new Image();im.src=asset(r.img);im.style.cssText=`display:block;width:100%;height:100%;object-fit:${r.fit||'contain'};object-position:${r.pos||'50% 50%'};pointer-events:none`;d.appendChild(im)}
     else if(r.html){d.innerHTML=r.html; // rich inline runs (<b>/<i>/<u>/<s>/<span>/<a href>) — re-gate the links on the way in
       d.querySelectorAll('a[href]').forEach(a=>{const u=href(a.getAttribute('href'));if(u){a.setAttribute('href',u);if(u[0]!=='#'){a.target='_blank';a.rel='noopener noreferrer'}a.title=hint(u)}else a.removeAttribute('href')})}
     else d.textContent=r.text||'';

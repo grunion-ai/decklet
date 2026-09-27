@@ -348,4 +348,6 @@ test('templates: media — fill errors name what a media key takes', () => {
     assert.ok(r.errors.some(m => re.test(m)), JSON.stringify(fill) + ' → ' + r.errors.join(' | '));
   }
   assert.ok(v(deck([{template: 'statement', fill: {m1: {icon: 'factory'}}}])).errors.some(m => /fill key "m1"/.test(m)), 'no media on a non-list');
+  const ok = v(deck([{template: 'proof-strip', fill: {m1: {logo: '#acme', aspect: 3}, m2: {img: '#acme'}}}], {assets: {acme: PNG}}));
+  assert.deepEqual(ok.errors, [], 'an asset reference fills a media key: ' + ok.errors.join(' | '));
 });
