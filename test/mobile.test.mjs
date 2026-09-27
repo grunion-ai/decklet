@@ -1,6 +1,6 @@
 // decklet on a phone — live proofs under device emulation (Playwright, skipped when absent): Chromium as a Pixel 7, WebKit as an
 // iPhone 14 (touch, phone viewport, mobile UA). A touch edit persists across a reload, an app switch (the tab hides) commits
-// and stores the edit in flight, and a phone browser that refuses storage on file:// says so in red with no errors.
+// and stores the edit in flight, and a phone browser that refuses storage on file:// says "Not saving" with no errors.
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -57,13 +57,13 @@ for (const [bn, dev] of phones) live(`${dev} (${bn}): switching apps (the tab hi
   assert.deepEqual(p.errs, []); await b.close();
 });
 
-live('iPhone 14 (webkit): file:// with storage refused — red at load, Save a copy shows, a touch edit still holds for the session, no errors', async () => {
+live('iPhone 14 (webkit): file:// with storage refused — the tab state at load, a touch edit still holds for the session, no errors', async () => {
   const b = await pw.webkit.launch(); const f = write('blocked-iphone.html', create(model()).html);
   const ctx = await b.newContext({...pw.devices['iPhone 14']});
   await ctx.addInitScript(() => { Object.defineProperty(window, 'localStorage', {get() { throw new Error('blocked'); }}); Object.defineProperty(window, 'indexedDB', {get() { throw new Error('blocked'); }}); });
   const p = watch(await ctx.newPage()); await p.goto(pathToFileURL(f).href);
-  assert.equal(await settled(p), 'bad');
-  assert.deepEqual(await p.evaluate(() => [document.body.classList.contains('nostore'), !$('savebad').hidden]), [true, true], 'the honest state: the save button red and marked, and it is the copy door');
+  assert.equal(await settled(p), 'tab');
+  assert.deepEqual(await p.evaluate(() => [document.body.classList.contains('nostore'), getComputedStyle(document.querySelector('#autosave .nos')).display !== 'none', !$('nosave').hidden]), [true, true, true], 'the honest state: "Not saving" on the save button (still the copy door) and the banner');
   const [x, y] = await center(p, '#addbtn'); await p.touchscreen.tap(x, y); await p.waitForTimeout(80);
   const [x2, y2] = await center(p, '#sadd'); await p.touchscreen.tap(x2, y2); await p.waitForTimeout(80);
   assert.equal(await p.evaluate(() => deck.slides.length), 5, 'the edit holds in memory');

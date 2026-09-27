@@ -161,8 +161,9 @@ live('new version: the browser replays its log onto the agent\'s file (human win
 live('⌘S writes the file: the first press links it (picker, mocked), the file carries DECK + LOG, later edits write back on their own; bin/edits reads it', async () => {
   const b = await pw.chromium.launch(); const f = write('fsa.html', create(model()).html);
   const ctx = await b.newContext(); await ctx.addInitScript(() => {
-    window.__writes = []; const h = {kind: 'file', name: 'fsa.html', queryPermission: async () => 'granted', requestPermission: async () => 'granted',
-      createWritable: async () => ({write: async s => { window.__writes.push(s); }, close: async () => {}})};
+    window.__writes = []; let mod = 1; const h = {kind: 'file', name: 'fsa.html', queryPermission: async () => 'granted', requestPermission: async () => 'granted',
+      getFile: async () => ({lastModified: mod, text: async () => window.__writes.at(-1) || document.documentElement.outerHTML}), // the changed-on-disk guard reads it
+      createWritable: async () => ({write: async s => { window.__writes.push(s); }, close: async () => { mod++; }})};
     window.showOpenFilePicker = async () => [h];
   });
   const p = await ctx.newPage(); await p.goto(pathToFileURL(f).href); await p.waitForTimeout(150); await p.evaluate(() => localStorage.clear()); await p.reload(); await p.waitForTimeout(150);

@@ -127,7 +127,7 @@ Hand off the HTML file only: make a PDF only when the human asks for one (the de
 4. What you inferred (style, layout choices) and anything marked experimental.
 
 ### Hosting the deck for editing
-Default: do not host. Chrome and Edge on `file://` write the file after one ⌘S ("Allow on every visit"). Host with `node bin/serve.mjs deck.html` when the person edits in Safari or Firefox, when you will rebuild while it is open, or when edits must survive refresh and close. Give them the printed URL. To rebuild while their page is open, run `node bin/serve.mjs deck.html --checkout --by <your name>` first (their page goes read-only; exit 1 means edits are still saving, so retry), then Step 4's `--from`, then `--checkin`: the page takes your version with their edits on top. Stop the server when the session ends. Browser pane and details: [docs/editor.md](docs/editor.md#hosting).
+Default: do not host. Chrome and Edge on `file://` write the file after one ⌘S ("Allow on every visit"). Host with `node bin/serve.mjs deck.html` when the person edits in Safari, Firefox or an embedded browser pane, when you will rebuild while it is open, or when edits must survive refresh and close. Give them the printed URL. To rebuild while their page is open, run `node bin/serve.mjs deck.html --checkout --by <your name>` first (their page goes read-only; exit 1 means edits are still saving, so retry), then Step 4's `--from`, then `--checkin`: the page takes your version with their edits on top. Stop the server when the session ends. Browser pane and details: [docs/editor.md](docs/editor.md#hosting).
 
 ---
 
