@@ -1172,21 +1172,43 @@ let pd=null;const RM=matchMedia('(prefers-reduced-motion:reduce)');
 const landing=()=>{const mv=[...gsel].sort((a,b)=>a-b),at2=ins-mv.filter(n=>n<ins).length,order=deck.slides.map((_,n)=>n).filter(n=>!gsel.has(n));order.splice(at2,0,...mv);return order}; // new order of old indices
 grid.addEventListener('pointerdown',e=>{const c=e.target.closest('.cell');if(!c||e.button)return;pd={c,n:+c.dataset.n,x:e.clientX,y:e.clientY,on:false};try{c.setPointerCapture(e.pointerId)}catch{} // a synthetic pointer (a test's touch) has no capture to take
   if(e.pointerType==='touch'&&!gsel.has(pd.n)){gsel=new Set([pd.n]);ganchor=pd.n;grid.querySelectorAll('.cell').forEach(x=>x.classList.toggle('sel',gsel.has(+x.dataset.n)))}}); // a finger fires no mousedown before it drags: the grabbed cell is the selection, as a click would make it
-grid.addEventListener('pointermove',e=>{
-  if(!pd)return;const dx=e.clientX-pd.x,dy=e.clientY-pd.y;
-  if(!pd.on){if(Math.hypot(dx,dy)<6)return;pd.on=true;e.preventDefault();getSelection().removeAllRanges();document.body.classList.add('dragging');pd.cells=[...grid.querySelectorAll('.cell')];pd.rects=pd.cells.map(c=>c.getBoundingClientRect());pd.c.classList.add('lift')}
-  pd.c.style.transform=`translate(${dx}px,${dy}px) scale(1.05)`;
-  const k=pd.rects.findIndex(r=>e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom);
-  if(k>=0)ins=k+(e.clientX<pd.rects[k].left+pd.rects[k].width/2?0:1);
+// pd.rects are viewport rects taken at lift (scrollTop pd.s0); a pointer at clientY maps into that frame as clientY+scrollTop-pd.s0,
+// so the target stays right after the sheet scrolls (the auto-scroll below, a wheel, a trackpad). The lifted cell scrolls with the
+// grid, so its transform adds the same offset back to stay under the pointer.
+function track(){
+  const s=sheet.scrollTop-pd.s0,x=pd.lx,y=pd.ly+s;
+  pd.c.style.transform=`translate(${x-pd.x}px,${y-pd.y}px) scale(1.05)`;
+  const k=pd.rects.findIndex(r=>x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom);
+  if(k>=0)ins=k+(x<pd.rects[k].left+pd.rects[k].width/2?0:1);
   if(ins==null)return;
   const order=landing();
   pd.cells.forEach((c,n)=>{if(c===pd.c)return;const to=pd.rects[order.indexOf(n)],from=pd.rects[n];c.style.transform=to===from?'':`translate(${to.left-from.left}px,${to.top-from.top}px)`});
+}
+grid.addEventListener('pointermove',e=>{
+  if(!pd)return;const dx=e.clientX-pd.x,dy=e.clientY-pd.y;
+  if(!pd.on){if(Math.hypot(dx,dy)<6)return;pd.on=true;e.preventDefault();getSelection().removeAllRanges();document.body.classList.add('dragging');pd.cells=[...grid.querySelectorAll('.cell')];pd.rects=pd.cells.map(c=>c.getBoundingClientRect());pd.s0=sheet.scrollTop;pd.max=sheet.scrollHeight-sheet.clientHeight;pd.c.classList.add('lift')}
+  pd.lx=e.clientX;pd.ly=e.clientY;track();asKick();
 });
-const pend=()=>{if(!pd)return;const d=pd;pd=null;if(!d.on)return;document.body.classList.remove('dragging');
+// auto-scroll: a dragged cell within EDGE px of the sheet's visible top or bottom (the pinned HUD's top edge, when it covers the
+// sheet) scrolls it, from 1px a frame at the zone's inner edge to VMAX at the edge and beyond; halved under reduced motion. A rAF
+// loop, so a still pointer keeps scrolling; it ends at either end, out of the zone, on drop, on Escape and on pointercancel.
+const EDGE=64,VMAX=20;let asId=0;
+function asSpeed(y){
+  const r=sheet.getBoundingClientRect(),h=$('hud').getBoundingClientRect(),bot=h.height&&h.top>r.top&&h.top<r.bottom?h.top:r.bottom,v=RM.matches?VMAX/2:VMAX;
+  const d=y<r.top+EDGE?-(r.top+EDGE-y):y>bot-EDGE?y-(bot-EDGE):0;
+  return d&&Math.sign(d)*Math.max(1,Math.round(v*Math.min(1,Math.abs(d)/EDGE)));
+}
+// the end is pd.max, measured at lift: the lifted cell's transform grows the sheet's scrollable overflow, so scrollHeight would chase it
+function asTick(){asId=0;if(!pd||!pd.on)return;const v=asSpeed(pd.ly),t=sheet.scrollTop,to=Math.max(0,Math.min(pd.max,t+v));if(!v||Math.abs(to-t)<.5)return;sheet.scrollTop=to;track();asId=requestAnimationFrame(asTick)}
+const asKick=()=>{if(!asId)asId=requestAnimationFrame(asTick)},asStop=()=>{cancelAnimationFrame(asId);asId=0};
+sheet.addEventListener('scroll',()=>{if(pd&&pd.on)track()},{passive:true}); // a wheel or trackpad scroll mid-drag moves the target too
+const pend=()=>{asStop();if(!pd)return;const d=pd;pd=null;if(!d.on)return;document.body.classList.remove('dragging');
   if(ins==null){d.c.classList.remove('lift');d.cells.forEach(c=>c.style.transform='');return}
   const to=d.rects[landing().indexOf(d.n)],from=d.rects[d.n];d.c.classList.replace('lift','drop');d.c.style.transform=`translate(${to.left-from.left}px,${to.top-from.top}px)`;
   const land=()=>{const at=ins;ins=null;reorder(at)};RM.matches?land():setTimeout(land,170)};
-grid.addEventListener('pointerup',pend);grid.addEventListener('pointercancel',pend);
+// cancel (Escape, pointercancel): the lifted cell and the rest go back, nothing is committed
+const pcancel=()=>{asStop();const d=pd;pd=null;ins=null;if(!d||!d.on)return;document.body.classList.remove('dragging');d.c.classList.remove('lift');d.cells.forEach(c=>c.style.transform='')};
+grid.addEventListener('pointerup',pend);grid.addEventListener('pointercancel',pcancel);
 // reorder: ONE snapshot per drop; moved slides keep their relative order and land at the insertion index
 function reorder(at){
   const mv=[...gsel].sort((a,b)=>a-b);if(!mv.length)return;snap();
@@ -1197,6 +1219,7 @@ function reorder(at){
 const dup=s=>JSON.parse(JSON.stringify(s));
 function sheetKey(e){
   const mod=e.metaKey||e.ctrlKey,k=e.key.toLowerCase();
+  if(e.key==='Escape'&&pd&&pd.on){pcancel();return true} // Escape mid-drag drops nothing and keeps the sheet
   if(e.key==='Escape'||(k==='c'&&!mod&&!e.altKey)){sheetClose();return true} // a bare C closes what C opened; ⌘C stays copy
   if(e.key==='Enter'&&gsel.size){i=[...gsel][0];sheetClose();return true}
   if((e.key==='Backspace'||e.key==='Delete')&&gsel.size){ // never the last slide
