@@ -122,7 +122,7 @@ Fix the model; re-run to `VERIFY PASS`, attach `verify-out/results.json`.
 ### Step 6 — hand-off notes for the human editor
 Hand off the HTML file only: make a PDF only when the human asks for one (the deck writes its own with ⤓). Say, in this order:
 1. Where the file is and that it opens from disk in any browser, no install, no network.
-2. **The editor:** [docs/editor.md](docs/editor.md). Quote the lines that matter (⌘S writes the file in Chrome/Edge, a copy in Safari; ⤓ writes the PDF; Esc opens the contact sheet; `node bin/export.mjs deck.html --png` for PNGs) and link the rest.
+2. **The editor:** [docs/editor.md](docs/editor.md). Quote the lines that matter (⌘S writes the file in Chrome/Edge, a copy in Safari; ⤓ writes the PDF; Esc opens the contact sheet; green save dot = file current; `node bin/export.mjs deck.html --png` for PNGs) and link the rest.
 3. To revise, run Step 4's `--from` commands; every edit a human makes round-trips that way.
 4. What you inferred (style, layout choices) and anything marked experimental.
 

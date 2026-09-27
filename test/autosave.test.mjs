@@ -99,7 +99,7 @@ live('continuous write-back: the dot links the file once; a burst of edits is ON
   assert.equal(await p.evaluate(() => window.__writes.length), 2, 'one write for the burst');
   assert.equal(blockOf(await p.evaluate(() => window.__writes.at(-1)), 'DECK').slides[0].els[1].x, 120, 'the file carries the last value');
   assert.equal(await p.evaluate(() => [document.getElementById('autosave').dataset.state, unsynced].join()), 'ok,0', 'green: the file has everything');
-  assert.match(await p.getAttribute('#autosave', 'data-tip'), /^Saved to file · \d\d:\d\d:\d\d$/);
+  assert.match(await p.getAttribute('#autosave', 'data-tip'), /^Saved to wb\.html · \d\d:\d\d:\d\d$/);
   // a tab going to the background does not wait out the debounce
   await p.evaluate(() => { snap(); slide().els[1].y = 250; save(); Object.defineProperty(document, 'hidden', {get: () => true, configurable: true}); document.dispatchEvent(new Event('visibilitychange')); });
   await p.waitForTimeout(150);

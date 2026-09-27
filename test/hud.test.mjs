@@ -56,8 +56,8 @@ live('hud: C opens the sheet, G toggles guides, the dot\'s tooltip carries the s
   await p.keyboard.press('g'); assert.equal(await p.getAttribute('#snap', 'aria-pressed'), 'false');
   await p.keyboard.press('c'); assert.equal(await p.evaluate(() => sheet.hidden), false, 'C opens the contact sheet');
   await p.keyboard.press('Escape'); assert.equal(await p.evaluate(() => sheet.hidden), true);
-  assert.match(await p.getAttribute('#autosave', 'data-tip'), /^Autosaved · \d\d:\d\d:\d\d$/, 'the tooltip is the state and its time');
-  assert.match(await p.getAttribute('#autosave', 'aria-label'), /^Autosaved · \d\d:\d\d:\d\d$/, 'the full sentence stays on the dot for screen readers');
+  assert.match(await p.getAttribute('#autosave', 'data-tip'), /^Saved in this browser only · \d\d:\d\d:\d\d · ⌘S links the file$/, 'the tooltip is the state, its time and the way to the file');
+  assert.match(await p.getAttribute('#autosave', 'aria-label'), /^Saved in this browser only · \d\d:\d\d:\d\d · ⌘S links the file$/, 'the full sentence stays on the dot for screen readers');
   await p.evaluate(() => { snap(); slide().els[1].x = 99; save(); }); await p.waitForTimeout(300);
   assert.match(await p.getAttribute('#autosave', 'data-tip'), /^Saved in this browser · 1 not in the file · ⌘S$/, 'amber names the pending count and the door');
   assert.deepEqual(p.errs, []); await b.close();
