@@ -88,3 +88,21 @@ live('K17: source, legend, deck name and page number share one baseline — righ
     await b.close();
   }
 });
+
+// K26: a long source and the legend share the one-line foot; validate estimates both widths and warns with the px overlap
+// (only verify used to catch it). The generic text-overlap gate stays quiet on that pair: one warning, the one that names the fix.
+const footSlide = (source, legend = '● quoting  ● DFM  ● CAD platforms') => chart().els.map(r => r.slot === 'source' ? {...r, text: source} : r.slot === 'legend' ? {...r, text: legend} : r);
+const collide = v => v.warnings.filter(w => /source.*legend.*foot line/.test(w));
+test('K26: validate warns when a long source collides with the legend on the foot line, naming the px overlap', () => {
+  const long = 'Source · company filings, analyst reports, vendor documentation, pricing pages, press and customer interviews';
+  for (const foot of [RIGHT, LEFT]) {
+    const v = validate(create(deck(foot, [{...chart(), els: footSlide(long)}])).deck);
+    assert.equal(collide(v).length, 1, `${foot.x == null ? 'right' : 'left'} footer: ` + v.warnings.join(' | '));
+    assert.match(collide(v)[0], /^slides\[0\]: .*~\d+px/);
+    assert.ok(!v.warnings.some(w => /text rows may not overlap/.test(w) && /Source ·/.test(w) && /● quoting/.test(w)), 'one warning for the pair, not two');
+  }
+  const short = validate(create(deck(RIGHT, [{...chart(), els: footSlide('Source · desk log, one week')}])).deck);
+  assert.deepEqual(collide(short), [], short.warnings.join(' | '));
+  const noLegend = validate(create(deck(RIGHT, [{...chart(), els: footSlide(long).filter(r => r.slot !== 'legend')}])).deck);
+  assert.deepEqual(collide(noLegend), []);
+});

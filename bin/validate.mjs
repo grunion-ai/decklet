@@ -323,6 +323,7 @@ export function validate(deck) {
     if (r.css) Wn(`${where}: raw css escape hatch used`);
     if (r.chart != null) for (const m of checkChart(r.chart)) E(`${where}: ${m}`);   // a chart row create() could not expand
     if (r.img && !IMGSRC.test(r.img)) E(`${where}: img must be a data: URI (single file, zero network), or '#id' naming a deck.assets entry`);
+    if (r.entity != null && !(typeof r.entity === 'string' && r.entity.trim())) E(`${where}: entity must be a company name — the deck.entities entry (or any alias) this logo belongs to`);
     // the logo row (docs/logo.md): a fixed column, a contain-fit image on a plate or a monogram chip, the name at col + gap
     if (isLogoRow(r)) {
       if (r.logo && !IMGSRC.test(r.logo)) E(`${where}: logo must be a data: URI (single file, zero network), '#id' naming a deck.assets entry, or '' for a monogram chip`);
@@ -456,6 +457,7 @@ export function validate(deck) {
     for (let a = 0; a < R.length; a++) for (let b = a + 1; b < R.length; b++) {
       const A = R[a], B = R[b];
       if (!A.text && !B.text) continue;                                                   // two graphics touching is layout, not collision
+      if (A.r._foot && B.r._foot && A.r._foot !== B.r._foot) continue;                    // the source and the legend: judged below, on the foot line
       if ((B.boxy && !B.logo && held(A, B)) || (A.boxy && !A.logo && held(B, A))) continue;                      // text on its card
       const sa = shelter(A), sb = shelter(B);
       if ((sa && sa !== B && overlap(sa, B) <= 0.5) || (sb && sb !== A && overlap(sb, A) <= 0.5)) continue;
@@ -514,10 +516,15 @@ export function validate(deck) {
     let FR = F && ({...F, over: 0});
     if (FR && seated && !footRight(FR)) { const [c] = counterRow(s), cr = c && rectOf(c.r, s); FR = {...FR, right: W - (cr ? cr.x : W - MGN) + 12}; delete FR.x; FR.w = 'auto'; }
     const fr = FR && rectOf(FR, s);
-    const seat = r => { const k = footOf(r, s); if (!k || !F) return r; const o = {...r, y: F.y, foot: undefined};
+    const seat = r => { const k = footOf(r, s); if (!k) return r; if (!F) return {...r, _foot: k}; const o = {...r, y: F.y, foot: undefined, _foot: k};
       if (k === 'right') { const rr = rectOf({...o, x: 0, right: undefined}, s); o.right = W - (fr ? fr.x : W - MGN) + 16; o.w = rr ? rr.w : o.w; delete o.x; }
       return o; };
     gapGate([...master.filter(m => !(s.hide || []).includes(m.id) && !s.els.some(e => e && e.override === m.id)).map(m => ({r: m.footer && FR ? FR : m, i: 'master ' + m.id})), ...counterRow(s), ...s.els.map((r, ei) => ({r: seat(r), i: 'els[' + ei + ']'}))], `slides[${si}]`, s);
+    // K26: the source (left foot) and the legend (right foot) share ONE line — estimate both widths as seated and warn with the
+    // overlap in px, or the air short of styles.gap (verify measures the glyphs; this catches it before a browser runs)
+    const feet = s.els.map(r => footOf(r, s) && rectOf(seat(r), s)).filter(Boolean), fl = feet.find(b => b.r._foot === 'left'), fg = feet.find(b => b.r._foot === 'right');
+    if (fl && fg && fl.x < fg.x) { const d = fg.x - (fl.x + fl.w);
+      if (d < gap - 0.5) Wn(`slides[${si}]: the source (~${Math.round(fl.w)}px wide) and the legend (~${Math.round(fg.w)}px) collide on the foot line — ${d < 0 ? `they overlap by ~${Math.round(-d)}px` : `~${Math.round(d)}px apart, under styles.gap ${gap}`}; shorten the source, or move the key off the foot (a label on the chart, a card body)`); }
     // K17: the foot band — below the content area's bottom edge (FOOT.y, scaled) and above the footer — holds the foot line only
     if (F && isNum(F.y) && isNum(H)) {
       // a row that shares the footer's own line (within half its leading) IS the foot line — a foot mark, a rail's label
@@ -638,9 +645,15 @@ export function validate(deck) {
   const esc = n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const entRe = ents.map(a => [a[0], new RegExp(`(^|[^\\p{L}\\p{N}])(${a.map(esc).join('|')})($|[^\\p{L}\\p{N}])`, 'iu')]);
   const namesIn = t => typeof t === 'string' ? entRe.map(([n, re]) => [n, t.search(re)]).filter(([, i]) => i >= 0).sort((a, b) => a[1] - b[1]).map(([n]) => n) : [];   // in reading order
-  // whose logo a row is: its asset key ('#misumi'), else its alt, else a logo row's name — the first that names a listed company.
+  // K24: whose logo a row is — its entity: (a listed name or alias, any case), else its asset key compared as a slug with each
+  // alias and each alias's first word ('#leo' is Leo AI, '#3dsystems' is 3D Systems), else its alt, else a logo row's name.
   // A logo row reading "buys Fictiv" beside '#misumi' is MISUMI's logo; an img with none of these is nobody's.
-  const logoOf = r => { for (const t of [[r.logo, r.img].find(k => typeof k === 'string' && k[0] === '#')?.slice(1), r.alt, isLogoRow(r) ? r.name : null]) { const n = namesIn(t); if (n.length) return n; } return []; };
+  const slug = t => String(t).normalize('NFKD').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+  const entOf = t => ents.filter(a => a.some(n => slug(n) === slug(t))).map(a => a[0]);
+  const idOf = id => id ? ents.filter(a => a.some(n => slug(n) === slug(id) || (slug(n.split(/\s+/)[0]).length >= 3 && slug(n.split(/\s+/)[0]) === slug(id)))).map(a => a[0]) : [];
+  const logoOf = r => { if (typeof r.entity === 'string') return entOf(r.entity);
+    const id = [r.logo, r.img].find(k => typeof k === 'string' && k[0] === '#')?.slice(1);
+    for (const n of [idOf(id), namesIn(id), namesIn(r.alt), isLogoRow(r) ? namesIn(r.name) : []]) if (n.length) return n; return []; };
   const isLogo = r => r && !isText(r) && (r.img != null || isLogoRow(r) || r.placeholder != null);
   const far = (a, b) => Math.hypot(Math.max(b.x - (a.x + a.w), a.x - (b.x + b.w), 0), Math.max(b.y - (a.y + a.h), a.y - (b.y + b.h), 0));
   for (const [si, s] of (Array.isArray(deck.slides) ? deck.slides : []).entries()) {
@@ -656,8 +669,12 @@ export function validate(deck) {
     const logos = els.filter(isLogo).map(r => rectOf({...r, over: 0}, s) || (isNum(r.x) && isNum(r.y) ? {x: r.x, y: r.y, w: isNum(r.w) ? r.w : (r.h ?? 24) * 2, h: r.h ?? 24} : null)).filter(Boolean);
     const named = new Set(), prose = new Set();
     const owned = new Set(els.filter(r => (isLogoRow(r) && r.logo) || (!isLogoRow(r) && r.img != null && !isText(r))).flatMap(logoOf));
+    for (const [ei, r] of s.els.entries()) if (isLogo(r) && typeof r.entity === 'string' && r.entity.trim() && !entOf(r.entity).length) Wn(`slides[${si}].els[${ei}]: entity "${r.entity}" names no company in deck.entities — use a listed name or alias, or add the company to deck.entities`);
     for (const r of els) if (isLogoRow(r) && !r.logo) for (const n of namesIn(r.name)) Wn(`slides[${si}]: monogram for ${n} — a listed company wants its real logo; fetch it with decklet-assets (deck.entities asks for this)`);
-    for (const r of [...texts, ...els.filter(r => isLogoRow(r) && r.logo)]) {
+    // a source line names where the numbers came from, not who is on the slide: the source slot, or a Caption in the foot band
+    const footTop = FOOT.y * (isNum(H) ? H : 540) / 540;
+    const sourced = r => r.slot === 'source' || (roleName(r) === 'Caption' && (rectOf({...r, over: 0}, s) || {}).y >= footTop - 0.5);
+    for (const r of [...texts.filter(r => !sourced(r)), ...els.filter(r => isLogoRow(r) && r.logo)]) {
       const t = isText(r) ? plain(r) : r.name, hits = namesIn(t); if (!hits.length) continue;
       if (isText(r) && !/^(Title|Supertitle|H1)$/.test(roleName(r)) && t.trim().length <= 40) {   // a listing is a short label: its logo sits beside it
         const b = rectOf({...r, over: 0}, s);
