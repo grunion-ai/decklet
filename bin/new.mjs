@@ -8,9 +8,10 @@
 // usage: node bin/new.mjs --out model.json [--slides 8] [--density reading|speaker] [--style <kit>] [--space WxH]
 import fs from 'node:fs';
 import path from 'node:path';
-import {fileURLToPath, pathToFileURL} from 'node:url';
+import {fileURLToPath} from 'node:url';
 import {diagramSlide} from '../lib/diagram.mjs';
 import KITS from '../examples/styles/index.mjs';
+import {isMain} from '../lib/is-main.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const CO = 'Meridian Freight';                 // fictional: no client residue in anything this writes
@@ -164,7 +165,7 @@ ${layouts.map((l, i) => `|  | ${i + 1} | ${l} |  |`).join('\n')}
 `;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isMain(import.meta.url)) {
   const a = process.argv.slice(2), o = {};
   for (let k = 0; k < a.length; k++) if (a[k].startsWith('--')) o[a[k].slice(2)] = a[k + 1] && !a[k + 1].startsWith('--') ? a[++k] : true;
   const die = m => { console.error(m); process.exit(2); };

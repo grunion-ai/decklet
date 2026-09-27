@@ -17,6 +17,7 @@ import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
 import {validate, linksOf} from './validate.mjs';
+import {isMain} from '../lib/is-main.mjs';
 
 export const modelOf = html => JSON.parse(html.match(/\/\*DECK\*\/([\s\S]*?)\/\*\/DECK\*\//)[1].replace(/<\\\/script/g, '</script'));
 
@@ -216,7 +217,7 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
   return res;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isMain(import.meta.url)) {
   const a = process.argv.slice(2), o = {}; let file = null;
   for (let k = 0; k < a.length; k++) if (a[k].startsWith('--')) o[a[k].slice(2)] = a[k + 1] && !a[k + 1].startsWith('--') ? a[++k] : true; else file = a[k];
   if (!file) { console.error('usage: node bin/verify.mjs deck.html [--refs dir] [--out dir] [--threshold 0.5] [--fuzz 2%] [--report model.report.json] [--fonts <css url, test-time only>] [--strict]'); process.exit(2); }

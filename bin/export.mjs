@@ -12,6 +12,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {isMain} from '../lib/is-main.mjs';
 
 const USAGE = 'usage: node bin/export.mjs deck.html --png [--out dir] [--scale 2]';
 export const pngSize = buf => buf.toString('latin1', 1, 4) === 'PNG' ? [buf.readUInt32BE(16), buf.readUInt32BE(20)] : null; // IHDR, no image library
@@ -49,7 +50,7 @@ export async function toPng(file, {out = null, scale = 1} = {}) {
   } finally { await b.close(); }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname)) {
+if (isMain(import.meta.url)) {
   const a = process.argv.slice(2), o = {}; let file = null;
   for (let k = 0; k < a.length; k++) if (a[k].startsWith('--')) o[a[k].slice(2)] = a[k + 1] && !a[k + 1].startsWith('--') ? a[++k] : true; else file = a[k];
   if (!file || !o.png) { console.error(USAGE); process.exit(2); }

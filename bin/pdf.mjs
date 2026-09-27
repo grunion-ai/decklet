@@ -10,6 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {isMain} from '../lib/is-main.mjs';
 
 // what the bytes say: Chromium's Skia backend writes page dictionaries in the clear, so no PDF parser is needed
 export function inspect(buf) {
@@ -48,7 +49,7 @@ export async function toPdf(file, out = file.replace(/\.html?$/, '') + '.pdf') {
   } finally { await b.close(); }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname)) {
+if (isMain(import.meta.url)) {
   const [file, out] = process.argv.slice(2);
   if (!file) { console.error('usage: node bin/pdf.mjs deck.html [out.pdf]'); process.exit(2); }
   toPdf(file, out).then(r => console.log(`PASS ${r.out} · ${r.pages} pages · ${r.box[0]}×${r.box[1]} pt · ${r.links} links · ${fs.statSync(r.out).size} bytes`))
