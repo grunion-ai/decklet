@@ -90,7 +90,7 @@ node bin/import-html.mjs --w 1600 --h 900 --out model.json 'pages/*.html'   # fi
 node bin/assets.mjs logo "Xometry" --out assets/                    # a logo file + manifest.json (aspect, plate) for deck.assets
 ```
 
-[`llms.txt`](llms.txt) is the machine summary and file map. [`deck.html`](deck.html) is the engine explaining itself — twelve slides built from [`examples/explainer/model.json`](examples/explainer/model.json) by the same CLI, including the motion vocabulary and three GIF clips of the editor filmed from the deck itself.
+[`llms.txt`](llms.txt) is the machine summary and file map. [`deck.html`](deck.html) is the engine explaining itself — eighteen slides built from [`examples/explainer/model.json`](examples/explainer/model.json) by the same CLI, including the motion vocabulary and three GIF clips of the editor filmed from the deck itself.
 
 ## Guarantees
 
