@@ -7,7 +7,7 @@
 //   --style: the same style.json create() will build with — text fit is only meaningful against the scale the deck will wear
 // library: import {validate, mergeStyle, ROLES} from './validate.mjs'  →  {ok, errors:[…], warnings:[…]}
 import fs from 'node:fs';
-import {LIBRARY, libraryFor, catalogue, DENSITY, densityReport} from '../lib/layouts.mjs';
+import {LIBRARY, libraryFor, catalogue, DENSITY, densityReport, FOOT} from '../lib/layouts.mjs';
 import {TEMPLATE, templateKeys, fillErrors, expandTemplates, templateCatalogue} from '../lib/templates.mjs';
 import {ICONS, iconNames, expandIcons} from '../lib/icons.mjs';
 import {checkChart, expandCharts} from '../lib/chart.mjs';
@@ -214,12 +214,13 @@ export function validate(deck) {
   const row = (r, where, s) => {
     if (!r || typeof r !== 'object') return E(`${where}: row must be an object`);
     const slot = r.slot && ((deck.slots || {})[r.slot] || (s && layouts[s.layout] && layouts[s.layout][r.slot]));
-    if (r.slot && !slot) E(`${where}: slot "${r.slot}" not in ${s && s.layout ? `layout "${s.layout}"` : 'any layout'} or deck.slots`);
+    if (r.slot === 'note' && !slot && s && s.layout && LIBRARY[s.layout] && isLibrary(s.layout)) E(`${where}: layout "${s.layout}" has no note — a note is a caption beside the visual it explains (K17): draw it as a free row under or beside that visual, inside the content area, or cut it`);
+    else if (r.slot && !slot) E(`${where}: slot "${r.slot}" not in ${s && s.layout ? `layout "${s.layout}"` : 'any layout'} or deck.slots`);
     if (r.role && !roleOk(r.role)) E(`${where}: role "${r.role}" not in styles.roles`);
     const over = r.override && (deck.master || []).find(m => m && m.id === r.override);   // a partial override reads the rest from its master row
     const role = r.role || (slot && slot.role) || (over && over.role);
     const textual = isText(r);
-    if (textual && !role) E(`${where}: text row "${plain(r).slice(0, 30)}" has no role (role or slot required)`);
+    if (textual && !role && !(r.slot && !slot)) E(`${where}: text row "${plain(r).slice(0, 30)}" has no role (role or slot required)`);
     for (const p of LOCKED) if (r[p] != null && textual) E(`${where}: "${plain(r).slice(0, 30)}" overrides ${p} — only a role sets font/size/lh/ls/mono`);
     if (r.html && /<script|on\w+=/i.test(r.html)) E(`${where}: html contains script/handler`);
     if (r.html && /font-size|font-family|line-height|letter-spacing/.test(r.html)) E(`${where}: html runs carry size/family/leading — runs may only carry color/weight/marks`);
@@ -367,8 +368,14 @@ export function validate(deck) {
   // — the anchoring the docs recommend — look left-anchored, so the gate added a counter box on top of the row that hosts it and
   // warned `overlaps by ~14px counter` on every slide whatever the text said. ROADMAP U6.
   const footRight = f => f.right != null || (f.x || 0) + (isNum(f.w) ? f.w : 0) / 2 > W / 2;
-  const counterRow = s => { const m = master.find(x => x && x.footer); if (!m || (s.hide || []).includes(m.id)) return [];
-    const f = {...m, ...(s.els.find(e => e && e.override === m.id) || {})}; if (footRight(f)) return [];
+  // K17: the footer this slide shows (its override merged), and the rows the engine seats on the foot line — a text row whose
+  // slot (or own key) says `foot` and that states no y of its own
+  const footerOf = s => { const m = master.find(x => x && x.footer); if (!m || (s.hide || []).includes(m.id)) return null;
+    return {...m, ...(s.els.find(e => e && e.override === m.id) || {})}; };
+  const slotOf = (r, s) => (r && r.slot && ((deck.slots || {})[r.slot] || (s && layouts[s.layout] && layouts[s.layout][r.slot]))) || {};
+  const footOf = (r, s) => r && isText(r) && r.y == null && !r.footer ? (r.foot ?? slotOf(r, s).foot) || null : null;
+  const counterRow = s => { const f = footerOf(s); if (!f) return [];
+    if (footRight(f)) return [];   // inline: the footer row carries it (a flipped left footer keeps its corner counter)
     return [{r: {right: MGN, y: f.y, w: 'auto', role: f.role, p: f.p, nowrap: 1, text: `${deck.slides.length} / ${deck.slides.length}`}, i: 'counter'}]; };
   const padPx = v => { const t = v == null ? null : (pad[v] ?? (typeof v === 'number' ? v + 'px' : v)); if (!t) return [0, 0];
     const n = String(t).split(/\s+/).map(parseFloat).map(z => Number.isFinite(z) ? z : 0); return n.length === 1 ? [n[0] * 2, n[0] * 2] : [n[1] * 2, n[0] * 2]; };
@@ -494,7 +501,23 @@ export function validate(deck) {
     const used = new Set();
     s.els.forEach((r, ei) => { row(r, `slides[${si}].els[${ei}]`, s); if (r && r.slot) { if (used.has(r.slot)) Wn(`slides[${si}]: slot "${r.slot}" bound twice`); used.add(r.slot); } });
     // the master rows this slide shows sit in the same set — a footer chip and a slide's last row owe each other the same air
-    gapGate([...master.filter(m => !(s.hide || []).includes(m.id) && !s.els.some(e => e && e.override === m.id)).map(m => ({r: m, i: 'master ' + m.id})), ...counterRow(s), ...s.els.map((r, ei) => ({r, i: 'els[' + ei + ']'}))], `slides[${si}]`, s);
+    // K17: the foot line as the engine draws it — a left-anchored footer hands the left to a seated source (its text moves next to
+    // the counter), a left foot row keeps its x on the footer's y, a right one hangs 16px left of the footer's text
+    const F = footerOf(s), seated = s.els.some(r => footOf(r, s) === 'left');
+    let FR = F && ({...F, over: 0});
+    if (FR && seated && !footRight(FR)) { const [c] = counterRow(s), cr = c && rectOf(c.r, s); FR = {...FR, right: W - (cr ? cr.x : W - MGN) + 12}; delete FR.x; FR.w = 'auto'; }
+    const fr = FR && rectOf(FR, s);
+    const seat = r => { const k = footOf(r, s); if (!k || !F) return r; const o = {...r, y: F.y, foot: undefined};
+      if (k === 'right') { const rr = rectOf({...o, x: 0, right: undefined}, s); o.right = W - (fr ? fr.x : W - MGN) + 16; o.w = rr ? rr.w : o.w; delete o.x; }
+      return o; };
+    gapGate([...master.filter(m => !(s.hide || []).includes(m.id) && !s.els.some(e => e && e.override === m.id)).map(m => ({r: m.footer && FR ? FR : m, i: 'master ' + m.id})), ...counterRow(s), ...s.els.map((r, ei) => ({r: seat(r), i: 'els[' + ei + ']'}))], `slides[${si}]`, s);
+    // K17: the foot band — below the content area's bottom edge (FOOT.y, scaled) and above the footer — holds the foot line only
+    if (F && isNum(F.y) && isNum(H)) {
+      // a row that shares the footer's own line (within half its leading) IS the foot line — a foot mark, a rail's label
+      const top = FOOT.y * H / 540, fl = roleOf(F.role), line = F.y - (fl ? fl.lh ?? fl.size * 1.25 : 14) / 2;
+      s.els.forEach((r, ei) => { if (!r || !isText(r) || r.override || footOf(r, s)) return; const b = rectOf(r, s);
+        if (b && b.y >= top - 0.5 && b.y < line) Wn(`slides[${si}].els[${ei}] "${plain(r).replace(/\s+/g, ' ').slice(0, 30)}" starts at y ${Math.round(b.y)}, in the foot band (${Math.round(top)}–${F.y}, under the content area and above the footer) — the foot is one line: bind the source slot (it joins the footer's line), set a note beside its visual, or move the row up`); });
+    }
     // ── connector AIR, across the slide: a connector leaves the same visible gap at both ends and never touches a
     // container. `to:`/`from:` hand that to the engine, so ends it terminates are not second-guessed here.
     // Headed strokes only — see the note above: a chart series or a decorative path has nothing to leave air FROM.

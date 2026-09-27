@@ -747,6 +747,7 @@ function drawEls(s,root,animate){
     if(an)d.style.animationDelay=(a++*120)+'ms';
     if(el._lines)d.dataset.lines=el._lines; // extractor metadata: source line count (layout-parity proof)
     if(el.over)d.dataset.over=1; // declared overlay: verify's collision check leaves this row alone
+    if(r.foot&&(r.text||r.html)&&!r.footer&&el.y==null)d.dataset.foot=r.foot==='right'?'right':'left'; // K17: seated on the footer's baseline by seat(); a row's own y opts out
     if((r.line||r.curve)&&r.arrow)d.dataset.head=r.arrow; // which end carries a head — the gate checks where it lands
 
     // ink = what can be drawn THROUGH text: leader lines, curves, rules, hairlines, small dots. A card, tile, bar, donut or
@@ -800,8 +801,21 @@ function render(){
 // counter: the corner is the counter's — its right edge sits on the margin on EVERY slide. A right-anchored footer master carries it
 // inline (inherits its font/baseline/padding); a left-anchored footer keeps its text at the left and the counter detaches to the corner
 // on the same top, wearing the footer's font (`corner`); no footer → the generic pin; deck.counter===0 draws none (a letter, a one-page document)
-const num=(root,n)=>{if(deck.counter===0)return;const f=root.querySelector('[data-footer]'),inl=f&&f.style.right!=='',c=document.createElement(inl?'span':'div');c.className=inl?'num':f?'num corner':'num pin';c.textContent=(inl&&f.textContent.trim()?' · ':'')+n+' / '+deck.slides.length;
-  if(f&&!inl){c.style.cssText=f.style.cssText;c.style.left='auto';c.style.width='auto';c.style.background='none';c.style.border='0'}if(!inl)c.style.right=MG()+'px';(inl?f:root).appendChild(c)};
+// K17 — ONE foot line: a `foot` row (the dense source, the legend) is seated on the footer's first-line baseline, measured, since
+// the footer, the counter and the source wear different roles. A left foot row starts on the margin; a right one hangs 16px left
+// of the footer's text. A left-anchored footer gives the left to the source: its text moves right, next to the counter, which
+// stays a detached corner so its box is the same on every slide (verify's parity). No footer → the pin is the baseline.
+const baseOf=e=>{const p=document.createElement('i');p.style.cssText='display:inline-block;width:0;height:0;padding:0;margin:0;border:0';e.insertBefore(p,e.firstChild);const y=e.offsetTop+e.clientTop+p.offsetTop;p.remove();return y};
+const num=(root,n)=>{const f=root.querySelector('[data-footer]'),ft=[...root.querySelectorAll('[data-foot]')],flip=!!(f&&f.style.right===''&&ft.some(d=>d.dataset.foot==='left'));
+  if(flip){f.style.left='auto';f.style.right=MG()+'px'}
+  let c=null;
+  if(deck.counter!==0){const inl=f&&f.style.right!==''&&!flip;c=document.createElement(inl?'span':'div');c.className=inl?'num':f?'num corner':'num pin';c.textContent=(inl&&f.textContent.trim()?' · ':'')+n+' / '+deck.slides.length;
+    if(f&&!inl){c.style.cssText=f.style.cssText;c.style.left='auto';c.style.width='auto';c.style.background='none';c.style.border='0'}if(!inl)c.style.right=MG()+'px';(inl?f:root).appendChild(c);
+    if(flip)f.style.right=(W-c.offsetLeft+12)+'px'}
+  const T=f||(c&&!c.parentNode.dataset.footer?c:null);if(!T||!ft.length)return;
+  const b=baseOf(T),L=Math.min(f?f.offsetLeft:W,c&&c.parentNode===root?c.offsetLeft:W);
+  for(const d of ft){if(d.dataset.foot==='right'){d.style.left='auto';d.style.right=(W-L+16)+'px'}else d.style.left=Math.max(MG(),parseFloat(d.style.left)||0)+'px';
+    d.style.top=(parseFloat(d.style.top)||0)+b-baseOf(d)+'px'}};
 // print: every slide becomes one page painted with its own bg — same drawEls, no handlers needed
 addEventListener('beforeprint',()=>{commitEdit();const p=$('print');p.innerHTML='';deck.slides.forEach((s,n)=>{const pg=document.createElement('div');pg.className='pg';pg.style.background=s.bg||'var(--card)';const cv=document.createElement('div');cv.className='cv';drawEls(s,cv,false);num(cv,n+1);pg.appendChild(cv);p.appendChild(pg)})});
 addEventListener('afterprint',()=>{$('print').innerHTML=''});

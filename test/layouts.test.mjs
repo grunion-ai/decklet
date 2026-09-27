@@ -217,8 +217,8 @@ test('library: the catalogue prints every slot box and the free band under the c
 
 test('library: the free band starts under the lowest chrome slot and ends at the foot', () => {
   const content = freeArea(LIBRARY.content);
-  assert.deepEqual(content, {x: 60, y: DENSE.subtitle.y + NEUTRAL_LH.H2, w: 840, h: DENSE.note.y - (DENSE.subtitle.y + NEUTRAL_LH.H2)},
-    'a dense layout: under the subtitle, above the note');
+  assert.deepEqual(content, {x: 60, y: DENSE.subtitle.y + NEUTRAL_LH.H2, w: 840, h: COUNTER.y - (DENSE.subtitle.y + NEUTRAL_LH.H2)},
+    'a dense layout: under the subtitle, above the counter reserve (the note is a caption seat per layout since K17, none on the bare canvas)');
   for (const [name, lay] of Object.entries(LIBRARY)) {
     const fa = freeArea(lay);
     assert.ok(fa.h > 0, name + ' has a band');
@@ -252,6 +252,7 @@ test('library: the counter owns the corner — COUNTER is the reserve, and no de
   const cx = 960 - COUNTER.right - COUNTER.w;
   for (const [name, lay] of Object.entries(LIBRARY)) for (const [slot, sl] of Object.entries(lay.slots)) {
     if (!(slot in DENSE) && sl.right == null) continue;
+    if (sl.foot) continue;   // K17: a foot-line row is seated by the engine beside the footer's text, clear of the counter
     const x1 = sl.right != null ? 960 - sl.right : sl.x + sl.w, y1 = sl.y + (sl.h ?? LH[sl.role] ?? 0);
     assert.ok(x1 <= cx || y1 <= COUNTER.y || sl.y >= COUNTER.y + COUNTER.h, `${name}.${slot} enters the counter reserve (ends x ${x1}, y ${y1})`);
   }
