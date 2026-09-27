@@ -32,7 +32,7 @@ const build = name => { const f = path.join(tmp, name);
   fs.writeFileSync(f, create(model).html.replace('</style>', '@supports (hanging-punctuation:first){#canvas .el[data-n="0"]{letter-spacing:24px!important}}</style>')); return f; };
 
 live('a WebKit-only wrap fails verify: Chromium passes, WebKit reports the collision per engine, the font-stack warning fires', async () => {
-  const r = await verify(build('wrap.html'), {log: () => {}});
+  const r = await verify(build('wrap.html'), {webkit: true, log: () => {}});   // forced: CI is Linux, where the default is off
   assert.ok(r.parity.every(s => s.pass), 'Chromium parity passes');
   assert.ok(r.engines.webkit.some(s => !s.pass), 'WebKit parity fails');
   const row = r.engines.webkit[0].rows.find(o => o.n === '0'); assert.ok(row.lines > 1, 'the label wraps in WebKit'); assert.match(row.problems.join(), /overlaps text 1/);
@@ -43,6 +43,16 @@ live('a WebKit-only wrap fails verify: Chromium passes, WebKit reports the colli
   assert.ok(fs.existsSync(path.join(path.dirname(r.file), 'verify-out', 'webkit', '01-slide-1.png')), 'WebKit shots land in their own folder');
 });
 
+test('the default runs WebKit on macOS only; elsewhere it is skipped and says why', {skip: !hasWebkit || process.platform === 'darwin'}, async () => {
+  const r = await verify(build('auto.html'), {log: () => {}});
+  assert.equal(r.engines.webkit, undefined); assert.equal(r.ok, true, r.errors.join(' | '));
+  assert.ok(r.skipped.some(s => /outside macOS/.test(s)));
+});
+test('the default runs WebKit on macOS', {skip: !hasWebkit || process.platform !== 'darwin'}, async () => {
+  const r = await verify(build('auto-mac.html'), {log: () => {}});
+  assert.ok(r.engines.webkit, 'WebKit ran'); assert.equal(r.ok, false);
+});
+
 live('webkit:false skips the WebKit pass and says so', async () => {
   const r = await verify(build('skip.html'), {webkit: false, log: () => {}});
   assert.equal(r.ok, true, r.errors.join(' | '));
@@ -50,10 +60,3 @@ live('webkit:false skips the WebKit pass and says so', async () => {
   assert.ok(r.skipped.some(s => /webkit/i.test(s)));
 });
 
-// TEMP diagnostic (removed before merge)
-live('TEMP diag', async t => {
-  const ex = JSON.parse(fs.readFileSync(new URL('../examples/explainer/model.json', import.meta.url), 'utf8'));
-  const f = path.join(tmp, 'ex.html'); fs.writeFileSync(f, create(ex).html);
-  const r = await verify(f, {out: path.join(tmp, 'vex')});
-  for (const [e, q] of Object.entries(r.engines)) for (const s of q) if (!s.pass) console.log('DIAG', e, s.slide, JSON.stringify(s.rows));
-});

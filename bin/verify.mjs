@@ -7,8 +7,9 @@
 //        later-painted opaque row (occlusion — sampled with elementFromPoint; fails like every other parity shape), and the page
 //        counter's box is the same on every slide that shows the footer (the corner is the counter's; a `hide` of the footer is exempt)
 //   3. AE pixel diff vs reference PNGs (ImageMagick `magick`/`compare`)  only when --refs is given
-// usage: node bin/verify.mjs deck.html [--refs dir] [--out dir] [--threshold 0.5] [--fuzz 2%] [--report model.report.json] [--fonts <css url>] [--strict] [--no-webkit]
-//   parity runs in Chromium and, when installed, WebKit (per-engine results; --no-webkit skips it). WebKit shots go to <out>/webkit/
+// usage: node bin/verify.mjs deck.html [--refs dir] [--out dir] [--threshold 0.5] [--fuzz 2%] [--report model.report.json] [--fonts <css url>] [--strict] [--webkit | --no-webkit]
+//   parity runs in Chromium and, on macOS when installed, WebKit (per-engine results; --webkit forces it on any OS, --no-webkit
+//   skips it). WebKit shots go to <out>/webkit/
 //   --report: the importer's drift report (default: model.report.json beside the deck) — masks where the mockup drew its chrome
 //   --fonts: a webfont stylesheet injected at TEST time only (the deck stays self-contained) so the AE shot uses the reference's font build
 //   refs: <slide.name>.png, <n>.png (1-based) or slide-<n>.png
@@ -30,7 +31,7 @@ export const fontWarnings = deck => Object.entries(deck?.styles?.roles || {}).fl
   return ENGINE_FAMILIES.includes(first) ? [{role, family: first, msg: `role ${role}: font stack starts with ${first}, which Safari and Chromium resolve to different fonts; lead with a named family (e.g. Menlo) so both engines measure the same text`}] : [];
 });
 
-export async function verify(file, {refs = null, out = null, threshold = 0.5, fuzz = '2%', strict = false, report = null, fonts = null, webkit = true, log = console.log} = {}) {
+export async function verify(file, {refs = null, out = null, threshold = 0.5, fuzz = '2%', strict = false, report = null, fonts = null, webkit = 'auto', log = console.log} = {}) {
   const html = fs.readFileSync(file, 'utf8');
   const res = {file, contract: null, parity: [], engines: {}, ae: [], errors: [], warnings: [], skipped: []};
   // self-containment — the guarantee the whole engine rests on
@@ -48,7 +49,11 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
     // res.engines.webkit and <out>/webkit/. One browser per engine, reused across every slide.
     const engines = [['chromium', pw.chromium]];
     const wkInstalled = (() => { try { return fs.existsSync(pw.webkit.executablePath()); } catch { return false; } })();
+    // 'auto' (the default) runs WebKit on macOS only: Safari exists only on Apple platforms, and Playwright's Linux WebKit resolves
+    // fonts through fontconfig, like neither Safari nor Chromium (the explainer's H1 wrapped there and nowhere a reader looks).
+    // `webkit: true` / --webkit forces it on any OS; false / --no-webkit skips it.
     if (webkit === false) res.skipped.push('webkit parity: skipped (--no-webkit)');
+    else if (webkit === 'auto' && process.platform !== 'darwin') res.skipped.push('webkit parity: off by default outside macOS, where WebKit fonts are not Safari\'s (--webkit forces it)');
     else if (!wkInstalled) res.skipped.push('webkit parity: WebKit not installed (npx playwright install webkit)');
     else engines.push(['webkit', pw.webkit]);
     const pageErrors = [];
@@ -244,8 +249,8 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
 if (isMain(import.meta.url)) {
   const a = process.argv.slice(2), o = {}; let file = null;
   for (let k = 0; k < a.length; k++) if (a[k].startsWith('--')) o[a[k].slice(2)] = a[k + 1] && !a[k + 1].startsWith('--') ? a[++k] : true; else file = a[k];
-  if (!file) { console.error('usage: node bin/verify.mjs deck.html [--refs dir] [--out dir] [--threshold 0.5] [--fuzz 2%] [--report model.report.json] [--fonts <css url, test-time only>] [--strict] [--no-webkit]'); process.exit(2); }
-  const r = await verify(file, {refs: o.refs, out: o.out, threshold: o.threshold ? +o.threshold : 0.5, fuzz: o.fuzz || '2%', strict: !!o.strict, report: o.report || null, fonts: o.fonts || null, webkit: !o['no-webkit']});
+  if (!file) { console.error('usage: node bin/verify.mjs deck.html [--refs dir] [--out dir] [--threshold 0.5] [--fuzz 2%] [--report model.report.json] [--fonts <css url, test-time only>] [--strict] [--webkit | --no-webkit]'); process.exit(2); }
+  const r = await verify(file, {refs: o.refs, out: o.out, threshold: o.threshold ? +o.threshold : 0.5, fuzz: o.fuzz || '2%', strict: !!o.strict, report: o.report || null, fonts: o.fonts || null, webkit: o['no-webkit'] ? false : o.webkit ? true : 'auto'});
   for (const m of r.contract.errors) console.error('ERROR   contract: ' + m);
   for (const m of r.contract.warnings) console.error('warning contract: ' + m);
   for (const l of r.links || []) console.log(`link    slide ${l.slide} ${l.row}: ${l.href}${l.to != null ? ' → ' + (l.to ? 'slide ' + l.to : 'NO SUCH SLIDE') : ''}`);
