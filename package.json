@@ -14,7 +14,8 @@
     "decklet-pdf": "bin/pdf.mjs",
     "decklet-import-html": "bin/import-html.mjs",
     "decklet-bug": "bin/bug.mjs",
-    "decklet-assets": "bin/assets.mjs"
+    "decklet-assets": "bin/assets.mjs",
+    "decklet-serve": "bin/serve.mjs"
   },
   "files": [
     "deck.html",
