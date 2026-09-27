@@ -26,7 +26,7 @@ export const fill = (name, k = 0) => {
   const lay = LIBRARY[name];
   // `body` and b1…bn are alternatives — a column carries the paragraph or the points, and validate errors on the pair, so the
   // image layouts fill as their paragraph here; the bullets-beside-an-image slide is its own test below.
-  const els = Object.entries(lay.slots).filter(([slot]) => !(/^b\d$/.test(slot) && lay.slots.body)).map(([slot, sl]) => {
+  const els = Object.entries(lay.slots).filter(([slot]) => !(/^b\d$/.test(slot) && lay.slots.body) && !/-media$/.test(slot)).map(([slot, sl]) => {   // a media slot is the marker's alternative
     if (slot === 'image') return {slot, img: IMG, fit: 'cover'};
     if (slot === 'chart') return {slot, bg: 'var(--box)'};   // a painted stand-in until the chart row lands
     if (!sl.role) return {slot};                              // paint slots (rule, dots, button): the slot carries the paint
@@ -342,4 +342,37 @@ live('live: the fixed decision slide paints its three cards; the buggy one paint
     await b.close(); return {n, f}; };
   assert.equal((await boxes(painted)).n, 3, 'three card boxes painted');
   assert.equal((await boxes(loose)).n, 0, 'the bug: text on empty canvas');
+});
+
+// ── F10: a list layout takes a logo, an image or an icon per item through `<item>-media`, bound IN PLACE of the item's marker
+const MEDIA_LAYOUTS = {agenda: ['item', 'n', 5], 'process-steps': ['step', 'n', 4], timeline: ['d', 'd', 4], 'three-up-cards': ['card', 'card', 3], 'proof-strip': ['logo', 'logo', 5]};
+const marker = (name, k) => ({agenda: `n${k}`, 'process-steps': `n${k}`, timeline: `d${k}`, 'three-up-cards': `card${k}-number`, 'proof-strip': `logo${k}-name`})[name];
+const centreY = sl => sl.y + (sl.h ?? NEUTRAL_LH[sl.role]) / 2;
+test('library: media — each list layout carries one <item>-media slot per item, roleless and unpainted, centred on the marker it replaces', () => {
+  for (const [name, [item, , n]] of Object.entries(MEDIA_LAYOUTS)) {
+    const slots = LIBRARY[name].slots, media = Object.keys(slots).filter(s => /-media$/.test(s));
+    assert.deepEqual(media, [...Array(n)].map((_, i) => `${item}${i + 1}-media`), name + ': one per item, in order');
+    for (const [i, s] of media.entries()) {
+      const sl = slots[s], mk = slots[marker(name, i + 1)];
+      assert.ok(!sl.role && !sl.bg && sl.w > 0 && sl.h > 0, `${name}.${s}: a media box`);
+      assert.equal(centreY(sl), centreY(mk), `${name}.${s}: centred on ${marker(name, i + 1)}`);
+      if (name === 'agenda') assert.equal(slots[`item${i + 1}`].x - (sl.x + sl.w), 8, 'agenda: one 8px gutter before the item');
+    }
+  }
+  const cat = catalogue();
+  assert.match(cat, /item1-media +media +78 +150 +24 +24/);
+});
+const MARK = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 20"><rect width="40" height="20" fill="#123"/></svg>');
+test('library: media — binding an icon, an img or a logo in place of every marker validates clean', () => {
+  for (const kind of ['icon', 'img', 'logo']) for (const name of Object.keys(MEDIA_LAYOUTS)) {
+    const s = fill(name);
+    const els = s.els.filter(r => !/^(n\d|card\d-number|logo\d-name)$/.test(r.slot) && !(name === 'timeline' && /^d\d$/.test(r.slot)));
+    for (const slot of Object.keys(LIBRARY[name].slots).filter(x => /-media$/.test(x))) {
+      const sl = LIBRARY[name].slots[slot];
+      els.push(kind === 'icon' ? {slot, icon: 'factory'} : kind === 'img' ? {slot, img: MARK, fit: 'contain'} : {slot, logo: MARK, h: sl.h, col: sl.w});
+    }
+    const r = validate(create({w: 960, h: 540, title: 'media', slides: [{...s, els}]}).deck);
+    assert.deepEqual(r.errors, [], `${name} ${kind}: ${r.errors.join(' | ')}`);
+    assert.deepEqual(r.warnings.filter(w => /from els|overlaps/.test(w)), [], `${name} ${kind}: ${r.warnings.join(' | ')}`);
+  }
 });

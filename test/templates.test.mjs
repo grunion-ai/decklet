@@ -246,3 +246,108 @@ test('templates: the logo family ships stand-in marks, and a deck without draft 
   const r = v(deck([{template: 'logo-cover-lockup'}]));
   assert.ok(r.errors.some(m => /placeholder mark .* may not ship/.test(m)), 'no draft, no stand-in');
 });
+
+// ── F10: per-item media. The list-shaped templates take a logo, an image or an icon per item: `fill: {m1: {logo}, m2: {icon}}`.
+// The media sits BESIDE the item's lead text, centred on that text's first line, one fixed gutter (lib/logo.mjs GAP) between;
+// a centred lead row keeps the pair centred. A logo turns the lead row into a logo row (docs/logo.md) whose name is the text.
+// A template with no media filled expands exactly as before.
+import {templateMedia, MEDIA_TEMPLATES} from '../lib/templates.mjs';
+import {GAP} from '../lib/logo.mjs';
+import {NEUTRAL_LH} from '../lib/layouts.mjs';
+import {scale} from '../lib/templates/kit.mjs';
+const LIST = ['agenda-ruled', 'exec-summary', 'stat-row-3', 'stat-row-4', 'kpi-scorecard', 'two-col-compare', 'benchmark-table', 'harvey-balls',
+  'scorecard-grid', 'value-chain', 'process-flow-3', 'process-flow-4', 'process-flow-5', 'timeline-horizontal', 'gantt-lanes', 'vertical-steps',
+  'funnel-stages', 'three-up-cards', 'table-insight', 'proof-strip'];
+const PNG = 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 20"><rect width="40" height="20" fill="#123"/></svg>').toString('base64');
+const MEDIA = {logo: {logo: PNG, aspect: 2}, img: {img: PNG, fit: 'cover'}, icon: {icon: 'factory'}, monogram: {logo: ''}};
+const mediaFill = (id, m) => Object.fromEntries(templateMedia(id).map(e => [e.key, m]));
+
+test('templates: media — every list-shaped template declares one media key per item, m1..mn, and the catalogue prints them', () => {
+  assert.deepEqual([...MEDIA_TEMPLATES].sort(), [...LIST].sort(), 'the list-shaped templates are exactly the ones that take media');
+  for (const id of LIST) {
+    const m = templateMedia(id), keys = templateKeys(id);
+    assert.ok(m.length >= 2, id + ': a list has at least two items');
+    m.forEach((e, i) => { assert.equal(e.key, 'm' + (i + 1)); assert.ok(keys.some(k => k.key === e.on && typeof k.text === 'string'), id + ' ' + e.key + ' rides a text key'); });
+  }
+  assert.deepEqual(templateMedia('statement'), [], 'a template that is not a list takes no media');
+  assert.equal(templateMedia('no-such'), null);
+  const cat = templateCatalogue();
+  assert.match(cat, /^ {4}m1 {3}media {6}logo · img · icon beside t\d+/m);
+});
+
+test('templates: media — no template row carries the item marker, and a template with no media expands exactly to its rows', () => {
+  for (const t of TEMPLATES) assert.ok(!t.els.some(r => 'item' in r), t.id + ': the item marker never reaches a deck');
+  for (const id of LIST) {
+    const d = deck([{template: id}]); expandTemplates(d);
+    assert.deepEqual(d.slides[0].els, scale(TEMPLATE[id].els, 1), id + ': unchanged without media');
+  }
+});
+
+const lhOf = r => NEUTRAL_LH[r.role];
+test('templates: media — an icon or image sits beside its item, centred on the first line, one gutter before the text', () => {
+  for (const id of LIST) for (const kind of ['icon', 'img']) {
+    const d = deck([{template: id, fill: mediaFill(id, MEDIA[kind])}]); expandTemplates(d);
+    const els = d.slides[0].els, marks = els.filter(r => r[kind] != null);
+    assert.equal(marks.length, templateMedia(id).length, `${id} ${kind}: one per item`);
+    for (const mk of marks) {
+      const txt = els[els.indexOf(mk) + 1];
+      assert.ok(txt && txt.text != null, `${id} ${kind}: the text follows its media`);
+      assert.equal(txt.x, mk.x + mk.w + GAP, `${id} ${kind}: one fixed gutter`);
+      assert.ok(Math.abs((mk.y + mk.h / 2) - (txt.y + lhOf(txt) / 2)) <= 0.5, `${id} ${kind}: centred on the first line (${mk.y}+${mk.h}/2 vs ${txt.y}+${lhOf(txt)}/2)`);
+      assert.ok(!txt.align || txt.align === 'left', `${id} ${kind}: the text starts at the gutter`);
+      if (kind === 'icon') { assert.equal(mk.w, mk.h, 'an icon is square'); assert.equal(mk.icon, 'factory'); }
+      else assert.equal(mk.fit, 'cover', 'fit rides along');
+    }
+  }
+});
+
+test('templates: media — a logo makes the lead row a logo row; its name is the text, its first line where the text was', () => {
+  for (const id of LIST) {
+    const plain = deck([{template: id}]); expandTemplates(plain);
+    const d = deck([{template: id, fill: mediaFill(id, MEDIA.logo)}]); expandTemplates(d);
+    const logos = d.slides[0].els.filter(r => r.logo != null);
+    assert.equal(logos.length, templateMedia(id).length, id + ': one logo row per item');
+    const names = templateMedia(id).map(e => templateKeys(id).find(k => k.key === e.on).text);
+    assert.deepEqual(logos.map(r => r.name), names, id + ': the names are the item texts');
+    for (const [i, r] of logos.entries()) {
+      const was = plain.slides[0].els.find(e => e.text === names[i]);
+      assert.equal(r.gap, GAP); assert.ok(r.col > 0 && r.h > 0); assert.equal(r.text, undefined);
+      assert.ok(Math.abs((r.y + r.h / 2) - (was.y + lhOf(was) / 2)) <= 0.5, `${id}: the name's first line stays put`);
+      if (was.align !== 'center') assert.equal(r.x, was.x, id + ': a left row keeps its x');
+    }
+  }
+});
+
+test('templates: media — every list template validates with media filled: zero errors, no air finding the plain slide lacks', () => {
+  for (const id of LIST) {
+    const base = new Set(v(deck([{template: id}])).warnings);
+    for (const [kind, m] of Object.entries(MEDIA)) {
+      const r = v(deck([{template: id, fill: mediaFill(id, m)}]));
+      assert.deepEqual(r.errors, [], `${id} ${kind}: ${r.errors.join(' | ')}`);
+      assert.deepEqual(r.warnings.filter(w => !base.has(w)), [], `${id} ${kind}: new warnings`);
+    }
+  }
+});
+
+test('templates: media — a text fill and a media fill on the same item compose; the canvas scale reaches the column', () => {
+  const on = templateMedia('benchmark-table')[0].on, d = deck([{template: 'benchmark-table', fill: {[on]: 'Xometry', m1: {logo: PNG, aspect: 3}}}]); expandTemplates(d);
+  assert.ok(d.slides[0].els.some(r => r.logo && r.name === 'Xometry'));
+  const big = deck([{template: 'benchmark-table', fill: {m1: {logo: PNG}}}], {w: 1600, h: 900}); expandTemplates(big);
+  const small = deck([{template: 'benchmark-table', fill: {m1: {logo: PNG}}}]); expandTemplates(small);
+  const [a, b] = [big, small].map(x => x.slides[0].els.find(r => r.logo));
+  assert.equal(a.col, Math.round(b.col * 1600 / 960)); assert.equal(a.h, Math.round(b.h * 1600 / 960));
+});
+
+test('templates: media — fill errors name what a media key takes', () => {
+  const bad = [[{m9: {icon: 'factory'}}, /fill key "m9"/], [{m1: 'factory'}, /takes one of \{logo\}, \{img\} or \{icon\}/],
+    [{m1: {icon: 'factory', img: PNG}}, /one of/], [{m1: {icon: 'no-such-icon'}}, /icon "no-such-icon"/],
+    [{m1: {img: 'https://x/y.png'}}, /data: URI/], [{m1: {img: PNG, fit: 'squash'}}, /fit/], [{m1: {logo: PNG, plate: 'pink'}}, /plate/],
+    [{m1: {logo: PNG, h: -3}}, /h must be/], [{m1: {icon: 'factory', size: 3}}, /"size"/]];
+  for (const [fill, re] of bad) {
+    const r = v(deck([{template: 'agenda-ruled', fill}]));
+    assert.ok(r.errors.some(m => re.test(m)), JSON.stringify(fill) + ' → ' + r.errors.join(' | '));
+  }
+  assert.ok(v(deck([{template: 'statement', fill: {m1: {icon: 'factory'}}}])).errors.some(m => /fill key "m1"/.test(m)), 'no media on a non-list');
+  const ok = v(deck([{template: 'proof-strip', fill: {m1: {logo: '#acme', aspect: 3}, m2: {img: '#acme'}}}], {assets: {acme: PNG}}));
+  assert.deepEqual(ok.errors, [], 'an asset reference fills a media key: ' + ok.errors.join(' | '));
+});
