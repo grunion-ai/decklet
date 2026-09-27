@@ -7,6 +7,7 @@ import path from 'node:path';
 import os from 'node:os';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {create} from '../bin/create.mjs';
+import {withBrowser} from './helpers/browser.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const tpl = fs.readFileSync(path.join(root, 'template.html'), 'utf8');
 const hud = tpl.slice(tpl.indexOf('<div id="hud">'), tpl.indexOf('<div id="sheet"'));
@@ -60,6 +61,25 @@ live('hud: C opens the sheet, G toggles guides, the dot\'s tooltip carries the s
   await p.evaluate(() => { snap(); slide().els[1].x = 99; save(); }); await p.waitForTimeout(300);
   assert.match(await p.getAttribute('#autosave', 'data-tip'), /^Saved in this browser · 1 not in the file · ⌘S$/, 'amber names the pending count and the door');
   assert.deepEqual(p.errs, []); await b.close();
+});
+
+// UAT, Safari 18.5, v0.14.0: C opened the sheet and a second C did nothing, though the tooltip reads "Contact sheet · C".
+// Inside the sheet every key goes to sheetKey(), which knew Escape and Enter but not C. A bare C now closes it the way Esc
+// does; ⌘C (Ctrl+C) still copies the selected slides and leaves the sheet open.
+for (const engine of ['chromium', 'webkit']) live(`hud: C toggles the contact sheet, and ⌘C inside it still copies (${engine})`, {timeout: 60000}, async () => {
+  await withBrowser(pw[engine], async (b) => {
+    const p = await open(b);
+    const hidden = () => p.evaluate(() => sheet.hidden);
+    await p.keyboard.press('c'); assert.equal(await hidden(), false, 'C opens the sheet');
+    await p.keyboard.press('c'); assert.equal(await hidden(), true, 'C again closes it');
+    assert.equal(await p.evaluate(() => i), 0, 'closing with C stays on the slide, as Esc does');
+    await p.keyboard.press('c'); assert.equal(await hidden(), false);
+    await p.keyboard.press('ControlOrMeta+c');
+    assert.equal(await hidden(), false, '⌘C inside the sheet leaves it open');
+    assert.equal(await p.evaluate(() => clip && clip.length), 1, '⌘C copied the selected slide');
+    await p.keyboard.press('Shift+C'); assert.equal(await hidden(), true, 'a capital C closes it too');
+    assert.deepEqual(p.errs, []);
+  }, {timeout: 50000});
 });
 
 live('hud: duplicate copies the selected rows offset 16px and selects the copies; with nothing selected it copies the slide', async () => {

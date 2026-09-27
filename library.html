@@ -1190,7 +1190,7 @@ function reorder(at){
 const dup=s=>JSON.parse(JSON.stringify(s));
 function sheetKey(e){
   const mod=e.metaKey||e.ctrlKey,k=e.key.toLowerCase();
-  if(e.key==='Escape'){sheetClose();return true}
+  if(e.key==='Escape'||(k==='c'&&!mod&&!e.altKey)){sheetClose();return true} // a bare C closes what C opened; ⌘C stays copy
   if(e.key==='Enter'&&gsel.size){i=[...gsel][0];sheetClose();return true}
   if((e.key==='Backspace'||e.key==='Delete')&&gsel.size){ // never the last slide
     const del=[...gsel].sort((a,b)=>b-a);if(del.length>=deck.slides.length)del.pop();if(!del.length)return true;
