@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
-import {pathToFileURL, fileURLToPath} from 'node:url';
+import {fileURLToPath} from 'node:url';
 import {validate, mergeStyle, fillKpi, FORMAT, resolveCanvas} from './validate.mjs';
 import {libraryFor} from '../lib/layouts.mjs';
 import {expandCharts} from '../lib/chart.mjs';
@@ -16,6 +16,7 @@ import {expandTemplates} from '../lib/templates.mjs';
 import {expandIcons} from '../lib/icons.mjs';
 import {flags as spellFlags, flagMap as spellMap, loadChecker} from '../lib/spell.mjs';
 import {stampIds, diffDecks, applyLog, blockOf, hasBlock, putBlock} from '../lib/edits.mjs';
+import {isMain} from '../lib/is-main.mjs';
 
 // page-size presets of ONE model space: the FORMAT table lives in validate.mjs (the module create builds on), re-exported
 // here so `import {create, FORMAT} from './create.mjs'` is unchanged and the validator can never size a deck differently.
@@ -97,7 +98,7 @@ export function create(model, {style = null, format, space, title, template, fro
   return {html, deck, hash, migrate};
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isMain(import.meta.url)) {
   const a = process.argv.slice(2), o = {};
   for (let k = 0; k < a.length; k++) if (a[k].startsWith('--')) o[a[k].slice(2)] = a[k + 1] && !a[k + 1].startsWith('--') ? a[++k] : true;
   if (!o.model || !o.out) { console.error('usage: node bin/create.mjs --model model.json [--style style.json] --out deck.html [--format …] [--space WxH] [--title …] [--from prev.html] [--force]'); process.exit(2); }

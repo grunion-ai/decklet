@@ -9,7 +9,7 @@
 // library: import {extract, assemble, extractInPage, classify, ROLES} — assemble() is pure and unit-tested.
 import fs from 'node:fs';
 import path from 'node:path';
-import {pathToFileURL} from 'node:url';
+import {isMain} from '../lib/is-main.mjs';
 
 // ── in-page walker: serialised into the mockup page by Playwright ──
 export function extractInPage(VW) {
@@ -299,7 +299,7 @@ export async function extract(files, { w = 1600, h = 900, shots = null } = {}) {
   return deck;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isMain(import.meta.url)) {
   const a = process.argv.slice(2), opt = { w: 1600, h: 900, out: 'model.json', shots: null }, files = [];
   for (let k = 0; k < a.length; k++) a[k].startsWith('--') ? (opt[a[k].slice(2)] = a[++k]) : files.push(...(/[*?[]/.test(a[k]) ? fs.globSync(a[k]).sort() : [a[k]]));
   if (!files.length) { console.error('usage: node bin/import-html.mjs [--w 1600 --h 900] [--out model.json] [--shots dir] <pages.html|glob> […]'); process.exit(2); }

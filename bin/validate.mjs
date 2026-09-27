@@ -7,13 +7,13 @@
 //   --style: the same style.json create() will build with — text fit is only meaningful against the scale the deck will wear
 // library: import {validate, mergeStyle, ROLES} from './validate.mjs'  →  {ok, errors:[…], warnings:[…]}
 import fs from 'node:fs';
-import {pathToFileURL} from 'node:url';
 import {LIBRARY, libraryFor, catalogue, DENSITY, densityReport} from '../lib/layouts.mjs';
 import {TEMPLATE, templateKeys, fillErrors, expandTemplates, templateCatalogue} from '../lib/templates.mjs';
 import {ICONS, iconNames, expandIcons} from '../lib/icons.mjs';
 import {checkChart, expandCharts} from '../lib/chart.mjs';
 import {stampIds} from '../lib/edits.mjs';
 import {PLATES, isLogoRow, logoGeom} from '../lib/logo.mjs';
+import {isMain} from '../lib/is-main.mjs';
 
 export const ROLES = ['Title', 'Supertitle', 'H1', 'H2', 'Body', 'Caption', 'Label', 'Stat'];
 // the KPI allowance: `Stat2` is an OPTIONAL ninth role — a second, smaller stat size for tiles, so a hero "63%" and a card
@@ -553,7 +553,7 @@ export function validate(deck) {
   return {ok: !errors.length, errors, warnings};
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isMain(import.meta.url)) {
   const a = process.argv.slice(2), strict = a.includes('--strict'), si = a.indexOf('--style');
   if (a.includes('--layouts')) { console.log(catalogue()); process.exit(0); }
   if (a.includes('--templates')) { console.log(templateCatalogue()); process.exit(0); }

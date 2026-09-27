@@ -3,8 +3,8 @@
 // usage: node bin/edits.mjs deck.html [--json]
 // prints: deck id + rev, every logged edit (slide/row, keys before → after, conflicts the last migrate kept)
 import fs from 'node:fs';
-import {pathToFileURL} from 'node:url';
 import {blockOf} from '../lib/edits.mjs';
+import {isMain} from '../lib/is-main.mjs';
 
 export function edits(html) {
   const deck = blockOf(html, 'DECK'), log = blockOf(html, 'LOG');
@@ -18,7 +18,7 @@ export function describe(e) {
   return `${e.t || ''} ${at}: ${what}${e.rev ? '' : '  [not in any file yet]'}`;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isMain(import.meta.url)) {
   const a = process.argv.slice(2), file = a.find(x => !x.startsWith('--'));
   if (!file) { console.error('usage: node bin/edits.mjs deck.html [--json]'); process.exit(2); }
   const r = edits(fs.readFileSync(file, 'utf8'));
