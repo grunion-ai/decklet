@@ -99,6 +99,17 @@ body.present .el a.lk{pointer-events:auto}
 @media (pointer:coarse){#hud #savebad{min-width:20px;height:20px;min-height:0;line-height:20px;border-radius:10px;top:-8px;right:-8px}}
 @keyframes asave{from{opacity:.5}to{opacity:1}}
 @media (prefers-reduced-motion:reduce){#autosave{animation:none!important}}
+/* capture: every registered edit drops an accent dot into the disk and a ring spreads from it (500 ms, class cap on the button) */
+#autosave .drop{position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px 0 0 -2px;border-radius:50%;background:var(--accent);opacity:0;pointer-events:none}
+#autosave::after{content:'';position:absolute;left:50%;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;box-sizing:border-box;border-radius:50%;border:1.5px solid var(--accent);opacity:0;pointer-events:none}
+#autosave.cap .drop{animation:cap-drop .5s ease-in}#autosave.cap::after{animation:cap-ring .5s ease-out}
+@keyframes cap-drop{0%{opacity:1;transform:translateY(-11px)}55%{opacity:1;transform:translateY(1px)}100%{opacity:0;transform:translateY(1px) scale(.5)}}
+@keyframes cap-ring{0%,50%{opacity:0;transform:scale(.4)}60%{opacity:.9}100%{opacity:0;transform:scale(1.6)}}
+/* rebase (hosted): the agent wrote a new version and the page is replaying its unacknowledged edits on top: a labelled pill */
+#autosave .upd,#autosave .rw{display:none}#autosave .upd{font:500 12px/16px ui-monospace,Menlo,monospace;white-space:nowrap}
+#autosave[data-state=rebase]{color:var(--accent)}#autosave[data-state=rebase]>svg:first-child{display:none}#autosave[data-state=rebase] .upd{display:inline}
+#autosave[data-state=rebase] .rw{display:block;order:-1;margin-right:6px;animation:cap-spin 1s linear infinite}@keyframes cap-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){#autosave.cap .drop,#autosave.cap::after,#autosave[data-state=rebase] .rw{animation:none}#autosave.cap{box-shadow:inset 0 0 0 1px var(--accent)}}
 #hud{position:relative;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 16px calc(8px + env(safe-area-inset-bottom));border-top:1px solid var(--line);font:12px ui-monospace,Menlo,monospace;color:var(--muted)}
 #hud button,#tb button,#sheet-back{background:var(--card);border:1px solid var(--line);color:var(--fg);border-radius:6px;padding:4px 10px;cursor:pointer;font:inherit}
 #hud .sep{width:1px;height:18px;background:var(--line)}
@@ -211,7 +222,7 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
   <button id="prev" class="mi mi-chevron-left" data-ms="200" data-tip="Previous slide · ←" aria-label="Previous slide · ←"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" data-mi="chevron"/></svg></button>
   <button id="next" class="mi mi-chevron-right" data-ms="200" data-tip="Next slide · →" aria-label="Next slide · →"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" data-mi="chevron"/></svg></button>
   <div class="spacer"></div>
-  <button id="autosave" class="mi mi-save" data-ms="600" data-state="ok" data-tip="Autosaved · click saves the file · ⌘S" aria-label="Autosaved · click saves the file · ⌘S"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7" class="lid" data-mi="animate"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></svg><span id="savebad" role="status" hidden></span></button>
+  <button id="autosave" class="mi mi-save" data-ms="600" data-state="ok" data-tip="Autosaved · click saves the file · ⌘S" aria-label="Autosaved · click saves the file · ⌘S"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7" class="lid" data-mi="animate"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></svg><i class="drop" aria-hidden="true"></i><span class="upd" aria-hidden="true">Updating</span><svg class="rw" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg><span id="savebad" role="status" hidden></span></button>
   <div class="sep"></div>
   <div id="addwrap">
     <button id="addbtn" class="mi mi-plus" data-ms="500" data-tip="Add text, box or slide" aria-label="Add text, box or slide" aria-haspopup="true" aria-expanded="false"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="plus" data-mi="animate"><path d="M5 12h14" class="horizontal"/><path d="M12 5v14" class="vertical"/></svg></button>
@@ -327,6 +338,9 @@ const store={
 //      {s,k} (slide props) · {sadd,at} · {sdel,slide} · {order:[ids]} · {m,k} (master row). Human edits are appended on every save.
 // applyLog: replays a log onto another version of the deck. Human wins: a key whose current value is neither the entry's
 //      before (agent changed it too → CONFLICT, agent value kept on the entry) nor its after (already applied → skip) is still set.
+//      applyLog(deck,log,true) = the agent wins instead (a hosted page replaying edits the agent never saw onto its rebuild): the
+//      key keeps the agent's value, the entry records it in `yielded`, and no later replay sets that key again.
+// splice: a deck file's source with its DECK and LOG data blocks rewritten; fileHtml() and bin/serve.mjs both write through it.
 /*EDITS*/
 // ids are deterministic (s1, s2… / r1, r2… — the next free number), so create() on the same model is byte-identical and a
 // diff of two builds is a diff of content. deck.id is stamped by create (a content hash); the browser falls back to its namespace.
@@ -352,10 +366,10 @@ function diffDecks(a,b){
   const ma=byId(a.master),mb=byId(b.master);
   for(const m of b.master||[]){const o=ma.get(m.id);if(!o)continue;const k=diffKeys(o,m,['id']);if(k)out.push({m:m.id,k})}
   return out}
-function applyLog(deck,log){
+function applyLog(deck,log,agent){
   const R={applied:0,conflicts:[],orphans:[]};
-  const setKeys=(t,e,addr)=>{let hit=0;for(const p in e.k){const[before,after]=e.k[p],cur=t[p];if(eq(cur,after))continue;
-      if(!eq(cur,before)){e.conflict=e.conflict||{};e.conflict[p]=cur;R.conflicts.push({...addr,key:p,human:after,agent:cur})}
+  const setKeys=(t,e,addr)=>{let hit=0;for(const p in e.k){if(e.yielded&&p in e.yielded)continue;const[before,after]=e.k[p],cur=t[p];if(eq(cur,after))continue;
+      if(!eq(cur,before)){if(agent){(e.yielded=e.yielded||{})[p]=cur;R.conflicts.push({...addr,key:p,human:after,agent:cur,kept:'agent'});continue}e.conflict=e.conflict||{};e.conflict[p]=cur;R.conflicts.push({...addr,key:p,human:after,agent:cur})}
       if(after===undefined)delete t[p];else t[p]=JSON.parse(JSON.stringify(after));hit=1}
     R.applied+=hit};
   for(const e of log){
@@ -371,6 +385,10 @@ function applyLog(deck,log){
     if(n<0){R.orphans.push({s:e.s,r:e.r});continue}
     setKeys(s.els[n],e,{s:e.s,r:e.r})}
   return R}
+function splice(src,deck,log){ // markers are built, never written out: a literal would be matched as the data block itself
+  const J=v=>JSON.stringify(v).replace(/<\/script/gi,'<\\/script');
+  const put=(h,m,v)=>{const a='/*'+m+'*/',b='/*/'+m+'*/',x=h.indexOf('='+a),y=x<0?-1:h.indexOf(b,x);if(y<0)throw new Error('marker '+m+' missing');return h.slice(0,x+1+a.length)+J(v)+h.slice(y)};
+  return put(put(src,'DECK',deck),'LOG',log)}
 /*/EDITS*/
 // ── BUG: the bug-report builder, the pure core shared with node (lib/bug.mjs lifts this block verbatim — ONE source) ──
 // A report is a mailto the reporter opens, reads and sends. The address is receive-only. bugFacts() is the CLOSED set of
@@ -428,6 +446,9 @@ const LKEY=NS+':log';
 // position: this tab's slide (by id — survives renumbering), else the URL hash (#4 = slide 4), else slide 1. A fresh
 // window opens on slide 1; a refresh or a new version of the file keeps the slide you were on. render() clamps.
 const hashPos=()=>parseInt(location.hash.slice(1))-1;
+// host: `node bin/serve.mjs deck.html` serves this file with <meta name="decklet-host" content="<token>"> after <head> (never in
+// the file). Taken here and dropped from the DOM, so no copy carries it; the probe at the foot turns the route on (HOST.on).
+const HOST=(()=>{const m=document.querySelector('meta[name="decklet-host"]');if(!m)return null;m.remove();return /^https?:$/.test(location.protocol)&&m.content?{t:m.content,rev:DECK.rev||'',on:false,name:'',stale:0}:null})(),hosted=()=>!!HOST&&fileH===HOST; // on the host route HOST is the file handle
 const tab={get:k=>{try{return sessionStorage.getItem(NS+':'+k)}catch{return null}},set:(k,v)=>{try{sessionStorage.setItem(NS+':'+k,v)}catch{}}};
 // the browser's copy of the log: the file's own, plus what this browser added since (write-back puts them in the file)
 let log,deck,history,base,unsynced=0,i=0,sel=new Set();
@@ -469,7 +490,7 @@ addEventListener('resize',fit);
 // The tooltip (title + hover label) always carries the last confirmed save time.
 const hms=d=>d?d.toTimeString().slice(0,8):'';
 const BLOCKED='Not saved — this browser blocks storage for local files (Safari does, on file://). Press ⌘S to save a copy you can reopen, or open this deck in Chrome.';
-const autosave=(st,msg)=>{const a=$('autosave');if(!a)return;a.dataset.state=st;const txt=msg||{ok:fileAt?'Saved to file · '+hms(fileAt):'Autosaved · '+hms(lastSavedAt),local:'Saved in this browser · '+unsynced+' edit'+(unsynced===1?'':'s')+' not in the file yet'+(fileH?' — writing':' — ⌘S writes them'),bad:TIER!=='mem'?'Not saved — edits will be lost on refresh'+(lastSavedAt?' (last saved '+hms(lastSavedAt)+')':''):BLOCKED,busy:'Saving…'}[st];a.dataset.full=txt;a.dataset.tip=msg||{ok:fileAt?'Saved to file · '+hms(fileAt):'Autosaved · '+hms(lastSavedAt),local:'Saved in this browser · '+unsynced+' not in the file'+(fileH?'':' · ⌘S'),bad:'Save a copy · ⌘S — this browser blocks storage, so edits only survive in a copy',busy:'Saving…'}[st];a.setAttribute('aria-label',txt);
+const autosave=(st,msg)=>{const a=$('autosave');if(!a)return;a.dataset.state=st;const to='Saved to '+(hosted()&&HOST.name||'file')+' · ';const txt=msg||{ok:fileAt?to+hms(fileAt):'Autosaved · '+hms(lastSavedAt),local:'Saved in this browser · '+unsynced+' edit'+(unsynced===1?'':'s')+' not in the file yet'+(fileH?' — writing':' — ⌘S writes them'),rebase:'Updating · the agent wrote a new version; your edits go on top',bad:TIER!=='mem'?'Not saved — edits will be lost on refresh'+(lastSavedAt?' (last saved '+hms(lastSavedAt)+')':''):BLOCKED,busy:'Saving…'}[st];a.dataset.full=txt;a.dataset.tip=msg||{ok:fileAt?to+hms(fileAt):'Autosaved · '+hms(lastSavedAt),local:'Saved in this browser · '+unsynced+' not in the file'+(fileH?'':' · ⌘S'),rebase:'Updating',bad:'Save a copy · ⌘S — this browser blocks storage, so edits only survive in a copy',busy:'Saving…'}[st];a.setAttribute('aria-label',txt);
   const bd=$('savebad');if(bd){const k=st==='bad'?'!':st==='local'&&unsynced?String(unsynced):'';bd.hidden=!k;bd.textContent=k;bd.setAttribute('aria-label',st==='bad'?'nothing is saved':k+' edit'+(k==='1'?'':'s')+' not in the file yet')}};
 // save: every mutation lands here. base = the deck as last saved; the diff since then is appended to the log (stamped with
 // the file rev it was made on — an entry with no rev has not reached a file yet), then model + log persist, the other windows
@@ -479,11 +500,13 @@ let asT,fileH=null,writing=false,fileAt=null,wbT=null;const WB=800;
 const FSA=!!window.showOpenFilePicker;
 function save(){
   stampIds(deck);const now=JSON.stringify(deck),ents=diffDecks(JSON.parse(base),deck).map(e=>({t:new Date().toISOString(),...e}));base=now;
-  if(ents.length){log.push(...ents);unsynced+=ents.length;store.set(LKEY,JSON.stringify(log))}
+  if(ents.length){log.push(...ents);unsynced+=ents.length;store.set(LKEY,JSON.stringify(log));capture()}
   autosave('busy');const ok=store.set(KEY,now);clearTimeout(asT);
   if(ents.length)tell({model:now,log:JSON.stringify(log)});
   if(fileH){clearTimeout(wbT);wbT=setTimeout(writeBack,WB)}
   asT=setTimeout(()=>autosave(ok?(unsynced?'local':'ok'):'bad'),250)}
+// capture: an edit registered, so the dot drops into the disk for 500 ms (class cap; a border flash under reduced motion)
+let capT;const capture=()=>{const a=$('autosave');if(!a)return;a.classList.remove('cap');void a.offsetWidth;a.classList.add('cap');clearTimeout(capT);capT=setTimeout(()=>a.classList.remove('cap'),500)};
 const flush=()=>{if(fileH&&wbT){clearTimeout(wbT);wbT=null;writeBack()}}; // the pending write-back, now
 if(!LS)document.body.classList.add('nostore'); // say it at load, not after the first lost edit (the foot of the script settles the dot)
 // a live text edit or a drag in flight must not die with the tab: commit + save when the page hides or unloads, and write the file
@@ -1427,10 +1450,7 @@ function fileHtml(){
   d.removeAttribute('style');q('body').removeAttribute('style');q('body').className='';d.querySelectorAll('#hud :disabled').forEach(b=>b.disabled=false);['#canvas','#grid','#print'].forEach(s=>q(s).innerHTML='');
   q('#snap').setAttribute('aria-pressed','false');q('#snap').dataset.tip='Guides + snap · off · G';q('#snap').setAttribute('aria-label',q('#snap').dataset.tip); // guides are browser state: a copy opens with them off
   q('#tb').hidden=q('#sheet').hidden=true;q('#addmenu').classList.remove('open');q('#helpmenu').classList.remove('open');
-  const J=v=>JSON.stringify(v).replace(/<\/script/gi,'<\\/script'),sc=q('script');
-  sc.textContent=sc.textContent
-    .replace(/\/\*DECK\*\/[\s\S]*?\/\*\/DECK\*\//,()=>'/*DECK*/'+J(deck)+'/*/DECK*/')
-    .replace(/\/\*LOG\*\/[\s\S]*?\/\*\/LOG\*\//,()=>'/*LOG*/'+J(log)+'/*/LOG*/');
+  const sc=q('script');sc.textContent=splice(sc.textContent,deck,log);
   return '<!DOCTYPE html>\n'+d.outerHTML;
 }
 // ⌘S (or the dot) = SAVE THE FILE, NOW. Chrome/Edge: the first press asks for the deck file once (File System Access) and from
@@ -1447,11 +1467,41 @@ async function linkFile(){ // a user gesture is required: called from ⌘S / the
 let wq=null; // one write in flight; a save during a write queues exactly one more
 async function writeBack(){
   clearTimeout(wbT);wbT=null;if(!fileH)return;if(writing){wq=1;return}writing=true;autosave('busy');
+  if(hosted()){try{await hostWrite();store.set(LKEY,JSON.stringify(log));fileAt=new Date()}catch(err){console.warn('decklet: host write failed; the edits wait in this browser and go on the next save or open',err)}
+    finally{writing=false;unsynced=log.filter(e=>!e.rev).length;autosave(unsynced?'local':'ok');if(wq){wq=null;writeBack()}}return}
   const fresh=log.filter(e=>!e.rev);for(const e of fresh)e.rev=deck.rev; // the file about to be written carries them
   try{const w=await fileH.createWritable();await w.write(fileHtml());await w.close();unsynced=0;store.set(LKEY,JSON.stringify(log));fileAt=new Date();autosave('ok')}
   catch(err){console.warn('decklet: write failed',err);for(const e of fresh)delete e.rev;fileH=null;autosave('local')}
   finally{writing=false;if(wq){wq=null;writeBack()}}
 }
+// ── host route (HOST.on): every save PUTs {model, log} to bin/serve.mjs on the write-back debounce, If-Match = the rev this page
+// last read or wrote; the server splices them into the file (splice(), the function fileHtml() writes with). The store is the
+// journal: on an http origin localStorage works in every browser, Safari included, so an entry the host has not acknowledged
+// (no rev) survives a refresh or a closed window and goes again on the next open. Entries are stamped only once the host says
+// 200, so the journal never claims a write that did not land. keepalive lets a PUT outlive pagehide, but browsers cap keepalive
+// bodies near 64 KB: a bigger model (images) goes without it, and the journal re-sends it on the next open.
+// A 412 or an SSE `changed` = the agent rebuilt the file (create --from): rebase() takes its version, replays this page's
+// unacknowledged edits on top (agent wins a key it also changed: applyLog(...,true)), then the PUT goes again on the new rev.
+async function hostWrite(){
+  for(let n=0;n<3;n++){
+    if(HOST.stale){HOST.stale=0;await rebase()}
+    const fresh=log.filter(e=>!e.rev);if(!fresh.length&&!HOST.force)return;HOST.force=0;
+    const body=JSON.stringify({model:deck,log:log.map(e=>e.rev?e:{...e,rev:deck.rev})});
+    const r=await fetch('/__decklet/file',{method:'PUT',headers:{'content-type':'application/json','X-Decklet-Token':HOST.t,'If-Match':HOST.rev},body,keepalive:body.length<60000});
+    if(r.ok){for(const e of fresh)e.rev=deck.rev;HOST.rev=deck.rev||'';return}
+    if(r.status!==412)throw new Error('host answered '+r.status);HOST.stale=1}
+  throw new Error('the file kept moving')}
+async function rebase(){
+  autosave('rebase');const html=await (await fetch('/',{cache:'no-store'})).text();
+  const blk=(m,f)=>{const x=html.match(new RegExp('=/\\*'+m+'\\*/([\\s\\S]*?)/\\*/'+m+'\\*/'));return x?JSON.parse(x[1]):f};
+  commitEdit();const d=blk('DECK'),flog=blk('LOG',[]),mine=log.filter(e=>!e.rev),r=applyLog(d,mine,true);
+  if(r.conflicts.length)console.warn('decklet: '+r.conflicts.length+' edit(s) conflict with the agent\'s new version; the agent\'s were kept',r.conflicts);
+  const sid=slide()&&slide().id,have=new Set(flog.map(ekey));
+  log=[...flog,...mine.filter(e=>!have.has(ekey(e)))];deck=d;stampIds(deck);base=JSON.stringify(deck);DECK.rev=deck.rev;HOST.rev=deck.rev||''; // DECK.rev: the rev this page now stands on (hydrate and receive compare against it)
+  unsynced=log.filter(e=>!e.rev).length;store.set(LKEY,JSON.stringify(log));store.set(KEY,base);history.length=0;hsave(); // undo steps were snapshots of the old version
+  drag=null;sel.clear();i=Math.max(0,deck.slides.findIndex(s=>s.id===sid));
+  if(!sheet.hidden){cellOf=new WeakMap();gsel=new Set([i]);ganchor=i;sheetRender()}else render();
+  tell({model:base,log:JSON.stringify(log)})}
 async function saveFile(){
   commitEdit();
   if(!FSA){saveCopy();return}
@@ -1494,6 +1544,12 @@ async function idbLoad(){try{const range=IDBKeyRange.bound(NS+':',NS+';'); // ev
   if(!r)return;r[0].forEach((k,n)=>mem.set(k,r[1][n]));TIER='idb';document.body.classList.remove('nostore');hydrate();setSpell(SPELL);setSnap(SNAP)}
   catch(e){console.warn('decklet: no IndexedDB either — edits live in memory until ⌘S',e)}} // a refusal (Safari on file://) leaves the memory tier
 if(LS)settle();else{autosave('busy','Loading…');idbLoad().then(settle)}
+// hosted: probe, then listen. Edits journaled while the host was away (or a working copy the served file does not match) go now.
+if(HOST)fetch('/__decklet',{headers:{'X-Decklet-Token':HOST.t},cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{if(!j||!j.ok)return;
+  HOST.on=true;fileH=HOST;HOST.name=j.name||'';if((j.rev||'')!==HOST.rev)HOST.stale=1;else if(base!==JSON.stringify(DECK))HOST.force=1;
+  const es=new EventSource('/__decklet/events?t='+encodeURIComponent(HOST.t));
+  es.addEventListener('changed',e=>{let v;try{v=JSON.parse(e.data).rev||''}catch{return}if(v!==HOST.rev){HOST.stale=1;writeBack()}});
+  if(unsynced||HOST.stale||HOST.force)writeBack();else autosave('ok')},err=>console.warn('decklet: no host answered; saving as a plain file',err));
 
 // self-check — model round-trips through JSON and renderer draws every element (+ master rows + counter)
 console.assert(JSON.parse(JSON.stringify(DECK)).slides.length===DECK.slides.length,'model round-trip');

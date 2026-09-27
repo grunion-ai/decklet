@@ -35,7 +35,7 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
   const html = fs.readFileSync(file, 'utf8');
   const res = {file, contract: null, parity: [], engines: {}, ae: [], errors: [], warnings: [], skipped: []};
   // self-containment — the guarantee the whole engine rests on
-  if (/(src|href)\s*=\s*["']https?:/i.test(html) || /@import|<link[^>]+stylesheet|fetch\s*\(|XMLHttpRequest|new\s+WebSocket/i.test(html)) res.errors.push('deck references the network');
+  if (/(src|href)\s*=\s*["']https?:/i.test(html) || /@import|<link[^>]+stylesheet|fetch\s*\((?!'\/(?!\/))|new\s+EventSource\s*\((?!'\/(?!\/))|XMLHttpRequest|new\s+WebSocket/i.test(html)) res.errors.push('deck references the network'); // fetch('/…') and EventSource('/…'): the bin/serve.mjs host route, same origin only
   const deck = modelOf(html);
   const v = validate(deck); res.contract = v; res.links = linksOf(deck); // every link, for a reviewer to check; an unresolved '#' is a contract error
   if (!v.ok) res.errors.push(`model contract: ${v.errors.length} errors`);

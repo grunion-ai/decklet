@@ -126,6 +126,9 @@ Hand off the HTML file only: make a PDF only when the human asks for one (the de
 3. To revise, run Step 4's `--from` commands; every edit a human makes round-trips that way.
 4. What you inferred (style, layout choices) and anything marked experimental.
 
+### Hosting the deck for editing
+Default: do not host. Chrome and Edge on `file://` write the file after one ⌘S ("Allow on every visit"). Host with `node bin/serve.mjs deck.html` when the person edits in Safari or Firefox, when you will rebuild while it is open, or when edits must survive refresh and close. Give them the printed URL, rebuild with Step 4's `--from` as usual (the page replays their edits on top), and stop the server when the session ends. Browser pane and details: [docs/editor.md](docs/editor.md#hosting).
+
 ---
 
 ## MODEL CONTRACT

@@ -34,6 +34,17 @@ This manifest is a contract: the gate compares it against the template, so the H
 **Position:** a new window opens on slide 1; a refresh, and a new version of the file, keep the slide you were on — by slide id, so inserting slides above does not move you. A stored working copy is trusted only on the same `rev`; a newer file wins as the base and the browser replays its own edit log onto it (human wins, conflicts flagged on the entries), so an agent's rewrite neither hides its changes nor drops the human's.
 **Versions:** none in the file since 0.9.0. Version history is weave's job; decklet keeps the edit log, which `create --from` replays.
 
+## Hosting
+`node bin/serve.mjs deck.html [--port N]` serves one deck on `127.0.0.1` and prints its URL. Open that URL instead of the file, in any browser: every edit is written into the deck file on the same 800 ms debounce, Safari and Firefox included. The server puts a token in the page it serves (a `<meta>` the file on disk never carries) and accepts writes only with it, only from its own origin, and only when the page's `If-Match` names the file's current `rev`. Each write keeps the previous file in `.decklet-history/` beside the deck, then renames the new one into place.
+**Edits survive the tab.** On the served origin localStorage works in every browser, so the store holds every edit the server has not confirmed. A refresh, or a window closed mid-edit, sends them again on the next open.
+**The agent can rebuild while the person edits.** Run `create --from` and write the file as usual. The server tells the open page the file changed; the page reads the new version, replays the edits it had not yet written on top (for a key the agent also changed, the agent's value stays and the entry records it under `yielded`, which `bin/edits.mjs` prints), and writes the result. The dot shows **Updating** while that runs.
+**The dot:** a small drop falls into the disk on every edit; amber with a count while edits wait for the server; the amber pulse while a write is in flight; `Saved to deck.html · HH:MM:SS` once the file has everything.
+**Claude's browser pane** opens a server from `.claude/launch.json`, and its URL must be the plain origin, so give the server a fixed port there:
+```json
+{"version": "0.0.1", "configurations": [{"name": "deck", "runtimeExecutable": "node", "runtimeArgs": ["bin/serve.mjs", "deck.html", "--port", "4411"], "port": 4411}]}
+```
+Stop the server when the session ends. The deck file stays one self-contained HTML file: open it from disk later and it saves the way it always did.
+
 ## Revising an edited deck
 
 **Revising a deck a human has touched — `--from` is mandatory.** The deck file carries the human's edits (`/*LOG*/`). Run, in this order:

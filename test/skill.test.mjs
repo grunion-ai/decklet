@@ -12,7 +12,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = f => fs.readFileSync(path.join(root, f), 'utf8');
 const words = f => read(f).split(/\s+/).filter(Boolean).length;
 
-const BUDGET = 7000;   // the study's four subjects read all of it once; 11,256 was about 40% more than authoring needs
+const BUDGET = 7100;   // the study's four subjects read all of it once; 11,256 was about 40% more than authoring needs; +100 for the hosting section (its detail lives in docs/editor.md#hosting)
 
 test('skill: SKILL.md stays inside the authoring budget', () => {
   const n = words('SKILL.md');
