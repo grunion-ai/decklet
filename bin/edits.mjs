@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // decklet edits — what the human changed in a deck file. Read it BEFORE regenerating a deck, so the revision keeps their work.
 // usage: node bin/edits.mjs deck.html [--json]
-// prints: deck id + rev, every logged edit (slide/row, keys before → after, conflicts the last migrate kept)
+// prints: deck id + rev, every logged edit (slide/row, keys before → after, conflicts the last migrate kept, and edits a hosted page yielded to the agent)
 import fs from 'node:fs';
 import {blockOf} from '../lib/edits.mjs';
 import {isMain} from '../lib/is-main.mjs';
@@ -14,7 +14,7 @@ const J = v => v === undefined ? '∅' : JSON.stringify(v);
 export function describe(e) {
   const at = e.m ? `master ${e.m}` : e.order ? 'slides' : e.sadd ? `slide ${e.sadd.id}` : e.sdel ? `slide ${e.sdel}` : `slide ${e.s}${e.r ? ' row ' + e.r : ''}`;
   const what = e.order ? `reordered → ${e.order.join(',')}` : e.sadd ? `added at ${e.at}` : e.sdel ? 'deleted' : e.add ? `row added at ${e.at}: ${J(e.add)}` : e.del ? 'row deleted' :
-    Object.entries(e.k || {}).map(([k, [a, b]]) => `${k} ${J(a)} → ${J(b)}${e.conflict && k in e.conflict ? ` (agent had ${J(e.conflict[k])}; human kept)` : ''}`).join(', ');
+    Object.entries(e.k || {}).map(([k, [a, b]]) => `${k} ${J(a)} → ${J(b)}${e.conflict && k in e.conflict ? ` (agent had ${J(e.conflict[k])}; human kept)` : ''}${e.yielded && k in e.yielded ? ` (agent's ${J(e.yielded[k])} kept; the edit came after its rebuild)` : ''}`).join(', ');
   return `${e.t || ''} ${at}: ${what}${e.rev ? '' : '  [not in any file yet]'}`;
 }
 

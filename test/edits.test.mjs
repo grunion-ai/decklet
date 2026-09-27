@@ -176,7 +176,8 @@ test('create --from: a conflict is reported and the human value wins; an older f
 // holds the marker strings. blockOf's regex was an unanchored whole-document search, so it matched the source literal and
 // JSON.parse('+J(log)+') threw an uncaught SyntaxError from create --from.
 const pre050 = html => {
-  const out = html.replace(/const LOG0=\/\*LOG\*\/\[\]\/\*\/LOG\*\/;/, 'const LOG0=[];');
+  // fileHtml() writes through splice() since the serve lane, so today's source carries no literal: put back the one 0.4 had
+  const out = html.replace(/const LOG0=\/\*LOG\*\/\[\]\/\*\/LOG\*\/;/, () => "const LOG0=[];const OLD=()=>'/*LOG*/'+J(log)+'/*/LOG*/';");
   assert.notEqual(out, html, 'fixture: the data blocks were stripped'); assert.match(out, /'\/\*LOG\*\/'/, 'fixture: the source literal stays');
   return out;
 };
