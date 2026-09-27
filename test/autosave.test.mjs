@@ -46,6 +46,8 @@ test('write-back is continuous: every save schedules a trailing debounced write 
   assert.match(tpl, /addEventListener\('pagehide',\(\)=>\{commitEdit\(\);[^\n]*flush\(\)\}\)/, 'pagehide flushes');
   assert.match(tpl, /visibilitychange',\(\)=>\{if\(document\.hidden\)\{commitEdit\(\);flush\(\)\}\}/, 'a hidden tab flushes');
   assert.match(tpl, /async function writeBack\(\)\{\n  clearTimeout\(wbT\);wbT=null;/, 'a write clears the pending one');
+  const wb = tpl.slice(tpl.indexOf('async function writeBack(){'), tpl.indexOf('async function hostWrite(')).split('\n')[1];
+  assert.match(wb.replace(/\/\/.*$/, ''), /if\(writing\)\{wq=1;return\}writing=true;autosave\('busy'\);/, 'one write in flight: the flag is set in code, never inside a trailing comment (#137 commented it out)');
 });
 
 test('storage is a tier chain — localStorage → IndexedDB → memory — and sync listens on storage + BroadcastChannel and never writes on receive', () => {
