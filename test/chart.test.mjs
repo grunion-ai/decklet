@@ -11,6 +11,7 @@ import {validate} from '../bin/validate.mjs';
 import {create} from '../bin/create.mjs';
 import {verify, modelOf} from '../bin/verify.mjs';
 import {chartRows, expandCharts, checkChart, hbarGeometry} from '../lib/chart.mjs';
+import {logoGeom} from '../lib/logo.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 let pw = null; try { pw = await import('playwright'); } catch {}
@@ -122,6 +123,58 @@ test('chart: hbarGeometry reserves a lead box per datum (the logo hook) and the 
   const rows = chartRows({...BOX, chart: {...funding, lead: 60}}, roles);
   assert.equal(rows.length, 1 + 2 + 3 * 5 + 1, 'the lead is reserved space: no row is drawn in it yet');
   assert.deepEqual(hbarGeometry({...BOX, chart: funding}, roles)[0].lead.w, 0, 'no lead by default');
+});
+
+const XOM = 'data:image/svg+xml;base64,PHN2Zy8+', VIZ = 'data:image/png;base64,iVBORw0KGgo=';
+
+test('chart: an hbar datum with a logo draws it in the lead box, sized and plated by the logo row — the value/label rows are untouched', () => {
+  const c = {...funding, sort: undefined, lead: 60, data: funding.data.map((d, k) => k === 1 ? {...d, logo: VIZ} : d)};
+  const rows = chartRows({...BOX, chart: c}, roles), g = hbarGeometry({...BOX, chart: c}, roles);
+  const ld = g.find(d => d.datum.label === 'Vizcom').lead;
+  const want = logoGeom({logo: VIZ, h: ld.h, col: ld.w, gap: 0}, 0);
+  const plate = rows.find(r => r.bg === '#FFFFFF' && r.radius);
+  assert.ok(plate, 'a plate row for the logo, same paint as a logo row');
+  assert.deepEqual([plate.x, plate.y, plate.w, plate.h], [ld.x + want.plate.x, ld.y + want.plate.y, want.plate.w, want.plate.h]);
+  const img = rows.find(r => r.img === VIZ);
+  assert.ok(img && img.fit === 'contain', 'contain-fit image, value passed through untouched');
+  assert.deepEqual([img.x, img.y, img.w, img.h], [ld.x + want.img.x, ld.y + want.img.y, want.img.w, want.img.h]);
+  assert.equal(rows.filter(r => r.img).length, 1, 'only the one datum with a logo draws one');
+  const vals = rows.filter(r => r.role === 'Label' && r.color === 'var(--fg)');
+  assert.deepEqual(vals.map(v => v.text), funding.data.map(d => d.text), 'value labels unaffected by the logo');
+});
+
+test('chart: an hbar logo can be an asset "#id" reference — chart.mjs passes it through untouched, no data: URI check', () => {
+  const c = {...funding, lead: 60, data: funding.data.map((d, k) => k === 0 ? {...d, logo: '#xometry'} : d)};
+  assert.deepEqual(checkChart(c), []);
+  const rows = chartRows({...BOX, chart: c}, roles);
+  assert.ok(rows.find(r => r.img === '#xometry'), 'the asset ref lands verbatim on the img row');
+});
+
+test('chart: a bar datum with a logo draws it under the bar, in the band reserved by lead, sized like a logo row', () => {
+  const data = [{label: 'Zoo', value: 10}, {label: 'Vizcom', value: 52, logo: VIZ}, {label: 'Adam', value: 4}, {label: 'Backflip', value: 30}];
+  const c = {mark: 'bar', data, lead: 40};
+  const rows = chartRows({...BOX, chart: c}, roles);
+  const cat = rows.find(r => r.role === 'Label' && r.text === 'Vizcom');
+  const plate = rows.find(r => r.bg === '#FFFFFF' && r.radius);
+  const img = rows.find(r => r.img === VIZ);
+  assert.ok(plate && img, 'plate + contain-fit image drawn for the one datum with a logo');
+  assert.equal(img.fit, 'contain');
+  assert.ok(img.y > cat.y + roles.Label.lh, 'the logo sits below the category label');
+  assert.ok(img.y + img.h <= BOX.y + BOX.h + 0.5, 'the logo stays inside the chart box');
+  assert.equal(rows.filter(r => r.img).length, 1, 'only the datum with a logo draws one');
+  assert.ok(!rows.some(r => r.chart), 'nothing left for the runtime to draw');
+});
+
+test('chart: validate refuses a datum logo with no lead reserved, a non-string logo, a bad aspect/plate, or a logo on a line', () => {
+  const one = c => checkChart(c);
+  assert.deepEqual(one({...funding, lead: 60, data: funding.data.map((d, k) => k ? d : {...d, logo: XOM})}), []);
+  for (const [c, re] of [
+    [{...funding, data: funding.data.map((d, k) => k ? d : {...d, logo: XOM})}, /lead/],
+    [{...funding, lead: 60, data: funding.data.map((d, k) => k ? d : {...d, logo: 5})}, /logo.*string/],
+    [{...funding, lead: 60, data: funding.data.map((d, k) => k ? d : {...d, logo: XOM, aspect: 0})}, /aspect/],
+    [{...funding, lead: 60, data: funding.data.map((d, k) => k ? d : {...d, logo: XOM, plate: 'neon'})}, /plate/],
+    [{mark: 'line', lead: 40, data: rising.data.map((d, k) => k ? d : {...d, logo: XOM})}, /line.*logo|logo.*line/],
+  ]) { const e = one(c); assert.ok(e.some(m => re.test(m)), String(re) + ' — ' + JSON.stringify(e)); }
 });
 
 test('chart: hbar validates clean in a deck, and validate refuses a bad sort, two highlights or a compare series', () => {
