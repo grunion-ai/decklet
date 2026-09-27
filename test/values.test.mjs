@@ -127,7 +127,7 @@ test('values: the chart templates the chart row can draw declare `data`, with th
     assert.equal(chartOf(TEMPLATE[id]).chart.mark, mark, id + ': the sample already goes through the chart row');
   }
   assert.deepEqual(templateVals('chart-grouped')[0].series, ['Actual', 'Plan'], 'two series: value and compare');
-  assert.deepEqual(templateVals('chart-waterfall'), [], 'a chart the chart row cannot draw keeps its rows fixed');
+  assert.deepEqual(templateVals('chart-waterfall').map(v => v.key), ['data'], 'a chart the chart row cannot draw still takes its bars from a data key (K22)');
 });
 
 test('values: a filled chart-column expands into bars carrying the filled points', () => {
@@ -161,7 +161,7 @@ test('values: --templates says which chart templates take data, and the rest kee
   assert.ok(block('chart-column').some(l => /^\s+data\s+bar data\s/.test(l)), block('chart-column').join('\n'));
   assert.ok(block('chart-line-trend').some(l => /^\s+data\s+line data\s/.test(l)), 'the line chart names its mark');
   assert.ok(block('chart-column').some(l => /fixed: none — every row fills/.test(l)), 'nothing left fixed: ' + block('chart-column').join('\n'));
-  assert.ok(block('chart-waterfall').some(l => /fixed: 5 rules · 5 shapes/.test(l)), 'a chart without a data key still says its rows are fixed');
+  assert.ok(block('chart-waterfall').some(l => /fixed: 1 rule$/.test(l)), 'the waterfall draws its bars from data since K22: only the baseline is fixed');
 });
 
 live('live: a filled chart-column deck verifies, and the bars on the page are the filled numbers', async () => {
