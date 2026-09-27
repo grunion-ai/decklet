@@ -13,7 +13,7 @@ const boldRows = els => [...new Set(els.filter(e => e.weight === 700).map(e => M
 
 test('bench: benchmark-table declares one value key naming the highlighted row, defaulting to none', () => {
   const vals = templateVals('benchmark-table');
-  assert.equal(vals.length, 1, 'exactly one value key');
+  assert.equal(vals.filter(v => !/^bar[1-4]$/.test(v.key)).length, 1, 'exactly one value key names the row (bar1..bar4 size the bars, K22)');
   assert.equal(vals[0].key, 'highlight');
   assert.equal(vals[0].sample, -1, 'the sample carries no highlight');
   assert.deepEqual(vals[0].range, [-1, 3]);
