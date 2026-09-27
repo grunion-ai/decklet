@@ -80,6 +80,7 @@ const ROLE_REQ = ['font', 'size', 'weight', 'color'];   // lh is strongly recomm
 const isNum = v => typeof v === 'number' && Number.isFinite(v);
 const plain = r => (r.text ?? r.html ?? '').replace(/<[^>]+>/g, '');
 const isText = r => r.text != null || r.html != null;
+export const AGAP = 10;   // `after` air when a row states no gap — the connector's own default air (template AGAP)
 // end-to-end span of a connector row; below ~40px a line is an icon stroke (a tick, a cross), not a run between boxes
 const connLen = r => { const x0 = r.x ?? 0, y0 = r.y ?? 0, e = r.line ? r.line : r.curve ? [r.curve[4], r.curve[5]] : null;
   return e && isNum(e[0]) && isNum(e[1]) ? Math.hypot(e[0] - x0, e[1] - y0) : 0; };
@@ -205,6 +206,8 @@ export function validate(deck) {
   let footers = 0;
   master.forEach((m, k) => { if (!m.id) E(`master[${k}]: missing id`); else if (mids.has(m.id)) E(`master[${k}]: duplicate id ${m.id}`); else mids.add(m.id); if (m.footer) footers++; });
   if (footers > 1) E(`${footers} footer master rows — at most one carries the counter`);
+  // a row reference, as `to`/`from` and `after` read it: a row id on this slide, a master id, or a slide row index
+  const findRow = (s, k) => typeof k === 'number' ? ((s && s.els) || [])[k] : (((s && s.els) || []).find(x => x && x.id === k) || master.find(m => m && m.id === k));
   // rows
   const row = (r, where, s) => {
     if (!r || typeof r !== 'object') return E(`${where}: row must be an object`);
@@ -222,6 +225,15 @@ export function validate(deck) {
     // `right`: the row's right edge N px from the canvas right edge, x derived at render from the measured width — the only
     // honest anchor for a w:'auto' chip. One edge per row: a row that states both has two answers for where it is.
     if (r.x != null && r.right != null) E(`${where}: x and right are exclusive — right anchors the right edge, x the left`);
+    // `after`: x is the named row's rendered right edge + gap (FRICTION F13) — the one honest place for a row that follows an
+    // auto-width one. A stroke keeps x: its run is measured from it and the whole stroke is translated.
+    if (r.after != null) {
+      if (!(typeof r.after === 'string' || Number.isInteger(r.after))) E(`${where}: after must be a row id (or a slide row index)`);
+      else if (!findRow(s, r.after)) E(`${where}: after "${r.after}" is not a row id on this slide, a master id, or a row index`);
+      if (r.right != null) E(`${where}: after and right are exclusive — after anchors the left edge to the named row, right to the canvas`);
+      if (r.x != null && !r.line && !r.curve) E(`${where}: after and x are exclusive — after derives x from the named row`);
+      if (r.gap != null && !isLogoRow(r) && !isNum(r.gap)) E(`${where}: gap must be a number of px — the air after the named row (default ${AGAP})`);
+    }
     if (r.w != null && r.w !== 'auto' && !isNum(r.w)) E(`${where}: w must be a number or "auto"`);
     if (r.line && !(Array.isArray(r.line) && r.line.length === 2 && r.line.every(isNum))) E(`${where}: line must be [x2,y2]`);
     if (r.curve && !(Array.isArray(r.curve) && r.curve.length === 6 && r.curve.every(isNum))) E(`${where}: curve must be [c1x,c1y,c2x,c2y,x2,y2]`);
@@ -311,8 +323,8 @@ export function validate(deck) {
     if (r.placeholder != null) { if (deck.draft) stands.add(String(r.placeholder)); else E(`${where}: placeholder mark "${r.placeholder}" may not ship — swap in the real logo, or set deck.draft on a sample sheet`); }
     if (textual && /^\s*\d+\s*\/\s*\d+\s*$/.test(plain(r))) Wn(`${where}: "${plain(r).trim()}" looks like a hardcoded page counter — the footer master renders it`);
     // geometry: inside the canvas (slot geometry resolved)
-    const right = r.right ?? (r.x == null && slot ? slot.right : null), y = r.y ?? (slot && slot.y) ?? 0, w = r.w ?? (slot && slot.w);
-    const x = right != null ? (isNum(w) ? W - right - w : 0) : r.x ?? (slot && slot.x) ?? 0;
+    const right = r.after != null ? null : r.right ?? (r.x == null && slot ? slot.right : null), y = r.y ?? (slot && slot.y) ?? 0, w = r.w ?? (slot && slot.w);
+    const x = r.after != null ? ((placed(r, s) || {}).row || {}).x ?? 0 : right != null ? (isNum(w) ? W - right - w : 0) : r.x ?? (slot && slot.x) ?? 0;
     if (isNum(W) && isNum(w) && x + w > W + 0.5) Wn(`${where}: extends past the right edge (${x}+${w} > ${W})`);
     if (isNum(H) && y > H) Wn(`${where}: y ${y} is below the canvas (${H})`);
     // text-fit heuristic: a nowrap row whose text is wider than its box (role.cw em per char, 0.55 unmeasured) will overflow
@@ -347,8 +359,20 @@ export function validate(deck) {
     return [{r: {right: MGN, y: f.y, w: 'auto', role: f.role, p: f.p, nowrap: 1, text: `${deck.slides.length} / ${deck.slides.length}`}, i: 'counter'}]; };
   const padPx = v => { const t = v == null ? null : (pad[v] ?? (typeof v === 'number' ? v + 'px' : v)); if (!t) return [0, 0];
     const n = String(t).split(/\s+/).map(parseFloat).map(z => Number.isFinite(z) ? z : 0); return n.length === 1 ? [n[0] * 2, n[0] * 2] : [n[1] * 2, n[0] * 2]; };
-  const rectOf = (r, s) => {
+  // `after`: the row as the runtime places it — x at the named row's right edge + gap, y its top unless stated, a stroke
+  // translated whole. The x is an estimate (est) whenever the named row's width is one; null on an unknown id or a cycle.
+  const placed = (r, s, seen = new Set()) => {
+    const t = findRow(s, r.after); if (!t || seen.has(t)) return null; seen.add(t);   // a cycle ends here: validate reports it once, below
+    const tr = rectOf({...t, over: 0}, s, seen); if (!tr) return null;
+    const g = isNum(r.gap) && !isLogoRow(r) ? r.gap : AGAP, dx = tr.x + tr.w + g - (r.x ?? 0), dy = r.y == null ? t.y ?? tr.y : 0;
+    const row = {...r, x: (r.x ?? 0) + dx, y: (r.y ?? 0) + dy}; delete row.after; delete row.right;
+    if (Array.isArray(r.line)) row.line = [r.line[0] + dx, r.line[1] + dy];
+    if (Array.isArray(r.curve)) row.curve = r.curve.map((v, j) => j % 2 ? v + dy : v + dx);
+    return {row, est: !!tr.estW};
+  };
+  const rectOf = (r, s, seen) => {
     if (!r || typeof r !== 'object') return null;
+    if (r.after != null) { const p = placed(r, s, seen); const o = p && rectOf(p.row, s); return o && {...o, estW: o.estW || p.est, r}; }
     const slot = (r.slot && ((deck.slots || {})[r.slot] || (s && layouts[s.layout] && layouts[s.layout][r.slot]))) || {};
     if (r.over ?? slot.over) return null;
     const rn = r.role || slot.role, role = roleOf(rn), textual = isText(r);
@@ -420,6 +444,15 @@ export function validate(deck) {
     const dm = densityReport(s, layouts, s.density || deck.density); if (dm) Wn(`slides[${si}]: ${dm}`);
     if (!Array.isArray(s.els)) return E(`slides[${si}]: els must be an array`);
     for (const id of s.hide || []) if (!mids.has(id)) E(`slides[${si}]: hide "${id}" is not a master id`);
+    // an after chain that comes back to itself has no left edge to start from: one error per cycle
+    const cycled = new Set();
+    for (const [ei, r] of s.els.entries()) {
+      if (!r || r.after == null || cycled.has(r)) continue;
+      const seen = [r], name = x => x.id ?? s.els.indexOf(x);
+      for (let cur = findRow(s, r.after); cur && cur.after != null && !seen.includes(cur); cur = findRow(s, cur.after)) seen.push(cur);
+      const last = findRow(s, seen[seen.length - 1].after);
+      if (last === r) { seen.forEach(x => cycled.add(x)); E(`slides[${si}].els[${ei}]: after cycle: ${[...seen, r].map(name).join(' → ')} — one row in the chain needs an x`); }
+    }
     const used = new Set();
     s.els.forEach((r, ei) => { row(r, `slides[${si}].els[${ei}]`, s); if (r && r.slot) { if (used.has(r.slot)) Wn(`slides[${si}]: slot "${r.slot}" bound twice`); used.add(r.slot); } });
     // the master rows this slide shows sit in the same set — a footer chip and a slide's last row owe each other the same air
@@ -427,7 +460,8 @@ export function validate(deck) {
     // ── connector AIR, across the slide: a connector leaves the same visible gap at both ends and never touches a
     // container. `to:`/`from:` hand that to the engine, so ends it terminates are not second-guessed here.
     // Headed strokes only — see the note above: a chart series or a decorative path has nothing to leave air FROM.
-    const conn = s.els.map((r, ei) => ({r, ei})).filter(o => o.r && (o.r.line || o.r.curve) && o.r.arrow && !o.r.waive && connLen(o.r) >= 40);
+    const pl = r => r && r.after != null ? ((placed(r, s) || {}).row || r) : r;   // an after row, where the runtime puts it
+    const conn = s.els.map((r, ei) => ({r: pl(r), ei})).filter(o => o.r && (o.r.line || o.r.curve) && o.r.arrow && !o.r.waive && connLen(o.r) >= 40);
     // containers only — the same shape the collision gate calls chrome. A tint band with no border is a backdrop a chart
     // line may legitimately run inside; the rule is about terminating on or inside a BORDER.
     const rects = s.els.filter(e => e && !isText(e) && (e.bd || e.bt || e.br || e.bb || e.bl || e.box || e.tile)
@@ -442,7 +476,7 @@ export function validate(deck) {
     const endOf = r => r.line ? [r.line[0], r.line[1]] : [r.curve[4], r.curve[5]];
     // a stub is a segment that ENDS where two connectors begin — and the stub itself is normally headless (only the
     // branches carry heads), so look for it among ALL strokes even though only headed rows are warned about
-    const fedBy = s.els.filter(e => e && (e.line || e.curve) && connLen(e) >= 40).map(endOf);
+    const fedBy = s.els.map(pl).filter(e => e && (e.line || e.curve) && connLen(e) >= 40).map(endOf);
     const seen = [];
     for (const {r, ei} of conn) {
       const w = `slides[${si}].els[${ei}]`, a0 = [r.x ?? 0, r.y ?? 0];
