@@ -617,7 +617,7 @@ function drawEls(s,root,animate){
     const an=animate&&ANIM.includes(r.anim)?r.anim:'';
     d.className='el'+(r.box?' box':'')+(r.tile?' tile':'')+(r.bullet?' bul':'')+(an?' '+an:'');
     if(r.svg)d.innerHTML=r.svg;
-    else if(r.img){const im=new Image();im.src=r.img;im.style.cssText=`display:block;width:100%;height:100%;object-fit:${r.fit||'fill'};object-position:${r.pos||'50% 50%'};pointer-events:none`;d.appendChild(im)}
+    else if(r.img){const im=new Image();im.src=r.img;im.style.cssText=`display:block;width:100%;height:100%;object-fit:${r.fit||'contain'};object-position:${r.pos||'50% 50%'};pointer-events:none`;d.appendChild(im)}
     else if(r.html){d.innerHTML=r.html; // rich inline runs (<b>/<i>/<u>/<s>/<span>/<a href>) — re-gate the links on the way in
       d.querySelectorAll('a[href]').forEach(a=>{const u=href(a.getAttribute('href'));if(u){a.setAttribute('href',u);if(u[0]!=='#'){a.target='_blank';a.rel='noopener noreferrer'}a.title=hint(u)}else a.removeAttribute('href')})}
     else d.textContent=r.text||'';
@@ -1159,9 +1159,9 @@ async function exportPdf(){
       else{const x=m.svg.cloneNode(true);x.setAttribute('xmlns','http://www.w3.org/2000/svg');x.setAttribute('width',m.w);x.setAttribute('height',m.h);x.style.color=m.color;if(!x.getAttribute('viewBox')&&x.getAttribute('width'))x.setAttribute('preserveAspectRatio','none');
         pic=await load('data:image/svg+xml;charset=utf-8,'+encodeURIComponent(new XMLSerializer().serializeToString(x)))}
       g.save();g.globalAlpha=m.op;g.beginPath();if(m.radius&&g.roundRect)g.roundRect(m.x*S,m.y*S,m.w*S,m.h*S,m.radius*S);else g.rect(m.x*S,m.y*S,m.w*S,m.h*S);g.clip();
-      // object-fit: fill (default) stretches; cover/contain scale by the ratio and place by object-position (defaults 50% 50%)
-      let dx=m.x,dy=m.y,dw=m.w,dh=m.h;
-      if(m.src&&(m.fit==='cover'||m.fit==='contain')){const k=m.fit==='cover'?Math.max(m.w/pic.naturalWidth,m.h/pic.naturalHeight):Math.min(m.w/pic.naturalWidth,m.h/pic.naturalHeight);dw=pic.naturalWidth*k;dh=pic.naturalHeight*k;
+      // object-fit: contain (default) and cover scale by the ratio and place by object-position (defaults 50% 50%); fill stretches
+      let dx=m.x,dy=m.y,dw=m.w,dh=m.h,fit=m.fit||'contain';
+      if(m.src&&fit!=='fill'){const k=fit==='cover'?Math.max(m.w/pic.naturalWidth,m.h/pic.naturalHeight):Math.min(m.w/pic.naturalWidth,m.h/pic.naturalHeight);dw=pic.naturalWidth*k;dh=pic.naturalHeight*k;
         const p=(m.pos||'50% 50%').split(/\s+/).map(v=>parseFloat(v)/100);dx=m.x+(m.w-dw)*(isNaN(p[0])?.5:p[0]);dy=m.y+(m.h-dh)*(isNaN(p[1])?.5:p[1])}
       g.drawImage(pic,dx*S,dy*S,dw*S,dh*S);g.restore();
     }
