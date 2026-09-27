@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import {fileURLToPath} from 'node:url';
+import {pathToFileURL} from 'node:url';
 import {create} from '../bin/create.mjs';
 import {verify} from '../bin/verify.mjs';
 import {LIBRARY} from '../lib/layouts.mjs';
@@ -31,4 +32,26 @@ live('DEBUG every-layout webkit rows', async () => {
   fs.writeFileSync(f, create(m).html);
   const r = await verify(f, {out: path.join(tmp, 'v-every')});
   console.log('EVERY-LAYOUT WEBKIT (15, 32):', JSON.stringify(r.engines.webkit.filter(s => [15, 32].includes(s.slide)), null, 1));
+});
+
+live('DEBUG H1 natural width in webkit', async () => {
+  const model = JSON.parse(fs.readFileSync(path.join(root, 'examples/explainer/model.json'), 'utf8'));
+  const f = path.join(tmp, 'explainer-width.html');
+  fs.writeFileSync(f, create(model).html);
+  const b = await pw.webkit.launch();
+  const p = await b.newPage({viewport: {width: 1060, height: 640}});
+  await p.goto(pathToFileURL(f).href); await p.waitForTimeout(300);
+  await p.evaluate(() => { localStorage.clear(); }); await p.reload(); await p.waitForTimeout(300);
+  await p.evaluate(k => { i = k; sel.clear(); render(); }, 2);
+  await p.waitForTimeout(150);
+  const width = await p.evaluate(() => {
+    const el = document.querySelector('#canvas .el[data-n="4"]');
+    const prevWrap = el.style.whiteSpace, prevW = el.style.width;
+    el.style.whiteSpace = 'nowrap'; el.style.width = 'auto';
+    const w = el.scrollWidth;
+    el.style.whiteSpace = prevWrap; el.style.width = prevW;
+    return w;
+  });
+  console.log('H1 NATURAL WIDTH (nowrap, webkit):', width);
+  await b.close();
 });
