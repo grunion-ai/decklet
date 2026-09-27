@@ -49,3 +49,11 @@ live('webkit:false skips the WebKit pass and says so', async () => {
   assert.equal(r.engines.webkit, undefined);
   assert.ok(r.skipped.some(s => /webkit/i.test(s)));
 });
+
+// TEMP diagnostic (removed before merge)
+live('TEMP diag', async t => {
+  const ex = JSON.parse(fs.readFileSync(new URL('../examples/explainer/model.json', import.meta.url), 'utf8'));
+  const f = path.join(tmp, 'ex.html'); fs.writeFileSync(f, create(ex).html);
+  const r = await verify(f, {out: path.join(tmp, 'vex')});
+  for (const [e, q] of Object.entries(r.engines)) for (const s of q) if (!s.pass) console.log('DIAG', e, s.slide, JSON.stringify(s.rows));
+});
