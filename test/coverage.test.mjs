@@ -72,10 +72,11 @@ test('coverage (K6): a template or layout slide is judged too — no exemption f
     {slot: 'b1', text: 'The bank feed posts overnight.'}, {slot: 'b2', text: 'Card statements land on the third day.'},
     {slot: 'b3', text: 'Two subsidiaries send spreadsheets.'}]};
   assert.equal(textOnly(validate(deck([bullets]))).length, 1, 'a bullet layout with no graphic warns');
-  assert.equal(textOnly(validate(deck([{template: 'bullet-page'}]))).length, 1, 'a text template warns');
-  assert.equal(textOnly(validate(deck([{template: 'stat-row-4'}]))).length, 1, 'stat tiles are words in boxes, not a graphic (K10)');
-  assert.equal(textOnly(validate(deck([{template: 'icon-bullets'}]))).length, 1, 'icons beside the points are decoration');
-  for (const t of ['area-bubbles', 'waffle', 'range-bar', 'chart-column', 'chart-line-trend', 'figure-flow'])
+  assert.equal(textOnly(validate(deck([{template: 'bullet-page', textOnly: false}]))).length, 1, 'a text template warns once the slide drops the mark it inherits');
+  const tiles = ['1,240', '$86K', '4.6'].map((text, i) => ({x: 60 + i * 290, y: 190, w: 260, h: 120, tile: 1, role: 'Stat', text}));
+  assert.equal(textOnly(validate(deck([{els: tiles}]))).length, 1, 'stat tiles are words in boxes, not a graphic (K10)');
+  assert.equal(textOnly(validate(deck([{template: 'icon-bullets', textOnly: false}]))).length, 1, 'icons beside the points are decoration');
+  for (const t of ['area-bubbles', 'waffle', 'range-bar', 'chart-column', 'chart-line-trend', 'figure-flow', 'stat-row-4'])
     assert.deepEqual(textOnly(validate(deck([{template: t}]))), [], `${t} draws a real graphic`);
   assert.deepEqual(textOnly(validate(deck([{...bullets, textOnly: true}]))), [], 'textOnly: true declares a words slide');
   assert.ok(validate(deck([{...bullets, textOnly: 1}])).errors.some(e => /textOnly/.test(e)), 'textOnly is a boolean');

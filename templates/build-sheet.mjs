@@ -13,7 +13,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { TEMPLATES } from './index.mjs';
 import { LIBRARY } from '../lib/layouts.mjs';
-import { scale } from '../lib/templates/kit.mjs';
+import { scale, pair, rect } from '../lib/templates/kit.mjs';
 import { chartRows } from '../lib/chart.mjs';
 import { KITS } from '../examples/styles/index.mjs';
 const dir = path.dirname(fileURLToPath(import.meta.url));
@@ -131,6 +131,11 @@ const KPIS = {   // per layout, so the two grids speak for two companies
   'kpi-grid-4': [['40M', 'events'], ['99.98%', 'delivered'], ['84 ms', 'median latency'], ['3', 'regions']],
 };
 const DELTAS = { 'kpi-grid': ['↑ 12%', '↓ 2', '↑ 4 min', 'new'], 'kpi-grid-4': ['↑ 12%', '↑ 0.01', '↓ 6 ms', '+1'] };
+const PAIRS = { 'kpi-grid': [[571, 640], [5, 3], [8, 12]], 'kpi-grid-4': [[35.7, 40], [99.97, 99.98], [90, 84], [2, 3]] };   // [earlier, now]
+const WEEK = [['Mon', 5], ['Tue', 6], ['Wed', 7], ['Thu', 6], ['Fri', 5], ['Sat', 58], ['Sun', 13]];   // share of runs, percent
+// the layouts whose sample is words by nature (chrome, lists, text columns, a lead number told in words, numbered steps): the
+// sheet marks their slides textOnly, the way a words template carries the mark in its definition
+const WORDS = ['content', 'title', 'bullets', 'two-cols', 'two-cols-header', 'comparison', 'fact', 'process-steps'];
 const fill = (name) => {
   const lay = LIBRARY[name];
   // `body` and b1…bn are alternatives (validate errors on the pair): the image layouts review as their paragraph, and the
@@ -155,6 +160,11 @@ const fill = (name) => {
     const link = (from, to) => ({ from, to, style: 'arrow', h: 2.5, bg: 'var(--fg)' });
     els.push(box(80, 'Sensor'), box(340, 'Gateway'), box(600, 'Dashboard'), link('sensor', 'gateway'), link('gateway', 'dashboard'));
   }
+  // the number layouts draw their numbers (K10): each KPI tile gets its before/after pair on the metric's own scale, the
+  // month or quarter the legend names on top in the line ink; the stat layout's share sits in its week of seven bars
+  if (PAIRS[name]) PAIRS[name].forEach(([prev, now], i) => { const sl = lay.slots[`kpi${i + 1}`]; els.push(...pair(sl.x, 396, sl.w, prev, now, 22, 8)); });
+  if (name === 'stat') WEEK.forEach(([d, v], i) => { const x = 60 + i * 120, h = Math.round(120 * v / 58);
+    els.push(rect(x, 460 - h, 100, h, { bg: d === 'Sat' ? 'var(--accent)' : 'var(--line)', radius: 3 }), { x, y: 466, w: 100, role: 'Label', align: 'center', nowrap: 1, text: d }); });
   if (name === 'cta') for (const e of els) if (e.slot === 'button' || e.slot === 'button-label') e.href = 'https://example.com';
   return els;
 };
@@ -195,7 +205,7 @@ const wear = (els, kit, layout) => {
 };
 // a styled slide: the backdrop first, the template's rows wearing the kit, then the L4 foot line — `style · warm · cover-hero`,
 // in the kit's muted ink (the one paint the band may take), never geometry
-const sslide = (t, kit) => ({ name: `style-${kit.name}-${t.id}`, layout: t.layout || undefined,
+const sslide = (t, kit) => ({ name: `style-${kit.name}-${t.id}`, layout: t.layout || undefined, textOnly: t.textOnly,
   els: [{ x: 0, y: 0, w: 960, h: 540, bg: `var(--${kit.name}-card)`, over: 1 },   // the slide wears the kit's ground
     ...wear(scale(t.els, 1), kit, t.layout), { override: 'foot', text: `style · ${kit.name} · ${t.id}`, color: `var(--${kit.name}-muted)` }] });
 const STYLES = { id: 'styles', name: 'Styles', note: 'The same six slides under every kit in examples/styles — a palette per slide through prefixed tokens, the kit\'s weight and case per row. The type scale is deck-wide: build with --style to see a kit\'s faces.' };
@@ -208,9 +218,16 @@ const FOOT_PAINT = { 'cover-split': { color: 'var(--card)', op: 0.7 } };
 // a template whose own chrome owns the left of the band (a rail, a foot mark) carries `foot: {x, w}`: the source line
 // starts clear of it. Geometry of the COUNTER is untouched — its corner is pinned to w − margin on every slide.
 const foot = (source, id, t) => ({ override: 'foot', text: `${source} · ${id}`, ...(t && t.foot ? t.foot : {}), ...(FOOT_PAINT[id] || {}) });
-const divider = (k, i, n = k.templates.length + k.layouts.length) => ({ name: `kind-${k.id}`, layout: 'title', els: [{ slot: 'supertitle', text: `${String(i + 1).padStart(2, '0')} · ${n} slides` }, { slot: 'title', text: k.name }, { x: 60, y: 400, w: 700, role: 'Body', color: 'var(--muted)', text: k.note }, foot('kind', k.id)] });
-const tslide = (t) => ({ name: t.id, layout: t.layout || undefined, hide: FULL_BLEED.includes(t.id) ? ['foot'] : undefined, els: [...scale(bind(t), 1), ...(FULL_BLEED.includes(t.id) ? [] : [foot('template', t.id, t)])] });
-const lslide = (n) => ({ name: `layout-${n}`, layout: n, hide: FULL_BLEED.includes(n) ? ['foot'] : undefined, els: [...fill(n), ...(FULL_BLEED.includes(n) ? [] : [foot('layout', n)])] });
+const divider = (k, i, n = k.templates.length + k.layouts.length) => ({ name: `kind-${k.id}`, layout: 'title', textOnly: true, els: [{ slot: 'supertitle', text: `${String(i + 1).padStart(2, '0')} · ${n} slides` }, { slot: 'title', text: k.name }, { x: 60, y: 400, w: 700, role: 'Body', color: 'var(--muted)', text: k.note }, foot('kind', k.id)] });
+// a words template's slide carries its textOnly mark (the coverage gate's opt-out). A list of companies shows its marks: the
+// sheet fills proof-strip's media keys with monogram chips ({logo: ''}, initials from each name) as a `template:` slide, so
+// create() draws them the way a deck that fills m1..m5 gets them — the logo twin of MEDIA's photos above
+const MARKS = { 'proof-strip': { logo: '' } };
+const marked = t => Object.fromEntries(t.media.map((_, i) => ['m' + (i + 1), MARKS[t.id]]));
+const tslide = (t) => ({ name: t.id, layout: t.layout || undefined, hide: FULL_BLEED.includes(t.id) ? ['foot'] : undefined, textOnly: t.textOnly,
+  ...(MARKS[t.id] ? { template: t.id, layout: undefined, fill: marked(t) } : {}),
+  els: [...(MARKS[t.id] ? [] : scale(bind(t), 1)), ...(FULL_BLEED.includes(t.id) ? [] : [foot('template', t.id, t)])] });
+const lslide = (n) => ({ name: `layout-${n}`, layout: n, textOnly: WORDS.includes(n) || undefined, hide: FULL_BLEED.includes(n) ? ['foot'] : undefined, els: [...fill(n), ...(FULL_BLEED.includes(n) ? [] : [foot('layout', n)])] });
 const index = [];
 const slides = [];
 for (const [i, k] of KINDS.entries()) {
