@@ -27,7 +27,8 @@
     "llms.txt",
     "README.md",
     "CHANGELOG.md",
-    "LICENSE"
+    "LICENSE",
+    "vendor"
   ],
   "exports": {
     "./diagram": "./lib/diagram.mjs",
