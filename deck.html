@@ -110,6 +110,18 @@ body.present .el a.lk{pointer-events:auto}
 #autosave[data-state=rebase]{color:var(--accent)}#autosave[data-state=rebase]>svg:first-child{display:none}#autosave[data-state=rebase] .upd{display:inline}
 #autosave[data-state=rebase] .rw{display:block;order:-1;margin-right:6px;animation:cap-spin 1s linear infinite}@keyframes cap-spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){#autosave.cap .drop,#autosave.cap::after,#autosave[data-state=rebase] .rw{animation:none}#autosave.cap{box-shadow:inset 0 0 0 1px var(--accent)}}
+/* checkout (hosted): an agent holds the deck (serve.mjs --checkout) and the canvas is read-only. agent = lock + its name;
+   agent-edit = bot + name + three dots while it writes (a `changed` in the last 10 s). Same button and footprint as rebase */
+#autosave .lk,#autosave .bt,#autosave .who,#autosave .dots{display:none}
+#autosave[data-state^=agent]{color:var(--accent)}#autosave[data-state^=agent]>svg:first-child{display:none}
+#autosave[data-state^=agent] .who{display:inline;font:500 12px/16px ui-monospace,Menlo,monospace;white-space:nowrap;max-width:14ch;overflow:hidden;text-overflow:ellipsis}
+#autosave[data-state=agent] .lk,#autosave[data-state=agent-edit] .bt{display:block;order:-1;margin-right:6px}
+#autosave[data-state=agent-edit] .dots{display:inline-flex;gap:2px;margin-left:5px}
+#autosave .dots i{width:3px;height:3px;border-radius:50%;background:currentColor;animation:ag-dot 1s ease-in-out infinite}#autosave .dots i:nth-child(2){animation-delay:.15s}#autosave .dots i:nth-child(3){animation-delay:.3s}
+@keyframes ag-dot{0%,80%,100%{opacity:.25}40%{opacity:1}}
+@media (prefers-reduced-motion:reduce){#autosave .dots i{animation:none;opacity:.8}}
+body.leased #canvas{cursor:not-allowed}
+#toast{position:fixed;left:50%;bottom:calc(64px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:30;max-width:calc(100vw - 32px);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 12px;color:var(--fg);font:12px/16px ui-monospace,Menlo,monospace}#toast[hidden]{display:none}
 #hud{position:relative;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 16px calc(8px + env(safe-area-inset-bottom));border-top:1px solid var(--line);font:12px ui-monospace,Menlo,monospace;color:var(--muted)}
 #hud button,#tb button,#sheet-back{background:var(--card);border:1px solid var(--line);color:var(--fg);border-radius:6px;padding:4px 10px;cursor:pointer;font:inherit}
 #hud .sep{width:1px;height:18px;background:var(--line)}
@@ -218,11 +230,12 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
   <span class="seg" id="tb-colors"></span>
   <button id="tb-master" hidden title="Promote this slide-local override back to every slide" aria-label="Promote this slide-local override back to every slide">Apply to all slides</button>
 </div>
+<div id="toast" role="status" aria-live="polite" hidden></div>
 <div id="hud">
   <button id="prev" class="mi mi-chevron-left" data-ms="200" data-tip="Previous slide · ←" aria-label="Previous slide · ←"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" data-mi="chevron"/></svg></button>
   <button id="next" class="mi mi-chevron-right" data-ms="200" data-tip="Next slide · →" aria-label="Next slide · →"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" data-mi="chevron"/></svg></button>
   <div class="spacer"></div>
-  <button id="autosave" class="mi mi-save" data-ms="600" data-state="ok" data-tip="Autosaved · click saves the file · ⌘S" aria-label="Autosaved · click saves the file · ⌘S"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7" class="lid" data-mi="animate"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></svg><i class="drop" aria-hidden="true"></i><span class="upd" aria-hidden="true">Updating</span><svg class="rw" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg><span id="savebad" role="status" hidden></span></button>
+  <button id="autosave" class="mi mi-save" data-ms="600" data-state="ok" data-tip="Autosaved · click saves the file · ⌘S" aria-label="Autosaved · click saves the file · ⌘S"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7" class="lid" data-mi="animate"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></svg><i class="drop" aria-hidden="true"></i><span class="upd" aria-hidden="true">Updating</span><svg class="lk" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><svg class="bt" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg><span class="who" aria-hidden="true"></span><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><svg class="rw" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg><span id="savebad" role="status" hidden></span></button>
   <div class="sep"></div>
   <div id="addwrap">
     <button id="addbtn" class="mi mi-plus" data-ms="500" data-tip="Add text, box or slide" aria-label="Add text, box or slide" aria-haspopup="true" aria-expanded="false"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="plus" data-mi="animate"><path d="M5 12h14" class="horizontal"/><path d="M12 5v14" class="vertical"/></svg></button>
@@ -490,7 +503,11 @@ addEventListener('resize',fit);
 // The tooltip (title + hover label) always carries the last confirmed save time.
 const hms=d=>d?d.toTimeString().slice(0,8):'';
 const BLOCKED='Not saved — this browser blocks storage for local files (Safari does, on file://). Press ⌘S to save a copy you can reopen, or open this deck in Chrome.';
-const autosave=(st,msg)=>{const a=$('autosave');if(!a)return;a.dataset.state=st;const to='Saved to '+(hosted()&&HOST.name||'file')+' · ';const txt=msg||{ok:fileAt?to+hms(fileAt):'Autosaved · '+hms(lastSavedAt),local:'Saved in this browser · '+unsynced+' edit'+(unsynced===1?'':'s')+' not in the file yet'+(fileH?' — writing':' — ⌘S writes them'),rebase:'Updating · the agent wrote a new version; your edits go on top',bad:TIER!=='mem'?'Not saved — edits will be lost on refresh'+(lastSavedAt?' (last saved '+hms(lastSavedAt)+')':''):BLOCKED,busy:'Saving…'}[st];a.dataset.full=txt;a.dataset.tip=msg||{ok:fileAt?to+hms(fileAt):'Autosaved · '+hms(lastSavedAt),local:'Saved in this browser · '+unsynced+' not in the file'+(fileH?'':' · ⌘S'),rebase:'Updating',bad:'Save a copy · ⌘S — this browser blocks storage, so edits only survive in a copy',busy:'Saving…'}[st];a.setAttribute('aria-label',txt);
+// LEASE (hosted): an agent's checkout {by, since, until, chg}; while it is held every state reads as agent (agent-edit for 10 s after a `changed`)
+let LEASE=null,agT=null;const hm=d=>new Date(d).toTimeString().slice(0,5);
+const autosave=(st,msg)=>{const a=$('autosave');if(!a)return;if(LEASE&&!/^agent/.test(st)){st=Date.now()-LEASE.chg<1e4?'agent-edit':'agent';msg=null}a.dataset.state=st;
+  const L=LEASE||{by:'',since:0,until:0},held='Checked out by '+L.by+' since '+hm(L.since)+' · until '+hm(L.until),writes=L.by+' is writing a new version · since '+hm(L.since)+' · until '+hm(L.until),w=a.querySelector('.who');if(w)w.textContent=L.by;
+  const to='Saved to '+(hosted()&&HOST.name||'file')+' · ';const txt=msg||{ok:fileAt?to+hms(fileAt):'Autosaved · '+hms(lastSavedAt),local:'Saved in this browser · '+unsynced+' edit'+(unsynced===1?'':'s')+' not in the file yet'+(fileH?' — writing':' — ⌘S writes them'),rebase:'Updating · the agent wrote a new version; your edits go on top',bad:TIER!=='mem'?'Not saved — edits will be lost on refresh'+(lastSavedAt?' (last saved '+hms(lastSavedAt)+')':''):BLOCKED,busy:'Saving…',agent:held,'agent-edit':writes}[st];a.dataset.full=txt;a.dataset.tip=msg||{ok:fileAt?to+hms(fileAt):'Autosaved · '+hms(lastSavedAt),local:'Saved in this browser · '+unsynced+' not in the file'+(fileH?'':' · ⌘S'),rebase:'Updating',bad:'Save a copy · ⌘S — this browser blocks storage, so edits only survive in a copy',busy:'Saving…',agent:held,'agent-edit':writes}[st];a.setAttribute('aria-label',txt);
   const bd=$('savebad');if(bd){const k=st==='bad'?'!':st==='local'&&unsynced?String(unsynced):'';bd.hidden=!k;bd.textContent=k;bd.setAttribute('aria-label',st==='bad'?'nothing is saved':k+' edit'+(k==='1'?'':'s')+' not in the file yet')}};
 // save: every mutation lands here. base = the deck as last saved; the diff since then is appended to the log (stamped with
 // the file rev it was made on — an entry with no rev has not reached a file yet), then model + log persist, the other windows
@@ -499,8 +516,10 @@ const autosave=(st,msg)=>{const a=$('autosave');if(!a)return;a.dataset.state=st;
 let asT,fileH=null,writing=false,fileAt=null,wbT=null;const WB=800;
 const FSA=!!window.showOpenFilePicker;
 function save(){
-  stampIds(deck);const now=JSON.stringify(deck),ents=diffDecks(JSON.parse(base),deck).map(e=>({t:new Date().toISOString(),...e}));base=now;
-  if(ents.length){log.push(...ents);unsynced+=ents.length;store.set(LKEY,JSON.stringify(log));capture()}
+  stampIds(deck);const now=JSON.stringify(deck),ents=diffDecks(JSON.parse(base),deck).map(e=>({t:new Date().toISOString(),...e}));
+  if(LEASE&&ents.length){unlease();return} // checked out: whatever path changed the model, the change is undone here
+  base=now;
+  if(ents.length){log.push(...ents);unsynced+=ents.length;store.set(LKEY,JSON.stringify(log));capture();beat()}
   autosave('busy');const ok=store.set(KEY,now);clearTimeout(asT);
   if(ents.length)tell({model:now,log:JSON.stringify(log)});
   if(fileH){clearTimeout(wbT);wbT=setTimeout(writeBack,WB)}
@@ -1449,7 +1468,7 @@ function fileHtml(){
   commitEdit();const d=document.documentElement.cloneNode(true),q=s=>d.querySelector(s);
   d.removeAttribute('style');q('body').removeAttribute('style');q('body').className='';d.querySelectorAll('#hud :disabled').forEach(b=>b.disabled=false);['#canvas','#grid','#print'].forEach(s=>q(s).innerHTML='');
   q('#snap').setAttribute('aria-pressed','false');q('#snap').dataset.tip='Guides + snap · off · G';q('#snap').setAttribute('aria-label',q('#snap').dataset.tip); // guides are browser state: a copy opens with them off
-  q('#tb').hidden=q('#sheet').hidden=true;q('#addmenu').classList.remove('open');q('#helpmenu').classList.remove('open');
+  q('#tb').hidden=q('#sheet').hidden=q('#toast').hidden=true;q('#addmenu').classList.remove('open');q('#helpmenu').classList.remove('open');
   const sc=q('script');sc.textContent=splice(sc.textContent,deck,log);
   return '<!DOCTYPE html>\n'+d.outerHTML;
 }
@@ -1466,7 +1485,7 @@ async function linkFile(){ // a user gesture is required: called from ⌘S / the
 }
 let wq=null; // one write in flight; a save during a write queues exactly one more
 async function writeBack(){
-  clearTimeout(wbT);wbT=null;if(!fileH)return;if(writing){wq=1;return}writing=true;autosave('busy');
+  clearTimeout(wbT);wbT=null;if(!fileH||LEASE)return;if(writing){wq=1;return} // leased: the journal keeps the edits; checkin writes themwriting=true;autosave('busy');
   if(hosted()){try{await hostWrite();store.set(LKEY,JSON.stringify(log));fileAt=new Date()}catch(err){console.warn('decklet: host write failed; the edits wait in this browser and go on the next save or open',err)}
     finally{writing=false;unsynced=log.filter(e=>!e.rev).length;autosave(unsynced?'local':'ok');if(wq){wq=null;writeBack()}}return}
   const fresh=log.filter(e=>!e.rev);for(const e of fresh)e.rev=deck.rev; // the file about to be written carries them
@@ -1502,6 +1521,25 @@ async function rebase(){
   drag=null;sel.clear();i=Math.max(0,deck.slides.findIndex(s=>s.id===sid));
   if(!sheet.hidden){cellOf=new WeakMap();gsel=new Set([i]);ganchor=i;sheetRender()}else render();
   tell({model:base,log:JSON.stringify(log)})}
+// ── checkout (hosted): `node bin/serve.mjs deck.html --checkout --by <name>` holds the deck while an agent rebuilds it. The
+// server says `lease` on the stream; the page goes read-only (pointer + edit keys on the canvas and the edit buttons stop, and
+// save() undoes anything that reached the model by another path), holds its writes (the host answers 423 anyway), and on
+// checkin or expiry rebases onto the agent's version (the `changed` that came under the lease left HOST.stale) and writes.
+// beat(): the host hears how many edits this page holds unacknowledged, so a checkout waits for them (409) instead of racing.
+let toastT;const toast=m=>{const t=$('toast');t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{t.hidden=true},2500)};
+const leaseToast=()=>toast('Read-only while '+LEASE.by+' has this deck checked out (until '+hm(LEASE.until)+')');
+const beat=()=>{if(HOST&&HOST.on)fetch('/__decklet/heartbeat',{method:'POST',headers:{'content-type':'application/json','X-Decklet-Token':HOST.t},body:JSON.stringify({pending:unsynced}),keepalive:true}).catch(()=>{})};
+function unlease(){ // an edit under the lease: back to the model as last saved, nothing logged
+  deck=JSON.parse(base);if(history.at(-1)===base){history.pop();hsave()}drag=null;sel.clear();i=Math.min(i,deck.slides.length-1);
+  if(!sheet.hidden){cellOf=new WeakMap();gsel=new Set([i]);ganchor=i;sheetRender()}else render();leaseToast()}
+function setLease(l){
+  if(l){if(!LEASE){commitEdit();drag=null;sel.clear();menu(false);if(sheet.hidden)render()}LEASE={...l,chg:LEASE?LEASE.chg:0};document.body.classList.add('leased');autosave('agent');return}
+  if(!LEASE)return;LEASE=null;clearTimeout(agT);document.body.classList.remove('leased');
+  if(HOST.stale||unsynced)writeBack();else autosave('ok')}
+const LOCKED='#canvas,#addbtn,#dup,#tb'; // navigation, present, the sheet, ⤓ and the menus stay live
+for(const t of ['pointerdown','mousedown','dblclick','click'])document.addEventListener(t,e=>{if(!LEASE||document.body.classList.contains('present')||!e.target.closest||!e.target.closest(LOCKED))return;e.preventDefault();e.stopImmediatePropagation();if(t==='pointerdown')leaseToast()},true);
+addEventListener('keydown',e=>{if(!LEASE||e.target.closest&&e.target.closest('dialog,input,textarea'))return;const k=e.key.toLowerCase();
+  if(['backspace','delete','enter'].includes(k)||(e.metaKey||e.ctrlKey)&&['z','v','x','d','b','i','u','k'].includes(k)){e.preventDefault();e.stopImmediatePropagation();leaseToast()}},true);
 async function saveFile(){
   commitEdit();
   if(!FSA){saveCopy();return}
@@ -1548,7 +1586,9 @@ if(LS)settle();else{autosave('busy','Loading…');idbLoad().then(settle)}
 if(HOST)fetch('/__decklet',{headers:{'X-Decklet-Token':HOST.t},cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{if(!j||!j.ok)return;
   HOST.on=true;fileH=HOST;HOST.name=j.name||'';if((j.rev||'')!==HOST.rev)HOST.stale=1;else if(base!==JSON.stringify(DECK))HOST.force=1;
   const es=new EventSource('/__decklet/events?t='+encodeURIComponent(HOST.t));
-  es.addEventListener('changed',e=>{let v;try{v=JSON.parse(e.data).rev||''}catch{return}if(v!==HOST.rev){HOST.stale=1;writeBack()}});
+  es.addEventListener('changed',e=>{let v;try{v=JSON.parse(e.data).rev||''}catch{return}if(v===HOST.rev)return;HOST.stale=1;
+    if(!LEASE)return writeBack();LEASE.chg=Date.now();autosave('agent-edit');clearTimeout(agT);agT=setTimeout(()=>autosave('agent'),1e4)}); // leased: rebase at checkin, not per write
+  es.addEventListener('lease',e=>{let l;try{l=JSON.parse(e.data)}catch{return}setLease(l)});setInterval(()=>{if(unsynced)beat()},2e4);
   if(unsynced||HOST.stale||HOST.force)writeBack();else autosave('ok')},err=>console.warn('decklet: no host answered; saving as a plain file',err));
 
 // self-check — model round-trips through JSON and renderer draws every element (+ master rows + counter)
