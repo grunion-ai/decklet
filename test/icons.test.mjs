@@ -1,6 +1,7 @@
 // decklet icon gate — `icon:'name'` rows expand at create time into inline Lucide SVG (ISC, lucide.dev) coloured by
 // tokens; the runtime draws nothing new. An unknown name is an error that lists the set. Only the icons a deck uses
-// reach the file.
+// reach the file. The set is the full Lucide catalogue (current names plus deprecated aliases), generated once from
+// @iconify-json/lucide and committed — no runtime dependency, no network fetch, decks stay self-contained.
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -14,11 +15,25 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const v = m => validate(create(m).deck);
 const deck = els => ({w: 960, h: 540, title: 'ico', slides: [{els}]});
 
-test('icons: a curated Lucide set ships, every entry is path markup on the 24 grid', () => {
+test('icons: the full Lucide set ships, every entry is path markup on the 24 grid', () => {
   const names = Object.keys(ICONS);
-  assert.ok(names.length >= 150, names.length + ' icons');
+  assert.ok(names.length >= 1900, names.length + ' icons');
   for (const n of ['check', 'zap', 'shield-check', 'trending-up', 'users', 'lightbulb', 'clock', 'target']) assert.ok(ICONS[n], n);
   for (const [n, v] of Object.entries(ICONS)) assert.ok(/^<(path|rect|circle|line|polyline|polygon|ellipse)/.test(v) && !/<svg|<script|data-mi|class=/.test(v), n + ' is bare shapes');
+});
+
+test('icons: F6 — the manufacturing vocabulary the CAD/DFM deck had to hand-inline is now in the set', () => {
+  for (const n of ['factory', 'printer', 'box', 'wrench', 'bot', 'cloud', 'git-merge', 'ruler', 'drafting-compass', 'handshake']) {
+    assert.ok(ICONS[n], n);
+    assert.deepEqual(v(deck([{icon: n, x: 60, y: 100}])).errors, [], n + ' validates');
+    const {html} = create(deck([{icon: n, x: 60, y: 100, w: 32, h: 32}]));
+    assert.match(html, /viewBox=\\"0 0 24 24\\"|viewBox="0 0 24 24"/, n + ' renders');
+  }
+});
+
+test('icons: a deprecated Lucide alias resolves to its current shape', () => {
+  assert.ok(ICONS['alert-triangle'], 'alert-triangle alias present');
+  assert.equal(iconSvg('alert-triangle'), iconSvg('triangle-alert'));
 });
 
 test('icons: iconSvg wraps the shapes in a 24-grid stroke svg in currentColor', () => {
