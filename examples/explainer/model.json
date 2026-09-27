@@ -38,7 +38,7 @@
       { "slot": "title", "text": "Eight roles. One font and size per role.", "anim": "rise" },
       { "x": 60, "y": 136, "w": 560, "role": "Title", "text": "Title 64" },
       { "x": 60, "y": 212, "w": 560, "role": "Supertitle", "text": "Supertitle · mono 12 · tracked · uppercase" },
-      { "x": 60, "y": 234, "w": 560, "role": "H1", "text": "H1 · 34 / 40 · the content-slide title" },
+      { "x": 60, "y": 234, "w": 600, "role": "H1", "text": "H1 · 34/40 · content-slide title" },
       { "x": 60, "y": 278, "w": 560, "role": "H2", "text": "H2 · 22 / 28 · 600" },
       { "x": 60, "y": 310, "w": 560, "role": "Body", "text": "Body · 16 / 24 · 400 — the reading size" },
       { "x": 60, "y": 338, "w": 560, "role": "Caption", "text": "Caption · 13 / 18 · muted" },
