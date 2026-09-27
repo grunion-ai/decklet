@@ -10,6 +10,8 @@
   4. **text over text** — a title landing on a caption;
   5. **text under paint** (occlusion) — a text row hidden by an opaque row painted later in `els` (a tinted box, an image, a bar). The compositor is asked, not the geometry (`elementFromPoint`), and it fails like the other four — a hidden row is never a warning. Fix by reordering `els` (paint first) or moving the box.
   Containment is not collision: text on a tile, a label inside a box, a slide backdrop all pass. A tint with no border is a backdrop and a circle/pill outline is decoration — neither is a container edge. A headless stroke crossing a card is routing, not a landing. `over:1` opts a row out of all five.
+- **Two engines**: parity runs in Chromium and, when Playwright's WebKit is installed, in WebKit too, one browser per engine reused across every slide. Safari lays some text out wider than Chromium (a `ui-monospace` stack is SF Mono in Safari and Menlo in Chromium), so a label can wrap onto the row under it in Safari while Chromium passes. Results are per engine: `results.json` carries `engines.chromium` (the same array as `parity`) and `engines.webkit`, the CLI prints one `parity` line per engine and slide, a WebKit failure reads `layout parity failed in webkit on <slides>`, and WebKit's per-slide PNGs land in `<out>/webkit/`. The AE diff stays Chromium-only. `--no-webkit` (API: `webkit: false`) skips the second engine; a missing WebKit install is reported under `skipped`.
+- **Font-stack warning**: a role whose `font` stack starts with `ui-monospace`, `ui-sans-serif`, `ui-serif`, `ui-rounded` or `system-ui` resolves to a different font per engine. Verify prints `warning font:` for each such role (`res.warnings`); it does not fail. Lead the stack with a named family (`Menlo, ui-monospace, monospace`) so both engines measure the same text.
 - **AE pixel diff** — when `--refs` exists (needs ImageMagick): `< 0.5%` of pixels differ at 2% fuzz. AE alone passes wrapped labels; parity is what catches them — that is why parity is not optional.
 
 ## Thresholds
@@ -28,5 +30,7 @@ Every check the two tools run, and what passes:
 | air | `validate` | no two declared boxes closer than `styles.gap` (default 4) unless contained or `over:1`; estimates warn with `~` |
 | occlusion | `verify` parity | no text row under an opaque row painted later in `els` |
 | counter | `verify` parity | the page counter's right edge is on `w − styles.margin`, and its box (right edge, top, height) is the same on every slide that shows the footer. The per-slide PNG carries the counter; the AE diff masks its box on both images |
-| page errors | `verify` | none |
+| engines | `verify` parity | every parity check passes in Chromium and in WebKit (when installed; `--no-webkit` skips) |
+| font stack | `verify` | warning only: no role's stack leads with `ui-monospace`, `ui-sans-serif`, `ui-serif`, `ui-rounded` or `system-ui` |
+| page errors | `verify` | none, in either engine |
 | AE | `verify --refs` | `< 0.5%` pixels at `-fuzz 2%` (set `--threshold`) |
