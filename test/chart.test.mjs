@@ -10,7 +10,7 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 import {validate} from '../bin/validate.mjs';
 import {create} from '../bin/create.mjs';
 import {verify, modelOf} from '../bin/verify.mjs';
-import {chartRows, expandCharts, checkChart} from '../lib/chart.mjs';
+import {chartRows, expandCharts, checkChart, hbarGeometry} from '../lib/chart.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 let pw = null; try { pw = await import('playwright'); } catch {}
@@ -69,6 +69,71 @@ test('chart: a rising line is one stroke with dots, the annotation a green dot +
     assert.ok(!l.over, 'placed clear, not declared as an overlay');
   }
   assert.equal(rows.length, 4 + 8 + 9 + 9 + 9 + 2 + 1, 'scale(3)+baseline, segments, dots, values, axis, annotation words+leader, source');
+});
+
+// the landscape deck's AI-CAD funding slide, hand-built there: ranked horizontal bars with a label column, one hot bar
+const funding = {mark: 'hbar', sort: 'desc', data: [{label: 'Zoo', value: 10.1, text: '$10.1M'}, {label: 'Vizcom', value: 52, text: '$52M'}, {label: 'Adam', value: 4.1, text: '$4.1M'}, {label: 'Backflip', value: 30, text: '$30M', highlight: true}, {label: 'Leo AI', value: 9.7, text: '$9.7M'}], source: 'Crunchbase, 2026'};
+
+test('chart: an hbar expands to ranked horizontal bars on one scale, a label column, value labels at the bar ends and a zero baseline', () => {
+  const rows = chartRows({...BOX, chart: {...funding, sort: undefined}}, roles), n = funding.data.length, L = roles.Label.lh;
+  const bs = rows.filter(r => r.bar), base = rows.find(r => r.line && r.dash);
+  assert.equal(bs.length, n);
+  assert.ok(base && base.bg === 'var(--muted)' && base.x === base.line[0], 'a grey dashed vertical zero baseline');
+  for (const b of bs) assert.equal(b.x, base.x, 'every bar starts at zero, on the baseline');
+  assert.equal(new Set(bs.map(b => b.h)).size, 1, 'one bar thickness');
+  for (let k = 1; k < n; k++) assert.ok(bs[k].y >= bs[k - 1].y + bs[k - 1].h + 4, 'bars stack top to bottom with air');
+  const maxLabel = rows.find(r => r.role === 'Label' && /^\d/.test(r.text) && r.y > bs.at(-1).y + bs.at(-1).h && r.text !== '0');
+  const max = +maxLabel.text.replace(/,/g, ''); assert.equal(max, 60, 'the one explicit scale is the nice max above 52, stated in a label');
+  const pw = maxLabel.x + maxLabel.w / 2 - base.x;
+  for (const [k, b] of bs.entries()) assert.ok(Math.abs(b.w - pw * funding.data[k].value / max) <= 1, `bar ${k} is drawn against that one scale`);
+  const vals = rows.filter(r => r.role === 'Label' && r.color === 'var(--fg)');
+  assert.deepEqual(vals.map(v => v.text), funding.data.map(d => d.text), 'direct value labels, text overrides');
+  for (const [k, v] of vals.entries()) { const b = bs[k]; assert.ok(v.x >= b.x + b.w + 4 && v.x <= b.x + b.w + 8, 'the value sits at the bar end'); assert.ok(Math.abs(v.y + L / 2 - (b.y + b.h / 2)) <= 1, 'centred on the bar'); }
+  const names = rows.filter(r => r.role === 'Label' && r.align === 'left' && r.color !== 'var(--fg)');
+  assert.deepEqual(names.map(r => r.text), funding.data.map(d => d.label), 'a label column, one name per bar');
+  for (const [k, t] of names.entries()) { assert.ok(t.x === BOX.x && t.x + t.w <= base.x - 4, 'names sit in the column left of the baseline'); assert.ok(Math.abs(t.y + L / 2 - (bs[k].y + bs[k].h / 2)) <= 1); }
+  const src = rows.at(-1); assert.deepEqual([src.role, src.text, src.y + roles.Caption.lh], ['Caption', funding.source, BOX.y + BOX.h]);
+  for (const r of rows) assert.ok(r.x >= BOX.x && r.x + (r.line ? 0 : r.w) <= BOX.x + BOX.w + 0.5 && r.y >= BOX.y && r.y + (r.line ? 0 : r.h || L) <= BOX.y + BOX.h + 0.5, 'inside the box: ' + JSON.stringify(r));
+  assert.equal(rows.length, 1 + 2 + 3 * n + 1, 'baseline + two scale labels, three rows per datum, source');
+});
+
+test('chart: hbar sort ranks the data, and one highlighted bar carries the accent while the rest go grey', () => {
+  const rank = s => chartRows({...BOX, chart: {...funding, sort: s}}, roles).filter(r => r.role === 'Label' && r.align === 'left' && r.color !== 'var(--fg)').map(r => r.text);
+  assert.deepEqual(rank('desc'), ['Vizcom', 'Backflip', 'Zoo', 'Leo AI', 'Adam']);
+  assert.deepEqual(rank('asc'), ['Adam', 'Leo AI', 'Zoo', 'Backflip', 'Vizcom']);
+  assert.deepEqual(rank(undefined), funding.data.map(d => d.label), 'no sort keeps the model order');
+  const bs = chartRows({...BOX, chart: funding}, roles).filter(r => r.bar);
+  assert.deepEqual(bs.map(b => b.bg), ['var(--muted)', 'var(--accent)', 'var(--muted)', 'var(--muted)', 'var(--muted)'], 'Backflip, ranked second, is the one accent bar');
+  assert.ok(bs.every(b => b.bg === 'var(--accent)' ? b.op == null : b.op === 0.6));
+  const plain = chartRows({...BOX, chart: {...funding, data: funding.data.map(({highlight, ...d}) => d)}}, roles).filter(r => r.bar);
+  assert.ok(plain.every(b => b.bg === 'var(--accent)'), 'no highlight: every bar is the accent');
+  assert.equal(funding.data[0].label, 'Zoo', 'sorting never reorders the model');
+});
+
+test('chart: hbarGeometry reserves a lead box per datum (the logo hook) and the label column moves over for it', () => {
+  const g = hbarGeometry({...BOX, chart: {...funding, lead: 60}}, roles);
+  assert.deepEqual(g.map(d => d.datum.label), ['Vizcom', 'Backflip', 'Zoo', 'Leo AI', 'Adam']);
+  for (const d of g) {
+    assert.equal(d.lead.x, BOX.x); assert.equal(d.lead.w, 60);
+    assert.ok(d.label.x >= d.lead.x + d.lead.w + 4 && d.label.x + d.label.w <= d.bar.x - 4, 'label after the lead, before the bar');
+    assert.ok(Math.abs(d.lead.y + d.lead.h / 2 - (d.bar.y + d.bar.h / 2)) <= 1 && d.lead.h >= d.bar.h, 'the lead box is centred on its bar row');
+  }
+  for (let k = 1; k < g.length; k++) assert.ok(g[k].lead.y >= g[k - 1].lead.y + g[k - 1].lead.h, 'lead boxes do not overlap');
+  const rows = chartRows({...BOX, chart: {...funding, lead: 60}}, roles);
+  assert.equal(rows.length, 1 + 2 + 3 * 5 + 1, 'the lead is reserved space: no row is drawn in it yet');
+  assert.deepEqual(hbarGeometry({...BOX, chart: funding}, roles)[0].lead.w, 0, 'no lead by default');
+});
+
+test('chart: hbar validates clean in a deck, and validate refuses a bad sort, two highlights or a compare series', () => {
+  const one = c => validate(create({w: 960, h: 540, slides: [{els: [{...BOX, chart: c}]}]}).deck);
+  const ok = one(funding); assert.deepEqual(ok.errors, []); assert.deepEqual(ok.warnings, []);
+  assert.deepEqual(one({...funding, lead: 60}).errors, []);
+  for (const [c, re] of [
+    [{...funding, sort: 'up'}, /sort/],
+    [{...funding, data: funding.data.map(d => ({...d, highlight: true}))}, /highlight/],
+    [{...funding, data: funding.data.map(d => ({...d, compare: 1}))}, /compare/],
+    [{...funding, lead: -5}, /lead/],
+  ]) { const e = one(c).errors; assert.ok(e.some(m => re.test(m)), String(re) + ' — ' + JSON.stringify(e)); }
 });
 
 test('chart: adjacent axis and value label boxes never overlap — a label box is the column pitch, not the slot rounded up', () => {
@@ -131,6 +196,7 @@ live('live: chart rows render with parity and zero page errors, and the expanded
   const m = {w: 960, h: 540, slides: [
     {name: 'bars', layout: 'chart', els: [{slot: 'title', text: 'Renewals by month'}, {slot: 'chart', chart: bars}, {slot: 'takeaway', text: 'Up every month.'}]},
     {name: 'line', layout: 'chart', els: [{slot: 'title', text: 'Renewal rate'}, {slot: 'chart', chart: rising}, {slot: 'takeaway', text: 'The radar bent the curve.'}]},
+    {name: 'hbar', layout: 'chart', els: [{slot: 'title', text: 'AI-CAD funding'}, {slot: 'chart', chart: {...funding, lead: 60}}, {slot: 'takeaway', text: 'Backflip is second.'}]},
   ]};
   const f = path.join(tmp, 'charts.html'); fs.writeFileSync(f, create(m).html);
   const r = await verify(f, {out: path.join(tmp, 'v-charts'), strict: true, log: () => {}});
@@ -152,5 +218,5 @@ test('chart: docs/charts.md carries the drawing rules, and SKILL.md links it', (
   assert.match(fs.readFileSync(path.join(root, 'SKILL.md'), 'utf8'), /\[docs\/charts\.md\]\(docs\/charts\.md\)/, 'GRAPHICS sends the reader to the chart reference');
   const sec = fs.readFileSync(path.join(root, 'docs/charts.md'), 'utf8');
   assert.ok(sec.length > 500);
-  for (const re of [/start at zero/, /max label/, /[Dd]irect value labels/, /dashed/, /60%/, /muted:true/, /annotations/, /source/, /rising/]) assert.match(sec, re);
+  for (const re of [/start at zero/, /max label/, /[Dd]irect value labels/, /dashed/, /60%/, /muted:true/, /annotations/, /source/, /rising/, /hbar/, /sort/, /highlight/, /lead/, /hbarGeometry/]) assert.match(sec, re);
 });
