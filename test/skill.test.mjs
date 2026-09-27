@@ -123,3 +123,23 @@ test('skill: the model contract carries logo, assets, entities, after, hbar, med
                     /`m1…mn`/, /`<item>-media`/, /all of Lucide/, /Ink is a rule/]) assert.match(doc, re, String(re));
   assert.ok(doc.includes('(docs/assets.md)') && doc.includes('(docs/logo.md)'), 'links the asset and logo references');
 });
+
+// v0.13.0 (K6, K9, K10, K12, K17, K18, K19): SKILL.md routes an executive summary and market numbers to graphics, the plan
+// names a graphic per slide, every listed company carries its real logo, and the hand-off is the HTML file alone.
+test('skill: v0.13.0 routes summaries and numbers to graphics and hands off HTML only', () => {
+  const doc = read('SKILL.md');
+  const step1 = doc.slice(doc.indexOf('### Step 1'), doc.indexOf('### Step 2'));
+  assert.match(step1, /names the graphic/, 'the plan names the graphic per slide');
+  assert.match(step1, /icon is decoration/, 'an icon is decoration, not the visual');
+  assert.doesNotMatch(doc, /naming a `layout` or `template` is exempt/, 'the retired layout/template exemption is gone');
+  assert.match(doc, /`textOnly: true`/, 'a words slide says textOnly');
+  assert.match(doc, /market numbers?[^\n]*`area-bubbles`[^\n]*`waffle`[^\n]*`range-bar`/i, 'market numbers route to the proportional templates');
+  assert.match(doc, /executive summary[^\n]*`exec-summary`[^\n]*60 words[^\n]*graphic/i, 'the exec summary is capped at 60 words and draws a graphic');
+  assert.match(doc, /kind: 'summary'/, 'kind summary is in the contract');
+  assert.match(doc, /real logo/, 'every listed company needs its real logo');
+  assert.match(doc, /missed:[^\n]*--domain[^\n]*never ship a monogram/, 'a missed logo gets --domain or a file, never a monogram');
+  assert.match(doc, /style: 'arrow'\|'dashed'\|'blocked'/, 'connector rows are documented');
+  assert.match(doc, /foot is one line/, 'the one-line foot is documented');
+  assert.match(doc, /HTML file only[^\n]*PDF only when (asked|the human asks)/, 'hand-off is the HTML file; a PDF only when asked');
+  assert.match(doc, /115 finished slides/, 'the template count is current');
+});
