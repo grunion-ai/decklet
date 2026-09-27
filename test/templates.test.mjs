@@ -351,3 +351,83 @@ test('templates: media — fill errors name what a media key takes', () => {
   const ok = v(deck([{template: 'proof-strip', fill: {m1: {logo: '#acme', aspect: 3}, m2: {img: '#acme'}}}], {assets: {acme: PNG}}));
   assert.deepEqual(ok.errors, [], 'an asset reference fills a media key: ' + ok.errors.join(' | '));
 });
+
+// ── K14: fill carries geometry. A value may set a point's x/y or a bar's length, and a text row that outgrows its sample
+// moves the rows under it down, or validate refuses the fill when that would run the slide off the canvas.
+import {templateVals} from '../lib/templates.mjs';
+const sampleFill = id => ({...Object.fromEntries(templateKeys(id).map(k => [k.key, k.text.startsWith('rating ') ? Number(k.text.split(' ')[1]) : k.text])),
+  ...Object.fromEntries(templateVals(id).map(v => [v.key, v.sample]))});
+const rowsOf = (id, fill, extra) => { const d = deck([{template: id, fill}], extra); expandTemplates(d); return d.slides[0].els; };
+
+test('templates: K14 — every template filled with its own sample expands to exactly its unfilled rows', () => {
+  for (const t of TEMPLATES) {
+    const fill = sampleFill(t.id);
+    assert.deepEqual(rowsOf(t.id, fill), rowsOf(t.id, undefined), t.id + ': a sample fill changes nothing');
+  }
+});
+
+test('templates: K14 — two-by-two plots each player at its filled coordinates, and the name follows the dot', () => {
+  const vals = templateVals('two-by-two');
+  assert.deepEqual(vals.map(v => v.key), ['x1', 'y1', 'x2', 'y2', 'x3', 'y3']);
+  for (const v of vals) assert.deepEqual(v.range, [0, 100]);
+  const dots = els => els.filter(r => r.radius != null && r.w === r.h && r.bg);
+  const centre = r => [r.x + r.w / 2, r.y + r.h / 2];
+  const els = rowsOf('two-by-two', {x1: 90, y1: 90, x2: 10, y2: 10, x3: 50, y3: 50});
+  const [a, b, c] = dots(els).map(centre);
+  assert.deepEqual(a, [768, 201], 'x 90 · y 90 is near the top-right of the 300..820 × 430..176 plot');
+  assert.deepEqual(b, [352, 405], 'x 10 · y 10 is near the bottom-left');
+  assert.deepEqual(c, [560, 303], '50 · 50 sits on the quadrant lines');
+  const name = t => els.find(r => r.text === t);
+  const A = name('Incumbent A'), B = name('Incumbent B'), U = name('Us');
+  assert.equal(A.y, 201 - 7, 'the name is centred on its dot'); assert.equal(B.y, 405 - 7); assert.equal(U.y, 303 - 7);
+  assert.ok(A.x + A.w <= 900, 'a name that would run past the margin flips to the left of its dot: ' + (A.x + A.w));
+  assert.ok(A.x + A.w <= a[0], 'and ends before the dot');
+  assert.ok(B.x >= 300, 'a left-hand name that would cross the y axis flips to the right of its dot: ' + B.x);
+  assert.ok(!templateFixed('two-by-two').some(s => /shape/.test(s)), 'no fixed shapes left: ' + templateFixed('two-by-two').join(' · '));
+  const r = v(deck([{template: 'two-by-two', fill: {x1: 90, y1: 90, x2: 10, y2: 10, x3: 50, y3: 50}}]));
+  assert.deepEqual(r.errors, [], r.errors.join(' | '));
+  assert.ok(v(deck([{template: 'two-by-two', fill: {x1: 120}}])).errors.some(m => /x1/.test(m) && /0\.\.100/.test(m)), 'a coordinate is range-checked');
+});
+
+test('templates: K14 — chart-bar-ranked draws every bar from its filled value, on one scale', () => {
+  const vals = templateVals('chart-bar-ranked');
+  assert.deepEqual(vals.map(v => v.key), ['v1', 'v2', 'v3', 'v4', 'v5']);
+  const bars = els => els.filter(r => r.h === 26 && r.w != null && r.bg);
+  const sample = bars(rowsOf('chart-bar-ranked')).map(r => r.w);
+  assert.deepEqual(sample, [504, 412, 269, 176, 109], 'the sample lengths are unchanged');
+  const els = rowsOf('chart-bar-ranked', {v1: 80, v2: 40, v3: 20, v4: 10, v5: 60});
+  assert.deepEqual(bars(els).map(r => r.w), [504, 252, 126, 63, 378], 'the largest value fills the track; the rest are in proportion');
+  for (const n of [80, 40, 20, 10, 60]) assert.ok(els.some(r => r.text === String(n)), 'the value label reads ' + n);
+  const b = bars(els), labs = els.filter(r => /^\d+$/.test(r.text || ''));
+  labs.forEach((l, i) => assert.equal(l.x, b[i].x + b[i].w + 12, 'each value label sits past its own bar'));
+  assert.ok(!templateFixed('chart-bar-ranked').some(s => /shape/.test(s)), 'the bars are no longer fixed: ' + templateFixed('chart-bar-ranked').join(' · '));
+  assert.deepEqual(v(deck([{template: 'chart-bar-ranked', fill: {v1: 1200, v2: 0}}])).errors, [], 'a value over the sample scale, and a zero, are legal');
+});
+
+const LONG = 'Who ships design-for-manufacture today';
+test('templates: K14 — a cover title that wraps pushes the context and the kicker line down instead of colliding', () => {
+  const plain = rowsOf('cover-hero'), long = rowsOf('cover-hero', {t2: LONG});
+  const bodyOf = els => els.find(r => r.role === 'Body'), labOf = els => els.find(r => r.role === 'Label');
+  assert.equal(bodyOf(long).y - bodyOf(plain).y, 68, 'one more Title line (68px) moves the body down by exactly that');
+  assert.equal(labOf(long).y - labOf(plain).y, 68, 'and the row under the body with it');
+  assert.equal(long[0].y, plain[0].y, 'the accent rule above the title stays put');
+  const r = v(deck([{template: 'cover-hero', fill: {t2: LONG}}]));
+  assert.deepEqual(r.errors, [], r.errors.join(' | '));
+  assert.deepEqual(r.warnings.filter(m => /overlaps/.test(m)), [], 'no collision: ' + r.warnings.join(' | '));
+  const big = rowsOf('cover-hero', {t2: LONG}, {w: 1600, h: 900});
+  assert.equal(bodyOf(big).y, Math.round((358 + 68) * 1600 / 960), 'the reflow happens on the 960 cut, then scales');
+});
+
+test('templates: K14 — a fill that would push rows past the canvas foot fails validate with a message naming the key', () => {
+  const r = v(deck([{template: 'cover-hero', fill: {t2: LONG + ' ' + LONG + ' ' + LONG}}]));
+  assert.ok(r.errors.some(m => /fill key "t2"/.test(m) && /lines/.test(m) && /canvas/.test(m)), r.errors.join(' | '));
+  const s = v(deck([{template: 'stat-row-4', fill: {t11: 'Units grew with the reseller channel. '.repeat(16)}}]));
+  assert.ok(s.errors.some(m => /fill key "t11"/.test(m) && /canvas/.test(m)), s.errors.join(' | '));
+});
+
+test('templates: K14 — stat-row-4 with a longer tile body reflows nothing it should not and still validates', () => {
+  const fill = {t11: 'Units grew with the reseller channel; install time halved once the gateway shipped paired. CSAT held through both quarters, and churn fell.'};
+  const r = v(deck([{template: 'stat-row-4', fill}]));
+  assert.deepEqual(r.errors, [], r.errors.join(' | '));
+  assert.deepEqual(r.warnings.filter(m => /overlaps/.test(m)), [], r.warnings.join(' | '));
+});
