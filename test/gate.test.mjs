@@ -27,7 +27,8 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'decklet-'));
 test('template + deck are self-contained (no external src/href, loaders, sockets)', () => {
   for (const [n, h] of [['template', tpl], ['deck', deck]]) {
     assert.doesNotMatch(h, /(src|href)\s*=\s*["']https?:/i, `${n}: external src/href`);
-    assert.doesNotMatch(h, /@import|<link[^>]+stylesheet|fetch\s*\(|XMLHttpRequest|new\s+WebSocket/i, `${n}: external loader`);
+    assert.doesNotMatch(h, /@import|<link[^>]+stylesheet|fetch\s*\((?!'\/(?!\/))|new\s+EventSource\s*\((?!'\/(?!\/))|XMLHttpRequest|new\s+WebSocket/i, `${n}: external loader`); // the host route (bin/serve.mjs) talks to its own origin: fetch('/…'), EventSource('/…')
+    assert.doesNotMatch(h, /fetch\s*\(\s*'\/\/|EventSource\s*\(\s*'\/\//, `${n}: protocol-relative is off-origin`);
     assert.match(h, /const store=\{\n  get:/, `${n}: storage shim`);
     assert.equal((h.match(/localStorage\./g) || []).length, 2, `${n}: storage API only inside the availability probe (the shim holds the probed object)`);
   }
