@@ -135,7 +135,7 @@ const fill = (name) => {
   const lay = LIBRARY[name];
   // `body` and b1…bn are alternatives (validate errors on the pair): the image layouts review as their paragraph, and the
   // `bullets` layout — which has no `body` — reviews as its six points. The `image-bullets` template shows the other half.
-  const els = Object.entries(lay.slots).filter(([slot]) => TEXT[`${name}.${slot}`] !== '' && !(/^b\d$/.test(slot) && lay.slots.body)).map(([slot, sl]) => {
+  const els = Object.entries(lay.slots).filter(([slot]) => TEXT[`${name}.${slot}`] !== '' && !(/^b\d$/.test(slot) && lay.slots.body) && !/-media$/.test(slot)).map(([slot, sl]) => {
     if (slot === 'image') return media(name, { slot });
     if (slot === 'chart') return { slot, chart: CHART };
     if (!sl.role) return { slot };                                        // paint: the slot carries it

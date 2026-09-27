@@ -516,13 +516,30 @@ const MG=()=>deck.styles&&deck.styles.margin!=null?deck.styles.margin:Math.round
 // res(): slot geometry ← master row (for override rows) ← the row's own props ← role treatment. The role fills what the row
 // left unset AND always wins the LOCKED keys: a row can never change family/size/line-height/tracking. Every consumer reads through this.
 const LOCK=['font','size','lh','ls'];
+// the logo row (docs/logo.md): a fixed column of width `col` holding a contain-fit logo on a plate, or a monogram chip, and the
+// name at col + gap with its FIRST line centred on the column. The same numbers as lib/logo.mjs logoGeom; test/logo.test.mjs holds both.
+// the asset table: '#id' names deck.assets[id], embedded once in DECK; resolved here, so the DOM, the ⤓ PDF and the saved file agree
+const asset=s=>typeof s==='string'&&s[0]==='#'?((deck.assets||{})[s.slice(1)]||''):s;
+const isLogo=r=>r.logo!==undefined||r.monogram!=null,PLATE={light:'#FFFFFF',dark:'#15171B'};
+const initials=n=>String(n||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0].toUpperCase()).join('');
+function drawLogo(r,d){
+  const h=r.h||24,col=r.col??h*2,gap=r.gap??8,lh=r.lh??(r.size||14)*1.25,box=(c,css)=>{const e=document.createElement('div');e.className=c;e.style.cssText='position:absolute;'+css;d.appendChild(e);return e};
+  if(r.logo){const k=r.plate==null||r.plate==='auto'||r.plate==='light'?'light':r.plate==='dark'?'dark':'none',p=k==='none'?0:Math.max(2,Math.round(h*.14));
+    let iw=col-2*p,ih=h-2*p;if(r.aspect>0){iw=Math.min(iw,ih*r.aspect);ih=Math.min(ih,iw/r.aspect)}
+    if(k!=='none')box('lplate',`left:0;top:0;width:${iw+2*p}px;height:${h}px;background:${PLATE[k]};border-radius:${Math.round(h*.22)}px`);
+    const im=new Image();im.src=asset(r.logo);im.alt=r.alt||(r.name?r.name+' logo':'');im.style.cssText=`position:absolute;left:${p}px;top:${(h-ih)/2}px;width:${iw}px;height:${ih}px;object-fit:contain;pointer-events:none`;d.appendChild(im)}
+  else{const s=Math.min(h,col),t=String(r.monogram||initials(r.name)).slice(0,3);
+    box('lmono',`left:0;top:${Math.round((h-s)/2)}px;width:${s}px;height:${s}px;border-radius:${Math.round(s*.22)}px;background:var(--fg);color:var(--card);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:${Math.round(s*(t.length>1?.38:.47))}px;line-height:1;letter-spacing:0;white-space:nowrap`).textContent=t}
+  // the name is the row's one in-flow child: the row's own width is col + gap + the name (w, when stated, is the whole row)
+  if(r.name){const n=document.createElement('span');n.className='lname';n.textContent=r.name;n.style.cssText=`display:block;margin-top:${Math.round((h-lh)/2)}px;line-height:${lh}px;white-space:${typeof r.w==='number'?'normal':'nowrap'}`;d.appendChild(n)}
+  d.dataset.logo=1;d.style.padding=`0 0 0 ${r.name?col+gap:col}px`;d.style.height=h+'px';d.style.width=typeof r.w==='number'?r.w+'px':r.name?'auto':col+'px';d.style.background='none';d.style.border='0'}
 const res=(el,s)=>{const m=el.override&&(deck.master||[]).find(x=>x.id===el.override)||{};const sl=el.slot&&LAY(s)[el.slot]||{};const r={...sl,...m,...el};
   // one horizontal anchor: a row's own `right` retires the slot's x (and its own x retires the slot's right), so every consumer sees one edge
   if(el.right!=null)delete r.x;else if(el.x!=null)delete r.right;
-  const R=deck.styles&&deck.styles.roles||{},t=R[r.role]||((r.text!=null||r.html!=null)&&R.Body)||{};for(const k in t)if(r[k]==null||LOCK.includes(k))r[k]=t[k];return r};
+  const R=deck.styles&&deck.styles.roles||{},t=R[r.role]||((r.text!=null||r.html!=null||isLogo(r))&&R.Body)||{};for(const k in t)if(r[k]==null||LOCK.includes(k))r[k]=t[k];return r};
 // motion vocabulary — the only four anims an element may carry; anything else is ignored (the validator rejects it upstream)
 const ANIM=['rise','fade','pop','wipe'];
-const paints=r=>!!(r.text||r.html||r.svg||r.img||r.bg||r.bd||r.bt||r.br||r.bb||r.bl||r.box||r.tile||r.line||r.curve||r.donut!=null);
+const paints=r=>!!(isLogo(r)||r.text||r.html||r.svg||r.img||r.bg||r.bd||r.bt||r.br||r.bb||r.bl||r.box||r.tile||r.line||r.curve||r.donut!=null);
 // href: navigable schemes only. ONE gate for both surfaces — a row's own href and an <a> inside an .html run — applied at
 // render as well as in validate, because a saved copy's model can be hand-edited to anything.
 const href=u=>{u=String(u==null?'':u).trim();if(u[0]==='#'){const n=slideNo(u.slice(1));return n?'#'+n:''}return /^(https?:|mailto:)/i.test(u)?u:''};
@@ -616,8 +633,9 @@ function drawEls(s,root,animate){
     terminate(r,s); // `to`/`from` clip the stroke before anything reads r.x/r.y/r.line/r.curve
     const an=animate&&ANIM.includes(r.anim)?r.anim:'';
     d.className='el'+(r.box?' box':'')+(r.tile?' tile':'')+(r.bullet?' bul':'')+(an?' '+an:'');
-    if(r.svg)d.innerHTML=r.svg;
-    else if(r.img){const im=new Image();im.src=r.img;im.style.cssText=`display:block;width:100%;height:100%;object-fit:${r.fit||'fill'};object-position:${r.pos||'50% 50%'};pointer-events:none`;d.appendChild(im)}
+    if(isLogo(r));   // drawn after its box is styled: drawLogo below
+    else if(r.svg)d.innerHTML=r.svg;
+    else if(r.img){const im=new Image();im.src=asset(r.img);im.style.cssText=`display:block;width:100%;height:100%;object-fit:${r.fit||'contain'};object-position:${r.pos||'50% 50%'};pointer-events:none`;d.appendChild(im)}
     else if(r.html){d.innerHTML=r.html; // rich inline runs (<b>/<i>/<u>/<s>/<span>/<a href>) — re-gate the links on the way in
       d.querySelectorAll('a[href]').forEach(a=>{const u=href(a.getAttribute('href'));if(u){a.setAttribute('href',u);if(u[0]!=='#'){a.target='_blank';a.rel='noopener noreferrer'}a.title=hint(u)}else a.removeAttribute('href')})}
     else d.textContent=r.text||'';
@@ -639,6 +657,7 @@ function drawEls(s,root,animate){
     // owns the left of the band (a rail, a foot mark) overrides x to start past it. The counter's corner is untouched.
     if(r.footer){d.dataset.footer='1';d.style.whiteSpace='nowrap';d.style.width='auto';
       if(r.right!=null||(r.x||0)+(typeof r.w==='number'?r.w:0)/2>W/2){d.style.left='auto';d.style.right=MG()+'px'}else{d.style.right='';d.style.left=Math.max(MG(),r.x||0)+'px'}}
+    if(isLogo(r))drawLogo(r,d);
     // line = one rotated div (no SVG layer); donut = one conic-gradient ring with a mask hole
     if(r.line){const x0=r.x||0,y0=r.y||0,dx=r.line[0]-x0,dy=r.line[1]-y0,len=Math.hypot(dx,dy),a=Math.atan2(dy,dx);
       const sw=r.h||3,c=r.bg||'var(--accent)',[as,ae]=AR(r),hd=HEAD(sw);
@@ -893,7 +912,7 @@ function commitEdit(){
 }
 function edit(k){
   if(typeof k!=='number'){snap();k=fork(k.slice(2));sel.clear();sel.add(k);render()}else snap();
-  const el=slide().els[k];if(el.svg||el.img)return; // marks and images have no text to edit
+  const el=slide().els[k];if(el.svg||el.img||isLogo(el))return; // marks and images have no text to edit
   drag=null;const t=canvas.querySelector(`[data-n="${k}"]`);t.querySelectorAll('.h,.num').forEach(x=>x.remove());t.contentEditable=true;t.focus();t.oninput=()=>paintSpell(); // nib + counter are chrome, not content
   getSelection().selectAllChildren(t);
   t.onblur=commitEdit;placeTb();
@@ -1140,13 +1159,13 @@ async function exportPdf(){
     // correctly (token colours resolve there); redrawn alone it lost var(--accent) and its rotation — so connectors stay in layer (a).
     const cb=cv.getBoundingClientRect(),media=[...cv.querySelectorAll('.el')].filter(d=>d.querySelector('img,svg')&&!d.dataset.seg&&!d.dataset.cur).map(d=>{
       const e=d.querySelector('img,svg'),b=e.getBoundingClientRect(),cs=getComputedStyle(d);
-      return{el:d,x:b.left-cb.left,y:b.top-cb.top,w:b.width,h:b.height,op:+cs.opacity,radius:parseFloat(cs.borderRadius)||0,color:cs.color,src:e.tagName==='IMG'?e.getAttribute('src'):null,svg:e.tagName==='IMG'?null:e,fit:e.tagName==='IMG'?e.style.objectFit:null,pos:e.tagName==='IMG'?e.style.objectPosition:null};
+      return{el:d,pic:e,x:b.left-cb.left,y:b.top-cb.top,w:b.width,h:b.height,op:+cs.opacity,radius:parseFloat(cs.borderRadius)||0,color:cs.color,src:e.tagName==='IMG'?e.getAttribute('src'):null,svg:e.tagName==='IMG'?null:e,fit:e.tagName==='IMG'?e.style.objectFit:null,pos:e.tagName==='IMG'?e.style.objectPosition:null};
     });
     // links, in page order: a row overlay (a.lk) is one rect; an inline mark can wrap across lines, so take each of its client rects
     for(const a of cv.querySelectorAll('a[href]')){const u=href(a.getAttribute('href'));if(!u||u[0]==='#')continue; // in-deck targets get no /URI annotation
       for(const b of (a.className==='lk'?[a.getBoundingClientRect()]:a.getClientRects())) if(b.width>1&&b.height>1)
         annots.push({n,u,r:[b.left-cb.left,H-(b.bottom-cb.top),b.right-cb.left,H-(b.top-cb.top)]});} // PDF space: origin bottom-left
-    media.forEach(m=>m.el.style.visibility='hidden'); // placeholders: layout stays, pixels come from layer (b)
+    media.forEach(m=>(m.el.dataset.logo?m.pic:m.el).style.visibility='hidden'); // a logo row keeps its plate and name in layer (a) // placeholders: layout stays, pixels come from layer (b)
     const pagebg=getComputedStyle(cv).backgroundColor; // the clone already carries this slide's background — the live canvas is left alone
     const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><style>${css}</style><foreignObject width="${W}" height="${H}"><div xmlns="http://www.w3.org/1999/xhtml" style="--W:${W}px;--H:${H}px">${new XMLSerializer().serializeToString(cv)}</div></foreignObject></svg>`;
     cv.remove();
@@ -1159,9 +1178,9 @@ async function exportPdf(){
       else{const x=m.svg.cloneNode(true);x.setAttribute('xmlns','http://www.w3.org/2000/svg');x.setAttribute('width',m.w);x.setAttribute('height',m.h);x.style.color=m.color;if(!x.getAttribute('viewBox')&&x.getAttribute('width'))x.setAttribute('preserveAspectRatio','none');
         pic=await load('data:image/svg+xml;charset=utf-8,'+encodeURIComponent(new XMLSerializer().serializeToString(x)))}
       g.save();g.globalAlpha=m.op;g.beginPath();if(m.radius&&g.roundRect)g.roundRect(m.x*S,m.y*S,m.w*S,m.h*S,m.radius*S);else g.rect(m.x*S,m.y*S,m.w*S,m.h*S);g.clip();
-      // object-fit: fill (default) stretches; cover/contain scale by the ratio and place by object-position (defaults 50% 50%)
-      let dx=m.x,dy=m.y,dw=m.w,dh=m.h;
-      if(m.src&&(m.fit==='cover'||m.fit==='contain')){const k=m.fit==='cover'?Math.max(m.w/pic.naturalWidth,m.h/pic.naturalHeight):Math.min(m.w/pic.naturalWidth,m.h/pic.naturalHeight);dw=pic.naturalWidth*k;dh=pic.naturalHeight*k;
+      // object-fit: contain (default) and cover scale by the ratio and place by object-position (defaults 50% 50%); fill stretches
+      let dx=m.x,dy=m.y,dw=m.w,dh=m.h,fit=m.fit||'contain';
+      if(m.src&&fit!=='fill'){const k=fit==='cover'?Math.max(m.w/pic.naturalWidth,m.h/pic.naturalHeight):Math.min(m.w/pic.naturalWidth,m.h/pic.naturalHeight);dw=pic.naturalWidth*k;dh=pic.naturalHeight*k;
         const p=(m.pos||'50% 50%').split(/\s+/).map(v=>parseFloat(v)/100);dx=m.x+(m.w-dw)*(isNaN(p[0])?.5:p[0]);dy=m.y+(m.h-dh)*(isNaN(p[1])?.5:p[1])}
       g.drawImage(pic,dx*S,dy*S,dw*S,dh*S);g.restore();
     }
