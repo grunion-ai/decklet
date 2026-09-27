@@ -7,7 +7,9 @@
 //        later-painted opaque row (occlusion — sampled with elementFromPoint; fails like every other parity shape), and the page
 //        counter's box is the same on every slide that shows the footer (the corner is the counter's; a `hide` of the footer is exempt)
 //   3. AE pixel diff vs reference PNGs (ImageMagick `magick`/`compare`)  only when --refs is given
-// usage: node bin/verify.mjs deck.html [--refs dir] [--out dir] [--threshold 0.5] [--fuzz 2%] [--report model.report.json] [--fonts <css url>] [--strict]
+// usage: node bin/verify.mjs deck.html [--refs dir] [--out dir] [--threshold 0.5] [--fuzz 2%] [--report model.report.json] [--fonts <css url>] [--strict] [--webkit | --no-webkit]
+//   parity runs in Chromium and, on macOS when installed, WebKit (per-engine results; --webkit forces it on any OS, --no-webkit
+//   skips it). WebKit shots go to <out>/webkit/
 //   --report: the importer's drift report (default: model.report.json beside the deck) — masks where the mockup drew its chrome
 //   --fonts: a webfont stylesheet injected at TEST time only (the deck stays self-contained) so the AE shot uses the reference's font build
 //   refs: <slide.name>.png, <n>.png (1-based) or slide-<n>.png
@@ -21,197 +23,224 @@ import {isMain} from '../lib/is-main.mjs';
 
 export const modelOf = html => JSON.parse(html.match(/\/\*DECK\*\/([\s\S]*?)\/\*\/DECK\*\//)[1].replace(/<\\\/script/g, '</script'));
 
-export async function verify(file, {refs = null, out = null, threshold = 0.5, fuzz = '2%', strict = false, report = null, fonts = null, log = console.log} = {}) {
+// a family each engine resolves on its own: Safari maps ui-monospace to SF Mono (wider), Chromium does not support it and falls
+// through to the next family. A stack that LEADS with one measures differently per engine, so verify warns (K5).
+const ENGINE_FAMILIES = ['ui-monospace', 'ui-sans-serif', 'ui-serif', 'ui-rounded', 'system-ui'];
+export const fontWarnings = deck => Object.entries(deck?.styles?.roles || {}).flatMap(([role, s]) => {
+  const first = String(s?.font || '').split(',')[0].trim().replace(/^['"]|['"]$/g, '').toLowerCase();
+  return ENGINE_FAMILIES.includes(first) ? [{role, family: first, msg: `role ${role}: font stack starts with ${first}, which Safari and Chromium resolve to different fonts; lead with a named family (e.g. Menlo) so both engines measure the same text`}] : [];
+});
+
+export async function verify(file, {refs = null, out = null, threshold = 0.5, fuzz = '2%', strict = false, report = null, fonts = null, webkit = 'auto', log = console.log} = {}) {
   const html = fs.readFileSync(file, 'utf8');
-  const res = {file, contract: null, parity: [], ae: [], errors: [], skipped: []};
+  const res = {file, contract: null, parity: [], engines: {}, ae: [], errors: [], warnings: [], skipped: []};
   // self-containment — the guarantee the whole engine rests on
   if (/(src|href)\s*=\s*["']https?:/i.test(html) || /@import|<link[^>]+stylesheet|fetch\s*\(|XMLHttpRequest|new\s+WebSocket/i.test(html)) res.errors.push('deck references the network');
   const deck = modelOf(html);
   const v = validate(deck); res.contract = v; res.links = linksOf(deck); // every link, for a reviewer to check; an unresolved '#' is a contract error
   if (!v.ok) res.errors.push(`model contract: ${v.errors.length} errors`);
+  res.warnings = fontWarnings(deck).map(w => w.msg);
   if (strict && v.warnings.length) res.errors.push(`model contract: ${v.warnings.length} warnings (--strict)`);
-  let chromium; try { ({chromium} = await import('playwright')); } catch { res.skipped.push('layout parity + AE: Playwright not installed (npm i -D playwright && npx playwright install chromium)'); }
-  if (chromium) {
-    out = out || path.join(path.dirname(path.resolve(file)), 'verify-out'); fs.mkdirSync(out, {recursive: true});
-    const W = deck.w, H = deck.h;
-    const b = await chromium.launch(); const p = await b.newPage({viewport: {width: W + 100, height: H + 100}, deviceScaleFactor: 1});
-    const pageErrors = []; p.on('pageerror', e => pageErrors.push(String(e)));
-    await p.goto(pathToFileURL(path.resolve(file)).href); await p.waitForTimeout(300);
-    await p.evaluate(() => { localStorage.clear(); }); await p.reload(); await p.waitForTimeout(300); // verify the SHIPPED model, not a stale local edit
-    await p.addStyleTag({content: '#canvas{transform:none!important;border:0!important;border-radius:0!important;position:absolute!important;left:0;top:0} .el{animation:none!important}'});
-    const N = deck.slides.length;
-    const repFile = report || path.join(path.dirname(path.resolve(file)), 'model.report.json');
-    const rep = fs.existsSync(repFile) ? JSON.parse(fs.readFileSync(repFile, 'utf8')) : null; // importer's drift report: where the mockup drew its chrome
-    if (fonts) { await p.addStyleTag({url: fonts}); await p.evaluate(() => document.fonts.ready); await p.waitForTimeout(1200); } // TEST-TIME only: pin the AE shot to the reference's webfont build
-    // the counter STAYS VISIBLE: the per-slide PNG is what a builder looks at, and hiding it deck-wide meant parity measured a box
-    // no artifact contained (ROADMAP U6). It is still engine chrome the mockups never had, so the AE diff masks its box on both
-    // images instead — see `geo.chrome` below.
-    const hasMagick = !!refs && (() => { try { execFileSync('magick', ['-version'], {stdio: 'pipe'}); return true; } catch { return false; } })();
-    if (refs && !hasMagick) res.skipped.push('AE: ImageMagick `magick` not on PATH');
-    for (let n = 0; n < N; n++) {
-      await p.evaluate(k => { i = k; sel.clear(); render(); }, n); await p.waitForTimeout(150);
-      const name = deck.slides[n].name || `slide-${n + 1}`;
-      let bad = await p.evaluate(([W, H]) => {
-      // collision: ink drawn THROUGH a text row — the defect a human sees instantly and no other gate catches. The engine marks
-      // its own ink (data-seg = a line, data-cur = a curve, data-ink = a thin rule/dot); a card, tile, bar, donut or backdrop is
-      // something text sits ON, never a collision. A stroke is sampled along its real path, so a diagonal leader line is judged by
-      // where it is drawn and not by its bounding square. `over:1` declares a deliberate overlay.
-      const cvr = document.getElementById('canvas').getBoundingClientRect();
-      const bez = (a, b, c, e, t) => { const u = 1 - t; return u * u * u * a + 3 * u * u * t * b + 3 * u * t * t * c + t * t * t * e; };
-      const ink = [...document.querySelectorAll('#canvas .el[data-seg],#canvas .el[data-cur],#canvas .el[data-ink]')].filter(d => d.dataset.over == null).map(d => {
-        const key = d.dataset.n ?? ('m:' + d.dataset.m), pt = (x, y) => ({x: cvr.left + x, y: cvr.top + y}), pts = [];
-        if (d.dataset.seg) { const [x1, y1, x2, y2, th] = d.dataset.seg.split(',').map(Number);
-          for (let k = 0; k <= 80; k++) pts.push(pt(x1 + (x2 - x1) * k / 80, y1 + (y2 - y1) * k / 80));
-          return {key, pts, t: th / 2 + 1}; }
-        if (d.dataset.cur) { const [x1, y1, c1x, c1y, c2x, c2y, x2, y2, th] = d.dataset.cur.split(',').map(Number);
-          for (let k = 0; k <= 80; k++) { const u = k / 80; pts.push(pt(bez(x1, c1x, c2x, x2, u), bez(y1, c1y, c2y, y2, u))); }
-          return {key, pts, t: th / 2 + 1}; }
-        const b = d.getBoundingClientRect();   // a thin rule or dot: axis-aligned, sample its own footprint
-        // the engine tags any small painted rect; only a RULE (one side <= 4px, or 6:1) or a DOT (both sides <= 12px) is ink.
-        // A 56x22 logo plate or chip is a surface text sits beside, not a stroke through it.
-        const lo = Math.min(b.width, b.height), hi = Math.max(b.width, b.height);
-        if (!(lo <= 4 || hi >= 6 * lo || hi <= 12)) return null;
-        for (let k = 0; k <= 40; k++) { const u = k / 40; pts.push({x: b.left + b.width * u, y: b.top + b.height * u}, {x: b.left + b.width * u, y: b.bottom - b.height * u}); }
-        return {key, pts, t: Math.min(b.width, b.height) / 2 + 1};
-      }).filter(Boolean).map(q => { const d = [...document.querySelectorAll('#canvas .el[data-seg],#canvas .el[data-cur],#canvas .el[data-ink]')].find(x => (x.dataset.n ?? ('m:' + x.dataset.m)) === q.key);
-        return {...q, head: d && d.dataset.head};   // which end carries an arrow, so the gate can ask where the head landed
-      });
-      // container edges the engine declared. `over:1` opts a row out of both new checks, as it does for stroke-over-text.
-      const chrome = [...document.querySelectorAll('#canvas .el[data-chrome]')].filter(d => d.dataset.over == null)
-        .map(d => ({key: d.dataset.n ?? ('m:' + d.dataset.m), b: d.getBoundingClientRect()}));
-      // an arrow HEAD terminating inside a fill is a defect (the connector was aimed at a centre, not stopped on the edge);
-      // a headless stroke crossing the same box is routing. A LANDING means the connector crossed INTO the box — it starts
-      // outside and ends inside. A box that holds both ends is the container the diagram lives in, not the thing pointed at.
-      // Depth tolerance covers the border and its antialiasing.
-      const headHits = [], within = (p, b) => p.x > b.left && p.x < b.right && p.y > b.top && p.y < b.bottom;
-      for (const q of ink) { if (!q.head) continue;
-        for (const [on, p, o] of [[q.head !== 'start', q.pts.at(-1), q.pts[0]], [q.head !== 'end', q.pts[0], q.pts.at(-1)]]) { if (!on) continue;
-          for (const c of chrome) if (!within(o, c.b) && p.x > c.b.left + 4 && p.x < c.b.right - 4 && p.y > c.b.top + 4 && p.y < c.b.bottom - 4) headHits.push({key: q.key, on: c.key});
-        } }
-      // text-over-text: the third shape. A title landing on a caption is the first thing a human sees and no other gate
-      // catches it. Glyph rects again, never boxes — two rows may share a box and still not touch a letter.
-      const inset = x => ({l: x.left, r: x.right, t: x.top + x.height * .15, b: x.bottom - x.height * .15});
-      // a row's client rects are its text LINE boxes — minus the `href` overlay: the inset anchor (a.lk, inset:0) is one more rect at
-      // the row's border-box top, a half-leading above the first line, and counted as a line it made every linked nowrap row "2 lines".
-      const same = (a, b) => Math.abs(a.top - b.top) < .5 && Math.abs(a.left - b.left) < .5 && Math.abs(a.width - b.width) < .5 && Math.abs(a.height - b.height) < .5;
-      const rects = d => { const skip = [...d.querySelectorAll('a.lk')].map(a => a.getBoundingClientRect()), g = document.createRange(); g.selectNodeContents(d); return [...g.getClientRects()].filter(x => !skip.some(s => same(s, x))); };
-      const words = d => rects(d).filter(x => x.width > 1 && x.height > 1).map(inset);
-      const texts = [...document.querySelectorAll('#canvas .el')]
-        .filter(d => (d.textContent || '').trim() && !d.querySelector('svg,img') && d.dataset.over == null)
-        .map(d => ({key: d.dataset.n ?? ('m:' + d.dataset.m), el: d, gl: words(d)}));
-      return [...document.querySelectorAll('#canvas .el')].map(d => {
-        const r = d.getBoundingClientRect(), cv = document.getElementById('canvas').getBoundingClientRect();
-        const o = {text: (d.textContent || '').trim().slice(0, 40), n: d.dataset.n ?? ('m:' + d.dataset.m), problems: [], ...(d.dataset.snapped ? {snapped: 1} : {})};
-        const textual = !!(d.textContent || '').trim() && !d.querySelector('svg,img');
-        if (textual) {
-          const rs = rects(d), tops = [];
-          for (const x of rs) { if (!x.width && !x.height) continue; if (!tops.some(t => Math.abs(t - x.top) < 2)) tops.push(x.top); }
-          const lines = tops.length || 1;
-          if (d.scrollWidth > d.clientWidth + 1) o.problems.push(`overflows its box (${d.scrollWidth}>${d.clientWidth})`);
-          if (d.style.whiteSpace === 'nowrap' && lines > 1) o.problems.push(`nowrap row renders ${lines} lines`);
-          if (d.dataset.lines && +d.dataset.lines !== lines) o.problems.push(`source had ${d.dataset.lines} line(s), renders ${lines}`);
-          o.lines = lines;
-          if (d.dataset.over == null && (ink.length || chrome.length || texts.length > 1)) {
-            // glyph rects carry the line box's leading; inset it so a rule sitting just under a heading is not a "collision".
-            // TWO samples inside = the stroke passes THROUGH the glyphs; one = it merely touches an edge (a leader pointing at a label).
-            const gl = rs.filter(x => x.width > 1 && x.height > 1).map(inset);
-            const hit = ink.filter(q => q.pts.filter(z => gl.some(g => z.x > g.l - q.t && z.x < g.r + q.t && z.y > g.t - q.t && z.y < g.b + q.t)).length >= 2);
-            if (hit.length) o.problems.push('overlapped by ' + hit.map(q => q.key).join(','));
-            // …and text must be wholly inside a container or wholly outside it. Straddling an edge is the other shape a human
-            // sees instantly: a label crossing a tile's border, or hanging half out of the box that is supposed to hold it.
-            const TOL = 2, cross = chrome.filter(c => gl.some(g => {
-              const inside = g.l >= c.b.left - TOL && g.r <= c.b.right + TOL && g.t >= c.b.top - TOL && g.b <= c.b.bottom + TOL;
-              const outside = g.r <= c.b.left + TOL || g.l >= c.b.right - TOL || g.b <= c.b.top + TOL || g.t >= c.b.bottom - TOL;
-              return !inside && !outside;
-            }));
-            if (cross.length) o.problems.push('straddles ' + cross.map(c => c.key).join(','));
-            const onText = texts.filter(t => t.el !== d && t.gl.some(h => gl.some(g => Math.min(g.r, h.r) - Math.max(g.l, h.l) > 2 && Math.min(g.b, h.b) - Math.max(g.t, h.t) > 2)));
-            if (onText.length) o.problems.push('overlaps text ' + onText.map(t => t.key).join(','));
-          }
-          // occlusion: the glyphs are drawn, and something painted LATER (rows paint in `els` order; master below) is on top of them.
-          // Parity's other shapes measure geometry; this one asks the compositor — elementFromPoint at five samples per line rect
-          // (inset corners + centre) — so a tint listed after the kicker is caught and the same tint listed before it is a backdrop.
-          // Only an opaque non-text row counts: another text row is text-over-text above, a transparent box hides nothing. The
-          // anchor overlay is pointer-events:none, so a linked row's own a.lk is never the hit.
-          if (d.dataset.over == null) {
-            const hits = new Map(), opaque = h => { if ((h.textContent || '').trim() && !h.querySelector('svg,img')) return null; if (h.querySelector('img')) return 'img'; if (h.querySelector('svg')) return 'svg';
-              const cs = getComputedStyle(h); return (cs.backgroundImage !== 'none' || !/^rgba\(\d+, \d+, \d+, 0\)$|^transparent$/.test(cs.backgroundColor)) ? 'box' : null; };
-            for (const x of rs) { if (x.width <= 2 || x.height <= 2) continue; const g = inset(x), px = [g.l + 1, (g.l + g.r) / 2, g.r - 1], py = [g.t + 1, (g.t + g.b) / 2, g.b - 1];
-              for (const [sx, sy] of [[0, 0], [2, 0], [1, 1], [0, 2], [2, 2]]) { const h = document.elementFromPoint(px[sx], py[sy]), e = h && h.closest('#canvas .el');
-                if (!e || e === d || e.dataset.over != null || hits.has(e)) continue; const kind = opaque(e); if (kind) hits.set(e, kind); } }
-            o.occluded = [...hits].map(([e, kind]) => ({under: e.dataset.n ?? ('m:' + e.dataset.m), kind}));
-          }
-        }
-        const hh = headHits.filter(x => x.key === o.n);
-        if (hh.length) o.problems.push('arrow lands inside ' + [...new Set(hh.map(x => x.on))].join(',') + ' — terminate it with to:/from:');
-        if (r.right > cv.left + W + 1 || r.bottom > cv.top + H + 1 || r.left < cv.left - 1 || r.top < cv.top - 1) o.problems.push('outside the canvas');
-        if (textual) { const s = deck.slides[i], row = d.dataset.n != null ? s.els[+d.dataset.n] : (deck.master || []).find(m => m.id === d.dataset.m);
-          o.role = row && (row.role || (row.slot && (((deck.layouts || {})[s.layout] || {})[row.slot] || (deck.slots || {})[row.slot] || {}).role)) || undefined; }
-        return o;
-      }).filter(o => o.problems.length || o.occluded?.length); }, [W, H]);
-      // occlusion names both rows so the builder fixes z-order or geometry. It fails — a hidden text row is never a warning
-      const occl = bad.flatMap(o => (o.occluded || []).map(u => ({...u, n: o.n, role: o.role, text: o.text, msg: `slide ${n + 1}: row ${o.n} (${o.role || 'text'} '${o.text}') under row ${u.under} (${u.kind})`})));
-      for (const o of bad) { for (const u of o.occluded || []) o.problems.push(`under row ${u.under} (${u.kind})`); delete o.occluded; }
-      bad = bad.filter(o => o.problems.length);
-      for (const u of occl) res.errors.push('occlusion: ' + u.msg);
-      // a row the type scale changed (imported with _src) may wrap or crowd differently from its source: that is a consequence of the
-      // scale, not a layout fault — reported as scale crowding for a human decision, never a failure. Everything else stays hard.
-      // …only when it renders FEWER lines (collapsed runs); more lines or overflow means the importer's fit cap failed — hard
-      const soft = o => o.snapped && o.problems.every(x => { const m = /^source had (\d+) line\(s\), renders (\d+)/.exec(x); return m && +m[2] < +m[1]; });
-      // the counter's box — right edge, top, height (its width follows the digits) — in canvas px, for the corner check below.
-      // `box` is the same rect as [x, y, w, h], for the AE mask.
-      const cm = await p.evaluate(() => { const c = document.querySelector('#canvas .num'); if (!c) return null; const r = c.getBoundingClientRect(), cv = canvas.getBoundingClientRect();
-        return {right: +(r.right - cv.left).toFixed(1), top: +(r.top - cv.top).toFixed(1), h: +r.height.toFixed(1), box: [r.left - cv.left, r.top - cv.top, r.width, r.height]}; });
-      const counter = cm && {right: cm.right, top: cm.top, h: cm.h};
-      res.parity.push({slide: n + 1, name, pass: !bad.some(o => !soft(o)), rows: bad.filter(o => !soft(o)), crowding: bad.filter(soft), occlusion: occl.map(u => u.msg), counter});
-      const act = path.join(out, `${String(n + 1).padStart(2, '0')}-${name}.png`);
-      await p.locator('#canvas').screenshot({path: act});
-      if (hasMagick) {
-        const ref = [`${name}.png`, `${n + 1}.png`, `slide-${n + 1}.png`].map(f => path.join(refs, f)).find(f => fs.existsSync(f));
-        if (!ref) { res.ae.push({slide: n + 1, name, skipped: 'no reference'}); continue; }
-        // `compare` exits 1 whenever the images differ and prints "AE (normalised)" on stderr — parse the leading number; never fall back to 0
-        const ae = (a, b, args, diff) => { const num = t => { const m = /^\s*(\d+(?:\.\d+)?)/.exec(t); return m ? +m[1] : NaN; }; const argv = ['compare', '-metric', 'AE', ...args, a, b, diff || path.join(out, `${String(n + 1).padStart(2, '0')}-${name}.diff.png`)]; try { return num(execFileSync('magick', argv, {stdio: 'pipe'}).toString()) || 0; } catch (e) { const v = num(e.stderr.toString()); if (Number.isNaN(v)) throw new Error('magick compare: ' + e.stderr.toString().trim()); return v; } };
-        const PAD = 6, mask = (src, dst, rects) => execFileSync('magick', [src, '-fill', 'black', ...rects.flatMap(r => ['-draw', `rectangle ${Math.floor(r[0] - PAD)},${Math.floor(r[1] - PAD)} ${Math.ceil(r[0] + r[2] + PAD)},${Math.ceil(r[1] + r[3] + PAD)}`]), dst]);
-        const pct = v => +(v / (W * H) * 100).toFixed(3), raw = ae(ref, act, ['-fuzz', fuzz]);
-        // imported decks deviate from their mockups ON PURPOSE: chrome is deck-wide (mockup drift normalised away) and rows the type
-        // scale changed were snapped. Mask both — where the engine drew them and where the mockup drew them — and pass on what is left:
-        // everything the engine was asked to reproduce verbatim. Hand-authored decks have no master drift / _src, so all three columns agree.
-        const geo = await p.evaluate(() => {
-          const c = canvas.getBoundingClientRect(), R = d => { const r = d.getBoundingClientRect(); return [r.left - c.left, r.top - c.top, r.width, r.height]; };
-          const chrome = [...canvas.querySelectorAll('.el[data-m]')].map(R), conflicts = [], s = deck.slides[i];
-          s.els.forEach((e, k) => { const d = canvas.querySelector(`[data-n="${k}"]`); if (!d) return; const a = R(d), bx = e._box || a;
-            const u = [Math.min(a[0], bx[0]), Math.min(a[1], bx[1])]; u.push(Math.max(a[0] + a[2], bx[0] + (bx[2] || 0)) - u[0], Math.max(a[1] + a[3], bx[1] + (bx[3] || a[3])) - u[1]);
-            if (e.slot === 'supertitle') chrome.push(u); else if (e._src) conflicts.push(u); });
-          return {chrome, conflicts};
+  let pw; try { pw = await import('playwright'); } catch { res.skipped.push('layout parity + AE: Playwright not installed (npm i -D playwright && npx playwright install chromium)'); }
+  if (pw) {
+    out = out || path.join(path.dirname(path.resolve(file)), 'verify-out');
+    // K5: parity runs in WebKit too, because Safari lays text out differently (ui-monospace is SF Mono there, Menlo in Chromium).
+    // Chromium stays the primary engine: res.parity, the AE diff and the top-level PNGs are its. WebKit adds parity only, under
+    // res.engines.webkit and <out>/webkit/. One browser per engine, reused across every slide.
+    const engines = [['chromium', pw.chromium]];
+    const wkInstalled = (() => { try { return fs.existsSync(pw.webkit.executablePath()); } catch { return false; } })();
+    // 'auto' (the default) runs WebKit on macOS only: Safari exists only on Apple platforms, and Playwright's Linux WebKit resolves
+    // fonts through fontconfig, like neither Safari nor Chromium (the explainer's H1 wrapped there and nowhere a reader looks).
+    // `webkit: true` / --webkit forces it on any OS; false / --no-webkit skips it.
+    if (webkit === false) res.skipped.push('webkit parity: skipped (--no-webkit)');
+    else if (webkit === 'auto' && process.platform !== 'darwin') res.skipped.push('webkit parity: off by default outside macOS, where WebKit fonts are not Safari\'s (--webkit forces it)');
+    else if (!wkInstalled) res.skipped.push('webkit parity: WebKit not installed (npx playwright install webkit)');
+    else engines.push(['webkit', pw.webkit]);
+    const pageErrors = [];
+    for (const [eng, browserType] of engines) {
+      const primary = eng === 'chromium', parity = primary ? res.parity : [], dir = primary ? out : path.join(out, eng);
+      res.engines[eng] = parity; fs.mkdirSync(dir, {recursive: true});
+      const W = deck.w, H = deck.h;
+      const b = await browserType.launch(); const p = await b.newPage({viewport: {width: W + 100, height: H + 100}, deviceScaleFactor: 1});
+      p.on('pageerror', e => pageErrors.push((primary ? '' : eng + ': ') + String(e)));
+      await p.goto(pathToFileURL(path.resolve(file)).href); await p.waitForTimeout(300);
+      await p.evaluate(() => { localStorage.clear(); }); await p.reload(); await p.waitForTimeout(300); // verify the SHIPPED model, not a stale local edit
+      await p.addStyleTag({content: '#canvas{transform:none!important;border:0!important;border-radius:0!important;position:absolute!important;left:0;top:0} .el{animation:none!important}'});
+      const N = deck.slides.length;
+      const repFile = report || path.join(path.dirname(path.resolve(file)), 'model.report.json');
+      const rep = fs.existsSync(repFile) ? JSON.parse(fs.readFileSync(repFile, 'utf8')) : null; // importer's drift report: where the mockup drew its chrome
+      if (fonts) { await p.addStyleTag({url: fonts}); await p.evaluate(() => document.fonts.ready); await p.waitForTimeout(1200); } // TEST-TIME only: pin the AE shot to the reference's webfont build
+      // the counter STAYS VISIBLE: the per-slide PNG is what a builder looks at, and hiding it deck-wide meant parity measured a box
+      // no artifact contained (ROADMAP U6). It is still engine chrome the mockups never had, so the AE diff masks its box on both
+      // images instead — see `geo.chrome` below.
+      const hasMagick = primary && !!refs && (() => { try { execFileSync('magick', ['-version'], {stdio: 'pipe'}); return true; } catch { return false; } })();
+      if (primary && refs && !hasMagick) res.skipped.push('AE: ImageMagick `magick` not on PATH');
+      for (let n = 0; n < N; n++) {
+        await p.evaluate(k => { i = k; sel.clear(); render(); }, n); await p.waitForTimeout(150);
+        const name = deck.slides[n].name || `slide-${n + 1}`;
+        let bad = await p.evaluate(([W, H]) => {
+        // collision: ink drawn THROUGH a text row — the defect a human sees instantly and no other gate catches. The engine marks
+        // its own ink (data-seg = a line, data-cur = a curve, data-ink = a thin rule/dot); a card, tile, bar, donut or backdrop is
+        // something text sits ON, never a collision. A stroke is sampled along its real path, so a diagonal leader line is judged by
+        // where it is drawn and not by its bounding square. `over:1` declares a deliberate overlay.
+        const cvr = document.getElementById('canvas').getBoundingClientRect();
+        const bez = (a, b, c, e, t) => { const u = 1 - t; return u * u * u * a + 3 * u * u * t * b + 3 * u * t * t * c + t * t * t * e; };
+        const ink = [...document.querySelectorAll('#canvas .el[data-seg],#canvas .el[data-cur],#canvas .el[data-ink]')].filter(d => d.dataset.over == null).map(d => {
+          const key = d.dataset.n ?? ('m:' + d.dataset.m), pt = (x, y) => ({x: cvr.left + x, y: cvr.top + y}), pts = [];
+          if (d.dataset.seg) { const [x1, y1, x2, y2, th] = d.dataset.seg.split(',').map(Number);
+            for (let k = 0; k <= 80; k++) pts.push(pt(x1 + (x2 - x1) * k / 80, y1 + (y2 - y1) * k / 80));
+            return {key, pts, t: th / 2 + 1}; }
+          if (d.dataset.cur) { const [x1, y1, c1x, c1y, c2x, c2y, x2, y2, th] = d.dataset.cur.split(',').map(Number);
+            for (let k = 0; k <= 80; k++) { const u = k / 80; pts.push(pt(bez(x1, c1x, c2x, x2, u), bez(y1, c1y, c2y, y2, u))); }
+            return {key, pts, t: th / 2 + 1}; }
+          const b = d.getBoundingClientRect();   // a thin rule or dot: axis-aligned, sample its own footprint
+          // the engine tags any small painted rect; only a RULE (one side <= 4px, or 6:1) or a DOT (both sides <= 12px) is ink.
+          // A 56x22 logo plate or chip is a surface text sits beside, not a stroke through it.
+          const lo = Math.min(b.width, b.height), hi = Math.max(b.width, b.height);
+          if (!(lo <= 4 || hi >= 6 * lo || hi <= 12)) return null;
+          for (let k = 0; k <= 40; k++) { const u = k / 40; pts.push({x: b.left + b.width * u, y: b.top + b.height * u}, {x: b.left + b.width * u, y: b.bottom - b.height * u}); }
+          return {key, pts, t: Math.min(b.width, b.height) / 2 + 1};
+        }).filter(Boolean).map(q => { const d = [...document.querySelectorAll('#canvas .el[data-seg],#canvas .el[data-cur],#canvas .el[data-ink]')].find(x => (x.dataset.n ?? ('m:' + x.dataset.m)) === q.key);
+          return {...q, head: d && d.dataset.head};   // which end carries an arrow, so the gate can ask where the head landed
         });
-        for (const x of (rep?.normalised || [])) if (x.slide === name && x.what === 'rect') geo.chrome.push([x.from[0], x.from[1], x.from[2] === 'auto' ? 400 : x.from[2], x.from[3] || 24]);
-        if (cm) geo.chrome.push(cm.box);   // the page counter is engine chrome no mockup drew: mask it on BOTH images, not hide it on the artifact
-        const masked = geo.chrome.length || geo.conflicts.length, stem = path.join(out, `${String(n + 1).padStart(2, '0')}-${name}`);
-        let noChrome = raw, noBoth = raw;
-        if (masked) {
-          const mr = stem + '.ref-masked.png', ma = stem + '.actual-masked.png';
-          mask(ref, mr, geo.chrome); mask(act, ma, geo.chrome); noChrome = ae(mr, ma, ['-fuzz', fuzz], stem + '.chrome.diff.png');
-          mask(mr, mr, geo.conflicts); mask(ma, ma, geo.conflicts); noBoth = ae(mr, ma, ['-fuzz', fuzz]);
+        // container edges the engine declared. `over:1` opts a row out of both new checks, as it does for stroke-over-text.
+        const chrome = [...document.querySelectorAll('#canvas .el[data-chrome]')].filter(d => d.dataset.over == null)
+          .map(d => ({key: d.dataset.n ?? ('m:' + d.dataset.m), b: d.getBoundingClientRect()}));
+        // an arrow HEAD terminating inside a fill is a defect (the connector was aimed at a centre, not stopped on the edge);
+        // a headless stroke crossing the same box is routing. A LANDING means the connector crossed INTO the box — it starts
+        // outside and ends inside. A box that holds both ends is the container the diagram lives in, not the thing pointed at.
+        // Depth tolerance covers the border and its antialiasing.
+        const headHits = [], within = (p, b) => p.x > b.left && p.x < b.right && p.y > b.top && p.y < b.bottom;
+        for (const q of ink) { if (!q.head) continue;
+          for (const [on, p, o] of [[q.head !== 'start', q.pts.at(-1), q.pts[0]], [q.head !== 'end', q.pts[0], q.pts.at(-1)]]) { if (!on) continue;
+            for (const c of chrome) if (!within(o, c.b) && p.x > c.b.left + 4 && p.x < c.b.right - 4 && p.y > c.b.top + 4 && p.y < c.b.bottom - 4) headHits.push({key: q.key, on: c.key});
+          } }
+        // text-over-text: the third shape. A title landing on a caption is the first thing a human sees and no other gate
+        // catches it. Glyph rects again, never boxes — two rows may share a box and still not touch a letter.
+        const inset = x => ({l: x.left, r: x.right, t: x.top + x.height * .15, b: x.bottom - x.height * .15});
+        // a row's client rects are its text LINE boxes — minus the `href` overlay: the inset anchor (a.lk, inset:0) is one more rect at
+        // the row's border-box top, a half-leading above the first line, and counted as a line it made every linked nowrap row "2 lines".
+        const same = (a, b) => Math.abs(a.top - b.top) < .5 && Math.abs(a.left - b.left) < .5 && Math.abs(a.width - b.width) < .5 && Math.abs(a.height - b.height) < .5;
+        const rects = d => { const skip = [...d.querySelectorAll('a.lk')].map(a => a.getBoundingClientRect()), g = document.createRange(); g.selectNodeContents(d); return [...g.getClientRects()].filter(x => !skip.some(s => same(s, x))); };
+        const words = d => rects(d).filter(x => x.width > 1 && x.height > 1).map(inset);
+        const texts = [...document.querySelectorAll('#canvas .el')]
+          .filter(d => (d.textContent || '').trim() && !d.querySelector('svg,img') && d.dataset.over == null)
+          .map(d => ({key: d.dataset.n ?? ('m:' + d.dataset.m), el: d, gl: words(d)}));
+        return [...document.querySelectorAll('#canvas .el')].map(d => {
+          const r = d.getBoundingClientRect(), cv = document.getElementById('canvas').getBoundingClientRect();
+          const o = {text: (d.textContent || '').trim().slice(0, 40), n: d.dataset.n ?? ('m:' + d.dataset.m), problems: [], ...(d.dataset.snapped ? {snapped: 1} : {})};
+          const textual = !!(d.textContent || '').trim() && !d.querySelector('svg,img');
+          if (textual) {
+            const rs = rects(d), tops = [];
+            for (const x of rs) { if (!x.width && !x.height) continue; if (!tops.some(t => Math.abs(t - x.top) < 2)) tops.push(x.top); }
+            const lines = tops.length || 1;
+            if (d.scrollWidth > d.clientWidth + 1) o.problems.push(`overflows its box (${d.scrollWidth}>${d.clientWidth})`);
+            if (d.style.whiteSpace === 'nowrap' && lines > 1) o.problems.push(`nowrap row renders ${lines} lines`);
+            if (d.dataset.lines && +d.dataset.lines !== lines) o.problems.push(`source had ${d.dataset.lines} line(s), renders ${lines}`);
+            o.lines = lines;
+            if (d.dataset.over == null && (ink.length || chrome.length || texts.length > 1)) {
+              // glyph rects carry the line box's leading; inset it so a rule sitting just under a heading is not a "collision".
+              // TWO samples inside = the stroke passes THROUGH the glyphs; one = it merely touches an edge (a leader pointing at a label).
+              const gl = rs.filter(x => x.width > 1 && x.height > 1).map(inset);
+              const hit = ink.filter(q => q.pts.filter(z => gl.some(g => z.x > g.l - q.t && z.x < g.r + q.t && z.y > g.t - q.t && z.y < g.b + q.t)).length >= 2);
+              if (hit.length) o.problems.push('overlapped by ' + hit.map(q => q.key).join(','));
+              // …and text must be wholly inside a container or wholly outside it. Straddling an edge is the other shape a human
+              // sees instantly: a label crossing a tile's border, or hanging half out of the box that is supposed to hold it.
+              const TOL = 2, cross = chrome.filter(c => gl.some(g => {
+                const inside = g.l >= c.b.left - TOL && g.r <= c.b.right + TOL && g.t >= c.b.top - TOL && g.b <= c.b.bottom + TOL;
+                const outside = g.r <= c.b.left + TOL || g.l >= c.b.right - TOL || g.b <= c.b.top + TOL || g.t >= c.b.bottom - TOL;
+                return !inside && !outside;
+              }));
+              if (cross.length) o.problems.push('straddles ' + cross.map(c => c.key).join(','));
+              const onText = texts.filter(t => t.el !== d && t.gl.some(h => gl.some(g => Math.min(g.r, h.r) - Math.max(g.l, h.l) > 2 && Math.min(g.b, h.b) - Math.max(g.t, h.t) > 2)));
+              if (onText.length) o.problems.push('overlaps text ' + onText.map(t => t.key).join(','));
+            }
+            // occlusion: the glyphs are drawn, and something painted LATER (rows paint in `els` order; master below) is on top of them.
+            // Parity's other shapes measure geometry; this one asks the compositor — elementFromPoint at five samples per line rect
+            // (inset corners + centre) — so a tint listed after the kicker is caught and the same tint listed before it is a backdrop.
+            // Only an opaque non-text row counts: another text row is text-over-text above, a transparent box hides nothing. The
+            // anchor overlay is pointer-events:none, so a linked row's own a.lk is never the hit.
+            if (d.dataset.over == null) {
+              const hits = new Map(), opaque = h => { if ((h.textContent || '').trim() && !h.querySelector('svg,img')) return null; if (h.querySelector('img')) return 'img'; if (h.querySelector('svg')) return 'svg';
+                const cs = getComputedStyle(h); return (cs.backgroundImage !== 'none' || !/^rgba\(\d+, \d+, \d+, 0\)$|^transparent$/.test(cs.backgroundColor)) ? 'box' : null; };
+              for (const x of rs) { if (x.width <= 2 || x.height <= 2) continue; const g = inset(x), px = [g.l + 1, (g.l + g.r) / 2, g.r - 1], py = [g.t + 1, (g.t + g.b) / 2, g.b - 1];
+                for (const [sx, sy] of [[0, 0], [2, 0], [1, 1], [0, 2], [2, 2]]) { const h = document.elementFromPoint(px[sx], py[sy]), e = h && h.closest('#canvas .el');
+                  if (!e || e === d || e.dataset.over != null || hits.has(e)) continue; const kind = opaque(e); if (kind) hits.set(e, kind); } }
+              o.occluded = [...hits].map(([e, kind]) => ({under: e.dataset.n ?? ('m:' + e.dataset.m), kind}));
+            }
+          }
+          const hh = headHits.filter(x => x.key === o.n);
+          if (hh.length) o.problems.push('arrow lands inside ' + [...new Set(hh.map(x => x.on))].join(',') + ' — terminate it with to:/from:');
+          if (r.right > cv.left + W + 1 || r.bottom > cv.top + H + 1 || r.left < cv.left - 1 || r.top < cv.top - 1) o.problems.push('outside the canvas');
+          if (textual) { const s = deck.slides[i], row = d.dataset.n != null ? s.els[+d.dataset.n] : (deck.master || []).find(m => m.id === d.dataset.m);
+            o.role = row && (row.role || (row.slot && (((deck.layouts || {})[s.layout] || {})[row.slot] || (deck.slots || {})[row.slot] || {}).role)) || undefined; }
+          return o;
+        }).filter(o => o.problems.length || o.occluded?.length); }, [W, H]);
+        // occlusion names both rows so the builder fixes z-order or geometry. It fails — a hidden text row is never a warning
+        const occl = bad.flatMap(o => (o.occluded || []).map(u => ({...u, n: o.n, role: o.role, text: o.text, msg: `slide ${n + 1}: row ${o.n} (${o.role || 'text'} '${o.text}') under row ${u.under} (${u.kind})`})));
+        for (const o of bad) { for (const u of o.occluded || []) o.problems.push(`under row ${u.under} (${u.kind})`); delete o.occluded; }
+        bad = bad.filter(o => o.problems.length);
+        for (const u of occl) res.errors.push('occlusion: ' + u.msg);
+        // a row the type scale changed (imported with _src) may wrap or crowd differently from its source: that is a consequence of the
+        // scale, not a layout fault — reported as scale crowding for a human decision, never a failure. Everything else stays hard.
+        // …only when it renders FEWER lines (collapsed runs); more lines or overflow means the importer's fit cap failed — hard
+        const soft = o => o.snapped && o.problems.every(x => { const m = /^source had (\d+) line\(s\), renders (\d+)/.exec(x); return m && +m[2] < +m[1]; });
+        // the counter's box — right edge, top, height (its width follows the digits) — in canvas px, for the corner check below.
+        // `box` is the same rect as [x, y, w, h], for the AE mask.
+        const cm = await p.evaluate(() => { const c = document.querySelector('#canvas .num'); if (!c) return null; const r = c.getBoundingClientRect(), cv = canvas.getBoundingClientRect();
+          return {right: +(r.right - cv.left).toFixed(1), top: +(r.top - cv.top).toFixed(1), h: +r.height.toFixed(1), box: [r.left - cv.left, r.top - cv.top, r.width, r.height]}; });
+        const counter = cm && {right: cm.right, top: cm.top, h: cm.h};
+        parity.push({slide: n + 1, name, pass: !bad.some(o => !soft(o)), rows: bad.filter(o => !soft(o)), crowding: bad.filter(soft), occlusion: occl.map(u => u.msg), counter});
+        const act = path.join(dir, `${String(n + 1).padStart(2, '0')}-${name}.png`);
+        await p.locator('#canvas').screenshot({path: act});
+        if (hasMagick) {
+          const ref = [`${name}.png`, `${n + 1}.png`, `slide-${n + 1}.png`].map(f => path.join(refs, f)).find(f => fs.existsSync(f));
+          if (!ref) { res.ae.push({slide: n + 1, name, skipped: 'no reference'}); continue; }
+          // `compare` exits 1 whenever the images differ and prints "AE (normalised)" on stderr — parse the leading number; never fall back to 0
+          const ae = (a, b, args, diff) => { const num = t => { const m = /^\s*(\d+(?:\.\d+)?)/.exec(t); return m ? +m[1] : NaN; }; const argv = ['compare', '-metric', 'AE', ...args, a, b, diff || path.join(out, `${String(n + 1).padStart(2, '0')}-${name}.diff.png`)]; try { return num(execFileSync('magick', argv, {stdio: 'pipe'}).toString()) || 0; } catch (e) { const v = num(e.stderr.toString()); if (Number.isNaN(v)) throw new Error('magick compare: ' + e.stderr.toString().trim()); return v; } };
+          const PAD = 6, mask = (src, dst, rects) => execFileSync('magick', [src, '-fill', 'black', ...rects.flatMap(r => ['-draw', `rectangle ${Math.floor(r[0] - PAD)},${Math.floor(r[1] - PAD)} ${Math.ceil(r[0] + r[2] + PAD)},${Math.ceil(r[1] + r[3] + PAD)}`]), dst]);
+          const pct = v => +(v / (W * H) * 100).toFixed(3), raw = ae(ref, act, ['-fuzz', fuzz]);
+          // imported decks deviate from their mockups ON PURPOSE: chrome is deck-wide (mockup drift normalised away) and rows the type
+          // scale changed were snapped. Mask both — where the engine drew them and where the mockup drew them — and pass on what is left:
+          // everything the engine was asked to reproduce verbatim. Hand-authored decks have no master drift / _src, so all three columns agree.
+          const geo = await p.evaluate(() => {
+            const c = canvas.getBoundingClientRect(), R = d => { const r = d.getBoundingClientRect(); return [r.left - c.left, r.top - c.top, r.width, r.height]; };
+            const chrome = [...canvas.querySelectorAll('.el[data-m]')].map(R), conflicts = [], s = deck.slides[i];
+            s.els.forEach((e, k) => { const d = canvas.querySelector(`[data-n="${k}"]`); if (!d) return; const a = R(d), bx = e._box || a;
+              const u = [Math.min(a[0], bx[0]), Math.min(a[1], bx[1])]; u.push(Math.max(a[0] + a[2], bx[0] + (bx[2] || 0)) - u[0], Math.max(a[1] + a[3], bx[1] + (bx[3] || a[3])) - u[1]);
+              if (e.slot === 'supertitle') chrome.push(u); else if (e._src) conflicts.push(u); });
+            return {chrome, conflicts};
+          });
+          for (const x of (rep?.normalised || [])) if (x.slide === name && x.what === 'rect') geo.chrome.push([x.from[0], x.from[1], x.from[2] === 'auto' ? 400 : x.from[2], x.from[3] || 24]);
+          if (cm) geo.chrome.push(cm.box);   // the page counter is engine chrome no mockup drew: mask it on BOTH images, not hide it on the artifact
+          const masked = geo.chrome.length || geo.conflicts.length, stem = path.join(out, `${String(n + 1).padStart(2, '0')}-${name}`);
+          let noChrome = raw, noBoth = raw;
+          if (masked) {
+            const mr = stem + '.ref-masked.png', ma = stem + '.actual-masked.png';
+            mask(ref, mr, geo.chrome); mask(act, ma, geo.chrome); noChrome = ae(mr, ma, ['-fuzz', fuzz], stem + '.chrome.diff.png');
+            mask(mr, mr, geo.conflicts); mask(ma, ma, geo.conflicts); noBoth = ae(mr, ma, ['-fuzz', fuzz]);
+          }
+          res.ae.push({slide: n + 1, name, px: raw, pct: pct(raw), pctNoChrome: pct(noChrome), pctNoChromeNoConflict: pct(noBoth), conflictRows: geo.conflicts.length, pass: pct(noBoth) < threshold});
         }
-        res.ae.push({slide: n + 1, name, px: raw, pct: pct(raw), pctNoChrome: pct(noChrome), pctNoChromeNoConflict: pct(noBoth), conflictRows: geo.conflicts.length, pass: pct(noBoth) < threshold});
       }
+      await b.close();
+      // the counter owns the corner: the same box on every slide that shows the footer. A slide that hides the footer (`hide`) draws
+      // the pin and is exempt; `counter:0` draws none. A moved counter — a footer override with its own y, a slide-local nudge — fails parity.
+      const fid = ((deck.master || []).find(m => m && m.footer) || {}).id;
+      // …and the corner it owns is the MARGIN corner. Slide-to-slide agreement alone passed a deck whose counter sat mid-canvas on
+      // every slide (the stretched right-anchored footer above), so the right edge is checked against `w − styles.margin` too.
+      const MGN = typeof (deck.styles || {}).margin === 'number' ? deck.styles.margin : Math.round(W * 0.06);
+      for (const q of parity) if (q.counter && Math.abs(q.counter.right - (W - MGN)) > 1) {
+        q.rows.push({n: 'counter', text: `${q.slide} / ${N}`, problems: [`counter right edge ${q.counter.right} is not on the margin (${W - MGN} = w − styles.margin) — the corner is the counter's on every slide`]}); q.pass = false; }
+      const shown = parity.filter((q, k) => q.counter && !(deck.slides[k].hide || []).includes(fid)), ref = shown[0];
+      for (const q of shown.slice(1)) if (['right', 'top', 'h'].some(k => q.counter[k] !== ref.counter[k])) {
+        q.rows.push({n: 'counter', text: `${q.slide} / ${N}`, problems: [`counter box (right ${q.counter.right}, top ${q.counter.top}, h ${q.counter.h}) differs from slide ${ref.slide} (right ${ref.counter.right}, top ${ref.counter.top}, h ${ref.counter.h}) — the corner is the counter's on every slide`]}); q.pass = false; }
     }
-    await b.close();
-    // the counter owns the corner: the same box on every slide that shows the footer. A slide that hides the footer (`hide`) draws
-    // the pin and is exempt; `counter:0` draws none. A moved counter — a footer override with its own y, a slide-local nudge — fails parity.
-    const fid = ((deck.master || []).find(m => m && m.footer) || {}).id;
-    // …and the corner it owns is the MARGIN corner. Slide-to-slide agreement alone passed a deck whose counter sat mid-canvas on
-    // every slide (the stretched right-anchored footer above), so the right edge is checked against `w − styles.margin` too.
-    const MGN = typeof (deck.styles || {}).margin === 'number' ? deck.styles.margin : Math.round(W * 0.06);
-    for (const q of res.parity) if (q.counter && Math.abs(q.counter.right - (W - MGN)) > 1) {
-      q.rows.push({n: 'counter', text: `${q.slide} / ${N}`, problems: [`counter right edge ${q.counter.right} is not on the margin (${W - MGN} = w − styles.margin) — the corner is the counter's on every slide`]}); q.pass = false; }
-    const shown = res.parity.filter((q, k) => q.counter && !(deck.slides[k].hide || []).includes(fid)), ref = shown[0];
-    for (const q of shown.slice(1)) if (['right', 'top', 'h'].some(k => q.counter[k] !== ref.counter[k])) {
-      q.rows.push({n: 'counter', text: `${q.slide} / ${N}`, problems: [`counter box (right ${q.counter.right}, top ${q.counter.top}, h ${q.counter.h}) differs from slide ${ref.slide} (right ${ref.counter.right}, top ${ref.counter.top}, h ${ref.counter.h}) — the corner is the counter's on every slide`]}); q.pass = false; }
     if (pageErrors.length) res.errors.push('page errors: ' + pageErrors.join(' | '));
     fs.writeFileSync(path.join(out, 'results.json'), JSON.stringify(res, null, 1));
   }
   if (res.parity.some(r => !r.pass)) res.errors.push('layout parity failed on ' + res.parity.filter(r => !r.pass).map(r => r.slide).join(','));
+  for (const [eng, q] of Object.entries(res.engines)) if (eng !== 'chromium' && q.some(r => !r.pass)) res.errors.push(`layout parity failed in ${eng} on ` + q.filter(r => !r.pass).map(r => r.slide).join(','));
   if (res.ae.some(r => r.pass === false)) res.errors.push('AE over threshold on ' + res.ae.filter(r => r.pass === false).map(r => `${r.slide} (${r.pctNoChromeNoConflict ?? r.pct}% after masks)`).join(','));
   res.ok = !res.errors.length;
   return res;
@@ -220,12 +249,13 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
 if (isMain(import.meta.url)) {
   const a = process.argv.slice(2), o = {}; let file = null;
   for (let k = 0; k < a.length; k++) if (a[k].startsWith('--')) o[a[k].slice(2)] = a[k + 1] && !a[k + 1].startsWith('--') ? a[++k] : true; else file = a[k];
-  if (!file) { console.error('usage: node bin/verify.mjs deck.html [--refs dir] [--out dir] [--threshold 0.5] [--fuzz 2%] [--report model.report.json] [--fonts <css url, test-time only>] [--strict]'); process.exit(2); }
-  const r = await verify(file, {refs: o.refs, out: o.out, threshold: o.threshold ? +o.threshold : 0.5, fuzz: o.fuzz || '2%', strict: !!o.strict, report: o.report || null, fonts: o.fonts || null});
+  if (!file) { console.error('usage: node bin/verify.mjs deck.html [--refs dir] [--out dir] [--threshold 0.5] [--fuzz 2%] [--report model.report.json] [--fonts <css url, test-time only>] [--strict] [--webkit | --no-webkit]'); process.exit(2); }
+  const r = await verify(file, {refs: o.refs, out: o.out, threshold: o.threshold ? +o.threshold : 0.5, fuzz: o.fuzz || '2%', strict: !!o.strict, report: o.report || null, fonts: o.fonts || null, webkit: o['no-webkit'] ? false : o.webkit ? true : 'auto'});
   for (const m of r.contract.errors) console.error('ERROR   contract: ' + m);
   for (const m of r.contract.warnings) console.error('warning contract: ' + m);
   for (const l of r.links || []) console.log(`link    slide ${l.slide} ${l.row}: ${l.href}${l.to != null ? ' → ' + (l.to ? 'slide ' + l.to : 'NO SUCH SLIDE') : ''}`);
-  for (const s of r.parity) console.log(`parity  slide ${s.slide} ${s.name}: ${s.pass ? 'PASS' : 'FAIL ' + JSON.stringify(s.rows)}`);
+  for (const [eng, q] of Object.entries(r.engines || {})) for (const s of q) console.log(`parity  ${eng.padEnd(8)} slide ${s.slide} ${s.name}: ${s.pass ? 'PASS' : 'FAIL ' + JSON.stringify(s.rows)}`);
+  for (const m of r.warnings || []) console.error('warning font: ' + m);
   for (const s of r.parity) for (const m of s.occlusion || []) console.log(`occlusion ${m}`);
   for (const s of r.parity) if (s.crowding?.length) console.log(`crowding slide ${s.slide} ${s.name}: ${s.crowding.length} row(s) the scale changed now wrap/crowd differently — ${s.crowding.map(c => JSON.stringify(c.text)).join(', ')}`);
   for (const s of r.ae) console.log(`ae      slide ${s.slide} ${s.name}: ${s.skipped ? 'skipped (' + s.skipped + ')' : (s.pass ? 'PASS' : 'FAIL') + ` raw ${s.pct}% · chrome masked ${s.pctNoChrome}% · + ${s.conflictRows} snapped rows masked ${s.pctNoChromeNoConflict}% (pass column)`}`);
