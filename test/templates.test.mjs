@@ -345,8 +345,10 @@ test('templates: media — a text fill and a media fill on the same item compose
 
 // K11: a logo in a media slot is never under MEDIA_MIN (20px at the 960 cut) and never shrunk by its column: a small `h` is raised,
 // a wide mark grows the column (one column per slide, so the names still align), and the rows under a taller item move down.
+// K23: a wordmark (3:1 or wider) reads like type, so its floor is WORDMARK_MIN (14px); in a box too narrow beside its text it
+// stacks above the text, out of the shared column (test/media-wordmarks.test.mjs).
 import {logoGeom, padOf, plateOf} from '../lib/logo.mjs';
-import {fillErrors} from '../lib/templates.mjs';
+import {fillErrors, WORDMARK, WORDMARK_MIN} from '../lib/templates.mjs';
 import {MEDIA_MIN} from '../lib/layouts.mjs';
 const expanded = (id, fill) => { const d = deck([{template: id, fill}]); expandTemplates(d); return d.slides[0].els; };
 test('templates: media — a logo is at least MEDIA_MIN tall and fills its chip: a small h is raised, a wide mark grows the column', () => {
@@ -355,15 +357,16 @@ test('templates: media — a logo is at least MEDIA_MIN tall and fills its chip:
   for (const id of FILLABLE) for (const aspect of [0.5, 1, 2, 6.8]) for (const h of [undefined, 12]) {
     const fill = {...mediaFill(id, null), ...Object.fromEntries(templateMedia(id).map((e, i) => [e.key, {logo: PNG, aspect: i ? aspect : 1, plate: 'light', ...(h ? {h} : {})}]))};
     const tag = `${id} aspect ${aspect} h ${h}`, why = fillErrors(id, fill);
-    if (why.length) { assert.match(why.join(' '), /needs \d+px beside .* at 20px tall/, tag); assert.equal(aspect, 6.8, tag + ': only a very wide mark is refused'); refused++; continue; }   // a centred box too narrow: refused, never shrunk
+    if (why.length) { assert.match(why.join(' '), /\(6\.8:1 wordmark\) needs \d+px beside .* at 14px tall/, tag); assert.equal(aspect, 6.8, tag + ': only a very wide mark is refused'); refused++; continue; }   // a centred box too narrow: refused, never shrunk
     const logos = expanded(id, fill).filter(r => r.logo != null);
     assert.equal(logos.length, templateMedia(id).length, tag);
     for (const r of logos) {
-      assert.ok(r.h >= MEDIA_MIN, `${tag}: logo ${r.h}px tall, under ${MEDIA_MIN}`);
+      const floor = r.aspect >= WORDMARK ? WORDMARK_MIN : MEDIA_MIN;
+      assert.ok(r.h >= floor, `${tag}: logo ${r.h}px tall, under ${floor}`);
       const g = logoGeom(r), inner = r.h - 2 * padOf(r.h, plateOf(r.plate));
       assert.ok(g.img.h >= inner - 0.01, `${tag}: the column shrank the mark to ${g.img.h.toFixed(1)}px of ${inner}`);
     }
-    const left = logos.filter(r => r.w != null);   // a centred pair has no w: it is centred on its own box, so there is no x to share
+    const left = logos.filter(r => r.w != null && r.name);   // a stacked wordmark carries no name, so it has no column to share   // a centred pair has no w: it is centred on its own box, so there is no x to share
     assert.ok(new Set(left.map(r => r.col)).size <= 1, `${tag}: one column per slide, so the names align`);
   }
 });

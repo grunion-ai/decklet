@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import {logoGeom, plateOf, monogramOf, PLATE_BG} from '../lib/logo.mjs';
+import {logoGeom, plateOf, monogramOf, PLATE_BG, autoCol} from '../lib/logo.mjs';
 import {validate} from '../bin/validate.mjs';
 import {create} from '../bin/create.mjs';
 import {verify} from '../bin/verify.mjs';
@@ -47,6 +47,41 @@ test('geometry: a missing logo draws a monogram chip from the name, or the monog
   assert.equal(m.img, null); assert.deepEqual([m.mono.w, m.mono.h, m.mono.text], [28, 28, 'HA']);
   assert.equal(monogramOf({name: 'Xometry'}), 'X'); assert.equal(monogramOf({monogram: 'XM', name: 'Xometry'}), 'XM');
   assert.equal(m.name.x, 98, 'the name sits at slot + gap, same as a real logo');
+});
+
+// K26: col:'auto' — the column is the painted logo, so the name sits one GAP after the plate's right edge and the caller never
+// re-derives the plate padding (v4's build.mjs did, per row: (h − 2·pad)·aspect + 2·pad)
+test('geometry: col auto hugs the plate, so the name starts one gap after the painted logo', () => {
+  for (const [aspect, plate] of [[4.44, 'light'], [1, 'dark'], [6, 'none']]) {
+    const g = logoGeom({logo: WIDE, aspect, h: 28, col: 'auto', plate});
+    const right = g.plate ? g.plate.x + g.plate.w : g.img.x + g.img.w;
+    assert.ok(Math.abs(g.name.x - (right + 8)) < 1e-9, `aspect ${aspect} ${plate}: name at ${g.name.x}, logo ends ${right}`);
+    assert.ok(Math.abs(g.img.w / g.img.h - aspect) < 1e-9, 'the mark keeps its full height: auto never shrinks it');
+    assert.equal(g.img.h, 28 - 2 * (plate === 'none' ? 0 : Math.max(2, Math.round(28 * 0.14))));
+  }
+  assert.equal(autoCol({logo: '', name: 'Hubb', h: 30, col: 'auto'}), 30, 'a monogram chip: its square');
+  assert.equal(autoCol({logo: WIDE, h: 30, col: 'auto'}), 60, 'no aspect: the 2h default');
+  assert.equal(autoCol({logo: WIDE, aspect: 2, h: 30, col: 80}), 80, 'a stated col stands');
+});
+
+live('runtime: col auto is resolved before validate and create, so the drawn name sits one gap after each logo', {timeout: 40000}, async () => {
+  const auto = LIST.slice(0, 4).map(r => ({...r, col: 'auto'}));
+  const m = deck([{x: 80, y: 48, w: 800, role: 'H1', text: 'Names right after their logos'}, ...auto]);
+  assert.deepEqual(validate(structuredClone(m)).errors, []);
+  const built = create(structuredClone(m)), f = path.join(tmp, 'auto.html'); fs.writeFileSync(f, built.html);
+  const cols = built.deck.slides[0].els.filter(r => r.logo != null).map(r => r.col);
+  assert.ok(cols.every(c => typeof c === 'number' && c > 0), 'create writes the number: ' + cols);
+  await withBrowser(pw.chromium, async b => {
+    const p = await b.newPage(); await p.goto('file://' + f);
+    await p.waitForFunction(() => [...document.querySelectorAll('#canvas img')].every(i => i.complete));
+    const got = await p.evaluate(() => [...document.querySelectorAll('#canvas .el[data-logo]')].map(d => {
+      const k = d.getBoundingClientRect().width / d.offsetWidth, n = d.querySelector('.lname').getBoundingClientRect();
+      const im = d.querySelector('.lplate') || d.querySelector('img'), e = im.getBoundingClientRect();
+      return (n.left - e.right) / k;
+    }));
+    assert.equal(got.length, 4);
+    for (const gap of got) assert.ok(Math.abs(gap - 8) <= 0.5, `name starts ${gap.toFixed(1)}px after the painted logo`);
+  }, {timeout: 30000});
 });
 
 test('validate: a logo row is a first-class row — checked fields, a box for the gap gate, a visual for coverage', () => {
