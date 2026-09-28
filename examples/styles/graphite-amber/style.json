@@ -21,7 +21,7 @@
    "cw": 0.61
   },
   "Supertitle": {
-   "font": "ui-monospace,Menlo,Consolas,monospace",
+   "font": "Menlo,'SF Mono',Consolas,monospace",
    "size": 12,
    "weight": 500,
    "lh": 16,
@@ -67,7 +67,7 @@
    "cw": 0.46
   },
   "Label": {
-   "font": "ui-monospace,Menlo,Consolas,monospace",
+   "font": "Menlo,'SF Mono',Consolas,monospace",
    "size": 11,
    "weight": 500,
    "lh": 14,
