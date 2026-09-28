@@ -140,6 +140,25 @@ test('density: a slide from exec-summary is a summary slide — capped at the su
   const bare = v(deck([{template: 'exec-summary'}], {density: 'reading'}));
   assert.ok(!bare.warnings.some(w => /density carries/.test(w)), 'the sample itself fits the summary cap: ' + bare.warnings.join(' | '));
 });
+// #165: the cap counted the value and axis labels a template graphic draws, so a 26-word note had to shrink to 15 on a
+// slide whose chart already carried the numbers. Those rows carry `graphic: 1` and the word count skips them, before
+// create expands the slide, after it, and in the model read back from the deck file.
+test('density: a template graphic\'s value and axis labels are not words — the cap counts the author\'s text', () => {
+  const data = [{label: 'Farm sensors · 2026', value: 4.2, ring: 5.1, text: '$4.2–5.1B'}, {label: 'Farm software · 2026', value: 2.6, text: '$2.6B'},
+    {label: 'Soil probes · 2026–30', value: 0.6, ring: 1.4, text: '$0.6B → $1.4B'}];
+  const model = n => deck([{template: 'area-bubbles', fill: {t4: lorem(n), data}}], {density: 'reading'});
+  const built = create(model(26)).deck;
+  for (const r of [validate(model(26)), validate(built), validate(JSON.parse(JSON.stringify(built)))])
+    assert.ok(!r.warnings.some(w => /density carries/.test(w)), 'a 26-word note fits beside the circles: ' + r.warnings.join(' | '));
+  const labels = built.slides[0].els.filter(r => r.graphic);
+  assert.deepEqual(labels.map(r => r.text), ['$4.2–5.1B', 'Farm sensors · 2026', '$2.6B', 'Farm software · 2026', '$0.6B → $1.4B', 'Soil probes · 2026–30'],
+    'the value labels and the category labels, nothing the author wrote');
+  const over = v(model(40)).warnings.find(w => /density carries/.test(w));
+  assert.ok(over, 'the cap still binds the author\'s own words');
+  assert.match(over, /this slide has 68/); assert.doesNotMatch(over, /Farm sensors|\$2\.6B/, 'the listing names only the rows it counted');
+  const ranges = create(deck([{template: 'range-bar'}], {density: 'reading'})).deck.slides[0].els.filter(r => r.graphic).map(r => r.text);
+  assert.ok(ranges.includes('2') && ranges.includes('Northwind Research') && ranges.includes('3.8–5.1'), 'axis ticks, row and value labels on range-bar too: ' + ranges);
+});
 test('density: kind is summary or nothing; a speaker summary keeps the speaker cap', () => {
   assert.ok(v(deck([claim({kind: 'sumary'})], {density: 'reading'})).errors.some(e => /kind/.test(e)));
   const rep = densityReport(claim({kind: 'summary'}), LIBRARY, 'speaker', 'summary');
