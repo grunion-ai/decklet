@@ -9,6 +9,7 @@ import os from 'node:os';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {route, markerSize, CGAP} from '../lib/connector.mjs';
 import {TEMPLATE} from '../lib/templates.mjs';
+import {LIBRARY} from '../lib/layouts.mjs';
 import {validate} from '../bin/validate.mjs';
 import {create} from '../bin/create.mjs';
 import {modelOf} from '../bin/verify.mjs';
@@ -91,6 +92,34 @@ test('templates: every process-flow arrow is a connector from box i to box i+1, 
     const v = validate({w: 960, h: 540, styles, slides: [{template: id}]});
     assert.deepEqual(v.errors, [], id);
   }
+});
+
+// #163: an annotation leader (`<p>-leader`, by id or slot) runs to its marker (`<p>-dot`); validate, and so verify, fail an end
+// more than 1px off the marker. The annotated-shot template and layout draw each leader from the callout's edge to its dot.
+test('leaders: every annotated-shot leader runs from its callout\'s edge to its marker, and validate fails one that stops short', () => {
+  const near = (px, py, b) => Math.hypot(Math.max(b.x - px, px - (b.x + b.w), 0), Math.max(b.y - py, py - (b.y + b.h), 0));
+  const ends = r => [[r.x, r.y], r.line];
+  const els = TEMPLATE['annotated-shot'].els;
+  for (const i of [0, 1, 2]) {
+    const L = els.find(r => r.id === `c${i}-leader`), D = els.find(r => r.id === `c${i}-dot`), C = els.find(r => r.id === `c${i}`);
+    assert.ok(L && D && C, `template: callout ${i} names its leader and dot`);
+    assert.ok(ends(L).some(([x, y]) => near(x, y, D) <= 1), `template: leader ${i} reaches its dot`);
+    assert.ok(ends(L).some(([x, y]) => near(x, y, C) <= 1), `template: leader ${i} starts on its callout`);
+  }
+  const lay = LIBRARY['annotated-shot'].slots;
+  for (const n of [1, 2, 3]) {
+    const L = lay[`callout${n}-leader`], D = lay[`callout${n}-dot`], C = lay[`callout${n}`];
+    assert.ok(ends(L).some(([x, y]) => near(x, y, D) <= 1), `layout: leader ${n} reaches its dot`);
+    assert.ok(ends(L).some(([x, y]) => near(x, y, C) <= 1), `layout: leader ${n} starts on its callout`);
+  }
+  assert.deepEqual(validate({w: 960, h: 540, styles, slides: [{template: 'annotated-shot'}]}).errors, []);
+  const dot = {id: 'm-dot', x: 175, y: 215, w: 10, h: 10, radius: 10, bg: 'var(--accent)'};
+  assert.deepEqual(validate(deckOf([dot, {id: 'm-leader', x: 660, y: 220, line: [185, 220], h: 1, bg: 'var(--line)'}])).errors, []);
+  assert.match(validate(deckOf([dot, {id: 'm-leader', x: 660, y: 220, line: [590, 220], h: 1, bg: 'var(--line)'}])).errors.join('\n'),
+    /leader "m-leader" ends 405px from its marker "m-dot"/);
+  const bound = short => ({w: 960, h: 540, styles, slides: [{layout: 'annotated-shot', els: [{slot: 'callout1-dot'}, {slot: 'callout1-leader', ...(short ? {x: 590, line: [650, 220]} : {})}]}]});   // the old 590..650 stub
+  assert.deepEqual(validate(bound()).errors, []);
+  assert.match(validate(bound(1)).errors.join('\n'), /leader "callout1-leader" ends 405px from its marker "callout1-dot"/);
 });
 
 live('live: the rendered connector keeps the gap at both measured edges, follows an auto chip, and a blocked link draws its marker', async () => {
