@@ -280,7 +280,7 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
         <div><kbd>C · Esc</kbd> contact sheet</div>
         <div><kbd>F</kbd> full screen (in-window when the browser refuses · from the sheet, the picked slide)</div>
         <div><kbd>G</kbd> guides + snap (a 16px dot grid · drags, resizes and connector ends snap to this slide's layout lines)</div>
-        <div><kbd>⌘C · ⌘V</kbd> copy · paste slides (in the sheet)</div>
+        <div><kbd>⌘C · ⌘V</kbd> copy · paste rows, onto any slide (in the sheet, slides)</div>
       </div>
       <div class="col"><div class="ph">Rows</div>
         <div><kbd>click</kbd> select · <kbd>⌘ · ⇧</kbd> add to the selection</div>
@@ -1315,6 +1315,9 @@ addEventListener('keydown',e=>{
   if(e.target.isContentEditable){if(e.key==='Escape')e.target.blur();return}
   if(!sheet.hidden){if(sheetKey(e))e.preventDefault();return}
   if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){e.preventDefault();undo();return}
+  if((e.metaKey||e.ctrlKey)&&!e.altKey&&!present()&&!(e.target.closest&&e.target.closest('input,textarea'))){const k=e.key.toLowerCase(); // text being edited keeps the browser's
+    if(k==='c'&&sel.size){e.preventDefault();copyRows();return}
+    if(k==='v'&&rclip){e.preventDefault();pasteRows();return}}
   if(e.key==='Escape'){if(helpmenu.classList.contains('open'))help(false);else if(sel.size){sel.clear();render()}else if(inlineP())setPresent(false);else sheetOpen();return} // Esc leaves in-window present the way it leaves real fullscreen
   if(e.key.startsWith('Arrow')&&sel.size){e.preventDefault();nudgeSel(e.key,e.shiftKey?10:1);return} // a selection owns the arrows: nudge, never navigate
   if(e.key==='ArrowRight'||e.key==='ArrowDown'||e.key===' ')nav(1); // ↓ ≡ → (next), ↑ ≡ ← (prev); guarded above: never while editing or in the sheet
@@ -1328,6 +1331,19 @@ addEventListener('keydown',e=>{
   if(e.key.toLowerCase()==='g'){commitEdit();setSnap(!SNAP)}
   if(e.key.toLowerCase()==='c')sheetOpen();
 });
+// ⌘C ⌘V on the canvas: the selected rows (`clip` stays the sheet's slides). A master, override or slot row copies as the row you
+// see; ids re-stamp where they land; a connector keeps only ends copied with it. Same slide: +16px a paste; another: where they sat.
+let rclip=null;
+function copyRows(){const s=slide(),mr=id=>(deck.master||[]).find(m=>m.id===id);
+  const rows=[...sel].sort((a,b)=>(typeof a==='number')-(typeof b==='number')||(typeof a==='number'?a-b:0)).map(k=>{
+    const el=typeof k==='number'?s.els[k]:mr(k.slice(2)),m=el.override&&mr(el.override)||{},sl=el.slot&&LAY(s)[el.slot]||{},c=dup({...sl,...m,...el});
+    delete c.id;delete c.override;delete c.slot;return {c,o:at(k,res(el,s)),names:typeof k==='number'?[k,el.id,el.override]:[k.slice(2)]}});
+  const find=(list,x)=>x==null?-1:list.findIndex(r=>r.names.includes(x));
+  const keep=rows.filter(r=>!isConn(r.c)||find(rows,r.c.from)>=0&&find(rows,r.c.to)>=0);
+  rclip={sid:s.id,n:0,rows:keep.map(r=>{const b={};for(const p of ['to','from']){const j=find(keep,r.c[p]);if(j>=0)b[p]=j;delete r.c[p]}return {c:r.c,o:r.o,b}})}}
+function pasteRows(){snap();const s=slide(),d=s.id===rclip.sid?16*++rclip.n:0,n0=s.els.length;
+  const cp=rclip.rows.map(r=>{const c=dup(r.c);moveBy(c,r.o,d,d);return c});s.els.push(...cp);stampIds(deck);
+  rclip.rows.forEach((r,j)=>{for(const p in r.b)cp[j][p]=cp[r.b[p]].id});sel.clear();cp.forEach((_,x)=>sel.add(n0+x));save();render()}
 // arrow nudge: EVERY selected row travels by the same fixed delta (1px, ⇧ 10px) so the selection keeps its shape — the keyboard
 // twin of drag through moveBy: connector far ends travel too, master rows fork first. One undo snapshot per burst (an 800ms pause starts a new one).
 let nudgeAt=0;
