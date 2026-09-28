@@ -149,6 +149,7 @@ body.leased #canvas{cursor:not-allowed}
 @media (pointer: coarse){.el .h{width:calc(28px/var(--S,1));height:calc(28px/var(--S,1));right:calc(-14px/var(--S,1));bottom:calc(-14px/var(--S,1));border-width:calc(2px/var(--S,1));border-radius:calc(6px/var(--S,1))}#canvas .h.pt{width:calc(28px/var(--S,1));height:calc(28px/var(--S,1));border-width:calc(2px/var(--S,1))}#hud button{min-height:44px}#tb button{min-height:44px}#tb button.sw{width:44px;height:44px;padding:10px;border:0;background-clip:content-box;box-shadow:inset 0 0 0 10px var(--card),inset 0 0 0 12px var(--line)}#tb button.sw.on{background-clip:content-box;box-shadow:inset 0 0 0 10px var(--card),inset 0 0 0 13px var(--fg)}}
 .mi-chevron-left path { transition: all 0.2s ease-in; } .mi-chevron-left .chevron { transform: translateX(-3px); }.mi-chevron-right path { transition: all 0.2s ease-in; } .mi-chevron-right .chevron { transform: translateX(3px); }.mi-plus .plus { overflow: visible; } .mi-plus .horizontal, .mi-plus .vertical { stroke-dasharray: 14; stroke-dashoffset: 0; transition: stroke-dashoffset 0.15s ease-out; } .mi-plus .plus.animate .horizontal { opacity: 0; animation: mi-plus-lineAnimation 0.3s ease-out forwards; } .mi-plus .plus.animate .vertical { opacity: 0; animation: mi-plus-lineAnimation 0.3s ease-out 0.25s forwards; /* Start shortly before horizontal ends */ } @keyframes mi-plus-lineAnimation { 0% { opacity: 0; stroke-dashoffset: 14; } 15% { opacity: 1; stroke-dashoffset: 14; } 100% { opacity: 1; stroke-dashoffset: 0; } }.mi-layout-grid .layout-grid-icon { overflow: visible; } .mi-layout-grid .layout-grid-icon.animate .top-right-panel { opacity: 0; animation: mi-layout-grid-fadeInTop 0.35s ease-out forwards; } .mi-layout-grid .layout-grid-icon.animate .bottom-right-panel { opacity: 0; animation: mi-layout-grid-fadeInRight 0.35s ease-out 0.1s forwards; } .mi-layout-grid .layout-grid-icon.animate .bottom-left-panel { opacity: 0; animation: mi-layout-grid-fadeInBottom 0.35s ease-out 0.2s forwards; } .mi-layout-grid .layout-grid-icon.animate .top-left-panel { opacity: 0; animation: mi-layout-grid-fadeInLeft 0.35s ease-out 0.3s forwards; } @keyframes mi-layout-grid-fadeInLeft { 0%, 50% { opacity: 0; transform: translateX(-10px); } 80% { opacity: 0.8; transform: translateX(2px); } 100% { opacity: 1; transform: translateX(0); } } @keyframes mi-layout-grid-fadeInRight { 0%, 50% { opacity: 0; transform: translateX(10px); } 80% { opacity: 0.8; transform: translateX(-2px); } 100% { opacity: 1; transform: translateX(0); } } @keyframes mi-layout-grid-fadeInTop { 0%, 50% { opacity: 0; transform: translateY(-10px); } 80% { opacity: 0.8; transform: translateY(2px); } 100% { opacity: 1; transform: translateY(0); } } @keyframes mi-layout-grid-fadeInBottom { 0%, 50% { opacity: 0; transform: translateY(10px); } 80% { opacity: 0.8; transform: translateY(-2px); } 100% { opacity: 1; transform: translateY(0); } }.mi-copy .copy-rect, .mi-copy .copy-path { transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1); } .mi-copy .copy-rect.animate { transform: translate(-3px, -3px); } .mi-copy .copy-path.animate { transform: translate(3px, 3px); } .mi-copy svg { overflow: visible; }.mi-file-down g.animate path { transform: translateY(2px); transition: transform 0.3s cubic-bezier(0.68, -0.6, 0.32, 1.6); } .mi-file-down g path { transform: translateY(0); transition: transform 0.3s cubic-bezier(0.68, -0.6, 0.32, 1.6); }.mi-maximize path { transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); } .mi-maximize .bottom-right { transform: translate(2px, 2px); } .mi-maximize .bottom-left { transform: translate(-2px, 2px); } .mi-maximize .top-right { transform: translate(2px, -2px); } .mi-maximize .top-left { transform: translate(-2px, -2px); } .mi-maximize svg { overflow: visible; }.mi-circle-question-mark .animate-icon { transition: transform 0.5s ease-in-out; } .mi-circle-question-mark .animate-path { transition: transform 0.5s ease-in-out; transform-origin: center; animation: mi-circle-question-mark-rotateAnimation 0.5s ease-in-out; } @keyframes mi-circle-question-mark-rotateAnimation { 0% { transform: rotate(0deg); } 20% { transform: rotate(-10deg); } 40% { transform: rotate(10deg); } 60% { transform: rotate(-10deg); } 100% { transform: rotate(0deg); } }.mi-grip circle { transform-origin: center; transform-box: fill-box; } .mi-grip .dots.animate circle { animation: mi-grip-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both; } .mi-grip .dots.animate circle:nth-child(2), .mi-grip .dots.animate circle:nth-child(4) { animation-delay: 0.05s; } .mi-grip .dots.animate circle:nth-child(3), .mi-grip .dots.animate circle:nth-child(5), .mi-grip .dots.animate circle:nth-child(7) { animation-delay: 0.1s; } .mi-grip .dots.animate circle:nth-child(6), .mi-grip .dots.animate circle:nth-child(8) { animation-delay: 0.15s; } .mi-grip .dots.animate circle:nth-child(9) { animation-delay: 0.2s; } @keyframes mi-grip-pop { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }.mi-save .lid { transition: transform 0.3s cubic-bezier(0.68, -0.6, 0.32, 1.6); } .mi-save .lid.animate { transform: translateY(2px); } .mi-save svg { overflow: visible; }.mi-spell-check .tick { stroke-dasharray: 10; stroke-dashoffset: 0; } .mi-spell-check .tick.animate { animation: mi-spell-check-draw 0.4s ease-out forwards; } @keyframes mi-spell-check-draw { 0% { stroke-dashoffset: 10; opacity: 0; } 20% { opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 1; } }
 #hud .mi-bug svg{transform-origin:50% 60%}#hud .mi-bug svg.animate{animation:mi-bug-wiggle .6s ease-in-out}@keyframes mi-bug-wiggle{25%{transform:rotate(-10deg)}75%{transform:rotate(10deg)}}
+#hud .mi-undo-2 svg.animate{animation:mi-undo-2-back .5s ease-in-out}@keyframes mi-undo-2-back{50%{transform:rotate(-30deg)}}#hud .mi-trash-2 .lid{transition:transform .2s ease-out}#hud .mi-trash-2 .lid.animate{transform:translateY(-2px)}
 @media (prefers-reduced-motion:reduce){.mi svg,.mi svg *{animation:none!important;transition:none!important}}
 /* Report a bug dialog: the deck's own chrome tokens; tiles are labels around hidden radios so the keyboard walks them as a group */
 #bugdlg{margin:auto;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--fg);padding:0;width:min(560px,calc(100vw - 32px));font:13px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;box-shadow:0 12px 40px #0008}
@@ -212,7 +213,7 @@ body.present #canvas{border:0;border-radius:0}
 /* peek HUD: a centred pill, lifted off the bottom edge. Full-width + bottom:0 put the right-hand controls exactly on the
    deck's own page counter (bottom-right, on styles.margin) whenever the canvas fills the screen — a tall 4:5 deck always. */
 body.present.peek #hud{display:flex!important;position:fixed;left:50%;right:auto;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom));width:auto;max-width:calc(100vw - 24px);flex-wrap:nowrap;z-index:10;background:var(--card);border:1px solid var(--line);border-top:1px solid var(--line);border-radius:10px}
-body.present.peek #hud .spacer{display:none}body.present.peek #hud #bug{display:none} /* the peek pill stays narrow enough to clear a carousel's page counter; a report waits for the editor */
+body.present.peek #hud .spacer{display:none}body.present.peek #hud #undobtn,body.present.peek #hud #delbtn{display:none}body.present.peek #hud #bug{display:none} /* the peek pill stays narrow enough to clear a carousel's page counter; a report waits for the editor */
 /* the peek pill must clear a 4:5 deck's bottom-right counter: icon buttons are wider than typed glyphs, so the pill tightens */
 body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{padding:3px 6px}
 /* print: Safari forces US Letter PORTRAIT — it ignores px @page sizes AND the landscape keyword (margin:0 is honored).
@@ -262,6 +263,8 @@ is the editor.</div><div class="el" style="left:calc(var(--u)*60);top:calc(var(-
     </div>
   </div>
   <button id="dup" class="mi mi-copy" data-ms="900" data-tip="Duplicate slide" aria-label="Duplicate slide"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" class="copy-rect" data-mi="animate"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" class="copy-path" data-mi="animate"/><path d="M12 15h6"/><path d="M15 12v6"/></svg></button>
+  <button id="undobtn" class="mi mi-undo-2" data-ms="500" data-tip="Undo · ⌘Z" aria-label="Undo · ⌘Z"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-mi="animate"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/></svg></button>
+  <button id="delbtn" class="mi mi-trash-2" data-ms="400" data-tip="Delete selection · ⌫" aria-label="Delete selection · ⌫"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g class="lid" data-mi="animate"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></g><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
   <button id="snap" class="mi mi-grip" data-ms="600" data-tip="Guides + snap · off · G" aria-label="Guides + snap · off · G" aria-pressed="false"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g class="dots" data-mi="animate"><circle cx="5" cy="5" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="19" cy="5" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="19" r="1"/><circle cx="12" cy="19" r="1"/><circle cx="19" cy="19" r="1"/></g></svg></button>
   <div id="spellwrap">
     <button id="spell" class="mi mi-spell-check" data-ms="500" data-tip="Spellcheck · on" aria-label="Spellcheck · on" aria-pressed="true"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 16 6-12 6 12"/><path d="M8 12h8"/><path d="m16 20 2 2 4-4" class="tick" data-mi="animate"/></svg></button>
@@ -295,7 +298,7 @@ is the editor.</div><div class="el" style="left:calc(var(--u)*60);top:calc(var(-
       </div>
       <div class="col"><div class="ph">File</div>
         <div><kbd>⌘S</kbd> save the file now (asks for it once, then every edit writes itself · Safari: downloads a copy)</div>
-        <div class="dim">Buttons only: add · duplicate · spellcheck · PDF. Spellcheck marks the words the build's dictionary refused, on every slide, with a wavy underline and a red wash; every contact-sheet thumbnail wears its own count. Its red badge opens them: every flagged word on this slide with the build's suggestions — a pick rewrites the row, Ignore in this deck silences the word. A click on a marked word while you are editing its row fixes just that one. The browser's own checker adds the row you type in. Never present, print or PDF.</div>
+        <div class="dim">Buttons only: add · duplicate · spellcheck · PDF. Spellcheck marks the words the build's dictionary refused, on every slide, with a wavy underline and a red wash; every contact-sheet thumbnail wears its own count. Its red badge opens them: every flagged word on this slide with the build's suggestions — a pick rewrites the row, Ignore in this deck silences the word. A click on a marked word while you are editing its row fixes just that one. A deck served by bin/serve.mjs also checks the words you type when you leave the row; opened any other way it checks only what the build checked. The underline under the word you are typing is the browser's own. Never present, print or PDF.</div>
       </div>
     </div>
   </div>
@@ -319,7 +322,7 @@ is the editor.</div><div class="el" style="left:calc(var(--u)*60);top:calc(var(-
   </form>
 </dialog>
 <!-- Flagged words, reachable: the red badge opens this panel for the whole slide; a click on a painted word while its row is
-     being edited opens it for that one occurrence. The suggestions were baked by the build (lib/spell.mjs); nothing is fetched. -->
+     being edited opens it for that one occurrence. The suggestions were baked by the build (lib/spell.mjs), or, on a served deck, answered by bin/serve.mjs for a committed row. -->
 <div id="spellmenu" role="dialog" aria-label="Flagged words" hidden></div>
 <div id="print"></div>
 
@@ -371,6 +374,7 @@ const store={
 //      applyLog(deck,log,true) = the agent wins instead (a hosted page replaying edits the agent never saw onto its rebuild): the
 //      key keeps the agent's value, the entry records it in `yielded`, and no later replay sets that key again.
 // splice: a deck file's source with its DECK and LOG data blocks rewritten; fileHtml() and bin/serve.mjs both write through it.
+//      splice(src,deck,log,spell) also rewrites SPELL (bin/serve.mjs, from its dictionary); a file without that block keeps none.
 // still: slide 1 as static markup, the <noscript> that opens #canvas (#85), for a reader that runs no script (QuickLook,
 //      Spotlight, grep, a repo's HTML preview). create, splice and fileHtml() all write it through stillIn.
 /*EDITS*/
@@ -417,10 +421,10 @@ function applyLog(deck,log,agent){
     if(n<0){R.orphans.push({s:e.s,r:e.r});continue}
     setKeys(s.els[n],e,{s:e.s,r:e.r})}
   return R}
-function splice(src,deck,log){ // markers are built, never written out: a literal would be matched as the data block itself
+function splice(src,deck,log,spell){ // markers are built, never written out: a literal would be matched as the data block itself
   const J=v=>JSON.stringify(v).replace(/<\/script/gi,'<\\/script');
-  const put=(h,m,v)=>{const a='/*'+m+'*/',b='/*/'+m+'*/',x=h.indexOf('='+a),y=x<0?-1:h.indexOf(b,x);if(y<0)throw new Error('marker '+m+' missing');return h.slice(0,x+1+a.length)+J(v)+h.slice(y)};
-  return stillIn(put(put(src,'DECK',deck),'LOG',log),deck)}
+  const put=(h,m,v,soft)=>{const a='/*'+m+'*/',b='/*/'+m+'*/',x=h.indexOf('='+a),y=x<0?-1:h.indexOf(b,x);if(y<0){if(soft)return h;throw new Error('marker '+m+' missing')}return h.slice(0,x+1+a.length)+J(v)+h.slice(y)};
+  const out=put(put(src,'DECK',deck),'LOG',log);return stillIn(spell?put(out,'SPELL',spell,1):out,deck)}
 // Rows wear drawEls's classes and inline styles, every px written as a multiple of --u (one model px in the container units of
 // #canvas), so the stylesheet alone fits the slide to the wrapper; text is escaped as textContent escapes it. Only what needs a browser to measure is missing: connectors and
 // `after` rows are left out, an asset-table image ('#id') keeps its box but not its picture (the table embeds it once, and a
@@ -578,7 +582,7 @@ const PAGE=PAGES[deck.page]?deck.page:'letter',PW=PAGES[PAGE][0];
 document.documentElement.style.cssText=`--W:${W}px;--H:${H}px;--Z:${(PW/W).toFixed(4)};--AR:${(W/H).toFixed(4)}`;
 if(PAGE!=='letter'){const st=document.createElement('style');st.textContent=`@page{size:${PAGES[PAGE][1]};margin:0}`;document.head.appendChild(st)}
 // undo = snapshot stack; snap() BEFORE each mutation; persisted so ⌘Z survives refresh. no redo yet (hydrate() reads it)
-const hsave=()=>store.set(HKEY,JSON.stringify(history));
+const hsave=()=>{store.set(HKEY,JSON.stringify(history));hudEd()};
 const snap=()=>{history.push(JSON.stringify(deck));if(history.length>50)history.shift();hsave()};
 function undo(){if(!history.length)return;deck=JSON.parse(history.pop());hsave();sel.clear();save();render()}
 
@@ -933,7 +937,7 @@ function render(){
   num(canvas,i+1);
   document.body.style.background=present()?(s.bg||'var(--card)'):''; // present backdrop = CURRENT slide's bg
   if(!$('sheet').hidden)sheetRender();
-  placeTb();
+  placeTb();hudEd();
 }
 // counter: the corner is the counter's — its right edge sits on the margin on EVERY slide. A right-anchored footer master carries it
 // inline (inherits its font/baseline/padding); a left-anchored footer keeps its text at the left and the counter detaches to the corner
@@ -1120,7 +1124,9 @@ function commitEdit(){
   if(!t)return;
   const el=slide().els[+t.dataset.n];
   t.onblur=null;t.querySelectorAll('.h,.num').forEach(x=>x.remove());
+  const was=el.html!=null?el.html:el.text;
   if(t.querySelector('*')){el.html=t.innerHTML;delete el.text}else{el.text=t.textContent;delete el.html} // inline marks → html; plain → text
+  if((el.html!=null?el.html:el.text)!==was)spellQueue(t.textContent); // hosted: the row's words go to the server's dictionary
   t.contentEditable=false;save();render();
 }
 function edit(k){
@@ -1223,7 +1229,7 @@ function sheetRender(){
     c.classList.toggle('sel',gsel.has(n));c.classList.remove('lift','drop');c.style.transform='';c.dataset.n=n;num(c.firstChild,n+1);c.lastChild.textContent=n+1;spellBadge(c.querySelector('.spellbad'),c._spell,' on slide '+(n+1));
     return c;
   });
-  grid.replaceChildren(...cells);
+  grid.replaceChildren(...cells);hudEd();
   const sc=`scale(${(cells[0].clientWidth/W).toFixed(4)})`;cells.forEach(c=>c.firstChild.style.transform=sc);
   sheet.scrollTop=top;
   const c=grid.children[i];if(c)c.scrollIntoView({block:'nearest'});
@@ -1323,10 +1329,7 @@ addEventListener('keydown',e=>{
   if(e.key.startsWith('Arrow')&&sel.size){e.preventDefault();nudgeSel(e.key,e.shiftKey?10:1);return} // a selection owns the arrows: nudge, never navigate
   if(e.key==='ArrowRight'||e.key==='ArrowDown'||e.key===' ')nav(1); // ↓ ≡ → (next), ↑ ≡ ← (prev); guarded above: never while editing or in the sheet
   if(e.key==='ArrowLeft'||e.key==='ArrowUp')nav(-1);
-  if((e.key==='Backspace'||e.key==='Delete')&&sel.size){
-    snap();[...sel].filter(k=>typeof k!=='number').forEach(k=>(slide().hide=slide().hide||[]).push(k.slice(2)));
-    [...sel].filter(k=>typeof k==='number').sort((a,b)=>b-a).forEach(n=>slide().els.splice(n,1));sel.clear();save();render();
-  }
+  if((e.key==='Backspace'||e.key==='Delete')&&sel.size)delSel();
   if(e.metaKey||e.ctrlKey||e.altKey)return; // plain letters only: ⌘C stays the browser's copy
   if(e.key.toLowerCase()==='f')fs();
   if(e.key.toLowerCase()==='g'){commitEdit();setSnap(!SNAP)}
@@ -1472,6 +1475,19 @@ $('pdf').onclick=()=>exportPdf().catch(()=>printPdf()); // the rasteriser in eve
 // SPELL0 is {word:[suggestions]} from 0.10.0 and a plain array of words in a 0.7–0.9 deck: both read as one map here.
 const SPELLS=Array.isArray(SPELL0)?Object.fromEntries(SPELL0.map(w=>[String(w).toLowerCase(),[]])):(SPELL0||{});
 const SPELLSET=new Set(Object.keys(SPELLS));
+// live check (issue 86): a deck served by bin/serve.mjs sends the words of a row when its edit commits (debounced; that row only,
+// never per keystroke). The server runs lib/spell.mjs, the build's own code and dictionary, and its answer merges into SPELLS and
+// SPELLSET: the badge, the wash, the sheet counts and the panel take it, and the next PUT writes it into the SPELL block.
+// SPELLON: null until asked · true = the server checks · false = it cannot (no dictionary). Found by a probe of the endpoint,
+// never by host or port. Anything but true = the build's words only (a file:// deck, any other host), and the tip says so.
+let SPELLON=null,spellT=null;const spellQ=new Set(),SPELLTIP=' · words from the last build only; a deck served by bin/serve.mjs also checks what you type';
+const spellAsk=words=>fetch('/__decklet/spell',{method:'POST',headers:{'content-type':'application/json','X-Decklet-Token':HOST.t},body:JSON.stringify({words})}).then(r=>r.ok?r.json():null);
+function spellQueue(text){if(SPELLON!==true)return; // the tokens lib/spell.mjs WORD and spellHits cut
+  for(const w of String(text).match(/\p{L}[\p{L}']*\p{L}|\p{L}/gu)||[])if(w.length<=64)spellQ.add(w);clearTimeout(spellT);spellT=setTimeout(spellSend,300)}
+function spellSend(){const words=[...spellQ].slice(0,500);spellQ.clear();if(!words.length)return; // the server takes 500 words of 64 characters at most
+  spellAsk(words).then(j=>{if(!j||!j.ok)return;for(const w of words){const k=w.toLowerCase();if(!(k in j.flags)){delete SPELLS[k];SPELLSET.delete(k)}}
+    for(const k in j.flags){SPELLS[k]=j.flags[k];SPELLSET.add(k)}paintSpell();
+    if(!sheet.hidden)for(const c of grid.children){c._spell=spellHits(c.firstChild).length;spellBadge(c.querySelector('.spellbad'),c._spell,' on slide '+(+c.dataset.n+1))}},()=>{})}
 const spellSkip=()=>new Set(((deck.spell&&deck.spell.ignore)||[]).map(w=>String(w).toLowerCase())); // the model key the build honours — the panel appends to it live
 const smenu=$('spellmenu'),sbad=$('spellbad');let spellAnchor=null; // the panel and its door; spellAnchor = the rect it points at, kept so a repaint holds its place
 // spellHits(root) → every flagged token under root as [textNode, index, length]; the canvas paints them, the sheet counts them
@@ -1483,7 +1499,7 @@ const spellHits=root=>{const out=[];if(!SPELLSET.size)return out;const skip=spel
 const spellBadge=(b,k,where)=>{b.hidden=!(SPELL&&!present()&&k>0);b.textContent=k;const s=k+' flagged word'+(k===1?'':'s')+where;b.setAttribute('aria-label',s);if(b.dataset.tip!=null)b.dataset.tip=s+' · click for the list'};
 function paintSpell(){const hits=SPELL&&!present()?spellHits(canvas):[];spellBadge($('spellbad'),hits.length,' on this slide');
   if(smenu&&!smenu.hidden){if((!SPELL||present())||(smenu.dataset.scope==='slide'&&!spellPanel(null)))spellClose();else if(smenu.dataset.scope==='slide')spellPlace(spellAnchor)} // an open panel follows the repaint: counts, words, and its place
-  const b=$('spell');b.dataset.tip='Spellcheck · '+(SPELL?'on':'off')+(hits.length?' · '+hits.length+' flagged on this slide':'');b.setAttribute('aria-label',b.dataset.tip);
+  const b=$('spell');b.dataset.tip='Spellcheck · '+(SPELL?'on':'off')+(hits.length?' · '+hits.length+' flagged on this slide':'')+(SPELL&&SPELLON!==true?SPELLTIP:'');b.setAttribute('aria-label',b.dataset.tip);
   if(!window.CSS||!CSS.highlights)return;if(!hits.length){CSS.highlights.delete('spell');return}
   const h=new Highlight();for(const [n,a,l] of hits){const r=new Range();r.setStart(n,a);r.setEnd(n,a+l);h.add(r)}CSS.highlights.set('spell',h)}
 const setSpell=on=>{SPELL=on;store.set(SKEY,on?'1':'0');const b=$('spell');b.classList.toggle('off',!on);b.setAttribute('aria-pressed',on);render()};
@@ -1603,6 +1619,18 @@ $('dup').onclick=()=>{commitEdit();menu(false);
   if(!sheet.hidden){snap();const src=[...gsel].sort((a,b)=>a-b);if(!src.length)return;const at=src[src.length-1]+1;const cp=src.map(n=>{const c=dup(deck.slides[n]);delete c.id;return c});deck.slides.splice(at,0,...cp);gsel=new Set(cp.map((_,x)=>at+x));ganchor=i=at;save();sheetRender();return}
   snap();const s=slide();
   const c=dup(s);delete c.id;deck.slides.splice(i+1,0,c);i=i+1;sel.clear();save();render()};
+// undo · delete as buttons (#167): a phone has no ⌘Z or ⌫, so each button runs what its key runs in the same place: the browser's
+// own text undo / delete while a row is being edited (mousedown keeps its focus, as the toolbar does), sheetKey() in the sheet,
+// undo() / delSel() on the canvas. hudEd() disables each exactly when its key would do nothing; never in the present-mode pill.
+function delSel(){
+  snap();[...sel].filter(k=>typeof k!=='number').forEach(k=>(slide().hide=slide().hide||[]).push(k.slice(2)));
+  [...sel].filter(k=>typeof k==='number').sort((a,b)=>b-a).forEach(n=>slide().els.splice(n,1));sel.clear();save();render();
+}
+function hudEd(){$('undobtn').disabled=!history.length;$('delbtn').disabled=$('sheet').hidden?!sel.size:!(gsel.size&&deck.slides.length>1)} // the sheet never deletes its last slide
+for(const b of ['undobtn','delbtn'])$(b).addEventListener('mousedown',e=>e.preventDefault());
+$('undobtn').onclick=()=>{if(document.activeElement.isContentEditable)document.execCommand('undo');else if(!sheet.hidden)sheetKey({key:'z',metaKey:true});else undo()};
+$('delbtn').onclick=()=>{if(document.activeElement.isContentEditable)document.execCommand('delete');else if(!sheet.hidden)sheetKey({key:'Delete'});else if(sel.size)delSel()};
+grid.addEventListener('mousedown',hudEd);grid.addEventListener('pointerdown',hudEd); // a sheet click selects without a re-render
 // fileHtml(): THIS document with the CURRENT model and log baked into their literals, chrome state stripped — the
 // file an agent reads (bin/edits.mjs, create --from) and the copy that opens anywhere without browser storage.
 function fileHtml(){
@@ -1733,6 +1761,7 @@ if(LS)settle();else{autosave('busy','Loading…');idbLoad().then(settle)}
 // hosted: probe, then listen. Edits journaled while the host was away (or a working copy the served file does not match) go now.
 if(HOST)fetch('/__decklet',{headers:{'X-Decklet-Token':HOST.t},cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{if(!j||!j.ok)return;
   HOST.on=true;fileH=HOST;HOST.name=j.name||'';if((j.rev||'')!==HOST.rev)HOST.stale=1;else if(base!==JSON.stringify(DECK))HOST.force=1;
+  spellAsk([]).then(j=>{SPELLON=!!(j&&j.ok);paintSpell()},()=>{SPELLON=false;paintSpell()}); // the live-check probe: an old server 404s, one without a dictionary 503s
   const es=new EventSource('/__decklet/events?t='+encodeURIComponent(HOST.t));
   es.addEventListener('changed',e=>{let v;try{v=JSON.parse(e.data).rev||''}catch{return}if(v===HOST.rev)return;HOST.stale=1;
     if(!LEASE)return writeBack();LEASE.chg=Date.now();autosave('agent-edit');clearTimeout(agT);agT=setTimeout(()=>autosave('agent'),1e4)}); // leased: rebase at checkin, not per write

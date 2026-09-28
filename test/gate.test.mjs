@@ -94,7 +94,7 @@ test('roles are the type system: eight complete roles in the template, locked ke
 test('HUD contract is a set: prev · next · autosave · + (Text/Box/Slide) · contact sheet · PDF · fullscreen · shortcuts', () => {
   assert.match(tpl, /<button id="prev" [^>]*aria-label="Previous slide · ←"><svg [^>]*><path [^>]*\/><\/svg><\/button>/, 'prev is icon-only'); assert.match(tpl, /<button id="next" [^>]*aria-label="Next slide · →"><svg [^>]*><path [^>]*\/><\/svg><\/button>/, 'next is icon-only');
   const ids = [...tpl.matchAll(/<div id="hud">[\s\S]*?<\/div>\n<div id="sheet"/g)][0][0].match(/id="([^"]+)"/g).map(s => s.slice(4, -1)).filter(s => s !== 'hud' && s !== 'sheet').sort();
-  assert.deepEqual(ids, ['add-box', 'add-text', 'addbtn', 'addmenu', 'addwrap', 'autosave', 'bug', 'dup', 'fs', 'grid-btn', 'help', 'helpmenu', 'helpwrap', 'next', 'pdf', 'prev', 'sadd', 'savebad', 'snap', 'spell', 'spellbad', 'spellwrap']);
+  assert.deepEqual(ids, ['add-box', 'add-text', 'addbtn', 'addmenu', 'addwrap', 'autosave', 'bug', 'delbtn', 'dup', 'fs', 'grid-btn', 'help', 'helpmenu', 'helpwrap', 'next', 'pdf', 'prev', 'sadd', 'savebad', 'snap', 'spell', 'spellbad', 'spellwrap', 'undobtn']);
   assert.deepEqual([...tpl.match(/<div id="hud">[\s\S]*?\n<\/div>/)[0].matchAll(/id="(prev|next|autosave|addbtn|dup|grid-btn|pdf|fs|help)"/g)].map(m => m[1]), ['prev', 'next', 'autosave', 'addbtn', 'dup', 'pdf', 'grid-btn', 'fs', 'help'], 'save state (the dot) leads the cluster, then edit, file, view; ⓘ rightmost');
   assert.match(tpl, /<button id="help" class="mi mi-circle-question-mark"[^>]*aria-label="Shortcuts"[^>]*><svg /, 'the shortcuts control is the question-mark icon'); assert.match(tpl, /<kbd>← →<\/kbd> previous · next/, 'popover nav line'); assert.match(tpl, /<button id="sheet-back" title="Back to slide \(Esc\)" aria-label="Back to slide \(Esc\)">← Back<\/button>/, 'contact sheet ← Back');
   assert.match(tpl, /if\(\(e\.metaKey\|\|e\.ctrlKey\)&&e\.key\.toLowerCase\(\)==='s'\)\{e\.preventDefault\(\);saveFile\(\);return\}/, '⌘S saves THE FILE (write-back), keyboard only'); assert.doesNotMatch(tpl, /id="save"/);
@@ -190,7 +190,7 @@ test('shortcuts popover cannot drift from the keybindings', () => {
 
 // ── 2c′. the HUD glyphs are the moving Lucide set: one svg per control, played once, never looped ──
 test('HUD icons: every control is a Lucide shape wearing its motion parts; no unicode glyph survives; nothing loops', () => {
-  for (const id of ['prev', 'next', 'autosave', 'addbtn', 'dup', 'grid-btn', 'spell', 'snap', 'pdf', 'fs', 'help']) {
+  for (const id of ['prev', 'next', 'autosave', 'addbtn', 'dup', 'undobtn', 'delbtn', 'grid-btn', 'spell', 'snap', 'pdf', 'fs', 'help']) {
     assert.match(tpl, new RegExp(`<button id="${id}" class="mi mi-[\\w-]+" data-ms="\\d+"[^>]*><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"[^>]*>[^]*?data-mi="[^"]+"[^]*?<\\/svg>(?:<span id="[a-z]+" role="status" hidden><\\/span>)?<\\/button>`), `${id} draws a Lucide shape on the 24 grid with its motion parts`);
   }
   assert.doesNotMatch(tpl, /<button id="(prev|next|addbtn|grid-btn|pdf|fs|help)"[^>]*>[‹›+⊞⤒⤓⛶ⓘ]<\/button>/, 'no control is a typed glyph any more');
