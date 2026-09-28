@@ -285,7 +285,7 @@ test('templates: media — no template row carries the item marker, and a templa
   for (const t of TEMPLATES) assert.ok(!t.els.some(r => 'item' in r), t.id + ': the item marker never reaches a deck');
   for (const id of LIST) {
     const d = deck([{template: id}]); expandTemplates(d);
-    assert.deepEqual(d.slides[0].els, scale(TEMPLATE[id].els, 1), id + ': unchanged without media');
+    assert.deepEqual(d.slides[0].els.map(({graphic, ...r}) => r), scale(TEMPLATE[id].els, 1), id + ': unchanged without media (a graphic label only gains its `graphic` mark, #165)');
   }
 });
 

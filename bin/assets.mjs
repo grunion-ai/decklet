@@ -8,7 +8,8 @@
 // logo tries, in order: a local --file, simple-icons (jsDelivr), the company site's header logo and icon links, Google's
 // s2 favicon, and last a monogram. It never fails for want of a source; the manifest row's `source` says which one landed,
 // a monogram row carries fallback:true, and the run ends with a "missed:" list on stderr (exit 1 under --strict). A site
-// or site-icon candidate whose fetch redirects off the company domain (K25: altair.com → siemens.com) is refused, and a
+// or site-icon candidate whose fetch lands off the company domain (K25: altair.com → siemens.com) is refused, unless the
+// page links it from its own header or nav, whose host then counts too (#155: a first-party CDN), and a
 // candidate that renders as one near-uniform colour (K25: a currentColor mark painting a flat square) is refused as blank.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -31,14 +32,14 @@ function writeRow(dir, row, bytes) {
 }
 
 const OFFLINE = process.env.DECKLET_ASSETS_OFFLINE === '1'; // tests: every network source fails, so a logo falls back
-// allowHost: the candidate's fetch must land, after every redirect, on that domain or a subdomain of it (K25)
+// allowHost: the candidate's fetch must land, after every redirect, on one of these domains or a subdomain of one (K25)
 async function get(url, {allowHost} = {}) {
   if (OFFLINE && !url.startsWith('data:')) throw new Error('offline');
   if (url.startsWith('data:')) { const [head, body] = url.split(','); return Buffer.from(head.endsWith(';base64') ? body : decodeURIComponent(body), head.endsWith(';base64') ? 'base64' : 'utf8'); }
   const r = await fetch(url, {headers: {'user-agent': UA}, redirect: 'follow', signal: AbortSignal.timeout(15000)});
   if (allowHost) {
     const finalHost = new URL(r.url || url).hostname;
-    if (!sameOrSubdomain(finalHost, allowHost)) throw new Error(`redirect host mismatch: ${url} landed on ${finalHost}, not ${allowHost} or a subdomain`);
+    if (!allowHost.some(h => sameOrSubdomain(finalHost, h))) throw new Error(`redirect host mismatch: ${url} landed on ${finalHost}, not ${allowHost.join(' or ')} or a subdomain`);
   }
   if (!r.ok) throw new Error(`${r.status} ${url}`);
   return Buffer.from(await r.arrayBuffer());
@@ -111,6 +112,13 @@ export async function logo(input, {out, name, domain, file} = {}) {
     catch (e) { tried.push(`${source}: ${e.message.slice(0, 120)}`); }
     return null;
   };
+  // no source landed: a monogram, unless the manifest already holds a real logo under this key (#154: a failed retry under a
+  // second domain replaced a working entry). Then that row and its file stay, and the caller reports the retry as kept.
+  const fallback = () => {
+    let prev; try { prev = JSON.parse(fs.readFileSync(path.join(out, 'manifest.json'), 'utf8')).find(r => r.name === key); } catch {}
+    if (prev && prev.source !== 'monogram') return {row: prev, tried, kept: true};
+    return {row: writeRow(out, {name: key, file: `${key}.svg`, source: 'monogram', aspect: 1, plate: 'any', fallback: true}, monogram(input)), tried};
+  };
   if (file) { // an explicit local import: normalise it the same way, or fall straight to the monogram (K25)
     const fmt = fmtOfFile(file);
     if (!fmt) tried.push(`file: unsupported extension ${path.extname(file) || '(none)'} — use .svg or .png`);
@@ -121,7 +129,7 @@ export async function logo(input, {out, name, domain, file} = {}) {
         tried.push(`file unusable (blank or unparseable): ${file}`);
       } catch (e) { tried.push(`file: ${e.message.slice(0, 120)}`); }
     }
-    return {row: writeRow(out, {name: key, file: `${key}.svg`, source: 'monogram', aspect: 1, plate: 'any', fallback: true}, monogram(input)), tried};
+    return fallback();
   }
   const slugs = [...new Set([slugOf(isDomain(input) ? dom.split('.')[0] : input), slugOf(dom.replace(/\.\w+$/, ''))])];
   for (const s of slugs) { const r = await attempt(`https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/${s}.svg`, 'svg', 'simple-icons'); if (r) return {row: r, tried}; }
@@ -135,12 +143,15 @@ export async function logo(input, {out, name, domain, file} = {}) {
       const cands = logoCandidates(html, site, [input, dom.split('.')[0]]);
       if (!cands.length) tried.push(`site: no logo candidates on ${site} (HTTP ${res.status})`);
       for (const c of cands) {
-        const r = await attempt(c.url, c.fmt, c.kind, c.url.startsWith('data:') ? site + '#inline-svg' : c.url, {allowHost: dom}); if (r) return {row: r, tried};
+        // a logo the page links from its own header or nav vouches for its host (#155: Xometry's mark on its Prismic CDN);
+        // a redirect from there to anywhere else is still refused
+        const allowHost = c.own && !c.url.startsWith('data:') ? [...new Set([dom, new URL(c.url).hostname])] : [dom];
+        const r = await attempt(c.url, c.fmt, c.kind, c.url.startsWith('data:') ? site + '#inline-svg' : c.url, {allowHost}); if (r) return {row: r, tried};
       }
     }
   } catch (e) { tried.push(`site: ${e.message.slice(0, 120)}`); }
   const s2 = await attempt(`https://www.google.com/s2/favicons?domain=${dom}&sz=256`, 'png', 's2'); if (s2) return {row: s2, tried};
-  return {row: writeRow(out, {name: key, file: `${key}.svg`, source: 'monogram', aspect: 1, plate: 'any', fallback: true}, monogram(input)), tried};
+  return fallback();
 }
 
 export async function shot(url, {out, crop, width = 1440, wait = 800} = {}) {
@@ -180,10 +191,12 @@ if (isMain(import.meta.url)) {
     } else if (cmd === 'logo') {
       const missed = [];
       for (const a of args) {
-        const {row, tried} = await logo(a, o);
+        const {row, tried, kept} = await logo(a, o);
         for (const t of tried) console.error('  skipped ' + t);
+        if (kept) console.error(`kept: ${a} (retry found no logo; the earlier ${row.source} entry ${row.file} stays)`);
         if (row.fallback) missed.push(a);
         console.log(JSON.stringify(row));
+        if (kept && o.strict) process.exitCode = 1;
       }
       if (missed.length) {
         console.error(`missed: ${missed.join(', ')} (monogram fallback; pass --domain or supply the file)`);

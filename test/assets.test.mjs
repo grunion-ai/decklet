@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
-import {execFileSync, execFile} from 'node:child_process';
+import {execFileSync, execFile, spawnSync} from 'node:child_process';
 import {promisify} from 'node:util';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {slugOf, domainOf, pathBBox, svgBBox, fitViewBox, svgPlate, decodePng, pngPlate, logoCandidates,
@@ -335,6 +335,29 @@ test('cli logo --file wires through the CLI arg parser', () => {
   assert.equal(m[0].source, 'file');
 });
 
+test('cli logo: a failed retry keeps the earlier real logo and reports the retry, never a monogram over it (#154)', () => {
+  const out = path.join(tmp, 'retry'), env = {...process.env, DECKLET_ASSETS_OFFLINE: '1'};
+  execFileSync(process.execPath, [cli, 'logo', 'MISUMI', '--file', wordmarkSvg, '--out', out], {stdio: 'pipe'});
+  const before = fs.readFileSync(path.join(out, 'misumi.svg'), 'utf8'), rowBefore = JSON.parse(fs.readFileSync(path.join(out, 'manifest.json'), 'utf8'))[0];
+  assert.equal(rowBefore.source, 'file');
+  // the retry under a second domain finds nothing (offline): the working entry and its file stay
+  const r = spawnSync(process.execPath, [cli, 'logo', 'MISUMI', '--domain', 'misumi.co.jp', '--out', out], {encoding: 'utf8', env});
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(out, 'manifest.json'), 'utf8')), [rowBefore], 'the manifest row is unchanged');
+  assert.equal(fs.readFileSync(path.join(out, 'misumi.svg'), 'utf8'), before, 'the logo file is not overwritten by a monogram');
+  assert.deepEqual(JSON.parse(r.stdout.trim()), rowBefore, 'the printed row is the kept one');
+  assert.match(r.stderr, /kept: MISUMI \(retry found no logo; the earlier file entry misumi\.svg stays\)/);
+  assert.doesNotMatch(r.stderr, /missed:/);
+  // a failed --file retry keeps it too, and --strict still exits 1 on the failed retry
+  const s = spawnSync(process.execPath, [cli, 'logo', 'MISUMI', '--file', path.join(fixtures, 'does-not-exist.svg'), '--out', out, '--strict'], {encoding: 'utf8', env});
+  assert.equal(s.status, 1, s.stderr);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(out, 'manifest.json'), 'utf8'))[0].source, 'file');
+  // a fallback may still replace a fallback
+  execFileSync(process.execPath, [cli, 'logo', 'Hexagon', '--out', out], {stdio: 'pipe', env});
+  const again = spawnSync(process.execPath, [cli, 'logo', 'Hexagon', '--out', out], {encoding: 'utf8', env});
+  assert.match(again.stderr, /missed: Hexagon/);
+});
+
 // a minimal fetch mock: home page + one absolute site candidate, offline and deterministic (no real network, no TLS)
 function mockFetch(routes) {
   return async (url) => {
@@ -345,21 +368,60 @@ function mockFetch(routes) {
 }
 const notFound = () => ({ok: false, status: 404, url: '', text: async () => '', arrayBuffer: async () => new ArrayBuffer(0)});
 const wordmarkSvgText = fs.readFileSync(wordmarkSvg, 'utf8');
+// a fetch that answers with the wordmark SVG after landing on `landed` (a redirect when it differs from the request)
+const svgAt = landed => async () => ({ok: true, status: 200, url: landed, arrayBuffer: async () => new TextEncoder().encode(wordmarkSvgText).buffer});
 
 test('logo refuses a site candidate whose fetch redirects off the company domain (K25 Altair→Siemens)', async (t) => {
   const real = globalThis.fetch;
   t.after(() => { globalThis.fetch = real; });
-  const home = `<header><a href="/"><img src="https://cdn.attacker.test/logo.svg" alt="Acme logo"></a></header>`;
+  // the header links two logos: one on the company domain, one on a CDN the header names (#155 makes that host first-party);
+  // both fetches redirect to another company's host, and both are refused
+  const home = `<header><a href="/"><img src="https://acme-redirect.test/logo.svg" alt="Acme logo"></a>
+    <nav><img src="https://acme.cdn.example.test/brand/logo.svg" alt="Acme"></nav></header>`;
   globalThis.fetch = mockFetch([
     ['https://cdn.jsdelivr.net/', notFound],
+    ['https://acme-redirect.test/logo.svg', svgAt('https://cdn.attacker.test/logo.svg')],
+    ['https://acme.cdn.example.test/brand/logo.svg', svgAt('https://siemens.test/logo.svg')],
     ['https://acme-redirect.test', async () => ({ok: true, status: 200, url: 'https://acme-redirect.test/', text: async () => home})],
-    ['https://cdn.attacker.test/logo.svg', async () => ({ok: true, status: 200, url: 'https://cdn.attacker.test/logo.svg', arrayBuffer: async () => new TextEncoder().encode(wordmarkSvgText).buffer})],
     ['https://www.google.com/s2/', notFound],
   ]);
   const out = path.join(tmp, 'redirect-candidate');
   const {row, tried} = await logo('Acme', {out, domain: 'acme-redirect.test'});
-  assert.equal(row.source, 'monogram', 'the off-domain candidate is refused, and nothing else lands');
-  assert.ok(tried.some(x => /redirect host mismatch/.test(x)), tried.join(' | '));
+  assert.equal(row.source, 'monogram', 'the off-domain candidates are refused, and nothing else lands');
+  assert.equal(tried.filter(x => /redirect host mismatch/.test(x)).length, 2, tried.join(' | '));
+  assert.ok(tried.some(x => /cdn\.example\.test\/brand\/logo\.svg landed on siemens\.test/.test(x)), 'the vouched CDN may not redirect away: ' + tried.join(' | '));
+});
+
+test('logo accepts a first-party CDN its own header links to, and still refuses a third-party host outside it (#155, Xometry)', async (t) => {
+  const real = globalThis.fetch;
+  t.after(() => { globalThis.fetch = real; });
+  // Xometry's header logo lives on its Prismic CDN; a campaign logo on its own domain ranks below it
+  const home = `<header><a href="/"><img src="https://acme-marketing.cdn.cms.test/acme-logo.svg" alt="Acme"></a></header>
+    <main><img src="https://assets.acme-cdn.test/images/acme-go-green.svg" alt="Acme Go Green Initiative"></main>`;
+  globalThis.fetch = mockFetch([
+    ['https://cdn.jsdelivr.net/', notFound],
+    ['https://acme-marketing.cdn.cms.test/acme-logo.svg', svgAt('https://acme-marketing.cdn.cms.test/acme-logo.svg')],
+    ['https://assets.acme-cdn.test/', svgAt('https://assets.acme-cdn.test/images/acme-go-green.svg')],
+    ['https://acme-cdn.test', async () => ({ok: true, status: 200, url: 'https://www.acme-cdn.test/', text: async () => home})],
+    ['https://www.google.com/s2/', notFound],
+  ]);
+  const {row} = await logo('Acme', {out: path.join(tmp, 'first-party-cdn'), domain: 'acme-cdn.test'});
+  assert.equal(row.source, 'site');
+  assert.equal(row.url, 'https://acme-marketing.cdn.cms.test/acme-logo.svg', 'the header logo lands, not the campaign logo');
+
+  // the same foreign host, linked only from the page body and an icon link: third-party, refused
+  const body = `<header><nav><a href="/about">About</a></nav></header>
+    <main><img src="https://cdn.other-co.test/acme-logo.svg" alt="Acme logo"></main>
+    <link rel="icon" type="image/svg+xml" href="https://cdn.other-co.test/icon.svg">`;
+  globalThis.fetch = mockFetch([
+    ['https://cdn.jsdelivr.net/', notFound],
+    ['https://cdn.other-co.test/', url => svgAt(url)()],
+    ['https://acme-cdn.test', async () => ({ok: true, status: 200, url: 'https://acme-cdn.test/', text: async () => body})],
+    ['https://www.google.com/s2/', notFound],
+  ]);
+  const {row: row2, tried} = await logo('Acme', {out: path.join(tmp, 'third-party-host'), domain: 'acme-cdn.test'});
+  assert.equal(row2.source, 'monogram');
+  assert.equal(tried.filter(x => /redirect host mismatch: .*landed on cdn\.other-co\.test, not acme-cdn\.test/.test(x)).length, 2, tried.join(' | '));
 });
 
 test('logo refuses the whole site when the home page itself redirects off-domain, but accepts a real subdomain', async (t) => {
