@@ -12,7 +12,8 @@ import {promisify} from 'node:util';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {slugOf, domainOf, pathBBox, svgBBox, fitViewBox, svgPlate, decodePng, pngPlate, logoCandidates,
         upsertManifest, monogram, initials, namesOther, alphaBBox, trimBox, cropImg, encodePng, writeManifestRow,
-        HIDE_CONSENT_CSS, sameOrSubdomain, nearUniformColor} from '../lib/assets.mjs';
+        HIDE_CONSENT_CSS, sameOrSubdomain, nearUniformColor, CONTRAST_MIN, relLum, contrastRatio, plateOn, paintLum,
+        svgPaintLum} from '../lib/assets.mjs';
 import {logo, closeBrowser} from '../bin/assets.mjs';
 import {after} from 'node:test';
 after(closeBrowser); // logo() calls in this file open a browser directly, outside the CLI's own finally
@@ -314,6 +315,38 @@ test('logo --file rejects a near-uniform PNG as blank and falls back to a monogr
   const out = path.join(tmp, 'file-blank-png');
   const {row} = await logo('Solid', {out, file: blankPng});
   assert.equal(row.source, 'monogram'); assert.equal(row.fallback, true);
+});
+
+test('contrast: the WCAG relative-luminance ratio, and the plate that clears 3:1 on the deck surface (#153)', () => {
+  assert.equal(CONTRAST_MIN, 3, 'WCAG 1.4.11, graphical objects');
+  assert.equal(contrastRatio(relLum([255, 255, 255]), relLum([0, 0, 0])), 21);
+  assert.ok(Math.abs(contrastRatio(relLum([0x77, 0x77, 0x77]), relLum([255, 255, 255])) - 4.48) < 0.01, '#777 on white is 4.48:1');
+  const pale = relLum([180, 180, 180]); // the Dassault Systèmes case: a pale grey mark
+  assert.deepEqual(plateOn(pale, '#F4F1EA'), {plate: 'dark', contrast: 8.65}, 'on a light surface it needs the dark chip');
+  assert.deepEqual(plateOn(pale, '#1A1D21'), {plate: 'none', contrast: 8.16}, 'on a dark surface it clears 3:1 bare');
+  assert.deepEqual(plateOn(relLum([20, 20, 20]), '#FFFFFF'), {plate: 'none', contrast: 18.42});
+  assert.deepEqual(plateOn(relLum([20, 20, 20]), '#0C1433'), {plate: 'light', contrast: 18.42}, 'a black mark on navy takes the white chip');
+  assert.equal(paintLum(decodePng(png(16, 16, () => [255, 255, 255, 255]))), null, 'an opaque tile brings its own plate: nothing to measure');
+  assert.ok(Math.abs(paintLum(decodePng(png(16, 16, disc([180, 180, 180])))) - pale) < 1e-9, 'the painted pixels, transparent ones ignored');
+  assert.equal(svgPaintLum('<svg><path d="M0 0h1v1z"/></svg>'), 0, 'no fill paints black');
+  assert.ok(Math.abs(svgPaintLum('<svg><path fill="#b4b4b4" d="M0 0h1v1z"/></svg>') - pale) < 1e-9);
+});
+
+test('logo --style measures the plate against the style surface and records the ratio (#153)', async () => {
+  const paleSvg = path.join(fixtures, 'pale.svg'), light = path.join(fixtures, 'light-style.json'), dark = path.join(fixtures, 'dark-style.json');
+  fs.writeFileSync(paleSvg, '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path fill="#b4b4b4" d="M20 40h20v20H20z"/><path fill="#b4b4b4" d="M60 40h20v20H60z"/></svg>');
+  fs.writeFileSync(light, JSON.stringify({tokens: {bg: '#E8E4DA', card: '#F4F1EA'}}));
+  fs.writeFileSync(dark, JSON.stringify({tokens: {bg: '#111315', card: '#1A1D21'}}));
+  const bare = await logo('Dassault', {out: path.join(tmp, 'plate-bare'), file: paleSvg});
+  assert.equal(bare.row.plate, 'any', 'without a style the grey reads as mid-tone, as before');
+  assert.equal(bare.row.contrast, undefined);
+  const {row} = await logo('Dassault', {out: path.join(tmp, 'plate-light'), file: paleSvg, style: light});
+  assert.equal(row.plate, 'dark'); assert.ok(Math.abs(row.contrast - 8.65) < 0.05, row.contrast); assert.equal(row.on, '#F4F1EA');
+  const m = JSON.parse(fs.readFileSync(path.join(tmp, 'plate-light', 'manifest.json'), 'utf8'))[0];
+  assert.deepEqual([m.plate, m.contrast, m.on], ['dark', row.contrast, '#F4F1EA'], 'the manifest records the ratio');
+  const onDark = execFileSync(process.execPath, [cli, 'logo', 'Dassault', '--file', paleSvg, '--style', dark, '--out', path.join(tmp, 'plate-dark')], {stdio: 'pipe'});
+  const d = JSON.parse(onDark.toString());
+  assert.deepEqual([d.plate, d.on], ['none', '#1A1D21']); assert.ok(Math.abs(d.contrast - 8.16) < 0.05, d.contrast);
 });
 
 test('logo --file: an unsupported extension and a missing file both fall back to a monogram with the reason recorded', async () => {
