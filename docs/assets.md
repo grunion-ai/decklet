@@ -16,7 +16,7 @@
 | `aspect` | Width over height of the painted area. Size the image box from it: `w = h * aspect`. |
 | `plate` | The background the logo needs. `dark`: a white or light mark that vanishes on a light slide. `light`: a black or navy mark that vanishes on a dark slide. `any`: coloured or opaque, reads on either. |
 
-Re-running a command replaces that row; it never duplicates it. Each write takes `manifest.json.lock`, merges its row into the current file and renames a temp file over it, so commands run in parallel into one folder keep every row.
+Re-running a command replaces that row; it never duplicates it, and a `logo` retry that finds nothing never replaces a real logo with a monogram (see below). Each write takes `manifest.json.lock`, merges its row into the current file and renames a temp file over it, so commands run in parallel into one folder keep every row.
 
 ## logo
 
@@ -38,6 +38,8 @@ Without `--file`, the command tries four sources in order and keeps the first us
 2. **The company site.** It fetches `https://<domain>` (then `www.`) and ranks the site's own mark first: an `<img>` or inline `<svg>` inside a link to the home page, then one inside `<header>` or `<nav>`, SVG before PNG, those naming the company before others, inverse variants and customer or partner strips last. A candidate whose file name, alt text or title names a different company is dropped, so a vendor homepage's "trusted by" strip (Cisco on SendCutSend, Dell on Vizcom) never lands. The company is matched by the name and the domain's first label; words such as `logo`, `white`, `header` and hashed build suffixes don't count as a name. SVG icon links, `apple-touch-icon` and PNG icons follow. `.ico`, JPEG and WebP are skipped. If the domain itself now redirects to a different company (an acquired or sold domain), the whole site is refused, and every individual candidate's fetch is checked the same way: its final URL, after every redirect, must land on that domain or a subdomain of it, or it is refused and the reason recorded. This is what stopped `logo altair.com` from saving Siemens' icon after Altair's domain started forwarding there.
 3. **Google s2**, a 256px site favicon.
 4. **A monogram**: the initials on a colour hashed from the name. The row carries `fallback: true`, and the run ends with `missed: <names>` on stderr. Add `--strict` to exit 1 when anything was missed, so a build script stops instead of shipping an "H" for Hexagon. Replace the file by hand, or pass `--domain` when the guessed site was wrong.
+
+A monogram never replaces a real logo. If every source fails and the manifest already holds a row under that key whose source is not `monogram` (an earlier run found the logo, and a retry under a second `--domain` did not), the command keeps that row and its file, prints the kept row, and reports `kept: <name> (retry found no logo; the earlier <source> entry <file> stays)` on stderr. `--strict` exits 1 on a kept retry as it does on a miss. A monogram may still replace a monogram.
 
 The domain is guessed as `<slug>.com` for a bare name; pass `--domain` when that guess is wrong. Skipped sources print to stderr with the reason.
 
