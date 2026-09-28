@@ -188,7 +188,7 @@ Row — every prop optional; a row is whatever its props make it:
 | `op` | 0–1 | — | opacity |
 | `box` | 1 | — | outlined card chrome (padding 6/8, radius 8, centred, pre-wrap) |
 | `tile` | 1 | — | filled card chrome (card bg, hairline, centred, flex-centred vertically) |
-| `bar` | 1 | — | bar: rounded top; needs `h` + `bg` |
+| `bar` | 1 | — | bar: square corners; needs `h` + `bg` |
 | `line` | `[x2,y2]` | — | straight line from (x,y) to (x2,y2); `h` = thickness (3), `bg` = colour |
 | `curve` | `[c1x,c1y,c2x,c2y,x2,y2]` | — | cubic bezier connector from (x,y); absolute coords like `line`; `h` = thickness, `bg` = colour |
 | `arrow` | `start`\|`end`\|`both` | — | arrow head on a `line` or a `curve` — never hand-build one out of three lines. **The head IS the terminus:** its tip lands on the stated end point and the stroke is shortened to make room, so a connector draws exactly as long as it was authored |
