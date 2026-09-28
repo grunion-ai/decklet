@@ -15,7 +15,7 @@ import {expandCharts} from '../lib/chart.mjs';
 import {expandTemplates} from '../lib/templates.mjs';
 import {expandIcons} from '../lib/icons.mjs';
 import {flags as spellFlags, flagMap as spellMap, loadChecker} from '../lib/spell.mjs';
-import {stampIds, diffDecks, applyLog, blockOf, hasBlock, putBlock} from '../lib/edits.mjs';
+import {stampIds, diffDecks, applyLog, blockOf, hasBlock, putBlock, stillIn} from '../lib/edits.mjs';
 import {isMain} from '../lib/is-main.mjs';
 
 // page-size presets of ONE model space: the FORMAT table lives in validate.mjs (the module create builds on), re-exported
@@ -95,6 +95,7 @@ export function create(model, {style = null, format, space, title, template, fro
   html = put(html, 'KEY', `'decklet:${deck.id}'`);
   html = put(html, 'ENGINE', `'${JSON.parse(fs.readFileSync(path.join(here, '..', 'package.json'), 'utf8')).version}'`); // the bug report leads with the version that built the file
   html = put(html, 'SPELL', JSON.stringify(spell ? spellMap(deck, spell) : {})); // option C: the flagged words AND their suggestions ride in the file; the editor underlines them and offers the fix
+  html = stillIn(html, deck); // #85: slide 1 as static markup in #canvas, for QuickLook, Spotlight and grep (no script runs there)
   return {html, deck, hash, migrate};
 }
 
