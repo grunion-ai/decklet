@@ -31,7 +31,8 @@ live('bin/pdf.mjs: one vector page per slide at the slide ratio, HUD hidden, lin
   const r = await toPdf(deck(), out);
   assert.equal(r.pages, 3);
   assert.ok(Math.abs(r.box[0] / r.box[1] - 960 / 540) < 0.005, `ratio ${r.box}`);
-  assert.equal(r.links, 2);
+  assert.equal(r.links, 2);                                     // the #85 still of slide 1 carries no href, so it adds no annotation
+  assert.ok(fs.readFileSync(deck(), 'utf8').includes('<div id="canvas"><noscript>'), 'the deck under test carries the still');
   assert.equal(r.hud, 'none');                                  // computed display of #hud under print media
   const bytes = fs.readFileSync(out, 'latin1');
   assert.match(bytes, /\/Type\s*\/Font/);                        // text is text: at least one embedded font
