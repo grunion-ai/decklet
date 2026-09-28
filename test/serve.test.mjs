@@ -134,7 +134,8 @@ test('splice() rewrites only the DECK and LOG data blocks, escapes </script, and
   assert.equal(blockOf(out, 'DECK').slides[0].els[0].text, 'a </script> b');
   assert.doesNotMatch(out.slice(out.indexOf('=/*DECK*/'), out.indexOf('/*/DECK*/')), /<\/script/i);
   assert.deepEqual(blockOf(out, 'LOG'), [{x: 1}]);
-  assert.equal(out.replace(/=\/\*DECK\*\/[\s\S]*?\/\*\/DECK\*\//, '').replace(/=\/\*LOG\*\/[\s\S]*?\/\*\/LOG\*\//, ''), html.replace(/=\/\*DECK\*\/[\s\S]*?\/\*\/DECK\*\//, '').replace(/=\/\*LOG\*\/[\s\S]*?\/\*\/LOG\*\//, ''), 'nothing else moves');
+  const rest = h => h.replace(/=\/\*DECK\*\/[\s\S]*?\/\*\/DECK\*\//, '').replace(/=\/\*LOG\*\/[\s\S]*?\/\*\/LOG\*\//, '').replace(/<div id="canvas"><noscript>[\s\S]*?<\/noscript>/, ''); // #85: and the still of slide 1 (test/still.test.mjs)
+  assert.equal(rest(out), rest(html), 'nothing else moves');
   assert.deepEqual(blockOf(splice(html, d, [], {dekjck: ['deck']}), 'SPELL'), {dekjck: ['deck']}, 'a fourth argument rewrites the SPELL block (the server\'s PUT, issue 86)');
   const old = html.replace(/const SPELL0=\/\*SPELL\*\/[\s\S]*?\/\*\/SPELL\*\//, 'const SPELL0=[]');
   assert.equal(blockOf(splice(old, d, [], {dekjck: []}), 'DECK').slides[0].els[0].text, 'a </script> b', 'a file from before the SPELL block keeps working: no block, nothing to rewrite');

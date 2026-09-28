@@ -9,6 +9,13 @@
 *{box-sizing:border-box;margin:0}
 body{background:var(--bg);color:var(--fg);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;height:100vh;height:100svh;display:flex;flex-direction:column;overflow:hidden}
 #wrap{flex:1;display:flex;align-items:center;justify-content:center;min-height:0}
+/* no script (QuickLook, a repo preview): #canvas holds the build's still of slide 1 and becomes a size container that fills the
+   wrapper. The still sets --u = one model px in container units, and every length in it is a multiple of --u, so CSS alone fits
+   the slide (QuickLook's thumbnailer misplaces an svg foreignObject). With script on the still is inert text, and render()
+   empties #canvas before the first paint. */
+#canvas:has(>noscript){width:100%;height:100%;border:0;background:none;transform:none!important;container-type:size;display:flex;align-items:center;justify-content:center}
+#canvas>noscript{display:contents}
+.still .el.box{padding:calc(var(--u)*6) calc(var(--u)*8);border-width:calc(var(--u)*1.5);border-radius:calc(var(--u)*8)}.still .el.tile{border-width:var(--u);border-radius:calc(var(--u)*12)}.still .pin{bottom:calc(var(--u)*10);font-size:calc(var(--u)*12)}
 #canvas{position:relative;width:var(--W);height:var(--H);background:var(--card);border:1px solid var(--line);border-radius:12px;transform-origin:center;flex:none;overflow:hidden}
 /* href is one model prop with two surfaces: an inset anchor over a whole row (a CTA box), and anchor runs inside .html.
    The row overlay is inert while editing (a click selects and drags the row) and live in present mode.
@@ -223,7 +230,8 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
 </style>
 </head>
 <body>
-<div id="wrap"><div id="canvas"></div></div>
+<div id="wrap"><div id="canvas"><noscript><div class="still" style="--u:min(calc(100cqw / 960),calc(100cqh / 540));position:relative;flex:none;overflow:hidden;width:calc(var(--u)*960);height:calc(var(--u)*540);background:var(--card);border:calc(var(--u)*1) solid var(--line);border-radius:calc(var(--u)*12)"><div class="el" style="left:calc(var(--u)*60);top:calc(var(--u)*486);width:calc(var(--u)*0);font-size:calc(var(--u)*14);height:calc(var(--u)*1);background:var(--line);left:calc(var(--u)*60);top:calc(var(--u)*486);width:calc(var(--u)*840.0);height:calc(var(--u)*1);padding:0;background:var(--line);transform:rotate(0rad);transform-origin:0 50%;border-radius:calc(var(--u)*2);"></div><div class="el" style="left:calc(var(--u)*660);top:calc(var(--u)*500);width:calc(var(--u)*240);font-size:calc(var(--u)*11);font-weight:500;color:var(--muted);font-family:Menlo,'SF Mono',Consolas,monospace;letter-spacing:calc(var(--u)*1);line-height:calc(var(--u)*14);text-transform:uppercase;text-align:right;white-space:nowrap;width:auto;left:auto;right:calc(var(--u)*60);">decklet<span class="num"> · 1 / 18</span></div><div class="el" style="left:calc(var(--u)*60);top:calc(var(--u)*132);width:calc(var(--u)*840);font-size:calc(var(--u)*12);font-weight:500;color:var(--accent);font-family:Menlo,'SF Mono',Consolas,monospace;letter-spacing:calc(var(--u)*1.5);line-height:calc(var(--u)*16);text-transform:uppercase;">DECKLET · A SELF-EXPLAINING DECK</div><div class="el" style="left:calc(var(--u)*60);top:calc(var(--u)*158);width:calc(var(--u)*840);font-size:calc(var(--u)*64);font-weight:800;color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;letter-spacing:calc(var(--u)*-1.5);line-height:calc(var(--u)*68);white-space:pre-wrap;">The renderer
+is the editor.</div><div class="el" style="left:calc(var(--u)*60);top:calc(var(--u)*318);width:calc(var(--u)*780);font-size:calc(var(--u)*16);font-weight:400;color:var(--muted);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;letter-spacing:calc(var(--u)*0);line-height:calc(var(--u)*24);">Agent-generated, brand-true, real-time editable presentations and assets: one portable HTML file, no office suite.</div><div class="el" style="left:calc(var(--u)*60);top:calc(var(--u)*410);width:calc(var(--u)*840);font-size:calc(var(--u)*13);font-weight:400;color:var(--muted);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;letter-spacing:calc(var(--u)*0);line-height:calc(var(--u)*18);">Drag anything · double-click to retype · ⌘Z undoes · → next slide · Esc contact sheet · F present · ⤓ PDF</div></div></noscript></div></div>
 <div id="tb" hidden>
   <span class="seg" id="tb-roles"></span>
   <span class="seg" id="tb-inline">
@@ -363,6 +371,8 @@ const store={
 //      key keeps the agent's value, the entry records it in `yielded`, and no later replay sets that key again.
 // splice: a deck file's source with its DECK and LOG data blocks rewritten; fileHtml() and bin/serve.mjs both write through it.
 //      splice(src,deck,log,spell) also rewrites SPELL (bin/serve.mjs, from its dictionary); a file without that block keeps none.
+// still: slide 1 as static markup, the <noscript> that opens #canvas (#85), for a reader that runs no script (QuickLook,
+//      Spotlight, grep, a repo's HTML preview). create, splice and fileHtml() all write it through stillIn.
 /*EDITS*/
 // ids are deterministic (s1, s2… / r1, r2… — the next free number), so create() on the same model is byte-identical and a
 // diff of two builds is a diff of content. deck.id is stamped by create (a content hash); the browser falls back to its namespace.
@@ -410,7 +420,64 @@ function applyLog(deck,log,agent){
 function splice(src,deck,log,spell){ // markers are built, never written out: a literal would be matched as the data block itself
   const J=v=>JSON.stringify(v).replace(/<\/script/gi,'<\\/script');
   const put=(h,m,v,soft)=>{const a='/*'+m+'*/',b='/*/'+m+'*/',x=h.indexOf('='+a),y=x<0?-1:h.indexOf(b,x);if(y<0){if(soft)return h;throw new Error('marker '+m+' missing')}return h.slice(0,x+1+a.length)+J(v)+h.slice(y)};
-  const out=put(put(src,'DECK',deck),'LOG',log);return spell?put(out,'SPELL',spell,1):out}
+  const out=put(put(src,'DECK',deck),'LOG',log);return stillIn(spell?put(out,'SPELL',spell,1):out,deck)}
+// Rows wear drawEls's classes and inline styles, every px written as a multiple of --u (one model px in the container units of
+// #canvas), so the stylesheet alone fits the slide to the wrapper; text is escaped as textContent escapes it. Only what needs a browser to measure is missing: connectors and
+// `after` rows are left out, an asset-table image ('#id') keeps its box but not its picture (the table embeds it once, and a
+// second copy would double it), a foot row keeps its own y, strokes draw without heads, dashes or to/from clipping. No href survives
+// (nothing navigates without script; a network URL would fail verify's self-containment check), and `</noscript` and `/*` are
+// defused so the copy can neither end its <noscript> nor read as a data block. With script on the parser keeps it as inert text.
+function still(deck){
+  const s=(deck.slides||[])[0];if(!s)return '';
+  const W=deck.w||960,H=deck.h||540,st=deck.styles||{},RL=st.roles||{},MG=st.margin!=null?st.margin:Math.round(W*.06),LY={...(deck.slots||{}),...((deck.layouts||{})[s.layout]||{})};
+  const E=t=>String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\u00a0/g,'&nbsp;'),Q=t=>String(t).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+  const U=c=>c.replace(/(-?\d*\.?\d+)px\b/g,'calc(var(--u)*$1)'),own=v=>typeof v==='string'&&v&&v[0]!=='#',logo=r=>r.logo!==undefined||r.monogram!=null;
+  const res=el=>{const m=el.override&&(deck.master||[]).find(x=>x.id===el.override)||{},r={...(el.slot&&LY[el.slot]||{}),...m,...el};
+    if(el.right!=null)delete r.x;else if(el.x!=null)delete r.right;
+    const t=RL[r.role]||((r.text!=null||r.html!=null||logo(r))&&RL.Body)||{};for(const k in t)if(r[k]==null||['font','size','lh','ls'].includes(k))r[k]=t[k];return r};
+  const items=[...(deck.master||[]).filter(m=>!(s.hide||[]).includes(m.id)&&!(s.els||[]).some(e=>e.override===m.id)),...(s.els||[])];
+  let foot=null;const rows=[];
+  for(const el of items){const r=res(el);
+    if(r.after!=null||(['arrow','dashed','blocked'].includes(r.style)&&r.line==null&&r.curve==null))continue;
+    let h='',fr=false;const lh=r.h||24,col=r.col??lh*2,gap=r.gap??8;
+    if(logo(r)){const nl=r.lh??(r.size||14)*1.25;
+      if(r.logo){const k=r.plate==null||r.plate==='auto'||r.plate==='light'?'light':r.plate==='dark'?'dark':'none',p=k==='none'?0:Math.max(2,Math.round(lh*.14));let iw=col-2*p,ih=lh-2*p;if(r.aspect>0){iw=Math.min(iw,ih*r.aspect);ih=Math.min(ih,iw/r.aspect)}
+        if(k!=='none')h+=`<div class="lplate" style="${U(`position:absolute;left:0;top:0;width:${iw+2*p}px;height:${lh}px;background:${k==='light'?'#FFFFFF':'#15171B'};border-radius:${Math.round(lh*.22)}px`)}"></div>`;
+        if(own(r.logo))h+=`<img src="${Q(r.logo)}" alt="${Q(r.alt||(r.name?r.name+' logo':''))}" style="${U(`position:absolute;left:${p}px;top:${(lh-ih)/2}px;width:${iw}px;height:${ih}px;object-fit:contain;pointer-events:none`)}">`}
+      else{const z=Math.min(lh,col),t=String(r.monogram||String(r.name||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0].toUpperCase()).join('')).slice(0,3);
+        h+=`<div class="lmono" style="${U(`position:absolute;left:0;top:${Math.round((lh-z)/2)}px;width:${z}px;height:${z}px;border-radius:${Math.round(z*.22)}px;background:var(--fg);color:var(--card);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:${Math.round(z*(t.length>1?.38:.47))}px;line-height:1;letter-spacing:0;white-space:nowrap`)}">${E(t)}</div>`}
+      if(r.name)h+=`<span class="lname" style="${U(`display:block;margin-top:${Math.round((lh-nl)/2)}px;line-height:${nl}px;white-space:${typeof r.w==='number'?'normal':'nowrap'}`)}">${E(r.name)}</span>`}
+    else if(r.svg)h=r.svg;
+    else if(r.img)h=!own(r.img)?'':`<img src="${Q(r.img)}" style="display:block;width:100%;height:100%;object-fit:${Q(r.fit||'contain')};object-position:${Q(r.pos||'50% 50%')};pointer-events:none">`;
+    else if(r.html)h=String(r.html).replace(/(<a\b[^>]*?)\s+href\s*=\s*("[^"]*"|'[^']*'|[^\s>]*)/gi,'$1');
+    else h=E(r.text||'');
+    const pad=r.p!=null?(st.pad&&st.pad[r.p])||(typeof r.p==='number'?r.p+'px':r.p):null;
+    let c=`${r.right!=null?`left:auto;right:${r.right}px;`:`left:${r.x||0}px;`}top:${r.y||0}px;width:${r.w==='auto'?'auto':(r.w||0)+'px'};font-size:${r.size||14}px;`+
+      (r.weight?`font-weight:${r.weight};`:'')+(r.color?`color:${r.color};`:'')+(r.font?`font-family:${r.font};`:'')+
+      (r.ls!=null?`letter-spacing:${r.ls}px;`:'')+(r.lh!=null?`line-height:${r.lh}px;`:'')+(r.tt?`text-transform:${r.tt};`:'')+
+      (r.ws?`white-space:${r.ws};`:'')+(r.nowrap?'white-space:nowrap;':'')+(!r.html&&/\n/.test(r.text||'')?'white-space:pre-wrap;':'')+(r.italic?'font-style:italic;':'')+(r.op!=null?`opacity:${r.op};`:'')+
+      (pad?`padding:${pad};`:'')+(r.h?`height:${r.h}px;`:'')+(r.bg?`background:${r.bg};`:'')+
+      (r.bd?`border:${r.bd};`:'')+(r.bt?`border-top:${r.bt};`:'')+(r.br?`border-right:${r.br};`:'')+(r.bb?`border-bottom:${r.bb};`:'')+(r.bl?`border-left:${r.bl};`:'')+
+      (r.shadow?`box-shadow:${r.shadow};`:'')+(r.bar?'border-radius:6px 6px 0 0;':'')+
+      (r.align?`text-align:${r.align};`:'')+(r.valign?`display:flex;flex-direction:column;justify-content:${r.valign==='bottom'?'flex-end':'center'};`:'')+(r.radius!=null?`border-radius:${typeof r.radius==='number'?r.radius+'px':r.radius};`:'')+(r.img||r.svg?'overflow:hidden;':'')+(r.css?r.css+';':'');
+    if(r.footer){fr=r.right!=null||(r.x||0)+(typeof r.w==='number'?r.w:0)/2>W/2;c+='white-space:nowrap;width:auto;'+(fr?`left:auto;right:${MG}px;`:`left:${Math.max(MG,r.x||0)}px;`)}
+    if(logo(r))c+=`padding:0 0 0 ${r.name?col+gap:col}px;height:${lh}px;width:${typeof r.w==='number'?r.w+'px':r.name?'auto':col+'px'};background:none;border:0;`;
+    if(r.line){const x0=r.x||0,y0=r.y||0,dx=r.line[0]-x0,dy=r.line[1]-y0;c+=`left:${x0}px;top:${y0}px;width:${Math.hypot(dx,dy).toFixed(1)}px;height:${r.h||3}px;padding:0;background:${r.bg||'var(--accent)'};transform:rotate(${Math.atan2(dy,dx)}rad);transform-origin:0 50%;border-radius:2px;`}
+    if(r.curve){const [a,b,cx,cy,ex,ey]=r.curve,sx=r.x||0,sy=r.y||0,sw=r.h||3,pd=sw*4+2,xs=[sx,a,cx,ex],ys=[sy,b,cy,ey],bx=Math.min(...xs)-pd,by=Math.min(...ys)-pd,bw=Math.max(...xs)-Math.min(...xs)+pd*2,bh=Math.max(...ys)-Math.min(...ys)+pd*2,P=(x,y)=>`${(x-bx).toFixed(2)} ${(y-by).toFixed(2)}`;
+      h=`<svg width="${bw}" height="${bh}" viewBox="0 0 ${bw} ${bh}" fill="none"><path d="M${P(sx,sy)}C${P(a,b)} ${P(cx,cy)} ${P(ex,ey)}" stroke="${Q(r.bg||'var(--accent)')}" stroke-width="${sw}"/></svg>`;c+=`left:${bx}px;top:${by}px;width:${bw}px;height:${bh}px;padding:0;background:none;border:0;`}
+    if(r.donut!=null){const ho=r.hole??55;c+=`width:${r.w}px;height:${r.w}px;padding:0;border-radius:50%;background:conic-gradient(${r.color||'var(--accent)'} ${r.donut}%,var(--line) 0);`+(ho>0?`-webkit-mask:radial-gradient(#0000 ${ho}%,#000 ${ho+1}%);mask:radial-gradient(#0000 ${ho}%,#000 ${ho+1}%);`:'')}
+    const row={cls:'el'+(r.box?' box':'')+(r.tile?' tile':'')+(r.bullet?' bul':''),c,h};rows.push(row);
+    if(r.footer&&!foot)foot={row,right:fr,text:String(r.text??r.html??'').trim()}}
+  // the counter, as num() seats it: inline in a right-anchored footer, the footer's corner beside a left one, else the pin
+  let tail='';const n='1 / '+deck.slides.length;
+  if(deck.counter!==0){if(foot&&foot.right)foot.row.h+=`<span class="num">${foot.text?' · ':''}${n}</span>`;
+    else if(foot)tail=`<div class="num corner" style="${Q(U(foot.row.c+`left:auto;width:auto;background:none;border:0;right:${MG}px`))}">${n}</div>`;
+    else tail=`<div class="num pin" style="${U(`right:${MG}px`)}">${n}</div>`}
+  const out=`<div class="still" style="--u:min(calc(100cqw / ${W}),calc(100cqh / ${H}));${Q(U(`position:relative;flex:none;overflow:hidden;width:${W}px;height:${H}px;background:${s.bg||'var(--card)'};border:1px solid var(--line);border-radius:12px`))}">`+
+    rows.map(r=>`<div class="${r.cls}" style="${Q(U(r.c))}">${r.h}</div>`).join('')+tail+'</div>';
+  return out.replace(/<\/noscript/gi,'&lt;/noscript').replace(/\/\*/g,'/&#42;').replace(/\s(?:xlink:)?(?:src|href)\s*=\s*(["'])\s*https?:[^"']*\1/gi,'')}
+// stillIn: the file's #canvas, opened with a fresh still. The marker is built, never written out (this source would match it).
+function stillIn(h,deck){const m=new RegExp('<div id="can'+'vas"[^>]*>(?:<noscript>[\\s\\S]*?</noscript>)?').exec(h);return m?h.slice(0,m.index)+'<div id="can'+'vas"><noscript>'+still(deck)+'</noscript>'+h.slice(m.index+m[0].length):h}
 /*/EDITS*/
 // ── BUG: the bug-report builder, the pure core shared with node (lib/bug.mjs lifts this block verbatim — ONE source) ──
 // A report is a mailto the reporter opens, reads and sends. The address is receive-only. bugFacts() is the CLOSED set of
@@ -1540,8 +1607,8 @@ function fileHtml(){
   d.removeAttribute('style');q('body').removeAttribute('style');q('body').className='';d.querySelectorAll('#hud :disabled').forEach(b=>b.disabled=false);['#canvas','#grid','#print'].forEach(s=>q(s).innerHTML='');
   q('#snap').setAttribute('aria-pressed','false');q('#snap').dataset.tip='Guides + snap · off · G';q('#snap').setAttribute('aria-label',q('#snap').dataset.tip); // guides are browser state: a copy opens with them off
   q('#tb').hidden=q('#sheet').hidden=q('#toast').hidden=q('#nosave').hidden=true;q('#addmenu').classList.remove('open');q('#helpmenu').classList.remove('open');
-  const sc=q('script');sc.textContent=splice(sc.textContent,deck,log);
-  return '<!DOCTYPE html>\n'+d.outerHTML;
+  const sc=q('script');sc.textContent=splice(sc.textContent,deck,log);q('#canvas').removeAttribute('style');
+  return stillIn('<!DOCTYPE html>\n'+d.outerHTML,deck); // slide 1 as it now stands, for a reader with no script
 }
 // ⌘S (or the dot) = SAVE THE FILE, NOW. Chrome/Edge: the first press asks for the deck file once (File System Access) and from
 // then on every edit rewrites it by itself, on the debounce above; the handle is kept in IndexedDB (store 'h') so the next
