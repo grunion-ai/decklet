@@ -12,6 +12,7 @@ import {create} from '../bin/create.mjs';
 import {verify, modelOf} from '../bin/verify.mjs';
 import {chartRows, expandCharts, checkChart, hbarGeometry} from '../lib/chart.mjs';
 import {logoGeom} from '../lib/logo.mjs';
+import {TEMPLATE} from '../lib/templates.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 let pw = null; try { pw = await import('playwright'); } catch {}
@@ -272,6 +273,38 @@ live('live: chart rows render with parity and zero page errors, and the expanded
   await b.close();
   assert.deepEqual(errs, []);
   assert.ok(moved.bar && moved.x > 60, 'a bar is a plain draggable row after expansion: ' + JSON.stringify(moved));
+});
+
+// #162: a bar is square by default; a radius, when a row sets one, rounds all four corners and never one end only
+const oneSided = v => typeof v === 'string' && new Set(v.trim().split(/[\s/]+/)).size > 1;
+test('chart: no chart mark carries a one-sided radius: bars are square unless the row rounds all four corners (#162)', () => {
+  for (const chart of [bars, {...bars, data: bars.data.map(d => ({...d, compare: d.value - 40}))}, funding])
+    for (const r of chartRows({...BOX, chart}, roles).filter(r => r.bar)) assert.equal(r.radius, undefined, `${chart.mark} bar is square: ${JSON.stringify(r)}`);
+  const d = create({slides: Object.keys(TEMPLATE).map(template => ({template}))}).deck;
+  d.slides.forEach((s, k) => s.els.forEach(r => assert.ok(!oneSided(r.radius), `${Object.keys(TEMPLATE)[k]}: radius ${r.radius} rounds one end only`)));
+  assert.doesNotMatch(fs.readFileSync(path.join(root, 'template.html'), 'utf8'), /r\.bar\?'border-radius/, 'the engine paints no radius onto a bar row');
+});
+
+live('live: every bar renders square at both ends, and no chart or template mark renders a one-sided radius (#162)', async () => {
+  const m = {w: 960, h: 540, slides: [
+    {els: [{...BOX, chart: bars}]}, {els: [{...BOX, chart: {...bars, data: bars.data.map(d => ({...d, compare: d.value - 40}))}}]}, {els: [{...BOX, chart: funding}]},
+    ...['chart-bar-ranked', 'chart-column', 'chart-grouped', 'chart-stacked-100', 'chart-waterfall', 'range-bar', 'stat-plus-chart'].map(template => ({template})),
+    {els: [{x: 60, y: 100, w: 200, h: 40, bar: 1, bg: 'var(--accent)', radius: 4}]},
+  ]};
+  const f = path.join(tmp, 'square.html'); fs.writeFileSync(f, create(m).html);
+  let got; const b = await pw.chromium.launch(); try { const p = await b.newPage({viewport: {width: 1280, height: 800}});
+  await p.goto(pathToFileURL(f).href); await p.waitForSelector('#canvas .el');
+  got = await p.evaluate(n => { localStorage.clear(); const out = [];
+    for (let k = 0; k < n; k++) { i = k; render();
+      for (const d of canvas.querySelectorAll('.el')) { const cs = getComputedStyle(d), row = d.dataset.n != null ? slide().els[+d.dataset.n] : {};
+        out.push({k, n: d.dataset.n, bar: !!row.bar, set: row.radius != null, c: ['TopLeft', 'TopRight', 'BottomRight', 'BottomLeft'].map(q => cs[`border${q}Radius`])}); } }
+    return out; }, m.slides.length);
+  } finally { await b.close(); }
+  const barsDrawn = got.filter(g => g.bar);
+  assert.ok(barsDrawn.length >= 20, `bars drawn: ${barsDrawn.length}`);
+  for (const g of barsDrawn.filter(g => !g.set)) assert.deepEqual(g.c, ['0px', '0px', '0px', '0px'], `slide ${g.k} row ${g.n}: a bar is square by default`);
+  for (const g of got) assert.equal(new Set(g.c).size, 1, `slide ${g.k} row ${g.n}: one-sided radius ${g.c.join(' ')}`);
+  assert.deepEqual(got.find(g => g.k === m.slides.length - 1 && g.bar).c, ['4px', '4px', '4px', '4px'], 'a row radius rounds all four corners');
 });
 
 test('chart: docs/charts.md carries the drawing rules, and SKILL.md links it', () => {

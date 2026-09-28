@@ -462,7 +462,7 @@ function still(deck){
       (r.ws?`white-space:${r.ws};`:'')+(r.nowrap?'white-space:nowrap;':'')+(!r.html&&/\n/.test(r.text||'')?'white-space:pre-wrap;':'')+(r.italic?'font-style:italic;':'')+(r.op!=null?`opacity:${r.op};`:'')+
       (pad?`padding:${pad};`:'')+(r.h?`height:${r.h}px;`:'')+(r.bg?`background:${r.bg};`:'')+
       (r.bd?`border:${r.bd};`:'')+(r.bt?`border-top:${r.bt};`:'')+(r.br?`border-right:${r.br};`:'')+(r.bb?`border-bottom:${r.bb};`:'')+(r.bl?`border-left:${r.bl};`:'')+
-      (r.shadow?`box-shadow:${r.shadow};`:'')+(r.bar?'border-radius:6px 6px 0 0;':'')+
+      (r.shadow?`box-shadow:${r.shadow};`:'')+
       (r.align?`text-align:${r.align};`:'')+(r.valign?`display:flex;flex-direction:column;justify-content:${r.valign==='bottom'?'flex-end':'center'};`:'')+(r.radius!=null?`border-radius:${typeof r.radius==='number'?r.radius+'px':r.radius};`:'')+(r.img||r.svg?'overflow:hidden;':'')+(r.css?r.css+';':'');
     if(r.footer){fr=r.right!=null||(r.x||0)+(typeof r.w==='number'?r.w:0)/2>W/2;c+='white-space:nowrap;width:auto;'+(fr?`left:auto;right:${MG}px;`:`left:${Math.max(MG,r.x||0)}px;`)}
     if(logo(r))c+=`padding:0 0 0 ${r.name?col+gap:col}px;height:${lh}px;width:${typeof r.w==='number'?r.w+'px':r.name?'auto':col+'px'};background:none;border:0;`;
@@ -843,7 +843,7 @@ function drawEls(s,root,animate){
       (r.ws?`white-space:${r.ws};`:'')+(r.nowrap?'white-space:nowrap;':'')+(r.html?(/\n/.test(r.html)?'white-space:pre-line;':''):/\n/.test(r.text||'')?'white-space:pre-wrap;':'')+(r.italic?'font-style:italic;':'')+(r.op!=null?`opacity:${r.op};`:'')+ // a \n breaks the line in html too: an inline mark carries a text row's \n into html (pre-line: space runs still collapse)
       (pad?`padding:${pad};`:'')+(r.h?`height:${r.h}px;`:'')+(r.bg?`background:${r.bg};`:'')+
       (r.bd?`border:${r.bd};`:'')+(r.bt?`border-top:${r.bt};`:'')+(r.br?`border-right:${r.br};`:'')+(r.bb?`border-bottom:${r.bb};`:'')+(r.bl?`border-left:${r.bl};`:'')+
-      (r.shadow?`box-shadow:${r.shadow};`:'')+(r.bar?'border-radius:6px 6px 0 0;':'')+
+      (r.shadow?`box-shadow:${r.shadow};`:'')+
       (r.align?`text-align:${r.align};`:'')+(r.valign?`display:flex;flex-direction:column;justify-content:${r.valign==='bottom'?'flex-end':'center'};`:'')+(r.radius!=null?`border-radius:${typeof r.radius==='number'?r.radius+'px':r.radius};`:'')+(r.img||r.svg?'overflow:hidden;':'')+(r.css?r.css+';':'');
     // footer master: the counter is appended INSIDE this row; the row is anchored to the content edge (styles.margin) and grows inward.
     // A row that declares `right` IS right-anchored — reading x/w alone read `{right:60, w:'auto'}` (no x) as left-anchored and then
