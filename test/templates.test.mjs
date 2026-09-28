@@ -520,3 +520,35 @@ test('templates: a slide made from a textOnly template inherits the mark; one ma
   assert.equal(d.slides[1].textOnly, undefined, 'stat-row-4 draws its bars');
   assert.equal(d.slides[2].textOnly, false, 'a slide that says otherwise keeps its own word');
 });
+
+// #160: a text key the catalogue lists must land on the same row whatever the values are. range-bar generated its axis
+// ticks and row labels from the data, so a fill of "t7" relabelled whichever row sat seventh once the data changed. deadKeys()
+// probes each listed key under alternative valid values: a series with every string grown, every number ×10 and ×3, one item
+// fewer and one more; a number key at either end of its range. A key is dead when its row changes role, vanishes, or (under
+// a new series) is a row the series itself draws, since the data owns that text.
+const PROBE = 'KEYPROBE';
+const textOf = r => r && (r.text ?? r.html ?? r.name);
+const each = (a, f) => a.map(p => p && typeof p === 'object' ? Object.fromEntries(Object.entries(p).map(([k, y]) => [k, f(y)])) : f(p));
+function deadKeys(id) {
+  const base = Object.fromEntries(templateVals(id).map(v => [v.key, v.sample])), data = [], ranged = [];
+  for (const v of templateVals(id)) {
+    if (v.kind === 'data') data.push(...[each(v.sample, y => typeof y === 'string' ? y + '·' : y), each(v.sample, y => typeof y === 'number' ? y * 10 : y),
+      each(v.sample, y => typeof y === 'number' ? y * 3 : y), v.sample.slice(0, -1), [...v.sample, v.sample[0]]].map(a => ({...base, [v.key]: a})));
+    else if (v.range) ranged.push(...v.range.map(x => ({...base, [v.key]: x})));
+  }
+  const rows = (vals, k) => { const fill = {...vals, ...(k ? {[k]: PROBE} : {})}; return fillErrors(id, fill).length ? null : expandTemplates(deck([{template: id, fill}])).slides[0].els; };
+  const home = (vals, k) => { const r = rows(vals, k), i = r ? r.findIndex(o => String(textOf(o)).includes(PROBE)) : -1;
+    return r && {i, role: i < 0 ? null : r[i].role || r[i].slot, was: i < 0 ? null : textOf(rows(vals)[i])}; };
+  return templateKeys(id).map(e => e.key).filter(k => { const h = home(base, k);
+    if (!h) return false;   // the probe itself is refused (too wide for the row): no verdict
+    if (h.i < 0) return true;
+    return data.some(a => { const o = home(a, k); return o && (o.i < 0 || o.role !== h.role || o.was !== h.was); })
+      || ranged.some(a => { const o = home(a, k); return o && (o.i < 0 || o.role !== h.role); }); });
+}
+test('templates: every text key the catalogue lists for range-bar lands on the same row whatever the data (#160)', () => {
+  for (const id of ['range-bar', 'range-bar-speaker']) assert.deepEqual(deadKeys(id), [], `${id}: its axis and row labels come from the data, never from a text key`);
+  assert.deepEqual(templateKeys('range-bar').map(e => e.key), ['t1', 't2', 't3', 't4', 't5'], 'chrome, subtitle, note and source');
+  assert.deepEqual(templateKeys('range-bar-speaker').map(e => e.key), ['t1', 't2'], 'chrome');
+  assert.ok(fillErrors('range-bar', {data: TEMPLATE['range-bar'].vals.data.sample, t7: 'x'}).some(m => /"t7" is not a fill key/.test(m)), 'a tick key is refused, not silently misplaced');
+  assert.doesNotMatch(templateCatalogue().split('\n  range-bar ')[1].split('\n  range-bar-speaker')[0], /^ {4}t6 /m, 'the catalogue lists no axis key');
+});
