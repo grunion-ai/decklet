@@ -38,7 +38,7 @@ const m = manifest.find(r => r.name === 'xometry');
 const row = {logo: dataUri(m.file), aspect: m.aspect, plate: m.plate, name: 'Xometry', x: 80, y: 120, h: 32, col: 120};
 ```
 
-The manifest's `plate` names the background a logo needs. `dark` gets a dark chip, `light` a white one, and `any` gets no chip. To make every chip in a list the same colour, set `plate: "light"` on each row.
+The manifest's `plate` names the background a logo needs. `dark` gets a dark chip, `light` a white one, and `any` gets no chip. Run `decklet-assets logo` with `--style` and the plate is measured against that deck's surface instead (`none` gets no chip either; see [assets.md](assets.md)). To make every chip in a list the same colour, set `plate: "light"` on each row.
 
 ## What validate checks
 
