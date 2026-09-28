@@ -281,7 +281,7 @@ is the editor.</div><div class="el" style="left:calc(var(--u)*60);top:calc(var(-
         <div><kbd>C · Esc</kbd> contact sheet</div>
         <div><kbd>F</kbd> full screen (in-window when the browser refuses · from the sheet, the picked slide)</div>
         <div><kbd>G</kbd> guides + snap (a 16px dot grid · drags, resizes and connector ends snap to this slide's layout lines)</div>
-        <div><kbd>⌘C · ⌘V</kbd> copy · paste the selected rows, onto any slide (in the sheet, slides)</div>
+        <div><kbd>⌘C · ⌘V</kbd> copy · paste rows, onto any slide (in the sheet, slides)</div>
       </div>
       <div class="col"><div class="ph">Rows</div>
         <div><kbd>click</kbd> select · <kbd>⌘ · ⇧</kbd> add to the selection</div>
@@ -1316,7 +1316,7 @@ addEventListener('keydown',e=>{
   if(e.target.isContentEditable){if(e.key==='Escape')e.target.blur();return}
   if(!sheet.hidden){if(sheetKey(e))e.preventDefault();return}
   if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){e.preventDefault();undo();return}
-  if((e.metaKey||e.ctrlKey)&&!e.altKey&&!present()&&!(e.target.closest&&e.target.closest('input,textarea'))){const k=e.key.toLowerCase(); // text being edited returned above: the browser's own copy and paste
+  if((e.metaKey||e.ctrlKey)&&!e.altKey&&!present()&&!(e.target.closest&&e.target.closest('input,textarea'))){const k=e.key.toLowerCase(); // text being edited keeps the browser's
     if(k==='c'&&sel.size){e.preventDefault();copyRows();return}
     if(k==='v'&&rclip){e.preventDefault();pasteRows();return}}
   if(e.key==='Escape'){if(helpmenu.classList.contains('open'))help(false);else if(sel.size){sel.clear();render()}else if(inlineP())setPresent(false);else sheetOpen();return} // Esc leaves in-window present the way it leaves real fullscreen
@@ -1332,11 +1332,8 @@ addEventListener('keydown',e=>{
   if(e.key.toLowerCase()==='g'){commitEdit();setSnap(!SNAP)}
   if(e.key.toLowerCase()==='c')sheetOpen();
 });
-// ⌘C ⌘V on the canvas: the selected rows, on a clipboard of their own (`clip` stays the contact sheet's slides). A master row,
-// an override or a slot row copies as the row you see (never an override of a master the target slide may hide), master rows
-// first so they stay under the slide rows. Ids are dropped and stamped where the rows land; a connector keeps an end only on a
-// row copied with it, and a routed connector without both of its rows stays behind. On the slide they came from the copies land
-// 16px down and right (16px more on each paste), on any other slide where they sat; the copies become the selection.
+// ⌘C ⌘V on the canvas: the selected rows (`clip` stays the sheet's slides). A master, override or slot row copies as the row you
+// see; ids re-stamp where they land; a connector keeps only ends copied with it. Same slide: +16px a paste; another: where they sat.
 let rclip=null;
 function copyRows(){const s=slide(),mr=id=>(deck.master||[]).find(m=>m.id===id);
   const rows=[...sel].sort((a,b)=>(typeof a==='number')-(typeof b==='number')||(typeof a==='number'?a-b:0)).map(k=>{
