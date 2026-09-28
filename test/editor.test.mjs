@@ -350,3 +350,43 @@ live('⤓ in WebKit: a page that throws restores the button and falls through to
   assert.equal(r.same, true, 'icon restored after the failure'); assert.equal(r.busy, false); assert.equal(r.printed, 1, 'print() is the fallback'); assert.equal(r.p, '', 'no stale bar');
   await b.close();
 });
+
+// Issue #79: ⌘C / ⌘V did nothing on a canvas selection; the only clipboard was the contact sheet's, and it held slides.
+// ⌘C copies the selected rows, ⌘V pastes them onto the current slide and the copies become the selection: 16px down and
+// right on the slide they came from, where they sat on any other slide. Pasted rows get fresh ids; a connector keeps its
+// ends only on rows copied with it (a routed connector without both of its rows stays behind); a master row copies as the
+// row you see, never as an override of a master the target slide may hide. ⌘Z takes a paste back. Text being edited keeps
+// the browser's own copy and paste.
+const clipModel = () => ({w: 960, h: 540, title: 'clip', master: [{id: 'foot', x: 60, y: 480, w: 300, role: 'Label', text: 'Footer'}], slides: [
+  {els: [{id: 'a', x: 100, y: 100, w: 200, h: 80, bg: 'var(--card)'}, {id: 'b', x: 500, y: 100, w: 200, h: 80, bg: 'var(--card)'}, {from: 'a', to: 'b', style: 'arrow'}, {x: 100, y: 300, w: 400, role: 'Body', text: 'alpha'}]},
+  {hide: ['foot'], els: [{x: 60, y: 80, w: 800, role: 'H1', text: 'Two'}]},
+]});
+for (const bn of ['chromium', 'webkit']) live(`⌘C ⌘V copy and paste the canvas selection, on this slide and across slides, and ⌘Z undoes it (${bn})`, {timeout: 90000}, async () => {
+  const b = await pw[bn].launch(); try {
+    const p = await fresh(b, write(`clip-${bn}.html`, create(clipModel()).html));
+    const els = () => p.evaluate(() => slide().els.map(e => ({id: e.id, x: e.x, y: e.y, from: e.from, to: e.to, text: e.text, override: e.override, slot: e.slot})));
+    const pick = ks => p.evaluate(ks => { sel.clear(); ks.forEach(k => sel.add(k)); render(); }, ks);
+    const key = k => p.keyboard.press('ControlOrMeta+' + k);
+    await pick([0, 1, 2]); await key('c');
+    assert.equal((await els()).length, 4, '⌘C changes nothing on the slide');
+    await key('v'); let e = await els();
+    assert.equal(e.length, 7, 'three rows pasted');
+    assert.deepEqual(await p.evaluate(() => [...sel]), [4, 5, 6], 'the copies become the selection');
+    assert.deepEqual([e[4].x, e[4].y, e[5].x, e[5].y], [116, 116, 516, 116], '16px down and right on the slide they came from');
+    assert.equal(new Set(e.map(r => r.id)).size, 7, 'every pasted row has an id of its own');
+    assert.deepEqual([e[6].from, e[6].to], [e[4].id, e[5].id], 'the connector joins the copies, never the originals');
+    await key('z'); assert.equal((await els()).length, 4, '⌘Z takes the paste back');
+    await pick([1, 2]); await key('c'); await key('v'); e = await els();
+    assert.deepEqual(e.slice(4).map(r => [r.x, r.y, r.from, r.to]), [[516, 116, undefined, undefined]], 'a routed connector without both of its rows stays behind');
+    await key('z');
+    await pick([3, 'm:foot']); await key('c');
+    await p.keyboard.press('Escape'); await p.keyboard.press('ArrowRight'); assert.equal(await p.evaluate(() => i), 1);
+    await key('v'); e = await els();
+    assert.deepEqual(e.slice(1).map(r => [r.text, r.x, r.y, r.override, r.slot]), [['Footer', 60, 480, undefined, undefined], ['alpha', 100, 300, undefined, undefined]], 'pasted where they sat; the master row as the row you saw, under the slide rows');
+    assert.ok(!e.some(r => r.id === 'foot'), 'no row takes the master id');
+    assert.deepEqual(await p.evaluate(() => ({hide: slide().hide, sel: [...sel]})), {hide: ['foot'], sel: [1, 2]}, 'the slide still hides its master; the copies are the selection');
+    await p.evaluate(() => edit(0)); await key('v'); await p.keyboard.press('Escape');
+    assert.equal((await els()).length, 3, 'while text is being edited ⌘V is the browser\'s own paste');
+    assert.deepEqual(p.errs, []);
+  } finally { await b.close(); }
+});
