@@ -9,10 +9,15 @@
 //   PUT /__decklet/file      {model, log} spliced into the file          X-Decklet-Token + If-Match: the rev the edit was made on
 //                            403 bad token · 412 {rev} the file moved on (an agent rebuilt it) · 200 {rev}; the file as it was
 //                            is kept in .decklet-history/<rev>-<ms>.html, the new one lands by rename (atomic) · 423 {lease} checked out
+//                            Once a spell request has loaded the dictionary, the SPELL block is rewritten from the new model
+//                            (flagMap, as create does), so a word flagged live is in the file on reload; else it stays as it was.
 //   POST /__decklet/heartbeat {pending}  the page's unacknowledged edit count: on every save, every 20 s while it has any
 //   POST /__decklet/checkout {by, ttl}   200 {lease} · 409 {pending} the page sent edits in the last 60 s that no PUT has
 //                            acknowledged, or {lease} someone else holds it. The lease lives here, in memory, never in the file.
 //   POST /__decklet/checkin  clears the lease (expiry does the same); `changed` first when the file moved under it
+//   POST /__decklet/spell    {words} ≤ 500 strings of ≤ 64 chars, the words of one edited row: 200 {ok, flags: {word: [suggestions]}},
+//                            lib/spell.mjs with the build's dictionary and the file's spell.ignore; {words: []} is the page's probe
+//                            · 503 {reason: 'no dictionary'} nspell/dictionary-en absent (dev deps) or a lang with none: build-time only
 //   GET /__decklet/events?t= SSE `changed` {rev} when anything but our own PUT rewrote the file (EventSource sets no headers);
 //                            `lease` {by, since, until} or null, and the current lease on connect
 // .decklet-host.json beside the deck = {port, token, pid}, mode 0600, removed on shutdown: how --checkout finds the server.
@@ -24,10 +29,12 @@ import http from 'node:http';
 import {randomBytes, timingSafeEqual} from 'node:crypto';
 import {blockOf, splice} from '../lib/edits.mjs';
 import {isMain} from '../lib/is-main.mjs';
+import {flagMap, loadChecker} from '../lib/spell.mjs';
 
 const hostFile = file => path.join(path.dirname(path.resolve(file)), '.decklet-host.json');
 
-export function serve(file, {port = 0, guard = 60000} = {}) {
+const SPELL_WORDS = 500, SPELL_LEN = 64;
+export function serve(file, {port = 0, guard = 60000, checker = loadChecker} = {}) {
   file = path.resolve(file);
   const dir = path.dirname(file), name = path.basename(file), token = randomBytes(24).toString('base64url'), hf = hostFile(file);
   const meta = `<meta name="decklet-host" content="${token}">`;
@@ -45,6 +52,12 @@ export function serve(file, {port = 0, guard = 60000} = {}) {
   const release = () => { clearTimeout(leaseT); if (!lease) return; const was = lease.rev, h = read(); lease = null; if (revOf(h) !== was) emit('changed', {rev: revOf(h)}); emit('lease', null); };
   // the page's unacknowledged edits: its last heartbeat count and when a human edit last arrived (heartbeat or PUT)
   const human = {pending: 0, at: 0};
+  // the dictionary, loaded once per lang on first use (the page's probe); suggest() is the slow half, so each word's answer is
+  // kept. ready = the loaded ones: a PUT never waits for a load, it rewrites SPELL only once the dictionary is in (the probe
+  // on open loads it, and no word is flagged live before it is).
+  const dicts = new Map(), ready = new Map(), dict = lang => { if (!dicts.has(lang)) dicts.set(lang, Promise.resolve(checker(lang)).then(c => {
+    if (!c) return null; const memo = new Map(), ok = w => c(w); ok.suggest = w => { if (!memo.has(w)) memo.set(w, c.suggest ? c.suggest(w) : []); return memo.get(w); }; return ok;
+  }, () => null).then(c => { ready.set(lang, c); return c; })); return dicts.get(lang); };
   const server = http.createServer((req, res) => {
     const u = new URL(req.url, 'http://x'), p = server.address().port;
     if (req.headers.host !== `127.0.0.1:${p}` && req.headers.host !== `localhost:${p}`) return send(res, 421, {ok: false});
@@ -72,14 +85,25 @@ export function serve(file, {port = 0, guard = 60000} = {}) {
       clearTimeout(leaseT); leaseT = setTimeout(release, ttl * 1000);
       emit('lease', pub()); send(res, 200, {ok: true, lease: pub()});
     });
+    if (req.method === 'POST' && u.pathname === '/__decklet/spell') return body(req, async b => {
+      const w = b && b.words;
+      if (!Array.isArray(w) || w.length > SPELL_WORDS || !w.every(x => typeof x === 'string' && x.length <= SPELL_LEN)) return send(res, 400, {ok: false});
+      let d; try { d = blockOf(read(), 'DECK'); } catch { d = {}; }
+      const c = await dict(d.lang || 'en');
+      if (!c) return send(res, 503, {ok: false, reason: 'no dictionary'});
+      send(res, 200, {ok: true, flags: flagMap({...d, master: [], slides: [{els: [{text: w.join(' ')}]}]}, c)}); // the file's deck with one row: every deck-level exception the build honours (spell.ignore)
+    });
     if (req.method === 'POST' && u.pathname === '/__decklet/checkin') { release(); return send(res, 200, {ok: true, lease: null}); }
     if (req.method !== 'PUT' || u.pathname !== '/__decklet/file') return send(res, 404, {ok: false});
     body(req, b => {
+      const c = b && b.model && typeof b.model === 'object' ? ready.get(b.model.lang || 'en') : null;
       const cur = read(), rev = revOf(cur);
       if (req.headers['if-match'] !== rev) return send(res, 412, {ok: false, rev});
       if (!b || typeof b.model !== 'object' || !Array.isArray(b.log)) return send(res, 400, {ok: false});
       if (lease) return send(res, 423, {ok: false, lease: pub()}); // checked out: the page's journal keeps the edit for checkin
-      const next = splice(cur, b.model, b.log), hist = path.join(dir, '.decklet-history'), tmp = path.join(dir, `.${name}.${process.pid}.tmp`);
+      // suggestions the file already carries are reused (suggest() can take a second a word; correct() is cheap)
+      let sp; try { if (c) { const had = blockOf(cur, 'SPELL', {}), k = w => c(w); k.suggest = w => !Array.isArray(had) && Object.hasOwn(had, w) ? had[w] : c.suggest(w); sp = flagMap(b.model, k); } } catch {}
+      const next = splice(cur, b.model, b.log, sp), hist = path.join(dir, '.decklet-history'), tmp = path.join(dir, `.${name}.${process.pid}.tmp`);
       fs.mkdirSync(hist, {recursive: true}); fs.writeFileSync(path.join(hist, `${rev || 'norev'}-${Date.now()}.html`), cur);
       fs.writeFileSync(tmp, next); last = next; fs.renameSync(tmp, file);
       human.pending = 0; human.at = Date.now(); // the PUT carries every entry the page had: acknowledged
