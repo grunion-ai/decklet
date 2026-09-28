@@ -17,6 +17,13 @@ const ROLES = ['Title', 'Supertitle', 'H1', 'H2', 'Body', 'Caption', 'Label', 'S
 const kit = (n) => JSON.parse(fs.readFileSync(path.join(root, 'examples/styles', n, 'style.json'), 'utf8'));
 const lum = (hex) => { const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
 
+// #157: the kits on the shelf kept the ui-monospace lead the engine default dropped in K26, so a deck in any of them failed
+// verify --strict on the font-stack warning. Every style under examples/styles leads with a named family.
+test('styles: no shipped style trips the font-stack warning', () => {
+  const dirs = fs.readdirSync(path.join(root, 'examples/styles')).filter(n => fs.existsSync(path.join(root, 'examples/styles', n, 'style.json')));
+  assert.deepEqual([...dirs].sort(), [...KITS].sort(), 'every style directory is on the shelf');
+  for (const n of dirs) assert.deepEqual(fontWarnings({styles: kit(n)}).map(w => w.msg), [], `examples/styles/${n}`);
+});
 test('styles: every kit exists and each is a complete STYLE CONTRACT', () => {
   for (const n of KITS) {
     const s = kit(n), where = `examples/styles/${n}`;
