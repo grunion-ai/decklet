@@ -1162,16 +1162,16 @@ live('live: present-mode peek HUD clears the page counter', async () => {
   await b.close();
   assert.equal(hit.overlap, false, `the peek HUD sits on the page counter: ${JSON.stringify(hit)}`);
 });
-test('contact sheet keeps the HUD: pinned above the sheet only while it is open, prev/next/present disabled there', () => {
+test('contact sheet keeps the HUD: pinned above the sheet only while it is open, prev/next disabled there, present live', () => {
   assert.match(tpl, /body\.sheet #hud\{[^}]*position:fixed[^}]*z-index:21/, 'the HUD rides above the z-20 sheet');
   assert.doesNotMatch(tpl, /\n#hud\{[^}]*position:fixed/, 'scoped to body.sheet — the normal HUD stays in flow');
   assert.match(tpl, /body\.sheet #sheet\{padding-bottom/, 'the last row of thumbnails clears the pinned HUD');
   assert.match(tpl, /#hud button:disabled\{opacity:\.35;cursor:default\}/, 'disabled, not hidden: the pill keeps its shape');
-  assert.match(tpl, /function sheetUi\(on\)\{sheet\.hidden=!on;document\.body\.classList\.toggle\('sheet',on\);for\(const k of \['prev','next','fs','add-text','add-box'\]\)\$\(k\)\.disabled=on\}/, 'one switch: hidden flag, body marker and the disabled set move together');
+  assert.match(tpl, /function sheetUi\(on\)\{sheet\.hidden=!on;document\.body\.classList\.toggle\('sheet',on\);for\(const k of \['prev','next','add-text','add-box'\]\)\$\(k\)\.disabled=on\}/, 'one switch: hidden flag, body marker and the disabled set move together');
   assert.doesNotMatch(tpl, /sheet\.hidden=(true|false)/, 'nothing flips sheet.hidden behind the switch (present mode included)');
   assert.match(tpl, /d\.querySelectorAll\('#hud :disabled'\)\.forEach\(b=>b\.disabled=false\)/, 'saveCopy strips the sheet\'s disabled set with the rest of the chrome state');
 });
-live('live: contact sheet — the HUD stays on top with + (adds after the current slide), ⊞ (closes) and the autosave dot live; ‹ › ⛶ disabled', async () => {
+live('live: contact sheet — the HUD stays on top with + (adds after the current slide), ⊞ (closes), ⛶ and the autosave dot live; ‹ › disabled', async () => {
   const f = path.join(tmp, 'sheet-hud.html'); fs.writeFileSync(f, create(explainer.model, {title: 'sheet-hud'}).html);
   const b = await pw.chromium.launch(); const p = await b.newPage({viewport: {width: 1280, height: 800}});
   await p.goto(pathToFileURL(f).href); await p.waitForSelector('#canvas .el');
@@ -1183,7 +1183,7 @@ live('live: contact sheet — the HUD stays on top with + (adds after the curren
       disabled: ['prev', 'next', 'fs'].map(k => document.getElementById(k).disabled), autosave: document.getElementById('autosave').getBoundingClientRect().width > 0,
       addable: document.getElementById('sadd').disabled}; });
   assert.equal(s.hud, 'visible', 'HUD visible over the sheet'); assert.equal(s.onTop, true, '+ is not covered by the sheet');
-  assert.deepEqual(s.disabled, [true, true, true], 'prev/next/present disabled on the sheet'); assert.equal(s.autosave, true, 'the autosave dot shows'); assert.equal(s.addable, false, '+ Slide stays live');
+  assert.deepEqual(s.disabled, [true, true, false], 'prev/next disabled on the sheet, present live (issue #83)'); assert.equal(s.autosave, true, 'the autosave dot shows'); assert.equal(s.addable, false, '+ Slide stays live');
   await ev(() => sheetOpen()); await ev(() => { gsel = new Set([1]); }); // the sheet's selection is the current slide there
   await p.click('#addbtn'); await p.click('#sadd'); await p.waitForTimeout(100);
   const a = await ev(() => ({n: deck.slides.length, open: !document.getElementById('sheet').hidden, cells: document.querySelectorAll('#grid .cell').length, sel: [...document.querySelectorAll('#grid .cell.sel')].map(c => +c.dataset.n), i}));
