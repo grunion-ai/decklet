@@ -8,7 +8,7 @@ import os from 'node:os';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {create} from '../bin/create.mjs';
-import {flags, flagMap, textsOf, checkable, loadChecker} from '../lib/spell.mjs';
+import {WORD, flags, flagMap, textsOf, checkable, loadChecker} from '../lib/spell.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const tpl = fs.readFileSync(path.join(root, 'template.html'), 'utf8');
 let pw = null; try { pw = await import('playwright'); } catch {}
@@ -27,6 +27,17 @@ test('spell: the tokeniser skips what a dictionary cannot judge — short, shout
   assert.deepEqual(textsOf(model()).length, 4, 'master + two text rows + the html row; the line carries no words');
   assert.deepEqual(flags(model(), correct), ['fotter', 'linkd', 'renewls'], 'tags and entities are stripped; the result is sorted, lowercase, unique');
   assert.deepEqual(flags({...model(), spell: {ignore: ['Fotter']}}, correct), ['linkd', 'renewls'], 'the ignore list is case-blind');
+});
+// #158: an accented word is one token. "Systèmes" split at the è and flagged "syst"; the editor highlighted half a word.
+test('spell: accented words stay whole — the build tokeniser and the editor matcher are one regex', () => {
+  const m = {slides: [{els: [{x: 60, y: 80, w: 800, role: 'H1', text: 'Dassault Systèmes, Škoda and the café naïve plan'}]}]};
+  assert.deepEqual(flags(m, correct), ['café', 'dassault', 'naïve', 'systèmes', 'škoda'], 'whole words, never "syst" or "mes"');
+  assert.deepEqual(flags(m, w => /^(dassault|systèmes|škoda|café|naïve|the|and|plan)$/i.test(w)), [], 'a word the checker accepts is never split into flagged pieces');
+  for (const w of ['Systèmes', 'Škoda', 'café']) assert.ok(checkable(w), w);
+  for (const w of ['ÉCOLE', 'aÉro']) assert.ok(!checkable(w), w + ': shouting and inner capitals are judged on every letter, not only ASCII');
+  const re = tpl.match(/const s=n\.data;let m;const re=(\/[^\n]*?\/[a-z]*);/);
+  assert.ok(re, 'spellHits builds its matcher inline');
+  assert.equal(re[1], String(WORD), 'the editor highlights exactly the tokens the build flagged');
 });
 
 test('spell: create writes the flagged words AND their suggestions into the deck; without a checker the block is empty', () => {

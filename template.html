@@ -1390,7 +1390,8 @@ const SPELLSET=new Set(Object.keys(SPELLS));
 // never by host or port. Anything but true = the build's words only (a file:// deck, any other host), and the tip says so.
 let SPELLON=null,spellT=null;const spellQ=new Set(),SPELLTIP=' · words from the last build only; a deck served by bin/serve.mjs also checks what you type';
 const spellAsk=words=>fetch('/__decklet/spell',{method:'POST',headers:{'content-type':'application/json','X-Decklet-Token':HOST.t},body:JSON.stringify({words})}).then(r=>r.ok?r.json():null);
-function spellQueue(text){if(SPELLON!==true)return;for(const w of String(text).split(/[^\p{L}']+/u)){const x=w.replace(/^'+|'+$/g,'');if(x&&x.length<=64)spellQ.add(x)}clearTimeout(spellT);spellT=setTimeout(spellSend,300)}
+function spellQueue(text){if(SPELLON!==true)return; // the tokens lib/spell.mjs WORD and spellHits cut
+  for(const w of String(text).match(/\p{L}[\p{L}']*\p{L}|\p{L}/gu)||[])if(w.length<=64)spellQ.add(w);clearTimeout(spellT);spellT=setTimeout(spellSend,300)}
 function spellSend(){const words=[...spellQ].slice(0,500);spellQ.clear();if(!words.length)return; // the server takes 500 words of 64 characters at most
   spellAsk(words).then(j=>{if(!j||!j.ok)return;for(const w of words){const k=w.toLowerCase();if(!(k in j.flags)){delete SPELLS[k];SPELLSET.delete(k)}}
     for(const k in j.flags){SPELLS[k]=j.flags[k];SPELLSET.add(k)}paintSpell();
@@ -1399,7 +1400,7 @@ const spellSkip=()=>new Set(((deck.spell&&deck.spell.ignore)||[]).map(w=>String(
 const smenu=$('spellmenu'),sbad=$('spellbad');let spellAnchor=null; // the panel and its door; spellAnchor = the rect it points at, kept so a repaint holds its place
 // spellHits(root) → every flagged token under root as [textNode, index, length]; the canvas paints them, the sheet counts them
 const spellHits=root=>{const out=[];if(!SPELLSET.size)return out;const skip=spellSkip();const it=document.createNodeIterator(root,NodeFilter.SHOW_TEXT);let n;
-  while(n=it.nextNode()){if(n.parentElement.closest('.h,.num,svg'))continue;const s=n.data;let m;const re=/[A-Za-z][A-Za-z']*[A-Za-z]|[A-Za-z]/g;
+  while(n=it.nextNode()){if(n.parentElement.closest('.h,.num,svg'))continue;const s=n.data;let m;const re=/\p{L}[\p{L}']*\p{L}|\p{L}/gu;
     while(m=re.exec(s)){const w=m[0].toLowerCase();if(SPELLSET.has(w)&&!skip.has(w))out.push([n,m.index,m[0].length])}}
   return out};
 // the badge: a red count, one per token (a word twice counts twice); hidden at zero, off, or while presenting
