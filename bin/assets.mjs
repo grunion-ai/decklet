@@ -111,6 +111,13 @@ export async function logo(input, {out, name, domain, file} = {}) {
     catch (e) { tried.push(`${source}: ${e.message.slice(0, 120)}`); }
     return null;
   };
+  // no source landed: a monogram, unless the manifest already holds a real logo under this key (#154: a failed retry under a
+  // second domain replaced a working entry). Then that row and its file stay, and the caller reports the retry as kept.
+  const fallback = () => {
+    let prev; try { prev = JSON.parse(fs.readFileSync(path.join(out, 'manifest.json'), 'utf8')).find(r => r.name === key); } catch {}
+    if (prev && prev.source !== 'monogram') return {row: prev, tried, kept: true};
+    return {row: writeRow(out, {name: key, file: `${key}.svg`, source: 'monogram', aspect: 1, plate: 'any', fallback: true}, monogram(input)), tried};
+  };
   if (file) { // an explicit local import: normalise it the same way, or fall straight to the monogram (K25)
     const fmt = fmtOfFile(file);
     if (!fmt) tried.push(`file: unsupported extension ${path.extname(file) || '(none)'} — use .svg or .png`);
@@ -121,7 +128,7 @@ export async function logo(input, {out, name, domain, file} = {}) {
         tried.push(`file unusable (blank or unparseable): ${file}`);
       } catch (e) { tried.push(`file: ${e.message.slice(0, 120)}`); }
     }
-    return {row: writeRow(out, {name: key, file: `${key}.svg`, source: 'monogram', aspect: 1, plate: 'any', fallback: true}, monogram(input)), tried};
+    return fallback();
   }
   const slugs = [...new Set([slugOf(isDomain(input) ? dom.split('.')[0] : input), slugOf(dom.replace(/\.\w+$/, ''))])];
   for (const s of slugs) { const r = await attempt(`https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/${s}.svg`, 'svg', 'simple-icons'); if (r) return {row: r, tried}; }
@@ -140,7 +147,7 @@ export async function logo(input, {out, name, domain, file} = {}) {
     }
   } catch (e) { tried.push(`site: ${e.message.slice(0, 120)}`); }
   const s2 = await attempt(`https://www.google.com/s2/favicons?domain=${dom}&sz=256`, 'png', 's2'); if (s2) return {row: s2, tried};
-  return {row: writeRow(out, {name: key, file: `${key}.svg`, source: 'monogram', aspect: 1, plate: 'any', fallback: true}, monogram(input)), tried};
+  return fallback();
 }
 
 export async function shot(url, {out, crop, width = 1440, wait = 800} = {}) {
@@ -180,10 +187,12 @@ if (isMain(import.meta.url)) {
     } else if (cmd === 'logo') {
       const missed = [];
       for (const a of args) {
-        const {row, tried} = await logo(a, o);
+        const {row, tried, kept} = await logo(a, o);
         for (const t of tried) console.error('  skipped ' + t);
+        if (kept) console.error(`kept: ${a} (retry found no logo; the earlier ${row.source} entry ${row.file} stays)`);
         if (row.fallback) missed.push(a);
         console.log(JSON.stringify(row));
+        if (kept && o.strict) process.exitCode = 1;
       }
       if (missed.length) {
         console.error(`missed: ${missed.join(', ')} (monogram fallback; pass --domain or supply the file)`);
