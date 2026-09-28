@@ -14,7 +14,7 @@ This manifest is a contract: the gate compares it against the template, so the H
 
 ## The contact sheet
 
-**Contact sheet:** live thumbnails 3-across; click / ⌘ / shift select, double-click opens, grab-and-drag reorders (mouse or touch — the other cells slide aside), ⌫ deletes (never the last), ⌘C ⌘V ⌘D ⌘Z. It also opens in present mode. Hold a dragged thumbnail near the sheet's top or bottom edge and the sheet scrolls, faster the closer you get; Escape cancels the drag.
+**Contact sheet:** live thumbnails 3-across; click / ⌘ / shift select, double-click opens, grab-and-drag reorders (mouse or touch — the other cells slide aside), ⌫ deletes (never the last), ⌘C ⌘V ⌘D ⌘Z, C or Esc closes, F presents from the picked slide. It also opens in present mode, and there F leaves full screen from the sheet. Hold a dragged thumbnail near the sheet's top or bottom edge and the sheet scrolls, faster the closer you get; Escape cancels the drag.
 
 ## PDF
 
