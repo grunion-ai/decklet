@@ -222,6 +222,47 @@ live('⌘B / ⌘I / ⌘U mark the selection while editing, and take the whole ro
   await b.close();
 });
 
+// B on a row whose role is already bold (Title, 800) showed "on", changed nothing on screen, and saved
+// <span style="font-weight: normal;">: the title came back regular. The button is disabled there, with a tip, and ⌘B is a no-op.
+const boldDeck = () => model({slides: [{els: [{x: 60, y: 80, w: 800, role: 'Title', text: 'Big title'}, {x: 60, y: 300, w: 400, role: 'Body', text: 'body one'}]}]});
+const editAll = (p, n) => p.evaluate(n => { i = 0; sel.clear(); sel.add(n); render(); edit(n); const t = canvas.querySelector(`[data-n="${n}"]`), r = document.createRange(); r.selectNodeContents(t); getSelection().removeAllRanges(); getSelection().addRange(r); placeTb(); }, n);
+const B = p => p.evaluate(() => { const b = tb.querySelector('[data-cmd="bold"]'); return {disabled: b.disabled, on: b.classList.contains('on'), tip: b.title, label: b.getAttribute('aria-label')}; });
+live('B on a row whose role is already bold is disabled with a tip, and a press leaves the model byte-identical', async () => {
+  const b = await pw.chromium.launch(); const p = await fresh(b, write('boldrole.html', create(boldDeck()).html)); try {
+  const before = await p.evaluate(() => JSON.stringify(deck));
+  await editAll(p, 0);
+  const s = await B(p);
+  assert.equal(s.disabled, true, 'B is disabled on a Title row'); assert.equal(s.on, false, 'and never shows "on"');
+  assert.equal(s.tip, 'Bold · the role is already bold'); assert.equal(s.label, s.tip, 'the tip is the accessible name too');
+  await p.evaluate(() => { const b = tb.querySelector('[data-cmd="bold"]'); b.disabled = false; b.click(); }); // the handler holds even if the button were live
+  await p.evaluate(() => nav(1));
+  assert.equal(await p.evaluate(() => JSON.stringify(deck)), before, 'the model is byte-identical');
+  assert.deepEqual(p.errs, []); } finally { await b.close(); }
+});
+live('⌘B on a row whose role is already bold leaves the model byte-identical, editing or merely selected', async () => {
+  const b = await pw.chromium.launch(); const p = await fresh(b, write('boldrole-key.html', create(boldDeck()).html)); try {
+  const before = await p.evaluate(() => JSON.stringify(deck));
+  await editAll(p, 0); await p.keyboard.press('Meta+b'); await p.evaluate(() => nav(1));
+  assert.equal(await p.evaluate(() => JSON.stringify(deck)), before, 'editing: unchanged');
+  await p.evaluate(() => { i = 0; sel.clear(); sel.add(0); render(); }); await p.keyboard.press('Meta+b'); await p.evaluate(() => nav(1));
+  assert.equal(await p.evaluate(() => JSON.stringify(deck)), before, 'selected: unchanged');
+  // a style decides, not the role name: a deck that sets Body to 700 disables B on Body
+  await p.evaluate(() => { deck.styles.roles.Body.weight = 700; i = 0; render(); });
+  await editAll(p, 1); assert.equal((await B(p)).disabled, true, 'a Body row styled 700 is already bold');
+  assert.deepEqual(p.errs, []); } finally { await b.close(); }
+});
+live('B on a regular-weight row still bolds and un-bolds', async () => {
+  const b = await pw.chromium.launch(); const p = await fresh(b, write('boldbody.html', create(boldDeck()).html)); try {
+  await editAll(p, 1);
+  const s = await B(p); assert.equal(s.disabled, false, 'B is live on a Body row'); assert.equal(s.tip, 'Bold');
+  await p.evaluate(() => tb.querySelector('[data-cmd="bold"]').click()); await p.evaluate(() => nav(1));
+  assert.match(await p.evaluate(() => deck.slides[0].els[1].html), /<b>body one<\/b>/, 'bolded');
+  await editAll(p, 1); assert.equal((await B(p)).on, true, 'B shows on over the bold run');
+  await p.evaluate(() => tb.querySelector('[data-cmd="bold"]').click()); await p.evaluate(() => nav(1));
+  assert.doesNotMatch(await p.evaluate(() => deck.slides[0].els[1].html || deck.slides[0].els[1].text), /<b>|font-weight/, 'un-bolded');
+  assert.deepEqual(p.errs, []); } finally { await b.close(); }
+});
+
 // L1.1 — the contact sheet keeps its scroll: every sheet action rebuilt the grid from innerHTML='', so #sheet's scroll
 // height collapsed for that frame and the viewport snapped to the top. #sheet (position:fixed; overflow:auto) is the
 // scroller, not the window. Both engines: the clamp-on-collapse is per engine.
