@@ -131,7 +131,8 @@ test('splice() rewrites only the DECK and LOG data blocks, escapes </script, and
   assert.equal(blockOf(out, 'DECK').slides[0].els[0].text, 'a </script> b');
   assert.doesNotMatch(out.slice(out.indexOf('=/*DECK*/'), out.indexOf('/*/DECK*/')), /<\/script/i);
   assert.deepEqual(blockOf(out, 'LOG'), [{x: 1}]);
-  assert.equal(out.replace(/=\/\*DECK\*\/[\s\S]*?\/\*\/DECK\*\//, '').replace(/=\/\*LOG\*\/[\s\S]*?\/\*\/LOG\*\//, ''), html.replace(/=\/\*DECK\*\/[\s\S]*?\/\*\/DECK\*\//, '').replace(/=\/\*LOG\*\/[\s\S]*?\/\*\/LOG\*\//, ''), 'nothing else moves');
+  const rest = h => h.replace(/=\/\*DECK\*\/[\s\S]*?\/\*\/DECK\*\//, '').replace(/=\/\*LOG\*\/[\s\S]*?\/\*\/LOG\*\//, '').replace(/<div id="canvas"><noscript>[\s\S]*?<\/noscript>/, ''); // #85: and the still of slide 1 (test/still.test.mjs)
+  assert.equal(rest(out), rest(html), 'nothing else moves');
   const tpl = fs.readFileSync(path.join(root, 'template.html'), 'utf8');
   assert.match(tpl.slice(tpl.indexOf('function fileHtml(')), /^function fileHtml\(\)\{[\s\S]*?sc\.textContent=splice\(sc\.textContent,deck,log\)/, 'fileHtml writes through splice()');
 });
