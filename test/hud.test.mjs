@@ -105,22 +105,23 @@ for (const engine of ['chromium', 'webkit']) live(`hud: F and ⛶ toggle full sc
   }, {timeout: 50000});
 });
 
-live('hud: duplicate copies the selected rows offset 16px and selects the copies; with nothing selected it copies the slide', async () => {
-  const b = await pw.chromium.launch(); const p = await open(b);
+// Issue #80: the button duplicated the selected rows when rows were selected, and the slide otherwise, so the same click
+// meant two things depending on the canvas. It duplicates slides only: the current slide on the canvas, the selected slides
+// in the sheet. Rows are copied with ⌘C / ⌘V (#79).
+test('hud: the duplicate button is named for the slide', () => {
+  assert.match(hud, /<button id="dup"[^>]*data-tip="Duplicate slide" aria-label="Duplicate slide"/);
+});
+live('hud: duplicate copies the slide whatever rows are selected; in the sheet it copies the selected slides', async () => {
+  const b = await pw.chromium.launch(); try { const p = await open(b);
   await p.evaluate(() => { sel.clear(); sel.add(1); sel.add(2); render(); });
   await p.click('#dup');
-  const s = await p.evaluate(() => ({n: slide().els.length, sel: [...sel], a: slide().els[3], c: slide().els[4]}));
-  assert.equal(s.n, 5); assert.deepEqual(s.sel, [3, 4]);
-  assert.deepEqual([s.a.x, s.a.y, s.a.text], [76, 216, 'body one']);
-  assert.deepEqual([s.c.x, s.c.y, s.c.line], [116, 316, [416, 316]], 'a connector moves both ends');
-  await p.evaluate(() => { sel.clear(); render(); });
-  await p.click('#dup');
-  const d = await p.evaluate(() => ({n: deck.slides.length, i, ids: deck.slides.map(x => x.id), texts: deck.slides.map(x => x.els[0].text)}));
-  assert.equal(d.n, 3); assert.equal(d.i, 1); assert.deepEqual(d.texts, ['One', 'One', 'Two']);
+  const d = await p.evaluate(() => ({n: deck.slides.length, i, rows: deck.slides.map(x => x.els.length), ids: deck.slides.map(x => x.id), texts: deck.slides.map(x => x.els[0].text), sel: [...sel]}));
+  assert.deepEqual([d.n, d.i, d.rows, d.texts, d.sel], [3, 1, [3, 3, 1], ['One', 'One', 'Two'], []], 'a slide copy after the current one, no row copies, nothing selected on the copy');
   assert.equal(new Set(d.ids).size, 3, 'the copy gets its own slide id');
+  await p.keyboard.press('ControlOrMeta+z'); assert.equal(await p.evaluate(() => deck.slides.length), 2, '⌘Z takes it back');
   await p.keyboard.press('c'); await p.click('#dup');
-  assert.equal(await p.evaluate(() => deck.slides.length), 4, 'in the sheet, duplicate copies the selected slides');
-  assert.deepEqual(p.errs, []); await b.close();
+  assert.equal(await p.evaluate(() => deck.slides.length), 3, 'in the sheet, duplicate copies the selected slides');
+  assert.deepEqual(p.errs, []); } finally { await b.close(); }
 });
 
 // ── the save control: one door, and an icon you can read ──────────────────────────────────────────────────────────────

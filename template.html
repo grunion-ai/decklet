@@ -260,7 +260,7 @@ body.present.peek #hud{gap:5px;padding:6px 10px}body.present.peek #hud button{pa
       <button id="sadd">+ Slide</button>
     </div>
   </div>
-  <button id="dup" class="mi mi-copy" data-ms="900" data-tip="Duplicate selection or slide" aria-label="Duplicate selection or slide"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" class="copy-rect" data-mi="animate"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" class="copy-path" data-mi="animate"/><path d="M12 15h6"/><path d="M15 12v6"/></svg></button>
+  <button id="dup" class="mi mi-copy" data-ms="900" data-tip="Duplicate slide" aria-label="Duplicate slide"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" class="copy-rect" data-mi="animate"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" class="copy-path" data-mi="animate"/><path d="M12 15h6"/><path d="M15 12v6"/></svg></button>
   <button id="snap" class="mi mi-grip" data-ms="600" data-tip="Guides + snap · off · G" aria-label="Guides + snap · off · G" aria-pressed="false"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g class="dots" data-mi="animate"><circle cx="5" cy="5" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="19" cy="5" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="19" r="1"/><circle cx="12" cy="19" r="1"/><circle cx="19" cy="19" r="1"/></g></svg></button>
   <div id="spellwrap">
     <button id="spell" class="mi mi-spell-check" data-ms="500" data-tip="Spellcheck · on" aria-label="Spellcheck · on" aria-pressed="true"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 16 6-12 6 12"/><path d="M8 12h8"/><path d="m16 20 2 2 4-4" class="tick" data-mi="animate"/></svg></button>
@@ -1597,12 +1597,11 @@ $('bugcopy').onclick=async()=>{const r=bugBuild(),b=$('bugcopy');try{await navig
 helpbtn.onclick=()=>help(!helpmenu.classList.contains('open'));
 helpbtn.onmouseenter=()=>{helpT=setTimeout(()=>help(true),350)};helpbtn.onmouseleave=()=>clearTimeout(helpT);
 document.addEventListener('mousedown',e=>{if(!e.target.closest('#addwrap'))menu(false);if(!e.target.closest('#helpwrap'))help(false);if(!e.target.closest('#spellmenu,#spellwrap'))spellClose()});
-// duplicate: selected rows (offset 16px, the copies become the selection) · else the slide, after itself · in the sheet, the selected slides
+// duplicate: slides only (rows copy with ⌘C ⌘V): the current slide, after itself · in the sheet, the selected slides
 $('dup').onclick=()=>{commitEdit();menu(false);
   if(!sheet.hidden){snap();const src=[...gsel].sort((a,b)=>a-b);if(!src.length)return;const at=src[src.length-1]+1;const cp=src.map(n=>{const c=dup(deck.slides[n]);delete c.id;return c});deck.slides.splice(at,0,...cp);gsel=new Set(cp.map((_,x)=>at+x));ganchor=i=at;save();sheetRender();return}
   snap();const s=slide();
-  if(sel.size){const ns=[...sel].map(k=>typeof k==='number'?k:fork(k.slice(2)));const cp=ns.map(n=>{const o=s.els[n],c=dup(o);delete c.id;moveBy(c,o,16,16);return c});const at=s.els.length;s.els.push(...cp);sel.clear();cp.forEach((_,x)=>sel.add(at+x));save();render();return}
-  const c=dup(s);delete c.id;deck.slides.splice(i+1,0,c);i=i+1;save();render()};
+  const c=dup(s);delete c.id;deck.slides.splice(i+1,0,c);i=i+1;sel.clear();save();render()};
 // fileHtml(): THIS document with the CURRENT model and log baked into their literals, chrome state stripped — the
 // file an agent reads (bin/edits.mjs, create --from) and the copy that opens anywhere without browser storage.
 function fileHtml(){

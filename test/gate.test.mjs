@@ -1447,7 +1447,7 @@ live('live: arrows nudge a selection 1px (⇧ 10px), a connector travels whole, 
 });
 test('nudge shares the drag translation path and is named in the shortcuts popover', () => {
   assert.match(tpl, /const moveBy=\(el,o,dx,dy\)=>/, 'one moveBy helper');
-  assert.equal((tpl.match(/moveBy\(/g) || []).length, 4, 'drag, nudge, duplicate and row paste all call it — no second translation path');
+  assert.equal((tpl.match(/moveBy\(/g) || []).length, 3, 'drag, nudge and row paste all call it — no second translation path');
   assert.match(tpl, /nudge 1px · <kbd>⇧<\/kbd> 10px/);
 });
 
