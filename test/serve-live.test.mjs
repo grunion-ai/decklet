@@ -12,6 +12,8 @@ import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {create} from '../bin/create.mjs';
 import {blockOf} from '../lib/edits.mjs';
+import {serve} from '../bin/serve.mjs';
+import {loadChecker} from '../lib/spell.mjs';
 import {projects, withProject} from './helpers/projects.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -99,6 +101,82 @@ for (const engine of projects()) live(`${engine}: hosted deck, edits reach the f
     await new Promise(r => setTimeout(r, 1200));
     assert.equal(fs.readdirSync(path.join(dir, '.decklet-history')).length, hist1, 'nothing written back');
   }, {timeout: 90000}); } finally { await new Promise(r => { s.child.on('exit', r); s.child.kill('SIGTERM'); }); }
+});
+
+// ── issue 86: a word typed after the build reaches the badge, the wash, the thumbnails and the panel. The page asks
+// bin/serve.mjs about the words of a row when the edit commits (debounced, never per keystroke); the server runs the build's
+// own lib/spell.mjs; the answer merges into the set the editor already paints, and the next PUT writes it into the file.
+// timeouts: the server loads the dictionary on the probe (about 3 s) and nspell's suggest() can take a second for one word
+const TIP = ' · words from the last build only; a deck served by bin/serve.mjs also checks what you type';
+const spellState = p => p.evaluate(() => ({
+  badge: $('spellbad').hidden ? null : +$('spellbad').textContent,
+  marks: [...(CSS.highlights.get('spell') || [])].map(r => r.toString()).sort(),
+  tip: $('spell').dataset.tip,
+}));
+const typeInto = async (p, n, text) => { await p.evaluate(n => { commitEdit(); sel.clear(); sel.add(n); render(); edit(n); }, n); await p.keyboard.type(text); };
+for (const engine of projects()) live(`${engine}: a served deck checks the words typed into a row — badge, wash, thumbnails, panel with suggestions — and they clear when the word is fixed`, async () => {
+  if (!await loadChecker('en')) return; // the dictionary is an optional peer; its absence is proved below
+  const dir = path.join(tmp, 'spell-' + engine); fs.mkdirSync(dir); const f = path.join(dir, 'deck.html'); fs.writeFileSync(f, create(model()).html);
+  const s = await start(f);
+  try { await withProject(pw, engine, async ({context}) => { const ctx = await context();
+    const p = await ctx.newPage(); const asked = [], errs = []; p.on('pageerror', e => errs.push(String(e)));
+    p.on('request', r => { if (r.url().endsWith('/__decklet/spell')) asked.push(JSON.parse(r.postData()).words); });
+    await p.goto(s.origin + '/'); await hostOn(p);
+    await p.waitForFunction(() => SPELLON, null, {timeout: 15000});
+    assert.deepEqual(asked, [[]], 'the editor finds the checker by a probe of the endpoint');
+    assert.equal((await spellState(p)).tip, 'Spellcheck · on', 'a served deck with a dictionary makes no build-only caveat');
+
+    await typeInto(p, 0, 'Untityled dekjck'); await p.waitForTimeout(500);
+    assert.equal(asked.length, 1, 'no request while typing');
+    await p.evaluate(() => commitEdit());
+    await p.waitForFunction(() => +$('spellbad').textContent === 2 && !$('spellbad').hidden, null, {timeout: 15000});
+    assert.deepEqual(asked.slice(1), [['Untityled', 'dekjck']], 'one request on commit, carrying the words of that row only');
+    assert.deepEqual(await spellState(p), {badge: 2, marks: ['Untityled', 'dekjck'], tip: 'Spellcheck · on · 2 flagged on this slide'});
+    await p.click('#spellbad');
+    const panel = await p.evaluate(() => [...document.querySelectorAll('#spellmenu .w')].map(w => [w.querySelector('b').textContent, [...w.querySelectorAll('.sg')].map(b => b.textContent)]));
+    assert.deepEqual(panel.map(x => x[0]), ['untityled', 'dekjck'], 'the panel lists the typed words');
+    assert.ok(panel[0][1].includes('untitled'), 'with the dictionary\'s suggestions: ' + JSON.stringify(panel));
+    await p.keyboard.press('Escape'); await p.keyboard.press('c');
+    await p.waitForFunction(() => !document.getElementById('sheet').hidden, null, {timeout: 2000});
+    assert.deepEqual(await p.evaluate(() => [...document.querySelectorAll('#grid .cell .spellbad')].map(b => b.hidden ? null : +b.textContent)), [2, null], 'the thumbnail counts them');
+    await p.keyboard.press('Escape'); await p.waitForFunction(() => document.getElementById('sheet').hidden, null, {timeout: 2000});
+
+    // the next save writes them into the file: a reload shows them before any new request
+    await diskHas(f, d => d.slides[0].els[0].text === 'Untityled dekjck');
+    const t0 = Date.now(); while (!('untityled' in blockOf(fs.readFileSync(f, 'utf8'), 'SPELL')) && Date.now() - t0 < 5000) await new Promise(r => setTimeout(r, 50));
+    assert.deepEqual(Object.keys(blockOf(fs.readFileSync(f, 'utf8'), 'SPELL')), ['dekjck', 'untityled'], 'the file carries the live flags');
+    await p.route('**/__decklet/spell', r => r.abort());
+    await p.reload(); await hostOn(p);
+    assert.deepEqual((await spellState(p)).marks, ['Untityled', 'dekjck'], 'reloaded: flagged from the file alone');
+    await p.unroute('**/__decklet/spell');
+
+    // the fix: typed over, committed — every surface clears, and the file drops the words
+    await p.reload(); await hostOn(p); await p.waitForFunction(() => SPELLON, null, {timeout: 15000});
+    await p.evaluate(() => { sel.clear(); sel.add(0); render(); edit(0); }); await p.keyboard.type('Untitled deck'); await p.evaluate(() => commitEdit());
+    await p.waitForFunction(() => $('spellbad').hidden, null, {timeout: 4000});
+    assert.deepEqual(await spellState(p), {badge: null, marks: [], tip: 'Spellcheck · on'});
+    await p.keyboard.press('c'); await p.waitForFunction(() => !document.getElementById('sheet').hidden, null, {timeout: 2000});
+    assert.deepEqual(await p.evaluate(() => [...document.querySelectorAll('#grid .cell .spellbad')].map(b => b.hidden ? null : +b.textContent)), [null, null]);
+    await diskHas(f, d => d.slides[0].els[0].text === 'Untitled deck');
+    const t1 = Date.now(); while (Object.keys(blockOf(fs.readFileSync(f, 'utf8'), 'SPELL')).length && Date.now() - t1 < 5000) await new Promise(r => setTimeout(r, 50));
+    assert.deepEqual(blockOf(fs.readFileSync(f, 'utf8'), 'SPELL'), {}, 'the file drops the fixed words');
+    assert.deepEqual(errs, []);
+  }, {timeout: 90000}); } finally { await new Promise(r => { s.child.on('exit', r); s.child.kill('SIGTERM'); }); }
+});
+
+live('a served deck whose server has no dictionary keeps build-time checking: one probe, no request on commit, and the file:// tip', async () => {
+  const dir = path.join(tmp, 'spell-none'); fs.mkdirSync(dir); const f = path.join(dir, 'deck.html'); fs.writeFileSync(f, create(model()).html);
+  const s = await serve(f, {spell: false});
+  try { await withProject(pw, 'chromium', async ({context}) => { const ctx = await context();
+    const p = await ctx.newPage(); const asked = []; p.on('request', r => { if (r.url().endsWith('/__decklet/spell')) asked.push(r.postData()); });
+    await p.goto(s.url); await hostOn(p);
+    await p.waitForFunction(() => SPELLON === false, null, {timeout: 4000});
+    assert.equal(asked.length, 1, 'the probe');
+    await typeInto(p, 0, 'Untityled'); await p.evaluate(() => commitEdit()); await p.waitForTimeout(800);
+    assert.equal(asked.length, 1, 'no request after the probe said no');
+    assert.equal(await p.evaluate(() => SPELLON), false);
+    assert.equal((await spellState(p)).tip, 'Spellcheck · on' + TIP, 'the same tip a file:// deck shows');
+  }); } finally { await s.close(); }
 });
 
 test.after(() => fs.rmSync(tmp, {recursive: true, force: true}));

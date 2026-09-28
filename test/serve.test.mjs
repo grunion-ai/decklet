@@ -14,6 +14,9 @@ import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {create} from '../bin/create.mjs';
 import {blockOf, splice, applyLog} from '../lib/edits.mjs';
+import {serve} from '../bin/serve.mjs';
+import {edits} from '../bin/edits.mjs';
+import {flagMap, loadChecker} from '../lib/spell.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const bin = path.join(root, 'bin', 'serve.mjs');
@@ -113,7 +116,7 @@ test('a PUT splices {model, log} into the file through splice() (the function fi
     const r = await put(s, {model: e.model, log: e.log}, {rev});
     assert.equal(r.status, 200, r.body); assert.deepEqual(JSON.parse(r.body), {ok: true, rev});
     const after = fs.readFileSync(f, 'utf8');
-    assert.equal(after, splice(before, e.model, e.log), 'byte for byte what the page\'s own splice makes of the same model and log');
+    assert.equal(after, splice(before, e.model, e.log), 'no spell request has loaded a dictionary, so the SPELL block stays: byte for byte what the page\'s own splice makes of the same model and log');
     assert.equal(blockOf(after, 'DECK').slides[0].els[0].text, 'Uno'); assert.equal(blockOf(after, 'LOG').length, 1);
     assert.ok(!after.includes(s.token), 'the injected meta never reaches the file');
     const dir = path.dirname(f), hist = fs.readdirSync(path.join(dir, '.decklet-history'));
@@ -133,8 +136,87 @@ test('splice() rewrites only the DECK and LOG data blocks, escapes </script, and
   assert.deepEqual(blockOf(out, 'LOG'), [{x: 1}]);
   const rest = h => h.replace(/=\/\*DECK\*\/[\s\S]*?\/\*\/DECK\*\//, '').replace(/=\/\*LOG\*\/[\s\S]*?\/\*\/LOG\*\//, '').replace(/<div id="canvas"><noscript>[\s\S]*?<\/noscript>/, ''); // #85: and the still of slide 1 (test/still.test.mjs)
   assert.equal(rest(out), rest(html), 'nothing else moves');
+  assert.deepEqual(blockOf(splice(html, d, [], {dekjck: ['deck']}), 'SPELL'), {dekjck: ['deck']}, 'a fourth argument rewrites the SPELL block (the server\'s PUT, issue 86)');
+  const old = html.replace(/const SPELL0=\/\*SPELL\*\/[\s\S]*?\/\*\/SPELL\*\//, 'const SPELL0=[]');
+  assert.equal(blockOf(splice(old, d, [], {dekjck: []}), 'DECK').slides[0].els[0].text, 'a </script> b', 'a file from before the SPELL block keeps working: no block, nothing to rewrite');
   const tpl = fs.readFileSync(path.join(root, 'template.html'), 'utf8');
   assert.match(tpl.slice(tpl.indexOf('function fileHtml(')), /^function fileHtml\(\)\{[\s\S]*?sc\.textContent=splice\(sc\.textContent,deck,log\)/, 'fileHtml writes through splice()');
+});
+
+// ── live spellcheck (issue 86): the page asks the server about the words of a committed row; the server runs lib/spell.mjs,
+// the build's own code and dictionary, so the build and the live check never disagree about a word ──
+const spellReq = (s, body, {token = s.token, host} = {}) => req(s, 'POST', '/__decklet/spell', {host, headers: {'content-type': 'application/json', ...(token ? {'x-decklet-token': token} : {})}, body: typeof body === 'string' ? body : JSON.stringify(body)});
+
+test('POST /__decklet/spell answers the refused words of a word list with their suggestions, through lib/spell.mjs, honouring the deck\'s spell.ignore', async () => {
+  const c = await loadChecker('en'); if (!c) return; // the dictionary is an optional peer: the no-dictionary answer is proved below
+  const d = path.join(tmp, 'spell-ignore'); fs.mkdirSync(d); const f = path.join(d, 'deck.html');
+  fs.writeFileSync(f, create({...model(), spell: {ignore: ['Grunion']}}).html);
+  const s = await start(f);
+  try {
+    const words = ['Untityled', 'dekjck', 'plan', 'MCA', 'grunion', 'Untityled'];
+    const r = await spellReq(s, {words});
+    assert.equal(r.status, 200, r.body); assert.equal(r.headers['access-control-allow-origin'], undefined, 'no CORS, ever');
+    const j = JSON.parse(r.body);
+    assert.deepEqual(j, {ok: true, flags: flagMap({slides: [{els: [{text: words.join(' ')}]}], spell: {ignore: ['Grunion']}}, c)}, 'exactly what the build computes for the same words');
+    assert.deepEqual(Object.keys(j.flags), ['dekjck', 'untityled'], 'shouting and ignored words pass, as they do at build time');
+    assert.ok(j.flags.untityled.includes('untitled'), 'with the dictionary\'s suggestions: ' + j.flags.untityled);
+    assert.deepEqual(JSON.parse((await spellReq(s, {words: []})).body), {ok: true, flags: {}}, 'the empty list is the probe');
+  } finally { await stop(s); }
+});
+
+test('POST /__decklet/spell is guarded like the write endpoints: token, Host, and a bounded list of short strings', async () => {
+  const f = deckFile(), s = await start(f);
+  try {
+    assert.equal((await spellReq(s, {words: ['dekjck']}, {token: null})).status, 403, 'no token');
+    assert.equal((await spellReq(s, {words: ['dekjck']}, {token: s.token.slice(1) + 'x'})).status, 403, 'a wrong token');
+    assert.equal((await spellReq(s, {words: ['dekjck']}, {host: 'evil.example'})).status, 421, 'a foreign Host');
+    for (const bad of [{}, {words: 'dekjck'}, {words: [1]}, {words: ['x'.repeat(65)]}, {words: Array(501).fill('word')}, 'not json'])
+      assert.equal((await spellReq(s, bad)).status, 400, JSON.stringify(bad).slice(0, 40));
+    assert.equal((await get(s, '/__decklet/spell', {headers: {'x-decklet-token': s.token}})).status, 404, 'POST only');
+  } finally { await stop(s); }
+});
+
+test('a PUT rewrites the SPELL block from the new model, so a reload shows the live flags; bin/edits.mjs and create --from still read the file', async () => {
+  const c = await loadChecker('en'); if (!c) return;
+  const f = deckFile(), s = await start(f);
+  try {
+    assert.equal((await spellReq(s, {words: []})).status, 200, 'the page\'s probe loads the dictionary; a PUT never waits for it');
+    const before = fs.readFileSync(f, 'utf8'), rev = blockOf(before, 'DECK').rev, e = edited(f);
+    e.model.slides[1].els[0].text = 'Untityled dekjck';
+    assert.equal((await put(s, {model: e.model, log: e.log}, {rev})).status, 200);
+    const after = fs.readFileSync(f, 'utf8');
+    assert.deepEqual(blockOf(after, 'SPELL'), flagMap(e.model, c), 'the words the build would flag in this model, with their suggestions');
+    assert.ok('untityled' in blockOf(after, 'SPELL') && 'dekjck' in blockOf(after, 'SPELL'));
+    assert.equal(edits(after).log.length, 1, 'bin/edits.mjs reads the log');
+    assert.equal(blockOf(create(model(), {from: f}).html, 'DECK').slides[0].els[0].text, 'Uno', 'create --from reads the file and replays the edit');
+  } finally { await stop(s); }
+});
+
+test('the dictionary loads off the request thread: a PUT sent while the probe is still loading it answers first', async () => {
+  if (!await loadChecker('en')) return;
+  const f = deckFile(), s = await start(f);
+  try {
+    let probed = 0; const probe = spellReq(s, {words: []}).then(r => { probed = Date.now(); return r; });
+    await new Promise(r => setTimeout(r, 100));
+    const rev = blockOf(fs.readFileSync(f, 'utf8'), 'DECK').rev, e = edited(f);
+    assert.equal((await put(s, {model: e.model, log: e.log}, {rev})).status, 200); const wrote = Date.now();
+    assert.equal((await probe).status, 200);
+    assert.ok(wrote < probed, 'the PUT did not wait behind nspell parsing the dictionary');
+  } finally { await stop(s); }
+});
+
+test('without a dictionary the endpoint says checking is unavailable (503) and a PUT leaves the build\'s SPELL block as it was', async () => {
+  const f = deckFile(), html = fs.readFileSync(f, 'utf8').replace(/=\/\*SPELL\*\/[\s\S]*?\/\*\/SPELL\*\//, '=/*SPELL*/{"built":["kept"]}/*/SPELL*/');
+  fs.writeFileSync(f, html);
+  const s = await serve(f, {spell: false}), p = s.port, host = `127.0.0.1:${p}`;
+  const call = (method, pth, body, h = {}) => fetch(`http://${host}${pth}`, {method, headers: {'content-type': 'application/json', 'x-decklet-token': s.token, ...h}, body: body && JSON.stringify(body)});
+  try {
+    const r = await call('POST', '/__decklet/spell', {words: ['dekjck']});
+    assert.equal(r.status, 503); assert.deepEqual(await r.json(), {ok: false, reason: 'no dictionary'});
+    const rev = blockOf(html, 'DECK').rev, e = edited(f);
+    assert.equal((await call('PUT', '/__decklet/file', {model: e.model, log: e.log}, {'if-match': rev})).status, 200);
+    assert.deepEqual(blockOf(fs.readFileSync(f, 'utf8'), 'SPELL'), {built: ['kept']}, 'no dictionary, no opinion: the build\'s words stay');
+  } finally { await s.close(); }
 });
 
 test('the SSE stream says `changed` with the new rev for a write that is not its own PUT, and nothing for its own', async () => {
