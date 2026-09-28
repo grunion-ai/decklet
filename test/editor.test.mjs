@@ -44,6 +44,33 @@ live('the mini toolbar opens on a text edit inside a multi-row selection: the ed
   assert.deepEqual(p.errs, []); await b.close();
 });
 
+live('an inline mark on a multi-line row keeps its line breaks: italic, a colour run, a reload, a deck already carrying html with a newline', async () => {
+  // any mark moves a row from text to html, and the newline travels into html as a literal \n. text rows pre-wrap on a \n
+  // and html rows did not, so the committed row collapsed onto one line. The fault sits on the shared text → html path.
+  const two = 'The renderer\nis the editor.';
+  const m = model({slides: [{els: [
+    {x: 60, y: 60, w: 800, role: 'H1', text: two},
+    {x: 60, y: 240, w: 800, role: 'H1', text: two},
+    {x: 60, y: 420, w: 800, role: 'Body', html: 'The <i>renderer</i>\nis the editor.'}]}]}); // damaged by the defect before this fix
+  const b = await pw.chromium.launch(); const p = await fresh(b, write('marklines.html', create(m).html));
+  const lines = n => p.evaluate(n => { sel.clear(); render(); /* the selection nib would count as a line */ const r = document.createRange(); r.selectNodeContents(canvas.querySelector(`.el[data-n="${n}"]`)); return new Set([...r.getClientRects()].filter(c => c.height).map(c => Math.round(c.top))).size; }, n);
+  const mark = (n, pick) => p.evaluate(([n, pick]) => {
+    sel.clear(); sel.add(n); render(); edit(n);
+    const t = canvas.querySelector(`.el[data-n="${n}"]`).firstChild, a = t.data.indexOf('renderer'), r = document.createRange();
+    r.setStart(t, a); r.setEnd(t, a + 8); getSelection().removeAllRanges(); getSelection().addRange(r);
+    tb.querySelector(pick).click(); commitEdit();
+  }, [n, pick]);
+  assert.deepEqual([await lines(0), await lines(1)], [2, 2], 'two lines before any mark');
+  await mark(0, '[data-cmd="italic"]');
+  await mark(1, '#tb-colors .sw');
+  const rows = await p.evaluate(() => slide().els.slice(0, 2).map(e => [e.html, e.text]));
+  assert.match(rows[0][0], /<i>renderer<\/i>/, 'italic landed as an html run'); assert.match(rows[1][0], /<span style="color:[^"]+">renderer<\/span>/, 'the colour run landed as an html run');
+  assert.deepEqual([await lines(0), await lines(1), await lines(2)], [2, 2, 2], 'italic, a colour run and a stored html \\n each keep two lines');
+  await p.reload(); await p.waitForTimeout(150);
+  assert.deepEqual([await lines(0), await lines(1), await lines(2)], [2, 2, 2], 'two lines again after a reload from the saved state');
+  assert.deepEqual(p.errs, []); await b.close();
+});
+
 live('a bound connector dragged without its anchors translates rigidly: the to:/from: ends become the human\'s', async () => {
   // dragging a line whose ends are bound to boxes that stay put used to leave both ends re-aimed at the boxes while the
   // shaft moved, skewing the stroke into a diagonal. The drag is a translation: shape and length are kept, the bindings drop.
