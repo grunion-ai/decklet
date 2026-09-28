@@ -520,6 +520,13 @@ export function validate(deck) {
       if (k === 'right') { const rr = rectOf({...o, x: 0, right: undefined}, s); o.right = W - (fr ? fr.x : W - MGN) + 16; o.w = rr ? rr.w : o.w; delete o.x; }
       return o; };
     gapGate([...master.filter(m => !(s.hide || []).includes(m.id) && !s.els.some(e => e && e.override === m.id)).map(m => ({r: m.footer && FR ? FR : m, i: 'master ' + m.id})), ...counterRow(s), ...s.els.map((r, ei) => ({r: seat(r), i: 'els[' + ei + ']'}))], `slides[${si}]`, s);
+    // #163: an annotation leader (`<p>-leader`, by id or slot) ends on its marker (`<p>-dot`), within 1px of the dot's box
+    const keyed = new Map(s.els.filter(r => r && (r.id ?? r.slot) != null).map(r => [String(r.id ?? r.slot), r]));
+    for (const [k, r] of keyed) { const m = /^(.*)-leader$/.exec(k), dr = m && keyed.get(m[1] + '-dot'); if (!dr) continue;
+      const sl = slotOf(r, s), x = r.x ?? sl.x, y = r.y ?? sl.y, ln = r.line ?? sl.line, D = rectOf({...dr, over: 0}, s);
+      if (!D || !isNum(x) || !isNum(y) || !Array.isArray(ln)) continue;
+      const d = Math.min(...[[x, y], ln].map(([px, py]) => Math.hypot(Math.max(D.x - px, px - (D.x + D.w), 0), Math.max(D.y - py, py - (D.y + D.h), 0))));
+      if (d > 1) E(`slides[${si}]: leader "${k}" ends ${Math.round(d)}px from its marker "${m[1]}-dot"; run it to the marker's edge`); }
     // K26: the source (left foot) and the legend (right foot) share ONE line — estimate both widths as seated and warn with the
     // overlap in px, or the air short of styles.gap (verify measures the glyphs; this catches it before a browser runs)
     const feet = s.els.map(r => footOf(r, s) && rectOf(seat(r), s)).filter(Boolean), fl = feet.find(b => b.r._foot === 'left'), fg = feet.find(b => b.r._foot === 'right');
