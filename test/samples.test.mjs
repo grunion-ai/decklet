@@ -10,7 +10,7 @@ import {fileURLToPath} from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dir = path.join(root, 'templates/samples');
 const KB = 1024;
-const SAMPLE_EACH = 100 * KB, SAMPLE_SUM = 160 * KB, LIBRARY = 740 * KB;   // the budget: ~100 KB an image (SKILL.md), the sheet well under 1 MB (736: every data template draws its graphic; 740: the engine grew by the sheet auto-scroll)
+const SAMPLE_EACH = 100 * KB, SAMPLE_SUM = 160 * KB, LIBRARY = 752 * KB;   // the budget: ~100 KB an image (SKILL.md), the sheet well under 1 MB (736: every data template draws its graphic; 740: the engine grew by the sheet auto-scroll; 752: the static copy of slide 1, #85, about 10 KB of engine and 2 KB of copy)
 // LIBRARY moved 640 → 704 KB on 2026-09-13: the Styles section went from five kits to eleven, six slides each.
 
 test('samples: two photos, one screenshot, one GIF, each under 100 KB, together under 160 KB', () => {

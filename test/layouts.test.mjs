@@ -414,3 +414,11 @@ test('library: template "table-insight" is a deprecated alias for "table-panel" 
   const r = validate(create({w: 960, h: 540, title: 'alias', slides: [{template: 'table-insight'}]}).deck);
   assert.deepEqual(r.errors, [], `an old deck naming table-insight still validates: ${r.errors.join(' | ')}`);
 });
+// #161: the warning printed on every command, since loading the template module built the alias's sample rows
+test('library: the table-insight deprecation warning prints only for a model that names it, and once', () => {
+  const run = (...args) => spawnSync(process.execPath, args, {cwd: root, encoding: 'utf8'}).stderr;
+  const make = id => `import {create} from './bin/create.mjs'; const d = {w: 960, h: 540, title: 'w', slides: [{template: '${id}'}, {template: '${id}'}]}; create(d);`;
+  assert.doesNotMatch(run('bin/validate.mjs', '--templates'), /deprecated/, 'the catalogue names no deprecated template');
+  assert.doesNotMatch(run('--input-type=module', '-e', make('table-panel')), /deprecated/, 'a deck without the old id builds silently');
+  assert.equal(run('--input-type=module', '-e', make('table-insight')).match(/template "table-insight" is deprecated/g)?.length, 1, 'the old id warns once per process');
+});

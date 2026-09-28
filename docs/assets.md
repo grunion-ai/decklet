@@ -14,7 +14,9 @@
 | `url` | The exact file a logo came from, so you can cite or replace it. An SVG drawn inline in the site's header records the page URL with `#inline-svg`. |
 | `fallback` | `true` on a monogram the `logo` command fell back to. The explicit `monogram` command leaves it off. |
 | `aspect` | Width over height of the painted area. Size the image box from it: `w = h * aspect`. |
-| `plate` | The background the logo needs. `dark`: a white or light mark that vanishes on a light slide. `light`: a black or navy mark that vanishes on a dark slide. `any`: coloured or opaque, reads on either. |
+| `plate` | The background the logo needs. `dark`: a white or light mark that vanishes on a light slide. `light`: a black or navy mark that vanishes on a dark slide. `any`: coloured or opaque, reads on either. With `--style`, `none`: the mark clears 3:1 on that style's slide surface without a chip. |
+| `contrast` | With `--style` only: the WCAG contrast ratio the logo gets on its plate, or on the bare surface when `plate` is `none`. |
+| `on` | With `--style` only: the surface colour it was measured against (`tokens.card`). |
 
 Re-running a command replaces that row; it never duplicates it, and a `logo` retry that finds nothing never replaces a real logo with a monogram (see below). Each write takes `manifest.json.lock`, merges its row into the current file and renames a temp file over it, so commands run in parallel into one folder keep every row.
 
@@ -26,6 +28,7 @@ node bin/assets.mjs logo "Formlabs" --out assets/logos
 node bin/assets.mjs logo "3D Systems" --domain 3dsystems.com --out assets/logos
 node bin/assets.mjs logo sendcutsend.com vizcom.ai protolabs.com --out assets/logos --strict
 node bin/assets.mjs logo Plasticity --file downloads/plasticity-mark.svg --out assets/logos
+node bin/assets.mjs logo "Dassault Systemes" --domain 3ds.com --style style.json --out assets/logos
 ```
 
 `logo` takes several names in one run and prints one manifest row per line.
@@ -44,6 +47,8 @@ A monogram never replaces a real logo. If every source fails and the manifest al
 The domain is guessed as `<slug>.com` for a bare name; pass `--domain` when that guess is wrong. Skipped sources print to stderr with the reason.
 
 Every SVG gets its viewBox fitted to what it paints (a pure path parser; Playwright's `getBBox` for SVGs with transforms or shapes other than paths). The bounding box counts invisible geometry too, such as an unfilled background rect, so with Playwright the command then renders the fitted SVG and trims the viewBox to the painted pixels; that is what made Protolabs draw at a third of its size. A PNG with transparent padding is cropped to its painted pixels the same way. A logo that paints nothing is rejected and the next source is tried; so is one that paints one colour edge to edge, such as an SVG using `currentColor` with no stylesheet around it, which renders as a flat plate rather than a mark (this is what stopped a Plasticity import from landing as a black square). A real mark that happens to be a single flat colour, like most simple-icons marks, is unaffected, since it always leaves negative space around its own shape once fitted. The plate comes from rendering the logo on a transparent page and averaging how bright its painted pixels are, so a light wordmark with a grey accent still reads as `dark`. Without Playwright it falls back to the SVG's fill colours. PNG logos are decoded and weighed the same way; one that is fully opaque brings its own background and reads `any`.
+
+Pass `--style <style.json>`, the same file you pass to `create`, and the plate is chosen for that deck. The command measures the logo against the style's slide surface, `tokens.card` (`tokens.bg` when there is no `card`; `bg` is the editor chrome behind the slide), with the WCAG 2.x relative-luminance contrast ratio. The logo's luminance is the mean over its painted pixels, weighted by area as above. If the bare surface gives at least 3:1 (WCAG 1.4.11's minimum for graphical objects), the plate is `none`; otherwise it is whichever chip gives the higher ratio: `light` (white) or `dark` (`#15171B`). The row records the ratio as `contrast` and the surface as `on`. A pale grey mark on a light style gets `dark`, where without `--style` it read as mid-tone and got `any`, then nearly vanished. An opaque PNG tile brings its own background and keeps `any` with no ratio.
 
 Use the manifest when you build the model. Put a `plate: dark` logo on a dark chip or a dark slide, never directly on white.
 
