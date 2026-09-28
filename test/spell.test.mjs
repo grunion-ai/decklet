@@ -112,11 +112,13 @@ live('spell: the badge counts this slide, follows typing and the toggle, and eve
   await p.goto(pathToFileURL(f).href); await p.evaluate(() => localStorage.clear()); await p.reload(); await p.waitForTimeout(150);
   const badge = () => p.evaluate(() => { const b = $('spellbad'); return b.hidden ? null : +b.textContent; });
   assert.equal(await badge(), 3, 'slide 1: three flagged words');
-  assert.equal(await p.getAttribute('#spell', 'data-tip'), 'Spellcheck · on · 3 flagged on this slide');
+  assert.equal(await p.getAttribute('#spell', 'data-tip'), 'Spellcheck · on · 3 flagged on this slide · words from the last build only; a deck served by bin/serve.mjs also checks what you type', 'a file:// deck says in plain words what it checks (issue 86)');
   assert.equal(await p.getAttribute('#spellbad', 'aria-label'), '3 flagged words on this slide');
   await p.evaluate(() => nav(1)); await p.waitForTimeout(50); assert.equal(await badge(), 1, 'slide 2: the master row alone');
   await p.evaluate(() => nav(-1)); await p.evaluate(() => { sel.clear(); sel.add(0); render(); edit(0); }); await p.keyboard.press('End'); await p.keyboard.type(' renewls'); await p.waitForTimeout(250);
-  assert.equal(await badge(), 4, 'a flagged word typed into a row counts at once'); await p.evaluate(() => commitEdit());
+  const asked = []; p.on('request', r => { if (!r.url().startsWith('file:')) asked.push(r.url()); });
+  assert.equal(await badge(), 4, 'a flagged word typed into a row counts at once'); await p.evaluate(() => commitEdit()); await p.waitForTimeout(600);
+  assert.deepEqual(asked, [], 'a file:// deck asks nothing of anyone: build-time words only');
   await p.click('#spell'); assert.equal(await badge(), null, 'off hides the badge'); assert.equal(await p.getAttribute('#spell', 'data-tip'), 'Spellcheck · off');
   await p.click('#spell'); assert.equal(await badge(), 4);
   await p.evaluate(() => setPresent(true)); await p.waitForTimeout(50); assert.equal(await badge(), null, 'presenting shows no badge'); await p.evaluate(() => setPresent(false));

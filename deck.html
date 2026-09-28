@@ -295,7 +295,7 @@ is the editor.</div><div class="el" style="left:calc(var(--u)*60);top:calc(var(-
       </div>
       <div class="col"><div class="ph">File</div>
         <div><kbd>⌘S</kbd> save the file now (asks for it once, then every edit writes itself · Safari: downloads a copy)</div>
-        <div class="dim">Buttons only: add · duplicate · spellcheck · PDF. Spellcheck marks the words the build's dictionary refused, on every slide, with a wavy underline and a red wash; every contact-sheet thumbnail wears its own count. Its red badge opens them: every flagged word on this slide with the build's suggestions — a pick rewrites the row, Ignore in this deck silences the word. A click on a marked word while you are editing its row fixes just that one. The browser's own checker adds the row you type in. Never present, print or PDF.</div>
+        <div class="dim">Buttons only: add · duplicate · spellcheck · PDF. Spellcheck marks the words the build's dictionary refused, on every slide, with a wavy underline and a red wash; every contact-sheet thumbnail wears its own count. Its red badge opens them: every flagged word on this slide with the build's suggestions — a pick rewrites the row, Ignore in this deck silences the word. A click on a marked word while you are editing its row fixes just that one. A deck served by bin/serve.mjs also checks the words you type when you leave the row; opened any other way it checks only what the build checked. The underline under the word you are typing is the browser's own. Never present, print or PDF.</div>
       </div>
     </div>
   </div>
@@ -319,7 +319,7 @@ is the editor.</div><div class="el" style="left:calc(var(--u)*60);top:calc(var(-
   </form>
 </dialog>
 <!-- Flagged words, reachable: the red badge opens this panel for the whole slide; a click on a painted word while its row is
-     being edited opens it for that one occurrence. The suggestions were baked by the build (lib/spell.mjs); nothing is fetched. -->
+     being edited opens it for that one occurrence. The suggestions were baked by the build (lib/spell.mjs), or, on a served deck, answered by bin/serve.mjs for a committed row. -->
 <div id="spellmenu" role="dialog" aria-label="Flagged words" hidden></div>
 <div id="print"></div>
 
@@ -371,6 +371,7 @@ const store={
 //      applyLog(deck,log,true) = the agent wins instead (a hosted page replaying edits the agent never saw onto its rebuild): the
 //      key keeps the agent's value, the entry records it in `yielded`, and no later replay sets that key again.
 // splice: a deck file's source with its DECK and LOG data blocks rewritten; fileHtml() and bin/serve.mjs both write through it.
+//      splice(src,deck,log,spell) also rewrites SPELL (bin/serve.mjs, from its dictionary); a file without that block keeps none.
 // still: slide 1 as static markup, the <noscript> that opens #canvas (#85), for a reader that runs no script (QuickLook,
 //      Spotlight, grep, a repo's HTML preview). create, splice and fileHtml() all write it through stillIn.
 /*EDITS*/
@@ -417,10 +418,10 @@ function applyLog(deck,log,agent){
     if(n<0){R.orphans.push({s:e.s,r:e.r});continue}
     setKeys(s.els[n],e,{s:e.s,r:e.r})}
   return R}
-function splice(src,deck,log){ // markers are built, never written out: a literal would be matched as the data block itself
+function splice(src,deck,log,spell){ // markers are built, never written out: a literal would be matched as the data block itself
   const J=v=>JSON.stringify(v).replace(/<\/script/gi,'<\\/script');
-  const put=(h,m,v)=>{const a='/*'+m+'*/',b='/*/'+m+'*/',x=h.indexOf('='+a),y=x<0?-1:h.indexOf(b,x);if(y<0)throw new Error('marker '+m+' missing');return h.slice(0,x+1+a.length)+J(v)+h.slice(y)};
-  return stillIn(put(put(src,'DECK',deck),'LOG',log),deck)}
+  const put=(h,m,v,soft)=>{const a='/*'+m+'*/',b='/*/'+m+'*/',x=h.indexOf('='+a),y=x<0?-1:h.indexOf(b,x);if(y<0){if(soft)return h;throw new Error('marker '+m+' missing')}return h.slice(0,x+1+a.length)+J(v)+h.slice(y)};
+  const out=put(put(src,'DECK',deck),'LOG',log);return stillIn(spell?put(out,'SPELL',spell,1):out,deck)}
 // Rows wear drawEls's classes and inline styles, every px written as a multiple of --u (one model px in the container units of
 // #canvas), so the stylesheet alone fits the slide to the wrapper; text is escaped as textContent escapes it. Only what needs a browser to measure is missing: connectors and
 // `after` rows are left out, an asset-table image ('#id') keeps its box but not its picture (the table embeds it once, and a
@@ -1120,7 +1121,9 @@ function commitEdit(){
   if(!t)return;
   const el=slide().els[+t.dataset.n];
   t.onblur=null;t.querySelectorAll('.h,.num').forEach(x=>x.remove());
+  const was=el.html!=null?el.html:el.text;
   if(t.querySelector('*')){el.html=t.innerHTML;delete el.text}else{el.text=t.textContent;delete el.html} // inline marks → html; plain → text
+  if((el.html!=null?el.html:el.text)!==was)spellQueue(t.textContent); // hosted: the row's words go to the server's dictionary
   t.contentEditable=false;save();render();
 }
 function edit(k){
@@ -1472,6 +1475,19 @@ $('pdf').onclick=()=>exportPdf().catch(()=>printPdf()); // the rasteriser in eve
 // SPELL0 is {word:[suggestions]} from 0.10.0 and a plain array of words in a 0.7–0.9 deck: both read as one map here.
 const SPELLS=Array.isArray(SPELL0)?Object.fromEntries(SPELL0.map(w=>[String(w).toLowerCase(),[]])):(SPELL0||{});
 const SPELLSET=new Set(Object.keys(SPELLS));
+// live check (issue 86): a deck served by bin/serve.mjs sends the words of a row when its edit commits (debounced; that row only,
+// never per keystroke). The server runs lib/spell.mjs, the build's own code and dictionary, and its answer merges into SPELLS and
+// SPELLSET: the badge, the wash, the sheet counts and the panel take it, and the next PUT writes it into the SPELL block.
+// SPELLON: null until asked · true = the server checks · false = it cannot (no dictionary). Found by a probe of the endpoint,
+// never by host or port. Anything but true = the build's words only (a file:// deck, any other host), and the tip says so.
+let SPELLON=null,spellT=null;const spellQ=new Set(),SPELLTIP=' · words from the last build only; a deck served by bin/serve.mjs also checks what you type';
+const spellAsk=words=>fetch('/__decklet/spell',{method:'POST',headers:{'content-type':'application/json','X-Decklet-Token':HOST.t},body:JSON.stringify({words})}).then(r=>r.ok?r.json():null);
+function spellQueue(text){if(SPELLON!==true)return; // the tokens lib/spell.mjs WORD and spellHits cut
+  for(const w of String(text).match(/\p{L}[\p{L}']*\p{L}|\p{L}/gu)||[])if(w.length<=64)spellQ.add(w);clearTimeout(spellT);spellT=setTimeout(spellSend,300)}
+function spellSend(){const words=[...spellQ].slice(0,500);spellQ.clear();if(!words.length)return; // the server takes 500 words of 64 characters at most
+  spellAsk(words).then(j=>{if(!j||!j.ok)return;for(const w of words){const k=w.toLowerCase();if(!(k in j.flags)){delete SPELLS[k];SPELLSET.delete(k)}}
+    for(const k in j.flags){SPELLS[k]=j.flags[k];SPELLSET.add(k)}paintSpell();
+    if(!sheet.hidden)for(const c of grid.children){c._spell=spellHits(c.firstChild).length;spellBadge(c.querySelector('.spellbad'),c._spell,' on slide '+(+c.dataset.n+1))}},()=>{})}
 const spellSkip=()=>new Set(((deck.spell&&deck.spell.ignore)||[]).map(w=>String(w).toLowerCase())); // the model key the build honours — the panel appends to it live
 const smenu=$('spellmenu'),sbad=$('spellbad');let spellAnchor=null; // the panel and its door; spellAnchor = the rect it points at, kept so a repaint holds its place
 // spellHits(root) → every flagged token under root as [textNode, index, length]; the canvas paints them, the sheet counts them
@@ -1483,7 +1499,7 @@ const spellHits=root=>{const out=[];if(!SPELLSET.size)return out;const skip=spel
 const spellBadge=(b,k,where)=>{b.hidden=!(SPELL&&!present()&&k>0);b.textContent=k;const s=k+' flagged word'+(k===1?'':'s')+where;b.setAttribute('aria-label',s);if(b.dataset.tip!=null)b.dataset.tip=s+' · click for the list'};
 function paintSpell(){const hits=SPELL&&!present()?spellHits(canvas):[];spellBadge($('spellbad'),hits.length,' on this slide');
   if(smenu&&!smenu.hidden){if((!SPELL||present())||(smenu.dataset.scope==='slide'&&!spellPanel(null)))spellClose();else if(smenu.dataset.scope==='slide')spellPlace(spellAnchor)} // an open panel follows the repaint: counts, words, and its place
-  const b=$('spell');b.dataset.tip='Spellcheck · '+(SPELL?'on':'off')+(hits.length?' · '+hits.length+' flagged on this slide':'');b.setAttribute('aria-label',b.dataset.tip);
+  const b=$('spell');b.dataset.tip='Spellcheck · '+(SPELL?'on':'off')+(hits.length?' · '+hits.length+' flagged on this slide':'')+(SPELL&&SPELLON!==true?SPELLTIP:'');b.setAttribute('aria-label',b.dataset.tip);
   if(!window.CSS||!CSS.highlights)return;if(!hits.length){CSS.highlights.delete('spell');return}
   const h=new Highlight();for(const [n,a,l] of hits){const r=new Range();r.setStart(n,a);r.setEnd(n,a+l);h.add(r)}CSS.highlights.set('spell',h)}
 const setSpell=on=>{SPELL=on;store.set(SKEY,on?'1':'0');const b=$('spell');b.classList.toggle('off',!on);b.setAttribute('aria-pressed',on);render()};
@@ -1734,6 +1750,7 @@ if(LS)settle();else{autosave('busy','Loading…');idbLoad().then(settle)}
 // hosted: probe, then listen. Edits journaled while the host was away (or a working copy the served file does not match) go now.
 if(HOST)fetch('/__decklet',{headers:{'X-Decklet-Token':HOST.t},cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{if(!j||!j.ok)return;
   HOST.on=true;fileH=HOST;HOST.name=j.name||'';if((j.rev||'')!==HOST.rev)HOST.stale=1;else if(base!==JSON.stringify(DECK))HOST.force=1;
+  spellAsk([]).then(j=>{SPELLON=!!(j&&j.ok);paintSpell()},()=>{SPELLON=false;paintSpell()}); // the live-check probe: an old server 404s, one without a dictionary 503s
   const es=new EventSource('/__decklet/events?t='+encodeURIComponent(HOST.t));
   es.addEventListener('changed',e=>{let v;try{v=JSON.parse(e.data).rev||''}catch{return}if(v===HOST.rev)return;HOST.stale=1;
     if(!LEASE)return writeBack();LEASE.chg=Date.now();autosave('agent-edit');clearTimeout(agT);agT=setTimeout(()=>autosave('agent'),1e4)}); // leased: rebase at checkin, not per write
