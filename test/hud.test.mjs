@@ -26,7 +26,7 @@ const open = async (b) => {
 
 test('hud: the buttons run navigate · save state · edit · file · view, in that order, with a divider between groups', () => {
   const ids = [...hud.matchAll(/<button id="([^"]+)"/g)].map(m => m[1]).filter(id => !['add-text', 'add-box', 'sadd'].includes(id));
-  assert.deepEqual(ids, ['prev', 'next', 'autosave', 'addbtn', 'dup', 'snap', 'spell', 'spellbad', 'pdf', 'grid-btn', 'fs', 'help', 'bug'], 'the spell count badge is a button of its own; save is ONE button, not two');
+  assert.deepEqual(ids, ['prev', 'next', 'autosave', 'addbtn', 'dup', 'undobtn', 'delbtn', 'snap', 'spell', 'spellbad', 'pdf', 'grid-btn', 'fs', 'help', 'bug'], 'the spell count badge is a button of its own; save is ONE button, not two');
   assert.equal((hud.match(/class="sep"/g) || []).length, 3, 'three dividers = four groups after the spacer');
   assert.ok(hud.indexOf('class="spacer"') < hud.indexOf('id="autosave"'), 'the save-state button leads the right-hand cluster');
 });
@@ -37,6 +37,8 @@ test('hud: every control names itself and its key on hover through data-tip, nev
   assert.match(hud, /id="fs"[^>]*data-tip="Full screen · F"/);
   assert.match(hud, /id="grid-btn"[^>]*data-tip="Contact sheet · C"/);
   assert.match(hud, /id="snap"[^>]*data-tip="Guides \+ snap · off · G"/);
+  assert.match(hud, /id="undobtn"[^>]*data-tip="Undo · ⌘Z" aria-label="Undo · ⌘Z"/);
+  assert.match(hud, /id="delbtn"[^>]*data-tip="Delete selection · ⌫" aria-label="Delete selection · ⌫"/);
   assert.match(tpl, /#hud \[data-tip\]:hover::before\{display:block\}/, 'one tooltip rule for the whole HUD');
 });
 
@@ -151,5 +153,45 @@ live('hud: storage blocked (Safari on file://) — red, the copy sentence, and a
       document.getElementById('autosave').click(); await new Promise(r => setTimeout(r, 200)); return blob ? (await blob.text()).slice(0, 200) : null; });
     assert.match(String(copy), /^<!DOCTYPE html>/, 'a click in the blocked state downloads the deck as a copy — the Safari path');
     assert.deepEqual(errs, []);
+  } finally { await b.close(); }
+});
+
+// ── undo and delete as buttons (#167): on a phone ⌘Z and ⌫ do not exist, so the HUD carries both, on every pointer ──────
+// Each click runs the code its key runs; each is disabled exactly when its key would do nothing. The present-mode pill has neither.
+test('hud: undo and delete sit in the edit group, and the present-mode pill leaves them out', () => {
+  const edit = hud.slice(hud.indexOf('id="addwrap"'), hud.indexOf('id="pdf"'));
+  assert.ok(edit.includes('id="undobtn"') && edit.includes('id="delbtn"'), 'both live between + and the file group');
+  assert.match(tpl, /body\.present\.peek #hud #undobtn,body\.present\.peek #hud #delbtn\{display:none\}/);
+  assert.match(tpl, /\$\('undobtn'\)\.onclick=/); assert.match(tpl, /\$\('delbtn'\)\.onclick=/);
+});
+
+live('hud: undo and delete follow the selection and the undo stack, on the canvas and in the sheet', async () => {
+  const b = await pw.chromium.launch(); try {
+    const p = await open(b);
+    const st = () => p.evaluate(() => ({u: $('undobtn').disabled, d: $('delbtn').disabled, h: history.length, rows: slide().els.length, slides: deck.slides.length}));
+    let s = await st();
+    assert.equal(s.h, 0); assert.equal(s.u, true, 'nothing to undo: Undo is disabled'); assert.equal(s.d, true, 'nothing selected: Delete is disabled');
+    await p.click('.el[data-n="1"]'); s = await st();
+    assert.equal(s.d, false, 'a selected row enables Delete'); assert.equal(s.u, s.h === 0);
+    await p.click('#delbtn'); s = await st();
+    assert.equal(s.rows, 2, 'Delete removed the selected row'); assert.equal(s.d, true, 'the selection went with it'); assert.equal(s.u, false, 'and there is something to undo');
+    await p.click('#undobtn'); s = await st();
+    assert.equal(s.rows, 3, 'Undo put it back'); assert.equal(s.u, s.h === 0, 'Undo is enabled exactly while the stack holds a snapshot');
+    await p.evaluate(() => { history.length = 0; hsave(); render(); }); assert.equal((await st()).u, true);
+    // while a row is being edited the keys belong to the text (⌘Z is the browser's text undo), and so do the buttons
+    await p.dblclick('.el[data-n="0"]'); await p.keyboard.type('Uno');
+    assert.equal(await p.evaluate(() => document.activeElement.textContent), 'Uno');
+    await p.click('#undobtn');
+    const [open1, t1] = await p.evaluate(() => [document.activeElement.isContentEditable, document.activeElement.textContent]);
+    assert.equal(open1, true, 'the row stays open: Undo did not commit the edit or pop the deck snapshot');
+    assert.ok(t1 !== 'Uno' && ('Uno'.startsWith(t1) || t1 === 'One'), `Undo stepped the typing back, as ⌘Z does: ${t1}`);
+    await p.evaluate(() => { commitEdit(); sel.clear(); history.length = 0; hsave(); render(); });
+    await p.keyboard.press('c'); s = await st();
+    assert.equal(s.d, false, 'the sheet selects the current slide, so Delete is live');
+    await p.click('#delbtn'); s = await st();
+    assert.equal(s.slides, 1, 'Delete removed the selected slide'); assert.equal(s.d, true, 'one slide left: Delete is disabled, the key would do nothing');
+    await p.click('#undobtn'); s = await st();
+    assert.equal(s.slides, 2, 'Undo in the sheet brought the slide back'); assert.equal(await p.evaluate(() => sheet.hidden), false, 'and the sheet stays open');
+    assert.deepEqual(p.errs, []);
   } finally { await b.close(); }
 });

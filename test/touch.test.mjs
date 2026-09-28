@@ -142,3 +142,27 @@ live('editing on a phone: a swipe or a tap never turns the page (that is the pre
   await p.tap(300, 200); assert.equal(await at(p), 0);
   assert.deepEqual(p.errs, []); await b.close();
 });
+
+// #167: undo and delete were keys only, so a phone could neither undo nor remove. Taps only, no keyboard, no evaluate-driven edits.
+live('editing on a phone: tap a row then Delete removes it and Undo restores it; in the sheet the same for a slide, never the last', async () => {
+  const {b, p} = await launch(); try {
+  const mid = s => p.$eval(s, d => { const r = d.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; });
+  const tapOn = async s => { const [x, y] = await mid(s); await p.tap(x, y); };
+  for (const id of ['#undobtn', '#delbtn']) {
+    const r = await p.$eval(id, d => { const r = d.getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom, r.height]; });
+    assert.ok(r[0] >= 0 && r[1] >= 0 && r[2] <= 390 && r[3] <= 664, `${id} is on screen: ${r}`); assert.ok(r[4] >= 44, `${id} is ≥ 44px tall: ${r[4]}`);
+  }
+  const texts = () => p.evaluate(() => slide().els.map(e => e.text || ''));
+  await tapOn('.el[data-n="0"]'); assert.deepEqual(await p.evaluate(() => [...sel]), [0], 'the tap selected the title');
+  await tapOn('#delbtn'); assert.deepEqual(await texts(), ['', ''], 'Delete removed it');
+  await tapOn('#undobtn'); assert.deepEqual(await texts(), ['One', '', ''], 'Undo put it back');
+  await tapOn('#grid-btn'); assert.equal(await p.evaluate(() => sheet.hidden), false, 'the sheet is open');
+  await tapOn('#grid .cell[data-n="1"]'); assert.deepEqual(await p.evaluate(() => [...gsel]), [1]);
+  const titles = () => p.evaluate(() => deck.slides.map(s => s.els[0].text));
+  await tapOn('#delbtn'); assert.deepEqual(await titles(), ['One', 'Three'], 'Delete removed the tapped slide');
+  await tapOn('#undobtn'); assert.deepEqual(await titles(), ['One', 'Two', 'Three'], 'Undo brought it back');
+  await tapOn('#delbtn'); await tapOn('#delbtn'); assert.equal((await titles()).length, 1);
+  assert.equal(await p.$eval('#delbtn', d => d.disabled), true, 'one slide left: Delete is disabled');
+  assert.deepEqual(p.errs, []);
+  } finally { await b.close(); }
+});
