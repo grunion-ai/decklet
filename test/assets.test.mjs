@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
-import {execFileSync, execFile} from 'node:child_process';
+import {execFileSync, execFile, spawnSync} from 'node:child_process';
 import {promisify} from 'node:util';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {slugOf, domainOf, pathBBox, svgBBox, fitViewBox, svgPlate, decodePng, pngPlate, logoCandidates,
@@ -333,6 +333,29 @@ test('cli logo --file wires through the CLI arg parser', () => {
   assert.equal(row.source, 'file');
   const m = JSON.parse(fs.readFileSync(path.join(out, 'manifest.json'), 'utf8'));
   assert.equal(m[0].source, 'file');
+});
+
+test('cli logo: a failed retry keeps the earlier real logo and reports the retry, never a monogram over it (#154)', () => {
+  const out = path.join(tmp, 'retry'), env = {...process.env, DECKLET_ASSETS_OFFLINE: '1'};
+  execFileSync(process.execPath, [cli, 'logo', 'MISUMI', '--file', wordmarkSvg, '--out', out], {stdio: 'pipe'});
+  const before = fs.readFileSync(path.join(out, 'misumi.svg'), 'utf8'), rowBefore = JSON.parse(fs.readFileSync(path.join(out, 'manifest.json'), 'utf8'))[0];
+  assert.equal(rowBefore.source, 'file');
+  // the retry under a second domain finds nothing (offline): the working entry and its file stay
+  const r = spawnSync(process.execPath, [cli, 'logo', 'MISUMI', '--domain', 'misumi.co.jp', '--out', out], {encoding: 'utf8', env});
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(out, 'manifest.json'), 'utf8')), [rowBefore], 'the manifest row is unchanged');
+  assert.equal(fs.readFileSync(path.join(out, 'misumi.svg'), 'utf8'), before, 'the logo file is not overwritten by a monogram');
+  assert.deepEqual(JSON.parse(r.stdout.trim()), rowBefore, 'the printed row is the kept one');
+  assert.match(r.stderr, /kept: MISUMI \(retry found no logo; the earlier file entry misumi\.svg stays\)/);
+  assert.doesNotMatch(r.stderr, /missed:/);
+  // a failed --file retry keeps it too, and --strict still exits 1 on the failed retry
+  const s = spawnSync(process.execPath, [cli, 'logo', 'MISUMI', '--file', path.join(fixtures, 'does-not-exist.svg'), '--out', out, '--strict'], {encoding: 'utf8', env});
+  assert.equal(s.status, 1, s.stderr);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(out, 'manifest.json'), 'utf8'))[0].source, 'file');
+  // a fallback may still replace a fallback
+  execFileSync(process.execPath, [cli, 'logo', 'Hexagon', '--out', out], {stdio: 'pipe', env});
+  const again = spawnSync(process.execPath, [cli, 'logo', 'Hexagon', '--out', out], {encoding: 'utf8', env});
+  assert.match(again.stderr, /missed: Hexagon/);
 });
 
 // a minimal fetch mock: home page + one absolute site candidate, offline and deterministic (no real network, no TLS)
