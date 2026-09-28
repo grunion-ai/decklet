@@ -10,7 +10,7 @@ This manifest is a contract: the gate compares it against the template, so the H
 
 ## On a phone
 
-**On a phone:** the shell fits the layout viewport (never the inflated `innerWidth`), respects the safe area, and sizes with `svh`; test/touch.test.mjs is the phone lane (iPhone-sized, touch, coarse pointer). Under `(pointer: coarse)` the resize and connector nibs are 28px on screen whatever the slide's scale (`fit()` publishes the scale as `--S`; the nibs divide by it) and HUD and toolbar buttons are 44px tall; a fine pointer keeps the 13px nibs. Presenting, a finger turns the page: a horizontal swipe goes next or previous, a tap advances (the left fifth goes back), a tap in the bottom twelfth peeks the HUD, and a tap on a link follows it; editing has no page gesture.
+**On a phone:** the shell fits the layout viewport (never the inflated `innerWidth`), respects the safe area, and sizes with `svh`; test/touch.test.mjs is the phone lane (iPhone-sized, touch, coarse pointer). Under `(pointer: coarse)` the resize and connector nibs are 28px on screen whatever the slide's scale (`fit()` publishes the scale as `--S`; the nibs divide by it) and HUD and toolbar buttons are 44px tall (a colour swatch is a 44px square target around a round 20px dot); a fine pointer keeps the 13px nibs. Under 480px wide the toolbar's segments wrap, so every role button stays on screen. At any width the text toolbar sits above the row, or below it when above would cover another text row or leave the viewport. Presenting, a finger turns the page: a horizontal swipe goes next or previous, a tap advances (the left fifth goes back), a tap in the bottom twelfth peeks the HUD, and a tap on a link follows it; editing has no page gesture.
 
 ## The contact sheet
 
