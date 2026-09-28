@@ -84,6 +84,29 @@ for (const engine of ['chromium', 'webkit']) live(`hud: C toggles the contact sh
   }, {timeout: 50000});
 });
 
+// Issue #83: F did nothing on the contact sheet and ⛶ was disabled there. Full screen changes how the deck is shown, not
+// which slide is current, so it stays live on the sheet: pick a slide, press F (or ⛶), and presenting starts from it;
+// presenting with the sheet open, F leaves full screen from the sheet with no detour through the canvas.
+for (const engine of ['chromium', 'webkit']) live(`hud: F and ⛶ toggle full screen from the contact sheet, presenting from the picked slide (${engine})`, {timeout: 60000}, async () => {
+  await withBrowser(pw[engine], async (b) => {
+    const p = await open(b);
+    const st = () => p.evaluate(() => ({present: present(), sheet: !sheet.hidden, i}));
+    await p.keyboard.press('c');
+    assert.equal(await p.evaluate(() => $('fs').disabled), false, '⛶ is live on the sheet');
+    assert.deepEqual(await p.evaluate(() => ['prev', 'next'].map(k => $(k).disabled)), [true, true], '‹ › stay disabled: the sheet is the navigator');
+    await p.click('#grid .cell[data-n="1"]');
+    await p.keyboard.press('Alt+f'); assert.deepEqual(await st(), {present: false, sheet: true, i: 0}, 'a modified F is not the shortcut');
+    await p.keyboard.press('f'); await p.waitForFunction(() => present());
+    assert.deepEqual(await st(), {present: true, sheet: false, i: 1}, 'F on the sheet presents from the picked slide');
+    await p.keyboard.press('c'); assert.equal(await p.evaluate(() => !sheet.hidden), true, 'presenting, C opens the sheet');
+    await p.keyboard.press('f'); await p.waitForFunction(() => !present());
+    assert.deepEqual(await st(), {present: false, sheet: false, i: 1}, 'F on the sheet leaves full screen');
+    await p.keyboard.press('c'); await p.click('#grid .cell[data-n="0"]'); await p.click('#fs'); await p.waitForFunction(() => present());
+    assert.deepEqual(await st(), {present: true, sheet: false, i: 0}, '⛶ on the sheet presents from the picked slide too');
+    assert.deepEqual(p.errs, []);
+  }, {timeout: 50000});
+});
+
 live('hud: duplicate copies the selected rows offset 16px and selects the copies; with nothing selected it copies the slide', async () => {
   const b = await pw.chromium.launch(); const p = await open(b);
   await p.evaluate(() => { sel.clear(); sel.add(1); sel.add(2); render(); });
