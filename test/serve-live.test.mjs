@@ -166,7 +166,7 @@ for (const engine of projects()) live(`${engine}: a served deck checks the words
 
 live('a served deck whose server has no dictionary keeps build-time checking: one probe, no request on commit, and the file:// tip', async () => {
   const dir = path.join(tmp, 'spell-none'); fs.mkdirSync(dir); const f = path.join(dir, 'deck.html'); fs.writeFileSync(f, create(model()).html);
-  const s = await serve(f, {checker: async () => null});
+  const s = await serve(f, {spell: false});
   try { await withProject(pw, 'chromium', async ({context}) => { const ctx = await context();
     const p = await ctx.newPage(); const asked = []; p.on('request', r => { if (r.url().endsWith('/__decklet/spell')) asked.push(r.postData()); });
     await p.goto(s.url); await hostOn(p);

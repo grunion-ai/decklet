@@ -191,10 +191,23 @@ test('a PUT rewrites the SPELL block from the new model, so a reload shows the l
   } finally { await stop(s); }
 });
 
+test('the dictionary loads off the request thread: a PUT sent while the probe is still loading it answers first', async () => {
+  if (!await loadChecker('en')) return;
+  const f = deckFile(), s = await start(f);
+  try {
+    let probed = 0; const probe = spellReq(s, {words: []}).then(r => { probed = Date.now(); return r; });
+    await new Promise(r => setTimeout(r, 100));
+    const rev = blockOf(fs.readFileSync(f, 'utf8'), 'DECK').rev, e = edited(f);
+    assert.equal((await put(s, {model: e.model, log: e.log}, {rev})).status, 200); const wrote = Date.now();
+    assert.equal((await probe).status, 200);
+    assert.ok(wrote < probed, 'the PUT did not wait behind nspell parsing the dictionary');
+  } finally { await stop(s); }
+});
+
 test('without a dictionary the endpoint says checking is unavailable (503) and a PUT leaves the build\'s SPELL block as it was', async () => {
   const f = deckFile(), html = fs.readFileSync(f, 'utf8').replace(/=\/\*SPELL\*\/[\s\S]*?\/\*\/SPELL\*\//, '=/*SPELL*/{"built":["kept"]}/*/SPELL*/');
   fs.writeFileSync(f, html);
-  const s = await serve(f, {checker: async () => null}), p = s.port, host = `127.0.0.1:${p}`;
+  const s = await serve(f, {spell: false}), p = s.port, host = `127.0.0.1:${p}`;
   const call = (method, pth, body, h = {}) => fetch(`http://${host}${pth}`, {method, headers: {'content-type': 'application/json', 'x-decklet-token': s.token, ...h}, body: body && JSON.stringify(body)});
   try {
     const r = await call('POST', '/__decklet/spell', {words: ['dekjck']});

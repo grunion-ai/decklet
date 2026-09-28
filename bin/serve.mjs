@@ -29,12 +29,23 @@ import http from 'node:http';
 import {randomBytes, timingSafeEqual} from 'node:crypto';
 import {blockOf, splice} from '../lib/edits.mjs';
 import {isMain} from '../lib/is-main.mjs';
-import {flagMap, loadChecker} from '../lib/spell.mjs';
+import {Worker} from 'node:worker_threads';
 
 const hostFile = file => path.join(path.dirname(path.resolve(file)), '.decklet-host.json');
 
 const SPELL_WORDS = 500, SPELL_LEN = 64;
-export function serve(file, {port = 0, guard = 60000, checker = loadChecker} = {}) {
+// the spell worker: lib/spell.mjs, the build's own code, off the request thread. nspell parses the dictionary for seconds and
+// suggest() can take a second a word; a PUT or the stream must never wait behind that. Answers flagMap(deck) or null (no dictionary).
+const SPELL_WORKER = `const {parentPort, workerData} = require('node:worker_threads');
+const lib = import(workerData.lib), dicts = new Map();
+parentPort.on('message', async ({id, lang, deck, had}) => { let flags = null; try {
+  const {flagMap, loadChecker} = await lib;
+  if (!dicts.has(lang)) dicts.set(lang, loadChecker(lang).then(c => { if (!c) return null; const memo = new Map(), ok = w => c(w);
+    ok.memo = memo; ok.suggest = w => { if (!memo.has(w)) memo.set(w, c.suggest(w)); return memo.get(w); }; return ok; }));
+  const c = await dicts.get(lang);
+  if (c) { for (const w in had || {}) if (!c.memo.has(w) && Array.isArray(had[w])) c.memo.set(w, had[w]); flags = flagMap(deck, c); } // the file's suggestions: no suggest() for them
+} catch {} parentPort.postMessage({id, lang, flags}); });`;
+export function serve(file, {port = 0, guard = 60000, spell = true} = {}) {
   file = path.resolve(file);
   const dir = path.dirname(file), name = path.basename(file), token = randomBytes(24).toString('base64url'), hf = hostFile(file);
   const meta = `<meta name="decklet-host" content="${token}">`;
@@ -52,12 +63,19 @@ export function serve(file, {port = 0, guard = 60000, checker = loadChecker} = {
   const release = () => { clearTimeout(leaseT); if (!lease) return; const was = lease.rev, h = read(); lease = null; if (revOf(h) !== was) emit('changed', {rev: revOf(h)}); emit('lease', null); };
   // the page's unacknowledged edits: its last heartbeat count and when a human edit last arrived (heartbeat or PUT)
   const human = {pending: 0, at: 0};
-  // the dictionary, loaded once per lang on first use (the page's probe); suggest() is the slow half, so each word's answer is
-  // kept. ready = the loaded ones: a PUT never waits for a load, it rewrites SPELL only once the dictionary is in (the probe
-  // on open loads it, and no word is flagged live before it is).
-  const dicts = new Map(), ready = new Map(), dict = lang => { if (!dicts.has(lang)) dicts.set(lang, Promise.resolve(checker(lang)).then(c => {
-    if (!c) return null; const memo = new Map(), ok = w => c(w); ok.suggest = w => { if (!memo.has(w)) memo.set(w, c.suggest ? c.suggest(w) : []); return memo.get(w); }; return ok;
-  }, () => null).then(c => { ready.set(lang, c); return c; })); return dicts.get(lang); };
+  // spellOf(lang, deck, had) → flagMap(deck) from the worker, or null. The first spell request (the page's probe) starts it;
+  // ready = the langs it has answered for: a PUT rewrites SPELL only for those, so it never waits for a dictionary to load.
+  // spell: false = no worker, every answer null (the no-dictionary path, for tests).
+  let wk = null, seq = 0; const waits = new Map(), ready = new Set();
+  const spellOf = (lang, deck, had) => new Promise(ok => {
+    if (!spell) return ok(null);
+    if (!wk) {
+      wk = new Worker(SPELL_WORKER, {eval: true, workerData: {lib: new URL('../lib/spell.mjs', import.meta.url).href}}); wk.unref();
+      wk.on('message', m => { if (m.flags) ready.add(m.lang); const f = waits.get(m.id); waits.delete(m.id); if (f) f(m.flags); });
+      wk.on('error', () => { spell = false; for (const f of waits.values()) f(null); waits.clear(); }); // a dead worker: build-time only from here on
+    }
+    const id = ++seq; waits.set(id, ok); wk.postMessage({id, lang, deck, had});
+  });
   const server = http.createServer((req, res) => {
     const u = new URL(req.url, 'http://x'), p = server.address().port;
     if (req.headers.host !== `127.0.0.1:${p}` && req.headers.host !== `localhost:${p}`) return send(res, 421, {ok: false});
@@ -89,20 +107,19 @@ export function serve(file, {port = 0, guard = 60000, checker = loadChecker} = {
       const w = b && b.words;
       if (!Array.isArray(w) || w.length > SPELL_WORDS || !w.every(x => typeof x === 'string' && x.length <= SPELL_LEN)) return send(res, 400, {ok: false});
       let d; try { d = blockOf(read(), 'DECK'); } catch { d = {}; }
-      const c = await dict(d.lang || 'en');
-      if (!c) return send(res, 503, {ok: false, reason: 'no dictionary'});
-      send(res, 200, {ok: true, flags: flagMap({...d, master: [], slides: [{els: [{text: w.join(' ')}]}]}, c)}); // the file's deck with one row: every deck-level exception the build honours (spell.ignore)
+      const flags = await spellOf(d.lang || 'en', {...d, master: [], slides: [{els: [{text: w.join(' ')}]}]}); // the file's deck with one row: every deck-level exception the build honours (spell.ignore)
+      send(res, ...(flags ? [200, {ok: true, flags}] : [503, {ok: false, reason: 'no dictionary'}]));
     });
     if (req.method === 'POST' && u.pathname === '/__decklet/checkin') { release(); return send(res, 200, {ok: true, lease: null}); }
     if (req.method !== 'PUT' || u.pathname !== '/__decklet/file') return send(res, 404, {ok: false});
-    body(req, b => {
-      const c = b && b.model && typeof b.model === 'object' ? ready.get(b.model.lang || 'en') : null;
-      const cur = read(), rev = revOf(cur);
+    body(req, async b => {
+      const lang = b && b.model && typeof b.model === 'object' && (b.model.lang || 'en');
+      let sp, had; // the file's own suggestions go along, so a word it already carries costs no suggest()
+      if (lang && ready.has(lang)) { try { had = blockOf(read(), 'SPELL', {}); } catch {} sp = await spellOf(lang, b.model, Array.isArray(had) ? null : had) || undefined; }
+      const cur = read(), rev = revOf(cur); // nothing awaits from this read to the rename
       if (req.headers['if-match'] !== rev) return send(res, 412, {ok: false, rev});
       if (!b || typeof b.model !== 'object' || !Array.isArray(b.log)) return send(res, 400, {ok: false});
       if (lease) return send(res, 423, {ok: false, lease: pub()}); // checked out: the page's journal keeps the edit for checkin
-      // suggestions the file already carries are reused (suggest() can take a second a word; correct() is cheap)
-      let sp; try { if (c) { const had = blockOf(cur, 'SPELL', {}), k = w => c(w); k.suggest = w => !Array.isArray(had) && Object.hasOwn(had, w) ? had[w] : c.suggest(w); sp = flagMap(b.model, k); } } catch {}
       const next = splice(cur, b.model, b.log, sp), hist = path.join(dir, '.decklet-history'), tmp = path.join(dir, `.${name}.${process.pid}.tmp`);
       fs.mkdirSync(hist, {recursive: true}); fs.writeFileSync(path.join(hist, `${rev || 'norev'}-${Date.now()}.html`), cur);
       fs.writeFileSync(tmp, next); last = next; fs.renameSync(tmp, file);
@@ -122,7 +139,7 @@ export function serve(file, {port = 0, guard = 60000, checker = loadChecker} = {
   });
   const beat = setInterval(() => { for (const c of clients) c.write(': \n\n'); }, 15000); // proxies and sleeping laptops drop a silent stream
   const unlink = () => { try { if (JSON.parse(fs.readFileSync(hf, 'utf8')).token === token) fs.unlinkSync(hf); } catch {} };
-  const close = () => new Promise(r => { clearInterval(beat); clearTimeout(t); clearTimeout(leaseT); watcher.close(); unlink(); for (const c of clients) c.end(); server.close(() => r()); server.closeAllConnections(); });
+  const close = () => new Promise(r => { if (wk) wk.terminate(); clearInterval(beat); clearTimeout(t); clearTimeout(leaseT); watcher.close(); unlink(); for (const c of clients) c.end(); server.close(() => r()); server.closeAllConnections(); });
   return new Promise((ok, no) => { server.once('error', no); server.listen(port, '127.0.0.1', () => {
     const p = server.address().port;
     fs.writeFileSync(hf, JSON.stringify({port: p, token, pid: process.pid}), {mode: 0o600}); fs.chmodSync(hf, 0o600); // chmod: an old file keeps its mode through writeFileSync
