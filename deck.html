@@ -768,7 +768,7 @@ function drawEls(s,root,animate){
       (r.weight?`font-weight:${r.weight};`:'')+(r.color?`color:${r.color};`:'')+
       (r.font?`font-family:${r.font};`:'')+
       (r.ls!=null?`letter-spacing:${r.ls}px;`:'')+(r.lh!=null?`line-height:${r.lh}px;`:'')+(r.tt?`text-transform:${r.tt};`:'')+
-      (r.ws?`white-space:${r.ws};`:'')+(r.nowrap?'white-space:nowrap;':'')+(!r.html&&/\n/.test(r.text||'')?'white-space:pre-wrap;':'')+(r.italic?'font-style:italic;':'')+(r.op!=null?`opacity:${r.op};`:'')+
+      (r.ws?`white-space:${r.ws};`:'')+(r.nowrap?'white-space:nowrap;':'')+(r.html?(/\n/.test(r.html)?'white-space:pre-line;':''):/\n/.test(r.text||'')?'white-space:pre-wrap;':'')+(r.italic?'font-style:italic;':'')+(r.op!=null?`opacity:${r.op};`:'')+ // a \n breaks the line in html too: an inline mark carries a text row's \n into html (pre-line: space runs still collapse)
       (pad?`padding:${pad};`:'')+(r.h?`height:${r.h}px;`:'')+(r.bg?`background:${r.bg};`:'')+
       (r.bd?`border:${r.bd};`:'')+(r.bt?`border-top:${r.bt};`:'')+(r.br?`border-right:${r.br};`:'')+(r.bb?`border-bottom:${r.bb};`:'')+(r.bl?`border-left:${r.bl};`:'')+
       (r.shadow?`box-shadow:${r.shadow};`:'')+(r.bar?'border-radius:6px 6px 0 0;':'')+
