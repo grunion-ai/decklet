@@ -278,7 +278,7 @@ is the editor.</div><div class="el" style="left:calc(var(--u)*60);top:calc(var(-
         <div><kbd>← →</kbd> previous · next</div>
         <div><kbd>swipe · tap</kbd> presenting on a phone (left fifth goes back · bottom edge peeks the HUD)</div>
         <div><kbd>C · Esc</kbd> contact sheet</div>
-        <div><kbd>F</kbd> full screen (in-window when the browser refuses)</div>
+        <div><kbd>F</kbd> full screen (in-window when the browser refuses · from the sheet, the picked slide)</div>
         <div><kbd>G</kbd> guides + snap (a 16px dot grid · drags, resizes and connector ends snap to this slide's layout lines)</div>
         <div><kbd>⌘C · ⌘V</kbd> copy · paste slides (in the sheet)</div>
       </div>
@@ -1199,7 +1199,7 @@ tb.addEventListener('click',e=>{
 document.addEventListener('selectionchange',()=>{if(!tb.hidden||canvas.querySelector('[contenteditable="true"]'))placeTb()});
 // ── contact sheet: the slide manager ──
 const sheet=$('sheet'),grid=$('grid');let gsel=new Set(),ganchor=0,clip=null,ins=null;
-function sheetUi(on){sheet.hidden=!on;document.body.classList.toggle('sheet',on);for(const k of ['prev','next','fs','add-text','add-box'])$(k).disabled=on}
+function sheetUi(on){sheet.hidden=!on;document.body.classList.toggle('sheet',on);for(const k of ['prev','next','add-text','add-box'])$(k).disabled=on} // ⛶ stays live: full screen is how the deck shows, not which slide
 function sheetOpen(){commitEdit();sel.clear();gsel=new Set([i]);ganchor=i;sheetUi(true);cellOf=new WeakMap();sheetRender();tb.hidden=true}
 function sheetClose(){sheetUi(false);render()}
 $('sheet-back').onclick=sheetClose; // ← Back: closes to the CURRENT slide (i untouched); Esc / dblclick-a-cell unchanged
@@ -1293,6 +1293,7 @@ function sheetKey(e){
   if(e.key==='Escape'&&pd&&pd.on){pcancel();return true} // Escape mid-drag drops nothing and keeps the sheet
   if(e.key==='Escape'||(k==='c'&&!mod&&!e.altKey)){sheetClose();return true} // a bare C closes what C opened; ⌘C stays copy
   if(e.key==='Enter'&&gsel.size){i=[...gsel][0];sheetClose();return true}
+  if(k==='f'&&!mod&&!e.altKey){fs();return true} // F toggles full screen here as on the canvas; fs() presents from the picked slide
   if((e.key==='Backspace'||e.key==='Delete')&&gsel.size){ // never the last slide
     const del=[...gsel].sort((a,b)=>b-a);if(del.length>=deck.slides.length)del.pop();if(!del.length)return true;
     snap();del.forEach(n=>deck.slides.splice(n,1));i=Math.min(del[del.length-1],deck.slides.length-1);gsel=new Set([i]);ganchor=i;save();sheetRender();return true}
@@ -1343,7 +1344,7 @@ function nudgeSel(key,step){
 // or never answer it, and a button that does nothing reads as broken — so a rejection, or 400ms of silence, opens the second door.
 const inlineP=()=>document.body.classList.contains('present-inline');
 const setPresent=(on,inl)=>{document.body.classList.toggle('present',on);document.body.classList.toggle('present-inline',!!(on&&inl));document.body.classList.remove('peek');sel.clear();sheetUi(false);render();fit()};
-const fs=()=>{commitEdit();
+const fs=()=>{commitEdit();if(!sheet.hidden&&gsel.size)i=Math.min(...gsel); // from the contact sheet: the picked slide
   if(document.fullscreenElement)return document.exitFullscreen();
   if(inlineP())return setPresent(false);
   let done=false;const fb=()=>{if(!done&&!document.fullscreenElement){done=true;setPresent(true,true)}},t=setTimeout(fb,400);
