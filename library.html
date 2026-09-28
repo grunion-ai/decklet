@@ -1384,7 +1384,7 @@ const spellSkip=()=>new Set(((deck.spell&&deck.spell.ignore)||[]).map(w=>String(
 const smenu=$('spellmenu'),sbad=$('spellbad');let spellAnchor=null; // the panel and its door; spellAnchor = the rect it points at, kept so a repaint holds its place
 // spellHits(root) → every flagged token under root as [textNode, index, length]; the canvas paints them, the sheet counts them
 const spellHits=root=>{const out=[];if(!SPELLSET.size)return out;const skip=spellSkip();const it=document.createNodeIterator(root,NodeFilter.SHOW_TEXT);let n;
-  while(n=it.nextNode()){if(n.parentElement.closest('.h,.num,svg'))continue;const s=n.data;let m;const re=/[A-Za-z][A-Za-z']*[A-Za-z]|[A-Za-z]/g;
+  while(n=it.nextNode()){if(n.parentElement.closest('.h,.num,svg'))continue;const s=n.data;let m;const re=/\p{L}[\p{L}']*\p{L}|\p{L}/gu;
     while(m=re.exec(s)){const w=m[0].toLowerCase();if(SPELLSET.has(w)&&!skip.has(w))out.push([n,m.index,m[0].length])}}
   return out};
 // the badge: a red count, one per token (a word twice counts twice); hidden at zero, off, or while presenting
