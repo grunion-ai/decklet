@@ -769,7 +769,7 @@ function drawEls(s,root,animate){
       (r.weight?`font-weight:${r.weight};`:'')+(r.color?`color:${r.color};`:'')+
       (r.font?`font-family:${r.font};`:'')+
       (r.ls!=null?`letter-spacing:${r.ls}px;`:'')+(r.lh!=null?`line-height:${r.lh}px;`:'')+(r.tt?`text-transform:${r.tt};`:'')+
-      (r.ws?`white-space:${r.ws};`:'')+(r.nowrap?'white-space:nowrap;':'')+(!r.html&&/\n/.test(r.text||'')?'white-space:pre-wrap;':'')+(r.italic?'font-style:italic;':'')+(r.op!=null?`opacity:${r.op};`:'')+
+      (r.ws?`white-space:${r.ws};`:'')+(r.nowrap?'white-space:nowrap;':'')+(r.html?(/\n/.test(r.html)?'white-space:pre-line;':''):/\n/.test(r.text||'')?'white-space:pre-wrap;':'')+(r.italic?'font-style:italic;':'')+(r.op!=null?`opacity:${r.op};`:'')+ // a \n breaks the line in html too: an inline mark carries a text row's \n into html (pre-line: space runs still collapse)
       (pad?`padding:${pad};`:'')+(r.h?`height:${r.h}px;`:'')+(r.bg?`background:${r.bg};`:'')+
       (r.bd?`border:${r.bd};`:'')+(r.bt?`border-top:${r.bt};`:'')+(r.br?`border-right:${r.br};`:'')+(r.bb?`border-bottom:${r.bb};`:'')+(r.bl?`border-left:${r.bl};`:'')+
       (r.shadow?`box-shadow:${r.shadow};`:'')+(r.bar?'border-radius:6px 6px 0 0;':'')+
@@ -1071,6 +1071,9 @@ const tb=$('tb');
 // dedupe on the RESOLVED value (#23262C and rgb(35, 38, 44) are one swatch); the first literal spelling is kept
 const deckColors=()=>{const seen=new Map();for(const c of [...Object.values(deck.styles&&deck.styles.roles||{}).map(r=>r.color),...[...(deck.master||[]),...deck.slides.flatMap(s=>s.els||[])].flatMap(e=>[e.color,...[...(e.html||'').matchAll(/color:\s*([^;"']+)/g)].map(m=>m[1].trim())])].filter(Boolean)){canvas.style.color=c;const k=getComputedStyle(canvas).color;if(!seen.has(k))seen.set(k,c)}canvas.style.color='';return [...seen.values()]};
 const runSpan=(sr,node)=>{const a=sr.rangeCount&&sr.anchorNode,el=a&&(a.nodeType===1?a:a.parentElement).closest('[style*="color"]');return el&&node.contains(el)&&el!==node?el:null};
+// a row whose resolved weight is already bold (any role the style sets to 600+): B would only write font-weight:normal, so it stays off
+const heavy=r=>!!r&&(/^bold/.test(r.weight)||+r.weight>=600);
+const heavyRow=()=>{const ed=canvas.querySelector('.el[contenteditable="true"]'),el=ed?slide().els[+ed.dataset.n]:selEl();return !!el&&heavy(res(el,slide()))};
 // palette is TEXT color only (no box fill — retracted 2026-08-23): any painting row still gets the toolbar for Apply to all slides
 function placeTb(){
   // the row being edited wins over the selection: a row can be edited while others are still selected (sel.size > 1), and the
@@ -1091,6 +1094,7 @@ function placeTb(){
   const roles=Object.keys(deck.styles&&deck.styles.roles||{}),rw=$('tb-roles');
   rw.innerHTML=roles.map(n=>`<button data-role="${n}" class="${n===(src.role||(src.slot&&LAY(s)[src.slot]||{}).role)?'on':''}" title="${n}">${n}</button>`).join('');
   tb.querySelectorAll('[data-cmd]').forEach(b=>{b.disabled=!editing;b.classList.toggle('on',editing&&document.queryCommandState(b.dataset.cmd))});
+  const bb=tb.querySelector('[data-cmd="bold"]'),hb=heavy(r);if(hb){bb.disabled=true;bb.classList.remove('on')}bb.title=hb?'Bold · the role is already bold':'Bold';bb.setAttribute('aria-label',bb.title);
   const run=editing&&!sr.isCollapsed&&runSpan(sr,node),cur=run?(run.getAttribute('style').match(/color:\s*([^;]+)/)||[])[1]:res(src,s).color;
   $('tb-colors').innerHTML=deckColors().map(c=>`<button class="sw${c===(cur||'').trim()?' on':''}" data-color="${c}" style="background:${c}" title="${c}" aria-label="${c}"></button>`).join('');
   $('tb-master').hidden=!(el&&el.override);
@@ -1099,7 +1103,7 @@ function placeTb(){
 tb.addEventListener('mousedown',e=>e.preventDefault()); // keep the text selection + focus alive
 tb.addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;
-  if(b.dataset.cmd){document.execCommand(b.dataset.cmd);placeTb();return}
+  if(b.dataset.cmd){if(!(b.dataset.cmd==='bold'&&heavyRow()))document.execCommand(b.dataset.cmd);placeTb();return}
   if(b.dataset.link){ // the link MARK: wraps the selected run in <a href>, exactly as B wraps it in <b>. Empty field = unlink.
     const t0=canvas.querySelector('.el[contenteditable="true"]'),sr0=getSelection();
     if(!t0||sr0.isCollapsed||!t0.contains(sr0.anchorNode)){linkSel();placeTb();return} // no text selected: the field is the selected ROWS' link
@@ -1238,7 +1242,7 @@ addEventListener('keydown',e=>{
   if(e.key==='Escape'&&!smenu.hidden){e.preventDefault();spellClose(true);return} // the flagged-word panel closes first, and hands focus back to its door
   if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='s'){e.preventDefault();saveFile();return} // ⌘S never reaches the browser's Save Page As
   if((e.metaKey||e.ctrlKey)&&['b','i','u'].includes(e.key.toLowerCase())&&(e.target.isContentEditable||selEl())){ // ⌘B ⌘I ⌘U = the toolbar marks; on a selected row they take the whole row
-    e.preventDefault();if(!e.target.isContentEditable)edit([...sel][0]);document.execCommand({b:'bold',i:'italic',u:'underline'}[e.key.toLowerCase()]);placeTb();return}
+    e.preventDefault();if(e.key.toLowerCase()==='b'&&heavyRow())return;if(!e.target.isContentEditable)edit([...sel][0]);document.execCommand({b:'bold',i:'italic',u:'underline'}[e.key.toLowerCase()]);placeTb();return}
   if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'&&(e.target.isContentEditable||sel.size)){e.preventDefault();tb.querySelector('[data-link]').click();return} // ⌘K = the link button: a run while text is selected, else the selected rows
   if(e.target.isContentEditable){if(e.key==='Escape')e.target.blur();return}
   if(!sheet.hidden){if(sheetKey(e))e.preventDefault();return}

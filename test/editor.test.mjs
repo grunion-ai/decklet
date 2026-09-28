@@ -44,6 +44,33 @@ live('the mini toolbar opens on a text edit inside a multi-row selection: the ed
   assert.deepEqual(p.errs, []); await b.close();
 });
 
+live('an inline mark on a multi-line row keeps its line breaks: italic, a colour run, a reload, a deck already carrying html with a newline', async () => {
+  // any mark moves a row from text to html, and the newline travels into html as a literal \n. text rows pre-wrap on a \n
+  // and html rows did not, so the committed row collapsed onto one line. The fault sits on the shared text → html path.
+  const two = 'The renderer\nis the editor.';
+  const m = model({slides: [{els: [
+    {x: 60, y: 60, w: 800, role: 'H1', text: two},
+    {x: 60, y: 240, w: 800, role: 'H1', text: two},
+    {x: 60, y: 420, w: 800, role: 'Body', html: 'The <i>renderer</i>\nis the editor.'}]}]}); // damaged by the defect before this fix
+  const b = await pw.chromium.launch(); const p = await fresh(b, write('marklines.html', create(m).html));
+  const lines = n => p.evaluate(n => { sel.clear(); render(); /* the selection nib would count as a line */ const r = document.createRange(); r.selectNodeContents(canvas.querySelector(`.el[data-n="${n}"]`)); return new Set([...r.getClientRects()].filter(c => c.height).map(c => Math.round(c.top))).size; }, n);
+  const mark = (n, pick) => p.evaluate(([n, pick]) => {
+    sel.clear(); sel.add(n); render(); edit(n);
+    const t = canvas.querySelector(`.el[data-n="${n}"]`).firstChild, a = t.data.indexOf('renderer'), r = document.createRange();
+    r.setStart(t, a); r.setEnd(t, a + 8); getSelection().removeAllRanges(); getSelection().addRange(r);
+    tb.querySelector(pick).click(); commitEdit();
+  }, [n, pick]);
+  assert.deepEqual([await lines(0), await lines(1)], [2, 2], 'two lines before any mark');
+  await mark(0, '[data-cmd="italic"]');
+  await mark(1, '#tb-colors .sw');
+  const rows = await p.evaluate(() => slide().els.slice(0, 2).map(e => [e.html, e.text]));
+  assert.match(rows[0][0], /<i>renderer<\/i>/, 'italic landed as an html run'); assert.match(rows[1][0], /<span style="color:[^"]+">renderer<\/span>/, 'the colour run landed as an html run');
+  assert.deepEqual([await lines(0), await lines(1), await lines(2)], [2, 2, 2], 'italic, a colour run and a stored html \\n each keep two lines');
+  await p.reload(); await p.waitForTimeout(150);
+  assert.deepEqual([await lines(0), await lines(1), await lines(2)], [2, 2, 2], 'two lines again after a reload from the saved state');
+  assert.deepEqual(p.errs, []); await b.close();
+});
+
 live('a bound connector dragged without its anchors translates rigidly: the to:/from: ends become the human\'s', async () => {
   // dragging a line whose ends are bound to boxes that stay put used to leave both ends re-aimed at the boxes while the
   // shaft moved, skewing the stroke into a diagonal. The drag is a translation: shape and length are kept, the bindings drop.
@@ -193,6 +220,47 @@ live('⌘B / ⌘I / ⌘U mark the selection while editing, and take the whole ro
   await p.keyboard.press('Meta+u'); await p.evaluate(() => nav(1));
   assert.match(await p.evaluate(() => deck.slides[0].els[0].html), /<u>One<\/u>/);
   await b.close();
+});
+
+// B on a row whose role is already bold (Title, 800) showed "on", changed nothing on screen, and saved
+// <span style="font-weight: normal;">: the title came back regular. The button is disabled there, with a tip, and ⌘B is a no-op.
+const boldDeck = () => model({slides: [{els: [{x: 60, y: 80, w: 800, role: 'Title', text: 'Big title'}, {x: 60, y: 300, w: 400, role: 'Body', text: 'body one'}]}]});
+const editAll = (p, n) => p.evaluate(n => { i = 0; sel.clear(); sel.add(n); render(); edit(n); const t = canvas.querySelector(`[data-n="${n}"]`), r = document.createRange(); r.selectNodeContents(t); getSelection().removeAllRanges(); getSelection().addRange(r); placeTb(); }, n);
+const B = p => p.evaluate(() => { const b = tb.querySelector('[data-cmd="bold"]'); return {disabled: b.disabled, on: b.classList.contains('on'), tip: b.title, label: b.getAttribute('aria-label')}; });
+live('B on a row whose role is already bold is disabled with a tip, and a press leaves the model byte-identical', async () => {
+  const b = await pw.chromium.launch(); const p = await fresh(b, write('boldrole.html', create(boldDeck()).html)); try {
+  const before = await p.evaluate(() => JSON.stringify(deck));
+  await editAll(p, 0);
+  const s = await B(p);
+  assert.equal(s.disabled, true, 'B is disabled on a Title row'); assert.equal(s.on, false, 'and never shows "on"');
+  assert.equal(s.tip, 'Bold · the role is already bold'); assert.equal(s.label, s.tip, 'the tip is the accessible name too');
+  await p.evaluate(() => { const b = tb.querySelector('[data-cmd="bold"]'); b.disabled = false; b.click(); }); // the handler holds even if the button were live
+  await p.evaluate(() => nav(1));
+  assert.equal(await p.evaluate(() => JSON.stringify(deck)), before, 'the model is byte-identical');
+  assert.deepEqual(p.errs, []); } finally { await b.close(); }
+});
+live('⌘B on a row whose role is already bold leaves the model byte-identical, editing or merely selected', async () => {
+  const b = await pw.chromium.launch(); const p = await fresh(b, write('boldrole-key.html', create(boldDeck()).html)); try {
+  const before = await p.evaluate(() => JSON.stringify(deck));
+  await editAll(p, 0); await p.keyboard.press('Meta+b'); await p.evaluate(() => nav(1));
+  assert.equal(await p.evaluate(() => JSON.stringify(deck)), before, 'editing: unchanged');
+  await p.evaluate(() => { i = 0; sel.clear(); sel.add(0); render(); }); await p.keyboard.press('Meta+b'); await p.evaluate(() => nav(1));
+  assert.equal(await p.evaluate(() => JSON.stringify(deck)), before, 'selected: unchanged');
+  // a style decides, not the role name: a deck that sets Body to 700 disables B on Body
+  await p.evaluate(() => { deck.styles.roles.Body.weight = 700; i = 0; render(); });
+  await editAll(p, 1); assert.equal((await B(p)).disabled, true, 'a Body row styled 700 is already bold');
+  assert.deepEqual(p.errs, []); } finally { await b.close(); }
+});
+live('B on a regular-weight row still bolds and un-bolds', async () => {
+  const b = await pw.chromium.launch(); const p = await fresh(b, write('boldbody.html', create(boldDeck()).html)); try {
+  await editAll(p, 1);
+  const s = await B(p); assert.equal(s.disabled, false, 'B is live on a Body row'); assert.equal(s.tip, 'Bold');
+  await p.evaluate(() => tb.querySelector('[data-cmd="bold"]').click()); await p.evaluate(() => nav(1));
+  assert.match(await p.evaluate(() => deck.slides[0].els[1].html), /<b>body one<\/b>/, 'bolded');
+  await editAll(p, 1); assert.equal((await B(p)).on, true, 'B shows on over the bold run');
+  await p.evaluate(() => tb.querySelector('[data-cmd="bold"]').click()); await p.evaluate(() => nav(1));
+  assert.doesNotMatch(await p.evaluate(() => deck.slides[0].els[1].html || deck.slides[0].els[1].text), /<b>|font-weight/, 'un-bolded');
+  assert.deepEqual(p.errs, []); } finally { await b.close(); }
 });
 
 // L1.1 — the contact sheet keeps its scroll: every sheet action rebuilt the grid from innerHTML='', so #sheet's scroll

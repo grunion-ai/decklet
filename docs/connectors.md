@@ -12,6 +12,10 @@ and `validate` says nothing about it. That boundary was ruled by hand (G1's 1.5p
 leader accepted), and it is what keeps the warnings worth reading: a validator that flags a chart for being diagonal
 teaches you to ignore it. A headed stroke under 40px is an icon, not a run between boxes, and is exempt too.
 
+**A leader reaches its marker.** A row whose id (or slot) is `<name>-leader` pairs with the row `<name>-dot` on the same
+slide, and one of its ends must sit within 1px of that dot's box: `validate` errors otherwise, and so `verify` fails. The
+`annotated-shot` template and layout run each leader from the callout's edge to its dot's edge.
+
 | rule | do | not |
 |---|---|---|
 | **Straight runs are orthogonal** | horizontal, vertical, right-to-left | a diagonal — draw an elbow of two orthogonal segments *(warned)* |
