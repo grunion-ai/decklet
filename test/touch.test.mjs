@@ -16,10 +16,10 @@ const model = () => ({w: 960, h: 540, title: 'touch', slides: [
   {els: [{x: 60, y: 80, w: 800, role: 'H1', text: 'Two'}]},
   {els: [{x: 60, y: 80, w: 800, role: 'H1', text: 'Three'}]},
 ]});
-const launch = async () => {
-  const b = await pw.chromium.launch(); const ctx = await b.newContext(PHONE); const p = await ctx.newPage();
+const launch = async (opts = PHONE, m = model()) => {
+  const b = await pw.chromium.launch(); const ctx = await b.newContext(opts); const p = await ctx.newPage();
   const errs = []; p.on('pageerror', e => errs.push(String(e))); p.errs = errs;
-  const f = path.join(tmp, 'touch.html'); fs.writeFileSync(f, create(model()).html);
+  const f = path.join(tmp, 'touch.html'); fs.writeFileSync(f, create(m).html);
   await p.goto(pathToFileURL(f).href); await p.waitForTimeout(150); await p.evaluate(() => localStorage.clear()); await p.reload(); await p.waitForTimeout(150);
   const cdp = await ctx.newCDPSession(p);
   // a real finger: CDP touch events, so the page sees touchstart/touchend (and the synthetic mouse events that follow)
@@ -134,6 +134,48 @@ live('presenting on a phone: swipe turns the page, a tap advances (left fifth go
   await p.tap(W / 2, H / 2); assert.equal(await at(p), 2); assert.equal(await p.evaluate(() => document.body.classList.contains('peek')), false, 'a tap on the slide advances and lets the HUD go');
   assert.equal(await p.evaluate(() => present()), true, 'still presenting');
   assert.deepEqual(p.errs, []); await b.close();
+});
+
+// The text toolbar on a 375px phone (toolbar review at 82d0e8d): the role segment did not wrap, so Label and Stat sat past the
+// right edge; the 44px button floor stretched the 16px swatches into 16×44 ovals; and the toolbar always sat above the row, over
+// the title and supertitle. Under 480px the segments wrap; a swatch is a 44×44 tap target around a round 20px dot; the toolbar
+// goes below the row when above would cover a text row or leave the viewport. On a desktop, editing the Body kept hiding the
+// Title's second line, and the same rule moves it below there too.
+const stack = () => ({w: 960, h: 540, title: 'toolbar', slides: [{els: [
+  {x: 60, y: 40, w: 800, role: 'Supertitle', text: 'Quarterly review'},
+  {x: 60, y: 90, w: 800, role: 'Title', text: 'A title long enough to wrap onto a second line here'},
+  {x: 60, y: 250, w: 800, role: 'Body', text: 'Body copy under the title.'},
+]}]});
+const tbBoxes = p => p.evaluate(() => {
+  edit(2); placeTb();
+  const R = e => { const r = e.getBoundingClientRect(); return {l: r.left, t: r.top, r: r.right, b: r.bottom, w: r.width, h: r.height}; };
+  const sw = [...document.querySelectorAll('#tb .sw')].map(e => { const c = getComputedStyle(e), pad = parseFloat(c.paddingLeft) + parseFloat(c.paddingRight), padV = parseFloat(c.paddingTop) + parseFloat(c.paddingBottom); return {...R(e), clip: c.backgroundClip, dotW: e.getBoundingClientRect().width - pad, dotH: e.getBoundingClientRect().height - padV}; });
+  return {vw: document.documentElement.clientWidth, vh: document.documentElement.clientHeight, tb: R(tb), roles: [...document.querySelectorAll('#tb-roles button')].map(e => ({n: e.textContent, ...R(e)})),
+    sw, rows: [0, 1, 2].map(n => R(canvas.querySelector(`[data-n="${n}"]`)))};
+});
+const meets = (a, b) => a.r > b.l && a.l < b.r && a.b > b.t && a.t < b.b;
+live('phone text toolbar at 375px: every role button is on screen, swatches are round 44px targets, and the toolbar never covers the edited row or the rows above it', async () => {
+  const {b, p} = await launch({...PHONE, viewport: {width: 375, height: 667}}, stack()); try {
+  const {vw, vh, tb, roles, sw, rows} = await tbBoxes(p);
+  assert.equal(roles.length, 8, 'the eight roles');
+  for (const r of roles) assert.ok(r.l >= 0 && r.r <= vw && r.t >= 0 && r.b <= vh, `${r.n} inside the ${vw}×${vh} viewport: ${JSON.stringify(r)}`);
+  assert.ok(sw.length > 1, 'the deck colours show as swatches');
+  for (const s of sw) {
+    assert.ok(s.w >= 44 && s.h >= 44, `swatch tap target ≥ 44×44: ${s.w}×${s.h}`);
+    assert.equal(s.w, s.h, 'the target is square');
+    assert.equal(s.clip, 'content-box', 'the colour fills the dot, not the tap target');
+    assert.equal(s.dotW, s.dotH, `the dot is round, not an oval: ${s.dotW}×${s.dotH}`);
+  }
+  assert.ok(tb.t >= 0 && tb.b <= vh && tb.l >= 0 && tb.r <= vw, `the toolbar is inside the viewport: ${JSON.stringify(tb)}`);
+  for (const [n, row] of rows.entries()) assert.ok(!meets(tb, row), `the toolbar does not cover row ${n}: tb ${JSON.stringify(tb)}, row ${JSON.stringify(row)}`);
+  assert.deepEqual(p.errs, []); } finally { await b.close(); }
+});
+
+live('desktop text toolbar: editing the Body leaves the Title above it uncovered', async () => {
+  const {b, p} = await launch({viewport: {width: 1280, height: 800}}, stack()); try {
+  const {tb, rows} = await tbBoxes(p);
+  for (const [n, row] of rows.entries()) assert.ok(!meets(tb, row), `the toolbar does not cover row ${n}: tb ${JSON.stringify(tb)}, row ${JSON.stringify(row)}`);
+  assert.deepEqual(p.errs, []); } finally { await b.close(); }
 });
 
 live('editing on a phone: a swipe or a tap never turns the page (that is the present-mode gesture)', async () => {
