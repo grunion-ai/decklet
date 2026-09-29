@@ -103,7 +103,7 @@ node bin/verify.mjs deck.html                      # 3. verify the result
 ```
 `--from` inherits the deck id and the slide/row ids and replays every logged edit onto the new build. Full flow: [docs/editor.md](docs/editor.md#revising-an-edited-deck).
 
-**The deck names itself.** `--title` wins, else the model's `title`, else `decklet`. Write one short, human name: it becomes the browser tab and the `⤓`/`⌘S` filenames.
+**The deck names itself.** `--title` wins, else the model's `title`, else `decklet`. Write one short, human name: it becomes the browser tab and the `⤓`/`⌘S` filenames. The tab adds the position after the name (`Q3 update · slide 3 of 12`, `page` in a document); a one-slide deck shows the name alone, and the filenames never carry the count.
 
 ### Step 5 — verify (mandatory)
 ```

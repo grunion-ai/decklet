@@ -572,7 +572,7 @@ hydrate();
 // HUD icons move once: on load, a beat apart; then once per hover; never on a loop — one run per trigger
 const miPlay=(h)=>{const ms=+h.dataset.ms||0;if(!ms||h.dataset.on||matchMedia('(prefers-reduced-motion: reduce)').matches)return;h.dataset.on='1';const parts=[...h.querySelectorAll('[data-mi]')];for(const p of parts)p.classList.add(...p.dataset.mi.split(' '));setTimeout(()=>{for(const p of parts)p.classList.remove(...p.dataset.mi.split(' '));delete h.dataset.on},ms)};
 document.querySelectorAll('.mi').forEach((h,i)=>{h.addEventListener('mouseenter',()=>miPlay(h));setTimeout(()=>miPlay(h),300+i*90)});
-document.title=deck.title||'decklet'; // the deck names itself: tab title, ⤓ PDF filename and ⌘S copy filename are all this one string
+const deckName=()=>deck.title||'decklet'; // the deck names itself: the ⤓ PDF and the ⌘S copy take this string bare; the tab adds the slide count (render)
 const W=deck.w||960,H=deck.h||540;
 // print pages: printable width in px at 96dpi, and the named @page size (Safari honours names only — and ignores `landscape`,
 // so a landscape or A3 deck prints right from Chromium / bin/pdf.mjs and Letter-portrait-clipped from Safari)
@@ -934,6 +934,7 @@ function render(){
       for(const[pt,x,y]of pts){const h=document.createElement('i');h.className='h pt'+(pt[0]==='c'?' ctl':'');h.dataset.pt=pt;h.style.cssText=`left:${x}px;top:${y}px`;canvas.appendChild(h)}}
     else if(d&&paints(r)&&r.w!==0&&r.h!==0){const h=document.createElement('i');h.className='h';d.appendChild(h)}}
   num(canvas,i+1);
+  document.title=deckName()+(deck.slides.length>1?` · ${/^document/.test(deck.format)?'page':'slide'} ${i+1} of ${deck.slides.length}`:''); // one slide: the bare name
   document.body.style.background=present()?(s.bg||'var(--card)'):''; // present backdrop = CURRENT slide's bg
   if(!$('sheet').hidden)sheetRender();
   placeTb();hudEd();
@@ -1466,7 +1467,7 @@ async function exportPdf(){
   obj[pagesId-1]=`<< /Type /Pages /Kids [${kids.join(' ')}] /Count ${kids.length} >>`;
   obj.forEach((b,n)=>{off.push(out.length);out+=`${n+1} 0 obj\n${b}\nendobj\n`});
   const x=out.length;out+=`xref\n0 ${obj.length+1}\n0000000000 65535 f \n`+off.map(o=>String(o).padStart(10,'0')+' 00000 n \n').join('')+`trailer\n<< /Size ${obj.length+1} /Root 1 0 R >>\nstartxref\n${x}\n%%EOF\n`;
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([Uint8Array.from(out,ch=>ch.charCodeAt(0))],{type:'application/pdf'}));a.download=document.title.replace(/[\/:*?"<>|]+/g,'-')+'.pdf';a.click();
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([Uint8Array.from(out,ch=>ch.charCodeAt(0))],{type:'application/pdf'}));a.download=deckName().replace(/[\/:*?"<>|]+/g,'-')+'.pdf';a.click();
 }
 $('pdf').onclick=()=>exportPdf().catch(()=>printPdf()); // the rasteriser in every engine; the dialog only if it throws
 // option C paint: every text node of every live row, each flagged word a Range in one Highlight. Off, presenting, or no
@@ -1724,7 +1725,7 @@ $('autosave').onclick=saveFile; // the dot is the ⌘S door where there is no �
 hget().then(async h=>{if(h&&(await h.queryPermission({mode:'readwrite'}))==='granted'){fileH=h;if(unsynced)writeBack()}}); // a handle this browser still trusts: silent write-back from the first edit
 function saveCopy(){
   const html=fileHtml();
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([html],{type:'text/html'}));a.download=document.title.replace(/[\/:*?"<>|]+/g,'-')+'.html';a.click();
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([html],{type:'text/html'}));a.download=deckName().replace(/[\/:*?"<>|]+/g,'-')+'.html';a.click();
   autosave('busy');clearTimeout(asT);asT=setTimeout(()=>autosave('ok','Saved copy · '+hms(new Date())),250);
 }
 // add text + box: new text is born Body — or binds to a free slot of the slide's layout (inheriting its role + geometry)
