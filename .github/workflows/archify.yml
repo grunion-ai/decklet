@@ -1,12 +1,12 @@
 name: archify
-# Opens a PR when tt-a1i/archify cuts a release newer than vendor/archify.lock.json. docs/archify.md.
+# Pushes branch archify/<tag> when tt-a1i/archify cuts a release newer than vendor/archify.lock.json, then stops: GitHub Actions
+# may not open pull requests in this repository, so the run leaves a notice and a person opens the PR. docs/archify.md.
 on:
   schedule:
     - cron: '0 14 * * 1'
   workflow_dispatch:
 permissions:
   contents: write
-  pull-requests: write
 jobs:
   bump:
     runs-on: ubuntu-latest
@@ -21,11 +21,11 @@ jobs:
           else echo "tag=$(curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/repos/tt-a1i/archify/releases/latest | jq -r .tag_name)" >> "$GITHUB_OUTPUT"; fi
       - if: steps.check.outputs.tag != ''
         env:
-          GH_TOKEN: '${{ github.token }}'
           GITHUB_TOKEN: '${{ github.token }}'
           TAG: '${{ steps.check.outputs.tag }}'
         run: |
-          git ls-remote --exit-code origin "refs/heads/archify/$TAG" && { echo "archify/$TAG already open"; exit 0; }
+          PR="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/main...archify/$TAG?expand=1"
+          git ls-remote --exit-code origin "refs/heads/archify/$TAG" && { echo "::notice title=archify $TAG::Branch archify/$TAG is pushed and not merged yet. Open the PR by hand: $PR"; exit 0; }
           node bin/archify-sync.mjs --tag "$TAG"
           node --test test/archify.test.mjs
           git config user.name 'github-actions[bot]'
@@ -34,4 +34,4 @@ jobs:
           git add vendor CHANGELOG.md docs/archify.md
           git commit -m "archify: vendor $TAG"
           git push origin "archify/$TAG"
-          gh pr create --title "archify: vendor $TAG" --body "Moves vendor/archify to $TAG with bin/archify-sync.mjs. Release notes: https://github.com/tt-a1i/archify/releases/tag/$TAG. The archify gate passed in this run; close and reopen the PR to start the full test workflow."
+          echo "::notice title=archify $TAG::Pushed branch archify/$TAG; the archify gate passed in this run. Open the PR by hand: $PR"
