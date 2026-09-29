@@ -1,6 +1,6 @@
 # archify
 
-decklet ships [archify](https://github.com/tt-a1i/archify) (MIT, tt-a1i) at **v3.0.0** in `vendor/archify`. archify turns a typed JSON spec into one standalone, explorable HTML diagram: architecture, workflow, sequence, data flow and lifecycle, with its own validator and export to PNG, SVG and WebM.
+decklet ships [archify](https://github.com/tt-a1i/archify) (MIT, tt-a1i) at **v3.0.1** in `vendor/archify`. archify turns a typed JSON spec into one standalone, explorable HTML diagram: architecture, workflow, sequence, data flow and lifecycle, with its own validator and export to PNG, SVG and WebM.
 
 ## Figure or archify
 
@@ -32,7 +32,7 @@ To move the pin, run one command:
 
 ```bash
 node bin/archify-sync.mjs               # the latest release
-node bin/archify-sync.mjs --tag v3.0.0 # one tag, forward or back
+node bin/archify-sync.mjs --tag v3.0.1 # one tag, forward or back
 node bin/archify-sync.mjs --check       # exit 1 when a newer release is out
 ```
 

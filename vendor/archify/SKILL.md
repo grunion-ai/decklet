@@ -20,7 +20,7 @@ For a real codebase, read [Repository authoring](references/repository-authoring
 
 When the user supplies a frozen candidate, run `finalize` first as one CLI invocation. Its passing receipt completes the automated gates; follow any visual review recommendation under Delivery before claiming visual quality. For repair, follow step 5.
 
-The optional update check never delays `finalize`; see Update awareness.
+`finalize` includes a bounded update check in its delivery receipt; see Update awareness.
 
 ## Fast authoring path
 
@@ -43,10 +43,7 @@ Use this path for ordinary generation. Read branch references only when their st
 
 ## Update awareness
 
-After the first candidate exists, a harness with true parallel tool calls may run `scripts/check-update.mjs` once alongside `finalize`. Otherwise skip it without delaying delivery.
-
-- For `silent`, continue without mentioning the update check.
-- For `update_available`, read `references/update-awareness.md`, follow it, then continue the requested task.
+`finalize` and standalone `deliver` include `update` in their receipts. Do not run a separate check for the same delivery. If `update.noticeRequired` is true, read `references/update-awareness.md` and keep one update line in your final response to the user, even after a quality gate fails. For a task with several diagrams, mention the update once in the final response. Snooze or ignore a reminder only when the user explicitly asks; never install or update on your own initiative.
 
 Before the first candidate, use the authoring references and relevant repository source, not Archify implementation or tests. Inspect Archify implementation if diagnostics remain unactionable after focused repairs.
 
