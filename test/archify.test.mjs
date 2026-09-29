@@ -60,3 +60,14 @@ test('the pin is documented where a reader looks', () => {
   assert.match(read('docs/figures.md'), /\(archify\.md\)/, 'docs/figures.md must link docs/archify.md');
   assert.ok(JSON.parse(read('package.json')).files.includes('vendor'), 'package.json files must ship vendor/');
 });
+
+// GitHub Actions may not open pull requests in this repository, so the workflow hands over a pushed branch and a notice.
+test('the archify workflow stops at the pushed branch and asks for a PR by hand', () => {
+  const yml = read('.github/workflows/archify.yml');
+  assert.doesNotMatch(yml, /gh pr create/, 'the workflow token cannot open a PR; the run must not try');
+  assert.doesNotMatch(yml, /pull-requests:/, 'the workflow needs no pull-requests permission');
+  assert.match(yml, /git push origin "archify\/\$TAG"/);
+  assert.equal((yml.match(/::notice title=archify \$TAG::/g) || []).length, 2, 'a notice on the run that pushes the branch and on each later run that finds it');
+  assert.match(yml, /compare\/main\.\.\.archify\/\$TAG\?expand=1/, 'the notice links the page that opens the PR');
+  assert.match(read('docs/archify.md'), /open the PR by hand/);
+});

@@ -38,4 +38,4 @@ node bin/archify-sync.mjs --check       # exit 1 when a newer release is out
 
 The script replaces the tree, rewrites the lock, adds a line under `## Unreleased` in CHANGELOG.md and updates the tag in this page. Review the upstream release notes, run `npm test`, and ship it as its own PR.
 
-The `archify` workflow runs `--check` every Monday. On a newer upstream release it runs the sync, runs the archify gate and opens a PR on branch `archify/<tag>`. A PR opened by the workflow's token starts no other workflow, so close and reopen it to run the full `test` gate before merging.
+The `archify` workflow runs `--check` every Monday. On a newer upstream release it runs the sync, runs the archify gate, pushes branch `archify/<tag>` and stops with a notice on the run that links the compare page. GitHub Actions may not open pull requests in this repository, so open the PR by hand from that branch; the `test` gate starts on its own. Each later run repeats the notice until the branch is merged.
