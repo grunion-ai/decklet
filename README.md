@@ -148,7 +148,7 @@ A row is text by default; `box`, `tile`, `bar`, `line`, `donut`, `svg`, `img` ar
 | animated GIF clips | supported | `img` data: URI plays as-is; `docs/record-clips.mjs` films them from the deck and writes them back into the model |
 | contact sheet (select, reorder, dup, delete) | supported | 3-across live thumbnails; pointer-drag reorder (mouse + touch), also in present mode |
 | fullscreen presentation | supported | F / ⛶, hover-peek HUD (pinned while a menu or the sheet is open) |
-| PDF | supported | ⤓ → slide-sized PDF written in-file (Chromium verified; Safari unconfirmed → print fallback); ⌘P → paper, Letter/A4 named sizes |
+| PDF | supported | ⤓ → vector, slide-sized PDF through the deck's own print pipeline in Chromium (text stays text, fonts embed, every link kept); Safari keeps the in-file raster path; `bin/pdf.mjs deck.html` writes it headless; ⌘P → paper, Letter/A4 named sizes |
 | HTML pages → model | supported | `bin/import-html.mjs` (Playwright) |
 | spellcheck · suggestions | supported | the build's dictionary flags the words (optional peer); the editor washes and underlines them on every slide in every engine, the badge opens a panel of them with the build's suggestions, a pick rewrites the row, `spell.ignore` silences a name |
 | validate / verify | supported | parity mandatory, AE optional |
