@@ -576,7 +576,9 @@ test('create: --title is model data (clean tab title, clean ⤓/⌘S filename), 
   assert.match(a.html, /<title>decklet<\/title>/, 'no sentinel and no interpolation in <title> — the runtime titles the document');
   assert.doesNotMatch(a.html, /\/\*\/?TITLE\*\//, 'the TITLE marker is gone from the engine');
   assert.equal(modelOf(a.html).title, 'x<y&z', '--title lands in the model, escaped by JSON not by HTML');
-  assert.match(tpl, /document\.title=deck\.title\|\|'decklet'/, 'one source for the tab title, the ⤓ PDF name and the ⌘S copy name');
+  assert.match(tpl, /const deckName=\(\)=>deck\.title\|\|'decklet'/, 'one source for the tab title, the ⤓ PDF name and the ⌘S copy name');
+  assert.doesNotMatch(tpl, /\.download=document\.title/, 'a download is named for the deck, never for the tab: the tab carries the slide count');
+  assert.equal((tpl.match(/\.download=deckName\(\)/g) || []).length, 2, 'the ⤓ PDF and the ⌘S copy both take the deck name');
   assert.equal(create(base, {}).deck.title, 'decklet');
   assert.equal(create({...base, title: 'from the model'}, {}).deck.title, 'from the model');
   assert.equal(create({...base, title: 'from the model'}, {title: 'from the flag'}).deck.title, 'from the flag', '--title wins');
@@ -1383,6 +1385,23 @@ live('live: the tab title is the model title — the ⤓ PDF and the ⌘S copy i
   const names = await p.evaluate(() => [document.title, document.title.replace(/[\/:*?"<>|]+/g, '-') + '.pdf']);
   await b.close();
   assert.deepEqual(names, ['Two deals, one re-read', 'Two deals, one re-read.pdf'], 'no /*TITLE*/ sentinel in the tab or the download');
+});
+live('live: the tab title counts the slides (deck title, then slide x of N) and the ⤓ PDF keeps the bare deck name', async () => {
+  const roles = modelOf(tpl).styles.roles, slides = [{els: []}, {els: []}, {els: []}];
+  const f = path.join(tmp, 'counted.html'), g = path.join(tmp, 'counted-letter.html');
+  fs.writeFileSync(f, create({styles: {roles}, slides}, {title: 'Two deals, one re-read'}).html);
+  fs.writeFileSync(g, create({w: 816, h: 1056, format: 'document-letter', styles: {roles}, slides: slides.slice(1)}, {title: 'Letter'}).html);
+  const b = await pw.chromium.launch(); const p = await b.newPage();
+  await p.goto(pathToFileURL(f).href); await p.evaluate(() => { localStorage.clear(); }); await p.reload();
+  const titles = [await p.title()];
+  await p.keyboard.press('ArrowRight'); titles.push(await p.title());
+  await p.keyboard.press('ArrowRight'); await p.keyboard.press('ArrowRight'); titles.push(await p.title());
+  const [dl] = await Promise.all([p.waitForEvent('download', {timeout: 3e4}), p.click('#pdf')]);
+  await p.goto(pathToFileURL(g).href); const letter = await p.title();
+  await b.close();
+  assert.deepEqual(titles, ['Two deals, one re-read · slide 1 of 3', 'Two deals, one re-read · slide 2 of 3', 'Two deals, one re-read · slide 3 of 3']);
+  assert.equal(dl.suggestedFilename(), 'Two deals, one re-read.pdf', 'the download is named for the deck');
+  assert.equal(letter, 'Letter · page 1 of 2', 'a document counts pages');
 });
 live('live: import-html --shots writes one reference PNG per page, named for the slide (verify --refs consumes it)', async () => {
   const dir = path.join(tmp, 'shots-new'), pages = ['alpha', 'beta'].map(n => {
