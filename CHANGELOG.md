@@ -1,6 +1,8 @@
 # Changelog
 ## Unreleased
 
+- **archify v3.2.0.** `vendor/archify` moves from v3.0.1 to v3.2.0, commit `208acba`, by `bin/archify-sync.mjs`. Release notes: https://github.com/tt-a1i/archify/releases/tag/v3.2.0
+
 - **archify v3.0.1.** `vendor/archify` moves from v3.0.0 to v3.0.1, commit `2ab3cae`, by `bin/archify-sync.mjs`. Release notes: https://github.com/tt-a1i/archify/releases/tag/v3.0.1
 - **The archify workflow stops at the pushed branch.** The scheduled run on 2026-09-28 vendored archify v3.0.0, pushed `archify/v3.0.0` and then failed at `gh pr create`: GitHub Actions may not open pull requests in this repository. The workflow now pushes the branch, leaves a notice that links the compare page and exits 0. It repeats the notice each week until the branch is merged, and it no longer asks for the `pull-requests` permission. `docs/archify.md` says to open the PR by hand.
 - **Chart bars are square at both ends (#162).** The engine painted every `bar` row with `border-radius:6px 6px 0 0`, so a column was rounded on its value end and an `hbar` bar on its top corners, and each read as a tab. `template.html` now paints no radius on a bar: every chart form (`bar`, `hbar`, a `compare` series, the template bars) is square by default, and a row that sets `radius` rounds all four corners. SKILL.md's row table and `docs/charts.md` say so. Deck and library html rebuilt. Gates: test/chart.test.mjs asserts that the chart rows and every template's rows carry no one-sided radius, and renders the chart forms and the chart templates in Chromium to check that each bar is square and that no mark draws a one-sided radius.
