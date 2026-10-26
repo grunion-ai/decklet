@@ -159,6 +159,7 @@ for (const bn of projects()) live(`two windows (${bn}): an edit in one shows in 
   await until(A, () => deck.slides[0].els[0].text === 'typed in B');
   assert.deepEqual(await A.evaluate(() => [slide().els[1].x, slide().els[1].y, log.length]), [123, 250, 3], 'A converged; three entries, every one of them once');
   assert.deepEqual(await B.evaluate(() => [log.length, canvas.querySelector('.el[contenteditable="true"]')]), [3, null], 'B: same log, the edit committed');
+  await until(A, () => JSON.parse(localStorage.getItem(KEY)).slides[0].els[0].text === 'typed in B');
   assert.deepEqual(JSON.parse(await A.evaluate(() => localStorage.getItem(KEY))).slides[0].els.map(e => [e.text, e.x, e.y]).slice(0, 2), [['typed in B', 60, 80], ['body one', 123, 250]], 'the store has both windows\' edits');
   assert.deepEqual([...A.errs, ...B.errs], []);
 }));
