@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // decklet model-contract validator — pure Node, no browser. Agents run this before create/verify.
+//        node bin/validate.mjs --suggest "three numbers with movement"   the top five layouts and templates for that content
 // usage: node bin/validate.mjs model.json [--style style.json] [--strict]     (--strict: warnings fail too)
 //        node bin/validate.mjs --layouts                                      (print the layout library catalogue)
 //        node bin/validate.mjs --templates                                    (print the template library: id · keys · samples)
@@ -14,6 +15,7 @@ import {checkChart, expandCharts} from '../lib/chart.mjs';
 import {stampIds} from '../lib/edits.mjs';
 import {PLATES, isLogoRow, logoGeom} from '../lib/logo.mjs';
 import {isMain} from '../lib/is-main.mjs';
+import {suggest} from '../lib/suggest.mjs';
 import {STYLES as CSTYLES, isConnector, route, gapOf, strokeOf} from '../lib/connector.mjs';
 
 export const ROLES = ['Title', 'Supertitle', 'H1', 'H2', 'Body', 'Caption', 'Label', 'Stat'];
@@ -736,6 +738,12 @@ if (isMain(import.meta.url)) {
   if (a.includes('--layouts')) { console.log(catalogue()); process.exit(0); }
   if (a.includes('--templates')) { console.log(templateCatalogue()); process.exit(0); }
   if (a.includes('--icons')) { console.log(iconNames()); process.exit(0); }
+  if (a.includes('--suggest')) {
+    const q = a[a.indexOf('--suggest') + 1];
+    if (!q) { console.error('usage: node bin/validate.mjs --suggest "<what the slide carries>"'); process.exit(2); }
+    suggest(q).forEach((s, k) => console.log(`${k + 1}  ${s.name.padEnd(24)} ${s.kind.padEnd(9)} ${String(s.density).padEnd(8)} ${s.keys.slice(0, 8).join(', ')}${s.keys.length > 8 ? ', …' : ''}`));
+    process.exit(0);
+  }
   const file = (si < 0 ? a : a.filter((_, k) => k !== si && k !== si + 1)).find(x => !x.startsWith('--'));
   if (!file) { console.error('usage: node bin/validate.mjs model.json [--style style.json] [--strict]'); process.exit(2); }
   const r = validateModel(JSON.parse(fs.readFileSync(file, 'utf8')), si >= 0 ? JSON.parse(fs.readFileSync(a[si + 1], 'utf8')) : null);
