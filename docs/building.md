@@ -5,6 +5,8 @@ must-include, put a five-year series in a bullet list, or print a number the bri
 that closes that gap: a coverage manifest written before the model, then a mandatory second pass over the rendered
 PNGs. Step 5 of [SKILL.md](../SKILL.md) is where it hangs.
 
+A model `bin/new.mjs` writes starts with `"$schema"` pointing at `schemas/model.schema.json`, so an editor completes props and flags a bad enum (an unknown template, anim or format) while you type. The schema holds structure and enums only; `validate` still owns fit, air, density and coverage. `style.json` has `schemas/style.schema.json`. Both are written from the engine's own constants by `node schemas/build.mjs`, and test/schema.test.mjs fails when they drift.
+
 ## Why the loop exists
 
 Thirty decks — five briefs, seven setups — were built blind and scored against a hand-built reference deck for the

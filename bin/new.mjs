@@ -184,7 +184,8 @@ if (isMain(import.meta.url)) {
 
   const dir = path.dirname(path.resolve(o.out));
   const model = newModel({slides, density, space: o.space || null});
-  fs.writeFileSync(o.out, JSON.stringify(model, null, 2) + '\n');
+  const $schema = path.relative(dir, fileURLToPath(new URL('../schemas/model.schema.json', import.meta.url))).split(path.sep).join('/');
+  fs.writeFileSync(o.out, JSON.stringify({$schema, ...model}, null, 2) + '\n');
   const man = path.join(dir, 'MANIFEST.md');
   fs.writeFileSync(man, manifest({slides, density, style: o.style || null, layouts: model.slides.map(s => s.template || s.layout)}));
   const wrote = [o.out, man];
