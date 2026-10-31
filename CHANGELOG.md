@@ -1,6 +1,7 @@
 # Changelog
 ## Unreleased
 
+- **`verify --slides`: measure only the slides a repair touched (#204).** `node bin/verify.mjs deck.html --slides s4,7` (API: `slides: ['s4', '7']`) runs layout parity and the AE diff on the named slides only, by id or 1-based number, and records them as `results.json` `scope`; the contract and self-containment checks still read the whole deck. An unknown slide exits 2 before any browser starts and lists the ids. docs/verify.md says to hand off on a full run. Gate: test/scope.test.mjs (the refusal, CLI exit 2, and a live scoped run beside a full one).
 - **archify v3.2.0.** `vendor/archify` moves from v3.0.1 to v3.2.0, commit `208acba`, by `bin/archify-sync.mjs`. Adds the ERD, class, tree, timeline and waterfall types and the explainer page; `docs/archify.md` lists them. Release notes: https://github.com/tt-a1i/archify/releases/tag/v3.2.0 (#198)
 
 - **archify v3.0.1.** `vendor/archify` moves from v3.0.0 to v3.0.1, commit `2ab3cae`, by `bin/archify-sync.mjs`. Release notes: https://github.com/tt-a1i/archify/releases/tag/v3.0.1
