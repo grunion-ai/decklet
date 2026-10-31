@@ -28,6 +28,10 @@
 
 A verify that cannot render (Playwright absent) is `skipped`, and `ok` stays false: a gate that did not run is not a pass. The deck stays on disk when only `verify` fails, so its PNGs can be read.
 
+## One slide at a time
+
+`node bin/verify.mjs deck.html --slides s4,7` measures only the named slides, by slide id or 1-based number, in every engine, and `results.json` records them as `scope`. The contract and self-containment checks still cover the whole deck. Use it between repairs; the hand-off takes a full run. An unknown slide exits 2 and lists the ids that exist.
+
 ## Thresholds
 
 Every check the two tools run, and what passes:
