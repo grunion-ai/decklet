@@ -14,6 +14,10 @@
 - **Font-stack warning**: a role whose `font` stack starts with `ui-monospace`, `ui-sans-serif`, `ui-serif`, `ui-rounded` or `system-ui` resolves to a different font per engine. Verify prints `warning font:` for each such role (`res.warnings`); it does not fail. Lead the stack with a named family (`Menlo, ui-monospace, monospace`) so both engines measure the same text.
 - **AE pixel diff** — when `--refs` exists (needs ImageMagick): `< 0.5%` of pixels differ at 2% fuzz. AE alone passes wrapped labels; parity is what catches them — that is why parity is not optional.
 
+## One slide at a time
+
+`node bin/verify.mjs deck.html --slides s4,7` measures only the named slides, by slide id or 1-based number, in every engine, and `results.json` records them as `scope`. The contract and self-containment checks still cover the whole deck. Use it between repairs; the hand-off takes a full run. An unknown slide exits 2 and lists the ids that exist.
+
 ## Thresholds
 
 Every check the two tools run, and what passes:
