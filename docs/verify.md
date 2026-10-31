@@ -14,6 +14,20 @@
 - **Font-stack warning**: a role whose `font` stack starts with `ui-monospace`, `ui-sans-serif`, `ui-serif`, `ui-rounded` or `system-ui` resolves to a different font per engine. Verify prints `warning font:` for each such role (`res.warnings`); it does not fail. Lead the stack with a named family (`Menlo, ui-monospace, monospace`) so both engines measure the same text.
 - **AE pixel diff** — when `--refs` exists (needs ImageMagick): `< 0.5%` of pixels differ at 2% fuzz. AE alone passes wrapped labels; parity is what catches them — that is why parity is not optional.
 
+## Finalize
+
+`node bin/finalize.mjs model.json --style style.json --out deck.html` runs `validate --strict` against the model merged with the style, `create` with the same style, and `verify --strict`, in that order, and stops at the first stage that does not pass. It writes `<deck stem>.finalize.json` either way:
+
+| field | holds |
+|---|---|
+| `engine` | the `package.json` version that ran |
+| `model`, `style` | path and sha256 of each input (`style` is `null` without `--style`) |
+| `deck` | path and sha256 of the written deck, `null` when `create` did not run |
+| `stages` | `validate`, `create`, `verify`, each `{status, errors, warnings, ms}`; status is `pass`, `fail`, `skipped` or `not-run` |
+| `ok` | true only when all three passed |
+
+A verify that cannot render (Playwright absent) is `skipped`, and `ok` stays false: a gate that did not run is not a pass. The deck stays on disk when only `verify` fails, so its PNGs can be read.
+
 ## Thresholds
 
 Every check the two tools run, and what passes:
