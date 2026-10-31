@@ -26,22 +26,22 @@ export async function finalize(modelFile, {style = null, out, format, space, tit
   const receipt = {engine: engine(), model: ident(modelFile), style: style ? ident(style) : null, deck: null, stages: [], ok: false};
   const stage = (name, run) => async () => {
     const t = Date.now(), r = await run();
-    receipt.stages.push({stage: name, status: r.status, errors: r.errors || [], warnings: r.warnings || [], ...(r.skipped?.length ? {skipped: r.skipped} : {}), ms: Date.now() - t});
+    receipt.stages.push({stage: name, status: r.status, errors: r.errors || [], warnings: r.warnings || [], ...(r.diagnostics ? {diagnostics: r.diagnostics} : {}), ...(r.skipped?.length ? {skipped: r.skipped} : {}), ms: Date.now() - t});
     return r.status === 'pass';
   };
   const stages = [
     stage('validate', () => {
       const v = validateModel(model, styleObj);
-      return {status: v.ok && !v.warnings.length ? 'pass' : 'fail', errors: v.errors, warnings: v.warnings};
+      return {status: v.ok && !v.warnings.length ? 'pass' : 'fail', errors: v.errors, warnings: v.warnings, diagnostics: v.diagnostics};
     }),
     stage('create', async () => {
       const spell = await loadChecker(model.lang || 'en');
       const {html, deck} = create(model, {style: styleObj, format, space, title, from, spell});
       const v = validate(deck);
-      if (!v.ok) return {status: 'fail', errors: v.errors, warnings: v.warnings};
+      if (!v.ok) return {status: 'fail', errors: v.errors, warnings: v.warnings, diagnostics: v.diagnostics};
       fs.writeFileSync(out, html);
       receipt.deck = ident(out);
-      return {status: 'pass', warnings: v.warnings};
+      return {status: 'pass', warnings: v.warnings, diagnostics: v.diagnostics};
     }),
     stage('verify', async () => {
       const r = await verifyFn(out, {out: verifyOut, strict: true, webkit, log: () => {}});
