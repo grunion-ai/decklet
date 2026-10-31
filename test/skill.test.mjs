@@ -75,7 +75,7 @@ test('skill: START HERE is the front door, above INPUTS, twelve lines at most', 
   assert.ok(lines.length <= 12, `START HERE is ${lines.length} lines (max 12) — route, do not explain`);
 
   // the sequence, in order, as commands
-  const seq = ['bin/new.mjs', 'bin/validate.mjs', 'bin/create.mjs', 'bin/verify.mjs'];
+  const seq = ['bin/new.mjs', 'bin/finalize.mjs', 'bin/validate.mjs', 'bin/create.mjs', 'bin/verify.mjs'];
   let cursor = 0;
   for (const cmd of seq) {
     const i = block.indexOf('node ' + cmd, cursor);
@@ -88,7 +88,7 @@ test('skill: START HERE is the front door, above INPUTS, twelve lines at most', 
   }
   assert.match(block, /--layouts/, 'names the layout catalogue');
   assert.match(block, /--templates/, 'names the template catalogue');
-  assert.match(block, /VERIFY PASS/, 'says a first pass is half the job');
+  assert.match(block, /FINALIZE PASS/, 'says a first pass is half the job');
 
   // every page it points at resolves, and the five questions are routed
   for (const [q, page] of [[/figure/i, 'figures.md'], [/chart/i, 'charts.md'], [/verify/i, 'verify.md'],
