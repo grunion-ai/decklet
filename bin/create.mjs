@@ -16,6 +16,7 @@ import {expandTemplates} from '../lib/templates.mjs';
 import {expandIcons} from '../lib/icons.mjs';
 import {flags as spellFlags, flagMap as spellMap, loadChecker} from '../lib/spell.mjs';
 import {stampIds, diffDecks, applyLog, blockOf, hasBlock, putBlock, stillIn} from '../lib/edits.mjs';
+import {engineOf} from '../lib/bug.mjs';
 import {isMain} from '../lib/is-main.mjs';
 
 // page-size presets of ONE model space: the FORMAT table lives in validate.mjs (the module create builds on), re-exported
@@ -87,6 +88,7 @@ export function create(model, {style = null, format, space, title, template, fro
     const predates = !hasBlock(prevHtml, 'LOG');   // built before 0.5.0: no edit log to replay
     const plog = blockOf(prevHtml, 'LOG', []);
     migrate = applyLog(deck, plog); if (predates) migrate.predates = true;
+    migrate.engine = engineOf(prevHtml);
     log = plog;
   }
   const hash = createHash('sha256').update(JSON.stringify(deck)).digest('hex').slice(0, 10);
@@ -116,7 +118,7 @@ if (isMain(import.meta.url)) {
     console.error(`spell: {"ignore": [${flagged.map(w => JSON.stringify(w)).join(', ')}]}`); // paste it into the model: the words as spell.ignore matches them, already JSON
   }
   if (migrate?.predates) console.error(`${o.from} predates the edit log (built before decklet 0.5.0): id and state carried, nothing to replay`);
-  if (migrate) { console.error(`migrated ${migrate.applied} human edit(s) from ${o.from} · ${migrate.conflicts.length} conflict(s) · ${migrate.orphans.length} orphan(s)`); for (const c of migrate.conflicts) console.error(`conflict ${c.s || c.m}${c.r ? '/' + c.r : ''}.${c.key}: kept human ${JSON.stringify(c.human)} over agent ${JSON.stringify(c.agent)}`); }
+  if (migrate) { console.error(`migrated ${migrate.applied} human edit(s) from ${o.from} (built by ${migrate.engine || 'an engine before the ENGINE marker'}) · ${migrate.conflicts.length} conflict(s) · ${migrate.orphans.length} orphan(s)`); for (const c of migrate.conflicts) console.error(`conflict ${c.s || c.m}${c.r ? '/' + c.r : ''}.${c.key}: kept human ${JSON.stringify(c.human)} over agent ${JSON.stringify(c.agent)}`); }
   const v = validate(deck);
   for (const m of v.errors) console.error('ERROR   ' + m);
   for (const m of v.warnings) console.error('warning ' + m);

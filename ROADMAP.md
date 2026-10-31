@@ -123,7 +123,7 @@ Three epics sit off their score.
 | --- | --- | --- | --- |
 | N2 Presenter view | 192 | Next | Notes with nowhere to read them during a talk is half of N1. N2 is what N1 is for. |
 | P3 Growth-aware parity | 288 | Next | D3 is red from its first commit until the parity semantics change. |
-| P4 Engine-version stamp | 320 | Later | P1.4 fixes the crash a stamp would have caught, and nothing else reads the stamp yet. |
+| P4 Engine-version stamp | 320 | Done | Every deck carries `/*ENGINE*/`; `create --from` reports it (#202). |
 
 ---
 
@@ -156,7 +156,7 @@ Seven small fixes, four of them documents that currently contradict the code: `p
 | P1.1 | XS | `package.json` says 0.5.0; `.claude-plugin/plugin.json` and `marketplace.json` both say 0.4.0. Reconcile, then gate it. CI checks neither today. |
 | P1.2 | XS | `llms.txt:21` names a `/*TITLE*/` marker that does not exist, and omits `LOG` and `VERSIONS`. The real set is `DECK` `TOKENS` `KEY` `LOG` `VERSIONS` `EDITS`. |
 | P1.3 | XS | The README roadmap still lists URL-hash deep links as future. They shipped in 0.5.0 (`template.html:296`, `:512`, `:966`). |
-| P1.4 | S | `create --from` throws an uncaught `SyntaxError` on any deck built before 0.4.0. `blockOf`'s regex is an unanchored whole-document search, so a missing `/*LOG*/` marker matches the literal inside `fileHtml()`'s own source and parses `'+J(log)+'` as JSON. |
+| P1.4 | S | **Done (CHANGELOG, `lib/edits.mjs` anchored block regex).** `create --from` threw an uncaught `SyntaxError` on any deck built before 0.4.0. `blockOf`'s regex is an unanchored whole-document search, so a missing `/*LOG*/` marker matches the literal inside `fileHtml()`'s own source and parses `'+J(log)+'` as JSON. |
 | P1.5 | S | CI runs `node --test` with no browser. 45 of 128 tests skip, including all 8 in `editor.test.mjs`. Install Chromium in CI, or say plainly in CONTRIBUTING that layout proof is a local pre-push step. |
 | P1.6 | XS | Swap `gate.test.mjs:224`'s `=== 3` for a named-site set. |
 | P1.7 | XS | Write the regenerate-never-merge rule for `deck.html` into CONTRIBUTING. |
@@ -173,9 +173,9 @@ Seven small fixes, four of them documents that currently contradict the code: `p
 
 A row opts into growth with a flag. `bin/verify.mjs`'s overflow, occlusion and collision checks read that flag and measure the grown box instead of failing.
 
-### P4. Engine-version stamp · `S` · Later
+### P4. Engine-version stamp · Done (#202)
 
-A shipped deck records nothing about the engine that built it. `deck.rev` is a content hash for conflict detection, not a compatibility signal, which is exactly why P1.4 crashes rather than reporting "this deck predates the feature". Stamping the engine version gives every later migration something to branch on.
+`create` writes `const ENGINE=/*ENGINE*/'<version>'/*/ENGINE*/` into every deck, `lib/bug.mjs` `engineOf(html)` reads it, and `create --from` returns it as `migrate.engine` and names it in its migrate line (`null` for a file from before the marker). `deck.rev` stays the content hash for conflict detection. A later migration branches on `migrate.engine`.
 
 ---
 

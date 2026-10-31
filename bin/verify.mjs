@@ -7,7 +7,7 @@
 //        later-painted opaque row (occlusion — sampled with elementFromPoint; fails like every other parity shape), and the page
 //        counter's box is the same on every slide that shows the footer (the corner is the counter's; a `hide` of the footer is exempt)
 //   3. AE pixel diff vs reference PNGs (ImageMagick `magick`/`compare`)  only when --refs is given
-// usage: node bin/verify.mjs deck.html [--refs dir] [--out dir] [--threshold 0.5] [--fuzz 2%] [--report model.report.json] [--fonts <css url>] [--strict] [--webkit | --no-webkit]
+// usage: node bin/verify.mjs deck.html [--refs dir] [--out dir] [--threshold 0.5] [--fuzz 2%] [--report model.report.json] [--fonts <css url>] [--strict] [--webkit | --no-webkit] [--slides id,n,…]
 //   parity runs in Chromium and, when installed, WebKit on every OS (per-engine results; --no-webkit skips it, --webkit is the
 //   same as the default). WebKit shots go to <out>/webkit/
 //   --report: the importer's drift report (default: model.report.json beside the deck) — masks where the mockup drew its chrome
@@ -19,7 +19,7 @@ import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
-import {validate, linksOf} from './validate.mjs';
+import {validate, linksOf, slideNo} from './validate.mjs';
 import {isMain} from '../lib/is-main.mjs';
 
 export const modelOf = html => JSON.parse(html.match(/\/\*DECK\*\/([\s\S]*?)\/\*\/DECK\*\//)[1].replace(/<\\\/script/g, '</script'));
@@ -32,13 +32,17 @@ export const fontWarnings = deck => Object.entries(deck?.styles?.roles || {}).fl
   return ENGINE_FAMILIES.includes(first) ? [{role, family: first, msg: `role ${role}: font stack starts with ${first}, which Safari and Chromium resolve to different fonts; lead with a named family (e.g. Menlo) so both engines measure the same text`}] : [];
 });
 
-export async function verify(file, {refs = null, out = null, threshold = 0.5, fuzz = '2%', strict = false, report = null, fonts = null, webkit = 'auto', log = console.log} = {}) {
+export const scopeOf = (deck, slides) => slides.map(u => { const n = slideNo(deck, '#' + String(u).trim()); if (!n) throw new Error(`no slide "${u}" — slides are 1-${deck.slides.length} or ${deck.slides.map((s, k) => s.id || `s${k + 1}`).join(', ')}`); return n; }).sort((a, b) => a - b).filter((n, k, a) => n !== a[k - 1]);
+
+export async function verify(file, {refs = null, out = null, threshold = 0.5, fuzz = '2%', strict = false, report = null, fonts = null, webkit = 'auto', slides = null, log = console.log} = {}) {
   const html = fs.readFileSync(file, 'utf8');
   const res = {file, contract: null, parity: [], engines: {}, ae: [], errors: [], warnings: [], skipped: []};
   // self-containment — the guarantee the whole engine rests on
   if (/(src|href)\s*=\s*["']https?:/i.test(html) || /@import|<link[^>]+stylesheet|fetch\s*\((?!'\/(?!\/))|new\s+EventSource\s*\((?!'\/(?!\/))|XMLHttpRequest|new\s+WebSocket/i.test(html)) res.errors.push('deck references the network'); // fetch('/…') and EventSource('/…'): the bin/serve.mjs host route, same origin only
   const deck = modelOf(html);
   res.deck = {sha256: createHash('sha256').update(fs.readFileSync(file)).digest('hex'), id: deck.id || null, rev: deck.rev || null};
+  const scope = slides ? scopeOf(deck, slides) : null;
+  if (scope) res.scope = scope;
   const v = validate(deck); res.contract = v; res.links = linksOf(deck); // every link, for a reviewer to check; an unresolved '#' is a contract error
   if (!v.ok) res.errors.push(`model contract: ${v.errors.length} errors`);
   res.warnings = fontWarnings(deck).map(w => w.msg);
@@ -77,6 +81,7 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
       const hasMagick = primary && !!refs && (() => { try { execFileSync('magick', ['-version'], {stdio: 'pipe'}); return true; } catch { return false; } })();
       if (primary && refs && !hasMagick) res.skipped.push('AE: ImageMagick `magick` not on PATH');
       for (let n = 0; n < N; n++) {
+        if (scope && !scope.includes(n + 1)) continue;
         await p.evaluate(k => { i = k; sel.clear(); render(); }, n); await p.waitForTimeout(150);
         const name = deck.slides[n].name || `slide-${n + 1}`;
         let bad = await p.evaluate(([W, H]) => {
@@ -250,8 +255,9 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
 if (isMain(import.meta.url)) {
   const a = process.argv.slice(2), o = {}; let file = null;
   for (let k = 0; k < a.length; k++) if (a[k].startsWith('--')) o[a[k].slice(2)] = a[k + 1] && !a[k + 1].startsWith('--') ? a[++k] : true; else file = a[k];
-  if (!file) { console.error('usage: node bin/verify.mjs deck.html [--refs dir] [--out dir] [--threshold 0.5] [--fuzz 2%] [--report model.report.json] [--fonts <css url, test-time only>] [--strict] [--webkit | --no-webkit]'); process.exit(2); }
-  const r = await verify(file, {refs: o.refs, out: o.out, threshold: o.threshold ? +o.threshold : 0.5, fuzz: o.fuzz || '2%', strict: !!o.strict, report: o.report || null, fonts: o.fonts || null, webkit: o['no-webkit'] ? false : o.webkit ? true : 'auto'});
+  if (!file) { console.error('usage: node bin/verify.mjs deck.html [--refs dir] [--out dir] [--threshold 0.5] [--fuzz 2%] [--report model.report.json] [--fonts <css url, test-time only>] [--strict] [--webkit | --no-webkit] [--slides id,n,…]'); process.exit(2); }
+  const r = await verify(file, {slides: typeof o.slides === 'string' ? o.slides.split(',') : null, refs: o.refs, out: o.out, threshold: o.threshold ? +o.threshold : 0.5, fuzz: o.fuzz || '2%', strict: !!o.strict, report: o.report || null, fonts: o.fonts || null, webkit: o['no-webkit'] ? false : o.webkit ? true : 'auto'}).catch(e => { if (/^no slide /.test(e.message)) { console.error(e.message); process.exit(2); } throw e; });
+  if (r.scope) console.log(`scope   slides ${r.scope.join(',')} of ${r.contract ? modelOf(fs.readFileSync(file, 'utf8')).slides.length : '?'} — a repair pass; hand off on a full run`);
   for (const m of r.contract.errors) console.error('ERROR   contract: ' + m);
   for (const m of r.contract.warnings) console.error('warning contract: ' + m);
   for (const l of r.links || []) console.log(`link    slide ${l.slide} ${l.row}: ${l.href}${l.to != null ? ' → ' + (l.to ? 'slide ' + l.to : 'NO SUCH SLIDE') : ''}`);

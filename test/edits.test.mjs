@@ -214,3 +214,14 @@ test('slide.notes and row.alt: create keeps them, diffDecks logs a change to eit
   assert.equal(v2.deck.slides[0].notes, 'open with the story', 'human notes win'); assert.equal(v2.deck.slides[0].els[0].alt, 'the title', 'human alt wins');
   assert.equal(v2.migrate.applied, 2);
 });
+
+test('create --from: names the engine that built the source deck, and null for a file from before the ENGINE marker (#202)', () => {
+  const version = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version;
+  const v1 = create(mk(), {}); const f1 = path.join(tmp, 'engine.html'), f0 = path.join(tmp, 'engine-none.html');
+  fs.writeFileSync(f1, v1.html);
+  assert.equal(create(mk(), {from: f1}).migrate.engine, version);
+  fs.writeFileSync(f0, v1.html.replace(/const ENGINE=\/\*ENGINE\*\/'[^']*'\/\*\/ENGINE\*\/;/, ''));
+  const v2 = create(mk(), {from: f0});
+  assert.equal(v2.migrate.engine, null);
+  assert.equal(v2.deck.id, v1.deck.id, 'a file without the marker still builds and keeps its id');
+});
