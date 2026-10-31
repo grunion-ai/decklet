@@ -22,6 +22,8 @@ import {isMain} from '../lib/is-main.mjs';
 // here so `import {create, FORMAT} from './create.mjs'` is unchanged and the validator can never size a deck differently.
 export {FORMAT};
 
+export const writeDeck = (out, html) => { const t = `${out}.${process.pid}.tmp`; fs.writeFileSync(t, html); fs.renameSync(t, out); };
+
 const here = path.dirname(fileURLToPath(import.meta.url));
 const esc = s => s.replace(/<\/script/gi, '<\\/script');
 const put = (html, mark, to) => {
@@ -119,6 +121,6 @@ if (isMain(import.meta.url)) {
   for (const m of v.errors) console.error('ERROR   ' + m);
   for (const m of v.warnings) console.error('warning ' + m);
   if (!v.ok && !o.force) { console.error('model invalid — fix the errors or pass --force'); process.exit(1); }
-  fs.writeFileSync(o.out, html);
+  writeDeck(o.out, html);
   console.log(`wrote ${o.out} · ${(html.length / 1024).toFixed(0)}KB · ${deck.format} ${deck.w}×${deck.h} · ${deck.slides.length} slides · master ${(deck.master || []).length} · layouts ${Object.keys(deck.layouts || {}).join(',') || '—'} · id ${deck.id} · rev ${hash}`);
 }
