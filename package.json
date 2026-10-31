@@ -9,6 +9,7 @@
   },
   "bin": {
     "decklet-create": "bin/create.mjs",
+    "decklet-finalize": "bin/finalize.mjs",
     "decklet-validate": "bin/validate.mjs",
     "decklet-verify": "bin/verify.mjs",
     "decklet-pdf": "bin/pdf.mjs",

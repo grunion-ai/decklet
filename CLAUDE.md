@@ -8,6 +8,7 @@ A slide engine for agents: the deck is a JSON model, the renderer is the editor,
 - Optional browser tooling for `verify`, `pdf` and `import-html`: `npm i -D playwright && npx playwright install chromium`
 - The authoring loop, from the repo root:
   - `node bin/new.mjs --out model.json --slides 8 --density reading`
+  - `node bin/finalize.mjs model.json --style style.json --out deck.html` runs the three stages below with one style and writes `deck.finalize.json`
   - `node bin/validate.mjs model.json --style style.json --strict`
   - `node bin/create.mjs --model model.json --style style.json --out deck.html --format slides`
   - `node bin/verify.mjs deck.html --strict`
