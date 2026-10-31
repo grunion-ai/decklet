@@ -1,6 +1,7 @@
 # Changelog
 ## Unreleased
 
+- **`create --from` names the engine that built the source deck (#202).** `create()` returns `migrate.engine`, read from the source file's `/*ENGINE*/` marker with `lib/bug.mjs` `engineOf` (`null` for a file from before the marker), and the CLI's migrate line says `(built by 0.12.0)`. ROADMAP P4 and P1.4 now say what was already true: every deck carries the stamp, and the pre-0.5 crash was fixed. Gate: a case in test/edits.test.mjs for a current deck and for one with the marker stripped.
 - **archify v3.2.0.** `vendor/archify` moves from v3.0.1 to v3.2.0, commit `208acba`, by `bin/archify-sync.mjs`. Adds the ERD, class, tree, timeline and waterfall types and the explainer page; `docs/archify.md` lists them. Release notes: https://github.com/tt-a1i/archify/releases/tag/v3.2.0 (#198)
 
 - **archify v3.0.1.** `vendor/archify` moves from v3.0.0 to v3.0.1, commit `2ab3cae`, by `bin/archify-sync.mjs`. Release notes: https://github.com/tt-a1i/archify/releases/tag/v3.0.1
