@@ -715,6 +715,22 @@ export function validate(deck) {
   return {ok: !errors.length, errors, warnings};
 }
 
+// a model as create() will build it, judged: the style merged the same way (or text fit is measured against the wrong roles —
+// 0 warnings here, then the overflow create --style causes and verify fails on), the template's neutral roles when no roles
+// exist anywhere, the canvas resolved before the library cuts its layouts to it (U1.1), then KPI fill and chart expansion.
+export function validateModel(model, style = null) {
+  const deck = structuredClone(model), notes = [];
+  mergeStyle(deck, style);
+  if (!deck.styles || !deck.styles.roles || !Object.keys(deck.styles.roles).length) {
+    const tpl = new URL('../template.html', import.meta.url);
+    if (fs.existsSync(tpl)) { const t = JSON.parse(fs.readFileSync(tpl, 'utf8').match(/\/\*DECK\*\/([\s\S]*?)\/\*\/DECK\*\//)[1]); deck.styles = {...t.styles, ...(deck.styles || {}), roles: t.styles.roles}; notes.push('no styles.roles in the model — validated against the template\'s neutral roles (create.mjs does the same)'); }
+  }
+  const canvas = resolveCanvas(deck);
+  if (canvas.w != null && canvas.h != null) { deck.w = canvas.w; deck.h = canvas.h; if (canvas.page) deck.page = deck.page || canvas.page; }
+  deck.layouts = {...libraryFor(deck), ...(deck.layouts || {})}; fillKpi(deck); expandCharts(deck);
+  return {...validate(deck), notes};
+}
+
 if (isMain(import.meta.url)) {
   const a = process.argv.slice(2), strict = a.includes('--strict'), si = a.indexOf('--style');
   if (a.includes('--layouts')) { console.log(catalogue()); process.exit(0); }
@@ -722,19 +738,8 @@ if (isMain(import.meta.url)) {
   if (a.includes('--icons')) { console.log(iconNames()); process.exit(0); }
   const file = (si < 0 ? a : a.filter((_, k) => k !== si && k !== si + 1)).find(x => !x.startsWith('--'));
   if (!file) { console.error('usage: node bin/validate.mjs model.json [--style style.json] [--strict]'); process.exit(2); }
-  const deck = JSON.parse(fs.readFileSync(file, 'utf8'));
-  // --style: the real type scale usually arrives at create time. Merge it the same way create() does, or text fit is measured
-  // against the wrong roles — validate reports 0 warnings while create --style reports the overflow verify then fails on.
-  mergeStyle(deck, si >= 0 ? JSON.parse(fs.readFileSync(a[si + 1], 'utf8')) : null);
-  if (!deck.styles || !deck.styles.roles || !Object.keys(deck.styles.roles).length) { // no roles anywhere → create.mjs inherits the template's neutral scale; validate against the same
-    const tpl = new URL('../template.html', import.meta.url);
-    if (fs.existsSync(tpl)) { const t = JSON.parse(fs.readFileSync(tpl, 'utf8').match(/\/\*DECK\*\/([\s\S]*?)\/\*\/DECK\*\//)[1]); deck.styles = {...t.styles, ...(deck.styles || {}), roles: t.styles.roles}; console.error('note    no styles.roles in the model — validated against the template\'s neutral roles (create.mjs does the same)'); }
-  }
-  // the canvas first: the library cuts its layouts to w/h, so `format` must be resolved before they are pulled in (U1.1)
-  const canvas = resolveCanvas(deck);
-  if (canvas.w != null && canvas.h != null) { deck.w = canvas.w; deck.h = canvas.h; if (canvas.page) deck.page = deck.page || canvas.page; }
-  deck.layouts = {...libraryFor(deck), ...(deck.layouts || {})}; fillKpi(deck); expandCharts(deck);   // exactly what create() does, so the same rows are judged
-  const r = validate(deck);
+  const r = validateModel(JSON.parse(fs.readFileSync(file, 'utf8')), si >= 0 ? JSON.parse(fs.readFileSync(a[si + 1], 'utf8')) : null);
+  for (const m of r.notes) console.error('note    ' + m);
   for (const m of r.errors) console.error('ERROR   ' + m);
   for (const m of r.warnings) console.error('warning ' + m);
   console.log(`${file}: ${r.errors.length} errors, ${r.warnings.length} warnings`);

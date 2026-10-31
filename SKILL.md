@@ -18,12 +18,12 @@ You produce a **model** (JSON). The toolchain produces a **deck** (one `.html` f
 ## START HERE
 
     node bin/new.mjs --out model.json --slides 8 --density reading
-    node bin/validate.mjs model.json --style style.json --strict
-    node bin/create.mjs --model model.json --style style.json --out deck.html --format slides
-    node bin/verify.mjs deck.html --strict
+    node bin/finalize.mjs model.json --style style.json --out deck.html --format slides
+
+`finalize` runs `validate --strict`, `create` and `verify --strict` with one style, stops at the first failure and writes `deck.finalize.json`. One stage alone, to diagnose: `node bin/validate.mjs model.json --style style.json --strict`, `node bin/create.mjs --model model.json --style style.json --out deck.html`, `node bin/verify.mjs deck.html --strict`.
 
 `node bin/validate.mjs --layouts` prints every slot box and free band; `--templates` prints every fill key and the `fixed:` rows no key reaches.
-A first `VERIFY PASS` is half the job — the second pass is [docs/building.md](docs/building.md).
+A first `FINALIZE PASS` is half the job — the second pass is [docs/building.md](docs/building.md).
 
 - a figure → [docs/figures.md](docs/figures.md); a chart → [docs/charts.md](docs/charts.md)
 - logos, screenshots, the asset table → [docs/assets.md](docs/assets.md), [docs/logo.md](docs/logo.md)
@@ -85,7 +85,7 @@ Discipline, in order of importance:
 ```
 node bin/validate.mjs model.json --style style.json [--strict]   # 0 errors required; read every warning — --strict fails on them
 ```
-**Always pass the same `--style` you will pass to `create`.** Text fit is only meaningful against the scale the deck will actually wear: without it the model is measured against the template's neutral roles, so `validate` can report 0 warnings on a model `create --style` then floods with overflow — and `verify` fails on. Omit `--style` only when there is none.
+**`finalize` hands both stages one style.** Run alone, `validate` needs the `--style` you give `create`, or it measures the template's neutral roles and passes overflow `verify` then fails on.
 
 **`--strict` is the pre-hand-off gate.** A `nowrap` width warning is the fit `verify`'s parity check measures in the browser, so fix it in the model (shorten, widen, or `w:'auto'`) before you create. Fix every warning `--strict` fails on, or write the reason into the hand-off note. Width is estimated from an average glyph (`MMMWWWMM` renders twice its estimate), so a silent `validate` is not a pass: Step 5 is mandatory.
 
@@ -344,5 +344,5 @@ Four words, and no fifth: `rise` (text — the default), `fade` (quiet chrome), 
 - **Walls of text.** More than ~60 Body words on a 16:9 slide, or Body wrapping past 3 lines. Split the slide.
 - **Network anything.** No webfonts, CDNs, remote images. Images and clips are data: URIs; fonts are installed or system stacks.
 - **Motion everywhere.** Every row carrying `anim`, or an anim invented outside the four. Motion marks the reading order of a few rows; the rest are already there.
-- **Unverified hand-off.** A deck without a `VERIFY PASS` is not done.
+- **Unverified hand-off.** A deck without a `FINALIZE PASS` is not done.
 
