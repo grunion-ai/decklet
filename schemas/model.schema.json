@@ -16,6 +16,13 @@
     "h": {
       "type": "number"
     },
+    "canvas": {
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
     "format": {
       "enum": [
         "slides",
