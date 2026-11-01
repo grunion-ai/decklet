@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "decklet style",
+  "description": "style.json: tokens, the eight roles, pad, margin and gap (SKILL.md STYLE CONTRACT).",
+  "type": "object",
+  "required": [
+    "tokens",
+    "roles"
+  ],
+  "properties": {
+    "tokens": {
+      "type": "object",
+      "properties": {
+        "bg": {
+          "type": "string"
+        },
+        "fg": {
+          "type": "string"
+        },
+        "muted": {
+          "type": "string"
+        },
+        "accent": {
+          "type": "string"
+        },
+        "card": {
+          "type": "string"
+        },
+        "line": {
+          "type": "string"
+        },
+        "sel": {
+          "type": "string"
+        },
+        "box": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "roles": {
+      "type": "object",
+      "description": "the eight text roles (plus the optional Stat2): the whole type system",
+      "properties": {
+        "Title": {
+          "$ref": "#/$defs/role"
+        },
+        "Supertitle": {
+          "$ref": "#/$defs/role"
+        },
+        "H1": {
+          "$ref": "#/$defs/role"
+        },
+        "H2": {
+          "$ref": "#/$defs/role"
+        },
+        "Body": {
+          "$ref": "#/$defs/role"
+        },
+        "Caption": {
+          "$ref": "#/$defs/role"
+        },
+        "Label": {
+          "$ref": "#/$defs/role"
+        },
+        "Stat": {
+          "$ref": "#/$defs/role"
+        },
+        "Stat2": {
+          "$ref": "#/$defs/role"
+        }
+      }
+    },
+    "pad": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "margin": {
+      "type": "number"
+    },
+    "gap": {
+      "type": "number"
+    }
+  },
+  "$defs": {
+    "role": {
+      "type": "object",
+      "required": [
+        "font",
+        "size",
+        "weight",
+        "color"
+      ],
+      "properties": {
+        "font": {
+          "type": "string",
+          "description": "a font stack: an installed or system family first, a generic fallback last; the deck loads no webfonts"
+        },
+        "size": {
+          "type": "number",
+          "description": "model px"
+        },
+        "weight": {
+          "type": [
+            "number",
+            "string"
+          ]
+        },
+        "lh": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "line height, model px"
+        },
+        "ls": {
+          "type": "number",
+          "description": "letter spacing, model px"
+        },
+        "color": {
+          "type": "string"
+        },
+        "tt": {
+          "type": "string",
+          "description": "text-transform, e.g. uppercase"
+        },
+        "cw": {
+          "type": "number",
+          "description": "measured average glyph width in em (bin/measure-cw.mjs)"
+        }
+      }
+    }
+  }
+}

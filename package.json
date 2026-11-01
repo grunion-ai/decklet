@@ -30,7 +30,8 @@
     "README.md",
     "CHANGELOG.md",
     "LICENSE",
-    "vendor"
+    "vendor",
+    "schemas"
   ],
   "exports": {
     "./diagram": "./lib/diagram.mjs",
