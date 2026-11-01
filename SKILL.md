@@ -22,7 +22,7 @@ You produce a **model** (JSON). The toolchain produces a **deck** (one `.html` f
 
 `finalize` runs `validate --strict`, `create` and `verify --strict` with one style, stops at the first failure and writes `deck.finalize.json`. One stage alone, to diagnose: `node bin/validate.mjs model.json --style style.json --strict`, `node bin/create.mjs --model model.json --style style.json --out deck.html`, `node bin/verify.mjs deck.html --strict`.
 
-`node bin/validate.mjs --layouts` prints every slot box and free band; `--templates` prints every fill key and the `fixed:` rows no key reaches.
+`node bin/validate.mjs --layouts` prints every slot box and free band, `--templates` every fill key, `--suggest "<content>"` the five that fit.
 A first `FINALIZE PASS` is half the job — the second pass is [docs/building.md](docs/building.md).
 
 - a figure → [docs/figures.md](docs/figures.md); a chart → [docs/charts.md](docs/charts.md)
