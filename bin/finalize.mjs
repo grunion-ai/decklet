@@ -2,6 +2,7 @@
 // decklet finalize — model.json (+ style.json) → a verified deck.html and one receipt, in one command.
 //   node bin/finalize.mjs model.json [--style style.json] --out deck.html [--format …] [--space WxH] [--title …] [--from prev.html]
 //                         [--verify-out dir] [--webkit | --no-webkit]
+//   node bin/finalize.mjs --check deck.html   exit 0 only when the deck's receipt passed and still matches the file's bytes
 // Stages, stopping at the first that does not pass: validate --strict (with the style) → create (with the same style) → verify --strict.
 // Writes <deck stem>.finalize.json whatever happened. Exit 0 only when every stage passed; a verify that could not render is skipped, not passed.
 import fs from 'node:fs';
@@ -9,7 +10,7 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {validateModel, validate} from './validate.mjs';
-import {create} from './create.mjs';
+import {create, writeDeck} from './create.mjs';
 import {verify} from './verify.mjs';
 import {loadChecker} from '../lib/spell.mjs';
 import {isMain} from '../lib/is-main.mjs';
@@ -19,6 +20,16 @@ const engine = () => JSON.parse(fs.readFileSync(path.join(root, 'package.json'),
 const sha = buf => createHash('sha256').update(buf).digest('hex');
 const ident = file => ({path: path.resolve(file), sha256: sha(fs.readFileSync(file))});
 export const receiptPath = out => out.replace(/\.html?$/i, '') + '.finalize.json';
+
+export function checkReceipt(deckFile) {
+  const rp = receiptPath(deckFile);
+  if (!fs.existsSync(rp)) return {ok: false, message: `no receipt at ${rp}: run finalize`};
+  const receipt = JSON.parse(fs.readFileSync(rp, 'utf8'));
+  if (!receipt.ok || !receipt.deck) return {ok: false, receipt, message: `the run in ${rp} did not pass: rerun finalize`};
+  const actual = fs.existsSync(deckFile) ? sha(fs.readFileSync(deckFile)) : null;
+  if (actual !== receipt.deck.sha256) return {ok: false, receipt, actual, message: `receipt is for ${receipt.deck.sha256.slice(0, 12)}…, file is ${actual ? actual.slice(0, 12) + '…' : 'missing'}: rerun finalize`};
+  return {ok: true, receipt, actual, message: `receipt matches ${actual.slice(0, 12)}…`};
+}
 
 export async function finalize(modelFile, {style = null, out, format, space, title, from = null, verifyOut = null, webkit = 'auto', verifyFn = verify, log = console.log} = {}) {
   const model = JSON.parse(fs.readFileSync(modelFile, 'utf8'));
@@ -39,7 +50,7 @@ export async function finalize(modelFile, {style = null, out, format, space, tit
       const {html, deck} = create(model, {style: styleObj, format, space, title, from, spell});
       const v = validate(deck);
       if (!v.ok) return {status: 'fail', errors: v.errors, warnings: v.warnings};
-      fs.writeFileSync(out, html);
+      writeDeck(out, html);
       receipt.deck = ident(out);
       return {status: 'pass', warnings: v.warnings};
     }),
@@ -58,6 +69,12 @@ export async function finalize(modelFile, {style = null, out, format, space, tit
 
 if (isMain(import.meta.url)) {
   const a = process.argv.slice(2), o = {}; let file = null;
+  if (a[0] === '--check') {
+    if (!a[1]) { console.error('usage: node bin/finalize.mjs --check deck.html'); process.exit(2); }
+    const c = checkReceipt(a[1]);
+    (c.ok ? console.log : console.error)(c.message);
+    process.exit(c.ok ? 0 : 1);
+  }
   for (let k = 0; k < a.length; k++) if (a[k].startsWith('--')) o[a[k].slice(2)] = a[k + 1] && !a[k + 1].startsWith('--') ? a[++k] : true; else file = a[k];
   if (!file || !o.out) { console.error('usage: node bin/finalize.mjs model.json [--style style.json] --out deck.html [--format …] [--space WxH] [--title …] [--from prev.html] [--verify-out dir] [--webkit | --no-webkit]'); process.exit(2); }
   const r = await finalize(file, {style: o.style || null, out: o.out, format: o.format, space: o.space, title: o.title, from: o.from || null, verifyOut: o['verify-out'] || null, webkit: o['no-webkit'] ? false : o.webkit ? true : 'auto'});
