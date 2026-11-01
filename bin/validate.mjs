@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 // decklet model-contract validator — pure Node, no browser. Agents run this before create/verify.
 //        node bin/validate.mjs --suggest "three numbers with movement"   the top five layouts and templates for that content
-// usage: node bin/validate.mjs model.json [--style style.json] [--strict]     (--strict: warnings fail too)
 // usage: node bin/validate.mjs model.json [--style style.json] [--strict] [--json]     (--strict: warnings fail too; --json: the coded diagnostics on stdout)
 //        node bin/validate.mjs --layouts                                      (print the layout library catalogue)
 //        node bin/validate.mjs --templates                                    (print the template library: id · keys · samples)
