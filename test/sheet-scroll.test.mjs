@@ -53,13 +53,14 @@ for (const bn of projects()) {
     const p = await openSheet(context, `down-${bn}.html`);
     assert.equal(await top(p), 0, 'the sheet opens at the top');
     const c = await grab(p, 0); const y = (await bottom(p)) - 4;
-    await p.mouse.move(c.x, y, {steps: 4}); const ins0 = await p.evaluate(() => ins);
+    await p.evaluate(() => { const f = () => { if (sheet.scrollTop > 0) window.insAtFirstScroll = ins; else requestAnimationFrame(f); }; f(); });
+    await p.mouse.move(c.x, y, {steps: 4});
     const d1 = await moved(p, 1); assert.ok(d1 > 0, `the sheet scrolls under a still pointer ${d1 > 0 ? '' : await why(p)}`);
     const d2 = await moved(p, 1); assert.ok(d2 > 0, `and keeps scrolling ${d2 > 0 ? '' : await why(p)}`);
     await p.waitForFunction(() => sheet.scrollTop > 400, null, {timeout: 40000, polling: 50}); // past a row, so the slot under the pointer has changed
     const ghost = await p.evaluate(() => { const r = document.querySelector('.cell.lift').getBoundingClientRect(); return r.top + r.height / 2; });
     assert.ok(Math.abs(ghost - y) < 4, `the lifted thumbnail stays under the pointer (${ghost} vs ${y})`);
-    assert.notEqual(await p.evaluate(() => ins), ins0, 'the insertion slot tracks the thumbnails moving under the still pointer');
+    assert.notEqual(await p.evaluate(() => ins), await p.evaluate(() => window.insAtFirstScroll), 'the insertion slot tracks the thumbnails moving under the still pointer');
     const end = await max(p);
     await p.waitForFunction(m => sheet.scrollTop >= m - 0.5, end, {timeout: 40000, polling: 50});
     { const d = await delta(p, 200); assert.equal(d, 0, `it stops at the end (${d}px after reaching ${end}; now ${await top(p)})`); }
