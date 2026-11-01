@@ -57,7 +57,7 @@ test('storage is a tier chain — localStorage → IndexedDB → memory — and 
   assert.match(tpl, /let TIER=LS\?'local':'mem';/); assert.match(tpl, /indexedDB\.open\('decklet',2\)/, 'one db, bumped to v2 for the kv store');
   assert.match(tpl, /for\(const s of \['h','kv'\]\)if\(!r\.result\.objectStoreNames\.contains\(s\)\)r\.result\.createObjectStore\(s\)/, 'the handle store and the kv store');
   assert.match(tpl, /async function idbLoad\(\)/); assert.match(tpl, /if\(LS\)settle\(\);else\{autosave\('busy','Loading…'\);idbLoad\(\)\.then\(settle\)\}/, 'the deck draws from DECK first, the IndexedDB copy lands after');
-  assert.match(tpl, /new BroadcastChannel\(NS\)/); assert.match(tpl, /addEventListener\('storage',e=>\{if\(e\.key===KEY\)receive/);
+  assert.match(tpl, /new BroadcastChannel\(NS\)/); assert.match(tpl, /addEventListener\('storage',e=>\{if\(e\.key===KEY\)\{receive/);
   const recv = tpl.slice(tpl.indexOf('function receive(m){'), tpl.indexOf('const slide=()=>'));
   assert.ok(!/store\.set\(|LS\.setItem|localStorage\.setItem|tell\(/.test(recv), 'receive() writes nothing and tells no one: ' + recv);
   assert.match(recv, /commitEdit\(\)/, 'an edit in flight is committed on top of what was heard');
