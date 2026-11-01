@@ -2,6 +2,7 @@
 // decklet model-contract validator — pure Node, no browser. Agents run this before create/verify.
 //        node bin/validate.mjs --suggest "three numbers with movement"   the top five layouts and templates for that content
 // usage: node bin/validate.mjs model.json [--style style.json] [--strict]     (--strict: warnings fail too)
+// usage: node bin/validate.mjs model.json [--style style.json] [--strict] [--json]     (--strict: warnings fail too; --json: the coded diagnostics on stdout)
 //        node bin/validate.mjs --layouts                                      (print the layout library catalogue)
 //        node bin/validate.mjs --templates                                    (print the template library: id · keys · samples)
 //        node bin/validate.mjs --icons                                        (print the icon names)
@@ -102,46 +103,71 @@ export function mergeStyle(deck, style) {
   return deck;
 }
 
+const BOX_END = ["to: '<row id>' so the engine stops the stroke on the box edge", 'a connector row {from, to, style}'];
+export const FIXES = {
+  'fit/nowrap-width': ev => [`w: ${ev.need}`, "w: 'auto'", 'shorten the text'],
+  'fit/wraps-past-three': () => ['split the slide', 'widen w'],
+  'fit/past-right-edge': () => ['right: <px> in place of x', 'narrow w'],
+  'air/gap': () => ['move the rows styles.gap apart', 'over: 1 for a deliberate overlay'],
+  'air/arrow-end': () => BOX_END,
+  'air/touches-box': () => BOX_END,
+  'coverage/text-only': () => ['add one graphic: a chart, figure, image or logo group', 'textOnly: true for a words slide'],
+  'density/budget': () => ['split the slide', 'cut words'],
+  'contract/row-type-override': () => ['use the role that carries that size', 'drop the font/size/lh/ls prop'],
+  'assets/monogram-known': () => ['decklet-assets logo <name> --domain <domain>'],
+  'entity/named-without-logo': () => ['a logo row for the company within 120px'],
+  'entity/prose-without-logo': () => ['a logo row for the company on the slide'],
+};
+
 export function validate(deck) {
   const stands = new Set();   // stand-in marks on a draft sheet: one line at the end, not one per row
   const errors = [], warnings = [];
-  const E = (m) => errors.push(m), Wn = (m) => warnings.push(m);
-  if (!deck || typeof deck !== 'object') return {ok: false, errors: ['model is not an object'], warnings};
+  const diagnostics = [];
+  const subjectOf = m => {
+    const s = /^slides\[(\d+)\](?:\.els\[(\d+)\])?/.exec(m), k = /^master\[(\d+)\]/.exec(m);
+    if (s) { const el = s[2] != null ? +s[2] : null, id = el != null ? deck.slides?.[+s[1]]?.els?.[el]?.id : null;
+      return {slide: +s[1] + 1, ...(el != null ? {el} : {}), ...(id ? {id} : {})}; }
+    return k ? {master: +k[1], ...(deck.master?.[+k[1]]?.id ? {id: deck.master[+k[1]].id} : {})} : {};
+  };
+  const report = (list, severity) => (code, m, evidence) => { list.push(m);
+    diagnostics.push({code, severity, message: m, subject: subjectOf(m), ...(evidence ? {evidence} : {}), fixes: FIXES[code] ? FIXES[code](evidence || {}) : []}); };
+  const E = report(errors, 'error'), Wn = report(warnings, 'warning');
+  if (!deck || typeof deck !== 'object') return {ok: false, errors: ['model is not an object'], warnings, diagnostics: [{code: 'contract/model-shape', severity: 'error', message: 'model is not an object', subject: {}, fixes: []}]};
   // the canvas create() will build: an explicit w/h wins, else the named format's preset (U1.1 — the contract's "from format")
   const {w: W, h: H} = resolveCanvas(deck);
-  if (deck.format == null && deck.w == null && deck.h == null) E(`deck size missing — name a format (${FORMATS.join('|')}), or give deck.w and deck.h as positive numbers`);
+  if (deck.format == null && deck.w == null && deck.h == null) E('deck/size', `deck size missing — name a format (${FORMATS.join('|')}), or give deck.w and deck.h as positive numbers`);
   else {
-    if (!isNum(W) || W <= 0) E('deck.w must be a positive number');
-    if (!isNum(H) || H <= 0) E('deck.h must be a positive number');
+    if (!isNum(W) || W <= 0) E('deck/size', 'deck.w must be a positive number');
+    if (!isNum(H) || H <= 0) E('deck/size', 'deck.h must be a positive number');
   }
-  if (deck.format && !FORMATS.includes(deck.format)) E(`deck.format "${deck.format}" not one of ${FORMATS.join('|')}`);
-  if (deck.page && !PAGES.includes(deck.page)) E(`deck.page "${deck.page}" must be ${PAGES.join('|')}`);
+  if (deck.format && !FORMATS.includes(deck.format)) E('deck/format', `deck.format "${deck.format}" not one of ${FORMATS.join('|')}`);
+  if (deck.page && !PAGES.includes(deck.page)) E('deck/page', `deck.page "${deck.page}" must be ${PAGES.join('|')}`);
   // styles.roles — the eight-role strict type scale: every role is a complete treatment; one font+size per role
   // (Title = display size for title/closing-slide headlines; H1 = content-slide title)
   const roles = deck.styles && deck.styles.roles;
-  if (!roles || typeof roles !== 'object' || !Object.keys(roles).length) E('styles.roles missing — every text row needs a role');
+  if (!roles || typeof roles !== 'object' || !Object.keys(roles).length) E('style/roles-missing', 'styles.roles missing — every text row needs a role');
   else {
     for (const [name, t] of Object.entries(roles)) {
-      if (!ROLES.includes(name) && !OPTIONAL.includes(name)) Wn(`role "${name}" is outside the eight-role scale (${ROLES.join(', ')})`);
-      for (const p of ROLE_REQ) if (t[p] == null) E(`role ${name}: missing ${p}`);
-      if (t.size != null && !isNum(t.size)) E(`role ${name}: size must be a number`);
-      if (t.cw != null && !(isNum(t.cw) && t.cw > 0 && t.cw < 2)) E(`role ${name}: cw must be the measured average glyph width in em (0.4–0.75 is normal)`);
+      if (!ROLES.includes(name) && !OPTIONAL.includes(name)) Wn('style/role-outside-scale', `role "${name}" is outside the eight-role scale (${ROLES.join(', ')})`);
+      for (const p of ROLE_REQ) if (t[p] == null) E('style/role-incomplete', `role ${name}: missing ${p}`);
+      if (t.size != null && !isNum(t.size)) E('style/role-size', `role ${name}: size must be a number`);
+      if (t.cw != null && !(isNum(t.cw) && t.cw > 0 && t.cw < 2)) E('style/role-cw', `role ${name}: cw must be the measured average glyph width in em (0.4–0.75 is normal)`);
     }
-    if (Object.keys(roles).filter(n => !OPTIONAL.includes(n)).length > 8) Wn(`${Object.keys(roles).length} roles — more than eight dilutes the scale`);
-    if (Object.keys(roles).length && !roles.Body) Wn('no Body role — text rows without a role fall back to Body at render time');
+    if (Object.keys(roles).filter(n => !OPTIONAL.includes(n)).length > 8) Wn('style/too-many-roles', `${Object.keys(roles).length} roles — more than eight dilutes the scale`);
+    if (Object.keys(roles).length && !roles.Body) Wn('style/no-body', 'no Body role — text rows without a role fall back to Body at render time');
   }
   const roleOk = n => !!(roles && (roles[n] || (n === 'Stat2' && roles.Stat)));   // Stat2 resolves from Stat when the style has none
   const roleOf = n => (roles && (roles[n] || (n === 'Stat2' && roles.Stat && kpiRole(roles.Stat)))) || null;
   const cwOf = n => { const t = roleOf(n); return t && isNum(t.cw) ? t.cw : 0.55; };   // em per character; a measured role beats the blanket guess
   const pad = (deck.styles && deck.styles.pad) || {};
-  if (deck.styles && deck.styles.gap != null && !(isNum(deck.styles.gap) && deck.styles.gap >= 0)) E('styles.gap must be a number of px ≥ 0 — the air every row owes its neighbours');
+  if (deck.styles && deck.styles.gap != null && !(isNum(deck.styles.gap) && deck.styles.gap >= 0)) E('style/gap', 'styles.gap must be a number of px ≥ 0 — the air every row owes its neighbours');
   // slots (deck scope) + layouts
   const checkSlot = (where, name, sl) => {
-    if (!sl || typeof sl !== 'object') return E(`${where}.${name}: slot must be an object`);
-    for (const p of ['x', 'y', 'w', 'right']) if (sl[p] != null && sl[p] !== 'auto' && !isNum(sl[p])) E(`${where}.${name}.${p} must be a number`);
-    if (sl.x != null && sl.right != null) E(`${where}.${name}: x and right are exclusive — right anchors the right edge, x the left`);
-    if (sl.role && !roleOk(sl.role)) E(`${where}.${name}: role "${sl.role}" not in styles.roles`);
-    if (!sl.role && sl.h == null) Wn(`${where}.${name}: slot has no role — rows bound to it must carry one`);   // a slot with h and no role is paint or media
+    if (!sl || typeof sl !== 'object') return E('slot/shape', `${where}.${name}: slot must be an object`);
+    for (const p of ['x', 'y', 'w', 'right']) if (sl[p] != null && sl[p] !== 'auto' && !isNum(sl[p])) E('slot/number', `${where}.${name}.${p} must be a number`);
+    if (sl.x != null && sl.right != null) E('slot/x-and-right', `${where}.${name}: x and right are exclusive — right anchors the right edge, x the left`);
+    if (sl.role && !roleOk(sl.role)) E('slot/unknown-role', `${where}.${name}: role "${sl.role}" not in styles.roles`);
+    if (!sl.role && sl.h == null) Wn('slot/no-role', `${where}.${name}: slot has no role — rows bound to it must carry one`);   // a slot with h and no role is paint or media
   };
   for (const [n, sl] of Object.entries(deck.slots || {})) checkSlot('slots', n, sl);
   // template / icon rows that create() could not expand are reported here, then the valid ones expand so the same rows are judged
@@ -151,24 +177,24 @@ export function validate(deck) {
   const isLibrary = name => !!libCut[name] && JSON.stringify((deck.layouts || {})[name] ?? libCut[name]) === JSON.stringify(libCut[name]);
   const kinds = [];   // the layout or template each slide named, read before templates expand — TEXT_KINDS are words by kind
   const nameOk = n => typeof n === 'string' && !!n.trim();
-  if (deck.entities != null && !(Array.isArray(deck.entities) && deck.entities.every(n => nameOk(n) || (Array.isArray(n) && n.length && n.every(nameOk))))) E('deck.entities must be an array of names — the companies whose every mention wants a logo — where an entry may be a list of aliases, [name, alias, …]');
+  if (deck.entities != null && !(Array.isArray(deck.entities) && deck.entities.every(n => nameOk(n) || (Array.isArray(n) && n.length && n.every(nameOk))))) E('entity/shape', 'deck.entities must be an array of names — the companies whose every mention wants a logo — where an entry may be a list of aliases, [name, alias, …]');
   for (const [si, s] of (Array.isArray(deck.slides) ? deck.slides : []).entries()) {
     if (!s || typeof s !== 'object') continue;
     kinds[si] = String(s.template || s.layout || '');
-    if (s.textOnly != null && typeof s.textOnly !== 'boolean') E(`slides[${si}]: textOnly must be true or false — true declares a words slide the coverage gate skips`);
-    if (s.template != null && !TEMPLATE[s.template]) E(`slides[${si}]: template "${s.template}" not in the library (${Object.keys(TEMPLATE).join(', ')})`);
-    else if (s.template != null) for (const m of fillErrors(s.template, s.fill || {})) E(`slides[${si}]: ${m}`);
-    if (s.kind != null && s.kind !== 'summary') E(`slides[${si}]: kind "${s.kind}" — the one slide kind is "summary" (an executive summary: reading density caps it at ${DENSITY.reading.max.summary} words)`);
-    if (s.density != null && !DENSITY[s.density]) E(`slides[${si}]: density "${s.density}" not one of ${Object.keys(DENSITY).join('|')}`);
+    if (s.textOnly != null && typeof s.textOnly !== 'boolean') E('coverage/text-only-flag', `slides[${si}]: textOnly must be true or false — true declares a words slide the coverage gate skips`);
+    if (s.template != null && !TEMPLATE[s.template]) E('template/unknown', `slides[${si}]: template "${s.template}" not in the library (${Object.keys(TEMPLATE).join(', ')})`);
+    else if (s.template != null) for (const m of fillErrors(s.template, s.fill || {})) E('template/fill', `slides[${si}]: ${m}`);
+    if (s.kind != null && s.kind !== 'summary') E('density/kind', `slides[${si}]: kind "${s.kind}" — the one slide kind is "summary" (an executive summary: reading density caps it at ${DENSITY.reading.max.summary} words)`);
+    if (s.density != null && !DENSITY[s.density]) E('density/unknown', `slides[${si}]: density "${s.density}" not one of ${Object.keys(DENSITY).join('|')}`);
     // the library and the templates are cut for 16:9 (lib/layouts.mjs, templates/): on any other canvas they stretch until D2
     if (isNum(W) && isNum(H) && Math.abs(W / H - 16 / 9) > 0.01) {
-      if (s.template != null && TEMPLATE[s.template]) Wn(`slides[${si}]: template "${s.template}" is cut for 16:9 — on a ${W}×${H} canvas it will stretch (ROADMAP D2); draw free rows or edit the expanded rows`);
-      else if (s.layout && isLibrary(s.layout)) Wn(`slides[${si}]: layout "${s.layout}" is cut for 16:9 — on a ${W}×${H} canvas it will stretch (ROADMAP D2); define the deck's own layout or draw free rows`);
+      if (s.template != null && TEMPLATE[s.template]) Wn('format/stretched-template', `slides[${si}]: template "${s.template}" is cut for 16:9 — on a ${W}×${H} canvas it will stretch (ROADMAP D2); draw free rows or edit the expanded rows`);
+      else if (s.layout && isLibrary(s.layout)) Wn('format/stretched-layout', `slides[${si}]: layout "${s.layout}" is cut for 16:9 — on a ${W}×${H} canvas it will stretch (ROADMAP D2); define the deck's own layout or draw free rows`);
     }
-    if (s.notes != null && typeof s.notes !== 'string') E(`slides[${si}]: notes must be a string — speaker notes, one string per slide`);
-    for (const [ri, r] of (Array.isArray(s.els) ? s.els : []).entries()) if (r && r.icon != null && !ICONS[r.icon]) E(`slides[${si}].els[${ri}]: icon "${r.icon}" not in the set (${iconNames()})`);
+    if (s.notes != null && typeof s.notes !== 'string') E('contract/notes', `slides[${si}]: notes must be a string — speaker notes, one string per slide`);
+    for (const [ri, r] of (Array.isArray(s.els) ? s.els : []).entries()) if (r && r.icon != null && !ICONS[r.icon]) E('contract/icon', `slides[${si}].els[${ri}]: icon "${r.icon}" not in the set (${iconNames()})`);
   }
-  if (deck.density != null && !DENSITY[deck.density]) E(`density "${deck.density}" not one of ${Object.keys(DENSITY).join('|')}`);
+  if (deck.density != null && !DENSITY[deck.density]) E('density/unknown', `density "${deck.density}" not one of ${Object.keys(DENSITY).join('|')}`);
   expandTemplates(deck); expandIcons(deck);
   const layouts = {...libraryFor(deck), ...(deck.layouts || {})};   // a slide may name a library layout the deck does not define
   expandCharts(deck);   // a chart template expands INTO a chart row (U4.2): judge the rows it stands for, as create() does
@@ -178,7 +204,7 @@ export function validate(deck) {
     if (!s || typeof s !== 'object' || !Array.isArray(s.els)) continue;
     const bound = new Set(s.els.filter(r => r && isText(r) && r.slot).map(r => r.slot));
     const bs = [...bound].filter(k => /^b\d$/.test(k)).sort();
-    if (bound.has('body') && bs.length) E(`slides[${si}]: binds "body" and ${bs.join(', ')} — a column carries the paragraph or the points, never both`);
+    if (bound.has('body') && bs.length) E('density/body-and-points', `slides[${si}]: binds "body" and ${bs.join(', ')} — a column carries the paragraph or the points, never both`);
   }
   // a paint slot cannot vanish: a slot with `h` and no `role` draws NOTHING unless a row binds it, so a slide that binds a
   // card's text and not the card's box ships loose text on empty canvas — and both gates pass it (ROADMAP S2).
@@ -204,78 +230,78 @@ export function validate(deck) {
       const bi = at(box), bx = layouts[s.layout][box];
       // the author may paint the box themselves, with a free row covering the slot — that is the box, bound or not
       if (bi < 0 && s.els.some(r => r && !isText(r) && !r.slot && isNum(r.x) && isNum(r.w) && isNum(r.h) && holds(r, bx) && r.y <= bx.y + 1)) continue;
-      if (bi < 0) E(`slides[${si}]: binds ${kids.map(k => `"${k.n}"`).join(', ')} but not the paint slot "${box}" they sit on — add {"slot": "${box}"} before its text rows, or they render on empty canvas`);
-      else if (bi > kids[0].i) Wn(`slides[${si}]: paint slot "${box}" is bound at els[${bi}], after its own text (els[${kids[0].i}] "${kids[0].n}") — a later row paints over it; move {"slot": "${box}"} before its text rows`);
+      if (bi < 0) E('slot/paint-unbound', `slides[${si}]: binds ${kids.map(k => `"${k.n}"`).join(', ')} but not the paint slot "${box}" they sit on — add {"slot": "${box}"} before its text rows, or they render on empty canvas`);
+      else if (bi > kids[0].i) Wn('slot/paint-order', `slides[${si}]: paint slot "${box}" is bound at els[${bi}], after its own text (els[${kids[0].i}] "${kids[0].n}") — a later row paints over it; move {"slot": "${box}"} before its text rows`);
     }
   }
   // master
   const master = deck.master || [];
-  if (!Array.isArray(master)) E('master must be an array');
+  if (!Array.isArray(master)) E('contract/master-shape', 'master must be an array');
   const mids = new Set();
   let footers = 0;
-  master.forEach((m, k) => { if (!m.id) E(`master[${k}]: missing id`); else if (mids.has(m.id)) E(`master[${k}]: duplicate id ${m.id}`); else mids.add(m.id); if (m.footer) footers++; });
-  if (footers > 1) E(`${footers} footer master rows — at most one carries the counter`);
+  master.forEach((m, k) => { if (!m.id) E('contract/master-id', `master[${k}]: missing id`); else if (mids.has(m.id)) E('contract/master-duplicate-id', `master[${k}]: duplicate id ${m.id}`); else mids.add(m.id); if (m.footer) footers++; });
+  if (footers > 1) E('contract/footer-count', `${footers} footer master rows — at most one carries the counter`);
   // a row reference, as `to`/`from` and `after` read it: a row id on this slide, a master id, or a slide row index
   const findRow = (s, k) => typeof k === 'number' ? ((s && s.els) || [])[k] : (((s && s.els) || []).find(x => x && x.id === k) || master.find(m => m && m.id === k));
   // rows
   const row = (r, where, s) => {
-    if (!r || typeof r !== 'object') return E(`${where}: row must be an object`);
+    if (!r || typeof r !== 'object') return E('contract/row-shape', `${where}: row must be an object`);
     const slot = r.slot && ((deck.slots || {})[r.slot] || (s && layouts[s.layout] && layouts[s.layout][r.slot]));
-    if (r.slot === 'note' && !slot && s && s.layout && LIBRARY[s.layout] && isLibrary(s.layout)) E(`${where}: layout "${s.layout}" has no note — a note is a caption beside the visual it explains (K17): draw it as a free row under or beside that visual, inside the content area, or cut it`);
-    else if (r.slot && !slot) E(`${where}: slot "${r.slot}" not in ${s && s.layout ? `layout "${s.layout}"` : 'any layout'} or deck.slots`);
-    if (r.role && !roleOk(r.role)) E(`${where}: role "${r.role}" not in styles.roles`);
+    if (r.slot === 'note' && !slot && s && s.layout && LIBRARY[s.layout] && isLibrary(s.layout)) E('density/note-unseated', `${where}: layout "${s.layout}" has no note — a note is a caption beside the visual it explains (K17): draw it as a free row under or beside that visual, inside the content area, or cut it`);
+    else if (r.slot && !slot) E('slot/unknown', `${where}: slot "${r.slot}" not in ${s && s.layout ? `layout "${s.layout}"` : 'any layout'} or deck.slots`);
+    if (r.role && !roleOk(r.role)) E('contract/unknown-role', `${where}: role "${r.role}" not in styles.roles`);
     const over = r.override && (deck.master || []).find(m => m && m.id === r.override);   // a partial override reads the rest from its master row
     const role = r.role || (slot && slot.role) || (over && over.role);
     const textual = isText(r);
-    if (textual && !role && !(r.slot && !slot)) E(`${where}: text row "${plain(r).slice(0, 30)}" has no role (role or slot required)`);
-    for (const p of LOCKED) if (r[p] != null && textual) E(`${where}: "${plain(r).slice(0, 30)}" overrides ${p} — only a role sets font/size/lh/ls/mono`);
-    if (r.html && /<script|on\w+=/i.test(r.html)) E(`${where}: html contains script/handler`);
-    if (r.html && /font-size|font-family|line-height|letter-spacing/.test(r.html)) E(`${where}: html runs carry size/family/leading — runs may only carry color/weight/marks`);
-    for (const p of ['x', 'y', 'h', 'right']) if (r[p] != null && !isNum(r[p])) E(`${where}: ${p} must be a number`);
+    if (textual && !role && !(r.slot && !slot)) E('contract/no-role', `${where}: text row "${plain(r).slice(0, 30)}" has no role (role or slot required)`);
+    for (const p of LOCKED) if (r[p] != null && textual) E('contract/row-type-override', `${where}: "${plain(r).slice(0, 30)}" overrides ${p} — only a role sets font/size/lh/ls/mono`);
+    if (r.html && /<script|on\w+=/i.test(r.html)) E('contract/html-script', `${where}: html contains script/handler`);
+    if (r.html && /font-size|font-family|line-height|letter-spacing/.test(r.html)) E('contract/html-type', `${where}: html runs carry size/family/leading — runs may only carry color/weight/marks`);
+    for (const p of ['x', 'y', 'h', 'right']) if (r[p] != null && !isNum(r[p])) E('contract/number', `${where}: ${p} must be a number`);
     // `right`: the row's right edge N px from the canvas right edge, x derived at render from the measured width — the only
     // honest anchor for a w:'auto' chip. One edge per row: a row that states both has two answers for where it is.
-    if (r.x != null && r.right != null) E(`${where}: x and right are exclusive — right anchors the right edge, x the left`);
+    if (r.x != null && r.right != null) E('contract/x-and-right', `${where}: x and right are exclusive — right anchors the right edge, x the left`);
     // `after`: x is the named row's rendered right edge + gap (FRICTION F13) — the one honest place for a row that follows an
     // auto-width one. A stroke keeps x: its run is measured from it and the whole stroke is translated.
     if (r.after != null) {
-      if (!(typeof r.after === 'string' || Number.isInteger(r.after))) E(`${where}: after must be a row id (or a slide row index)`);
-      else if (!findRow(s, r.after)) E(`${where}: after "${r.after}" is not a row id on this slide, a master id, or a row index`);
-      if (r.right != null) E(`${where}: after and right are exclusive — after anchors the left edge to the named row, right to the canvas`);
-      if (r.x != null && !r.line && !r.curve) E(`${where}: after and x are exclusive — after derives x from the named row`);
-      if (r.gap != null && !isLogoRow(r) && !isNum(r.gap)) E(`${where}: gap must be a number of px — the air after the named row (default ${AGAP})`);
+      if (!(typeof r.after === 'string' || Number.isInteger(r.after))) E('contract/after-type', `${where}: after must be a row id (or a slide row index)`);
+      else if (!findRow(s, r.after)) E('contract/after-unknown', `${where}: after "${r.after}" is not a row id on this slide, a master id, or a row index`);
+      if (r.right != null) E('contract/after-and-right', `${where}: after and right are exclusive — after anchors the left edge to the named row, right to the canvas`);
+      if (r.x != null && !r.line && !r.curve) E('contract/after-and-x', `${where}: after and x are exclusive — after derives x from the named row`);
+      if (r.gap != null && !isLogoRow(r) && !isNum(r.gap)) E('contract/after-gap', `${where}: gap must be a number of px — the air after the named row (default ${AGAP})`);
     }
-    if (r.w != null && r.w !== 'auto' && !isNum(r.w)) E(`${where}: w must be a number or "auto"`);
-    if (r.line && !(Array.isArray(r.line) && r.line.length === 2 && r.line.every(isNum))) E(`${where}: line must be [x2,y2]`);
-    if (r.curve && !(Array.isArray(r.curve) && r.curve.length === 6 && r.curve.every(isNum))) E(`${where}: curve must be [c1x,c1y,c2x,c2y,x2,y2]`);
-    if (r.arrow && !ARROWS.includes(r.arrow)) E(`${where}: arrow "${r.arrow}" not one of ${ARROWS.join('|')}`);
-    else if (r.arrow && !r.line && !r.curve) E(`${where}: arrow needs a line or a curve to sit on`);
+    if (r.w != null && r.w !== 'auto' && !isNum(r.w)) E('contract/w', `${where}: w must be a number or "auto"`);
+    if (r.line && !(Array.isArray(r.line) && r.line.length === 2 && r.line.every(isNum))) E('connector/line-shape', `${where}: line must be [x2,y2]`);
+    if (r.curve && !(Array.isArray(r.curve) && r.curve.length === 6 && r.curve.every(isNum))) E('connector/curve-shape', `${where}: curve must be [c1x,c1y,c2x,c2y,x2,y2]`);
+    if (r.arrow && !ARROWS.includes(r.arrow)) E('connector/arrow', `${where}: arrow "${r.arrow}" not one of ${ARROWS.join('|')}`);
+    else if (r.arrow && !r.line && !r.curve) E('connector/arrow-without-stroke', `${where}: arrow needs a line or a curve to sit on`);
     // to/from: terminate a connector against another row, so the engine — not the author — computes where the head stops
     // a connector row ({from, to, style, gap}): the engine routes it between the two rows' edges, inset by gap at both ends
     if (isConnector(r)) {
-      if (!CSTYLES.includes(r.style)) E(`${where}: style "${r.style}" not one of ${CSTYLES.join('|')}`);
-      if (r.from == null || r.to == null) E(`${where}: a connector needs both from and to — the rows it joins`);
-      if (r.x != null || r.y != null || r.after != null) E(`${where}: a connector takes its geometry from from/to — drop x, y and after`);
-      if (r.gap != null && !(isNum(r.gap) && r.gap >= 0)) E(`${where}: gap must be a number of px ≥ 0 — the air at each end (default styles.gap, else 6)`);
-      for (const p of ['to', 'from']) if (r[p] != null && isConnector(findRow(s, r[p]))) E(`${where}: ${p} "${r[p]}" is a connector — join two boxes`);
+      if (!CSTYLES.includes(r.style)) E('connector/style', `${where}: style "${r.style}" not one of ${CSTYLES.join('|')}`);
+      if (r.from == null || r.to == null) E('connector/endpoints', `${where}: a connector needs both from and to — the rows it joins`);
+      if (r.x != null || r.y != null || r.after != null) E('connector/geometry', `${where}: a connector takes its geometry from from/to — drop x, y and after`);
+      if (r.gap != null && !(isNum(r.gap) && r.gap >= 0)) E('connector/gap', `${where}: gap must be a number of px ≥ 0 — the air at each end (default styles.gap, else 6)`);
+      for (const p of ['to', 'from']) if (r[p] != null && isConnector(findRow(s, r[p]))) E('connector/target-is-connector', `${where}: ${p} "${r[p]}" is a connector — join two boxes`);
       const c = s && CSTYLES.includes(r.style) && r.from != null && r.to != null && findRow(s, r.from) && findRow(s, r.to) && routed(r, s);
-      if (c === null) E(`${where}: ${r.from} and ${r.to} overlap or have no resolvable box — nothing to route between`);
-      else if (c && c.len < 1) E(`${where}: the gutter between ${r.from} and ${r.to} is too narrow for a connector with ${gapOf(r, deck.styles)}px of air at each end`);
+      if (c === null) E('connector/no-route', `${where}: ${r.from} and ${r.to} overlap or have no resolvable box — nothing to route between`);
+      else if (c && c.len < 1) E('connector/gutter', `${where}: the gutter between ${r.from} and ${r.to} is too narrow for a connector with ${gapOf(r, deck.styles)}px of air at each end`);
     }
     for (const p of ['to', 'from']) {
       if (r[p] == null) continue;
-      if (!r.line && !r.curve && !isConnector(r)) { E(`${where}: ${p} needs a line or a curve to terminate`); continue; }
+      if (!r.line && !r.curve && !isConnector(r)) { E('connector/terminate-without-stroke', `${where}: ${p} needs a line or a curve to terminate`); continue; }
       const tgt = typeof r[p] === 'number' ? (s && s.els || [])[r[p]] : ((s && s.els || []).find(x => x.id === r[p]) || master.find(m => m.id === r[p]));
-      if (!tgt) { E(`${where}: ${p} "${r[p]}" is not a row id on this slide, a master id, or a row index`); continue; }
+      if (!tgt) { E('connector/target-unknown', `${where}: ${p} "${r[p]}" is not a row id on this slide, a master id, or a row index`); continue; }
       const sl = (tgt.slot && ((deck.slots || {})[tgt.slot] || (s && layouts[s.layout] && layouts[s.layout][tgt.slot]))) || {};
-      if (!isConnector(r) && !['x', 'y', 'w', 'h'].every(k => isNum(tgt[k] ?? sl[k]))) Wn(`${where}: ${p} "${r[p]}" has no resolvable x/y/w/h — the connector cannot be clipped to it`);
+      if (!isConnector(r) && !['x', 'y', 'w', 'h'].every(k => isNum(tgt[k] ?? sl[k]))) Wn('connector/target-unresolved', `${where}: ${p} "${r[p]}" has no resolvable x/y/w/h — the connector cannot be clipped to it`);
     }
     if (r.head != null) {
-      if (!HEADS.includes(r.head)) E(`${where}: head "${r.head}" not one of ${HEADS.join('|')}`);
-      else if (!r.arrow) E(`${where}: head needs arrow to say which end carries it`);
+      if (!HEADS.includes(r.head)) E('connector/head', `${where}: head "${r.head}" not one of ${HEADS.join('|')}`);
+      else if (!r.arrow) E('connector/head-without-arrow', `${where}: head needs arrow to say which end carries it`);
     }
     if (r.dash != null) {
-      if (!(r.dash === 1 || r.dash === true || (Array.isArray(r.dash) && r.dash.length === 2 && r.dash.every(v => isNum(v) && v > 0)))) E(`${where}: dash must be 1 or [on,off]`);
-      else if (!r.line && !r.curve) E(`${where}: dash needs a line or a curve`);
+      if (!(r.dash === 1 || r.dash === true || (Array.isArray(r.dash) && r.dash.length === 2 && r.dash.every(v => isNum(v) && v > 0)))) E('connector/dash', `${where}: dash must be 1 or [on,off]`);
+      else if (!r.line && !r.curve) E('connector/dash-without-stroke', `${where}: dash needs a line or a curve`);
     }
     // ── connector SHAPE rules. Warnings, never errors: a deck may have a deliberate exception — declare it with waive:1.
     // Ruled on two connector probes (decks/connector-probe*/RULES.md); see docs/connectors.md for the full list.
@@ -289,69 +315,69 @@ export function validate(deck) {
     // …only for rows long enough to BE connectors: a 9px stroke is a tick or a cross drawn as a line, not a run between boxes
     if ((r.line || r.curve) && r.arrow && !r.waive && connLen(r) >= 40) {
       const sw = r.h ?? 3, x0 = r.x ?? 0, y0 = r.y ?? 0;
-      if (sw < 2.5) Wn(`${where}: a headed connector at h=${sw} is too light — use 2.5 or more (a headless leader may be a hairline)`);
+      if (sw < 2.5) Wn('connector/weight', `${where}: a headed connector at h=${sw} is too light — use 2.5 or more (a headless leader may be a hairline)`);
       if (Array.isArray(r.line) && r.line.every(isNum)) {
         const dx = Math.abs(r.line[0] - x0), dy = Math.abs(r.line[1] - y0);
-        if (dx > 2 && dy > 2) Wn(`${where}: diagonal straight run — draw an elbow of two orthogonal segments instead`);
+        if (dx > 2 && dy > 2) Wn('connector/diagonal', `${where}: diagonal straight run — draw an elbow of two orthogonal segments instead`);
       }
       if (Array.isArray(r.curve) && r.curve.length === 6 && r.curve.every(isNum)) {
         const [c1x, c1y, c2x, c2y, ex, ey] = r.curve;
         const horiz = Math.abs(ex - x0) >= Math.abs(ey - y0), run = horiz ? Math.abs(ex - x0) : Math.abs(ey - y0);
         const A = horiz ? [x0, c1x, c2x, ex] : [y0, c1y, c2y, ey], B = horiz ? [y0, c1y, c2y, ey] : [x0, c1x, c2x, ex];
-        if (run < 88) Wn(`${where}: S-curve spanning ${Math.round(run)}px — an S-curve needs about 96px of channel, or re-cut the layout so it fits`);
+        if (run < 88) Wn('connector/s-curve-channel', `${where}: S-curve spanning ${Math.round(run)}px — an S-curve needs about 96px of channel, or re-cut the layout so it fits`);
         const lo = Math.min(A[0], A[3]), hi = Math.max(A[0], A[3]);
-        for (const k of [1, 2]) if (A[k] < lo - 2 || A[k] > hi + 2) Wn(`${where}: control point ${k} sits past the endpoints — the curve overshoots and doubles back`);
+        for (const k of [1, 2]) if (A[k] < lo - 2 || A[k] > hi + 2) Wn('connector/overshoot', `${where}: control point ${k} sits past the endpoints — the curve overshoots and doubles back`);
         // a control point taken out ALONG the run should reach 50%..90% of it; one taken out PERPENDICULAR (C5) is fine
         for (const [k, base, far] of [[1, 0, 3], [2, 3, 0]]) {
           const along = Math.abs(A[k] - A[base]), across = Math.abs(B[k] - B[base]);
-          if (run > 0 && along > across && along / run < 0.4) Wn(`${where}: control point ${k} at ${Math.round(along / run * 100)}% of the run — take it to 50% or 90%, or out perpendicular`);
+          if (run > 0 && along > across && along / run < 0.4) Wn('connector/control-point', `${where}: control point ${k} at ${Math.round(along / run * 100)}% of the run — take it to 50% or 90%, or out perpendicular`);
         }
       }
     }
-    if (r.href != null) { const m = hrefErr(deck, r.href); if (m) E(`${where}: href "${String(r.href).slice(0, 40)}" ${m}`); }
-    if (r.html) for (const u of runHrefs(r.html)) { const m = hrefErr(deck, u); if (m) E(`${where}: link run href "${u.slice(0, 40)}" ${m}`); }
-    if (r.anim && !ANIMS.includes(r.anim)) E(`${where}: anim "${r.anim}" not one of ${ANIMS.join('|')}`);
-    if (r.donut != null && !(isNum(r.donut) && r.donut >= 0 && r.donut <= 100)) E(`${where}: donut must be 0..100`);
+    if (r.href != null) { const m = hrefErr(deck, r.href); if (m) E('links/href', `${where}: href "${String(r.href).slice(0, 40)}" ${m}`); }
+    if (r.html) for (const u of runHrefs(r.html)) { const m = hrefErr(deck, u); if (m) E('links/run-href', `${where}: link run href "${u.slice(0, 40)}" ${m}`); }
+    if (r.anim && !ANIMS.includes(r.anim)) E('motion/anim', `${where}: anim "${r.anim}" not one of ${ANIMS.join('|')}`);
+    if (r.donut != null && !(isNum(r.donut) && r.donut >= 0 && r.donut <= 100)) E('contract/donut', `${where}: donut must be 0..100`);
     // `hole` is the ring's hollow as a percent of the radius (default 55). 0 is a filled pie — the Harvey-ball convention,
     // which reads at a size where a hairline ring does not.
     if (r.hole != null) {
-      if (!(isNum(r.hole) && r.hole >= 0 && r.hole < 100)) E(`${where}: hole must be 0..99 — the percent of the radius left hollow (0 = a filled ball)`);
-      else if (r.donut == null) E(`${where}: hole needs a donut to make a hole in`);
+      if (!(isNum(r.hole) && r.hole >= 0 && r.hole < 100)) E('contract/hole', `${where}: hole must be 0..99 — the percent of the radius left hollow (0 = a filled ball)`);
+      else if (r.donut == null) E('contract/hole-without-donut', `${where}: hole needs a donut to make a hole in`);
     }
-    if (r.bar && !(isNum(r.h) && r.bg)) E(`${where}: bar needs h and bg`);
-    if (r.p != null && typeof r.p === 'string' && !pad[r.p] && !/px|em|%/.test(r.p)) E(`${where}: p "${r.p}" is neither a styles.pad token nor a CSS length`);
-    if (r.override && !mids.has(r.override)) E(`${where}: override "${r.override}" is not a master id`);
-    if (r.group != null) E(`${where}: \`group\` is gone — every row moves on its own; delete it (a card is a painted row with text rows over it, each one independent)`);
-    if (r.css) Wn(`${where}: raw css escape hatch used`);
-    if (r.chart != null) for (const m of checkChart(r.chart)) E(`${where}: ${m}`);   // a chart row create() could not expand
-    if (r.img && !IMGSRC.test(r.img)) E(`${where}: img must be a data: URI (single file, zero network), or '#id' naming a deck.assets entry`);
-    if (r.entity != null && !(typeof r.entity === 'string' && r.entity.trim())) E(`${where}: entity must be a company name — the deck.entities entry (or any alias) this logo belongs to`);
+    if (r.bar && !(isNum(r.h) && r.bg)) E('contract/bar', `${where}: bar needs h and bg`);
+    if (r.p != null && typeof r.p === 'string' && !pad[r.p] && !/px|em|%/.test(r.p)) E('contract/pad', `${where}: p "${r.p}" is neither a styles.pad token nor a CSS length`);
+    if (r.override && !mids.has(r.override)) E('contract/override', `${where}: override "${r.override}" is not a master id`);
+    if (r.group != null) E('contract/group-removed', `${where}: \`group\` is gone — every row moves on its own; delete it (a card is a painted row with text rows over it, each one independent)`);
+    if (r.css) Wn('contract/raw-css', `${where}: raw css escape hatch used`);
+    if (r.chart != null) for (const m of checkChart(r.chart)) E('chart/expand', `${where}: ${m}`);   // a chart row create() could not expand
+    if (r.img && !IMGSRC.test(r.img)) E('assets/img-source', `${where}: img must be a data: URI (single file, zero network), or '#id' naming a deck.assets entry`);
+    if (r.entity != null && !(typeof r.entity === 'string' && r.entity.trim())) E('entity/logo-entity', `${where}: entity must be a company name — the deck.entities entry (or any alias) this logo belongs to`);
     // the logo row (docs/logo.md): a fixed column, a contain-fit image on a plate or a monogram chip, the name at col + gap
     if (isLogoRow(r)) {
-      if (r.logo && !IMGSRC.test(r.logo)) E(`${where}: logo must be a data: URI (single file, zero network), '#id' naming a deck.assets entry, or '' for a monogram chip`);
-      if (!(isNum(r.h) && r.h > 0)) E(`${where}: h must be a positive number — the logo row's height`);
-      if (r.col != null && !(isNum(r.col) && r.col > 0)) E(`${where}: col must be a positive number — the logo column's width; give every row in a list the same col`);
-      if (r.gap != null && !(isNum(r.gap) && r.gap >= 0)) E(`${where}: gap must be a number of px ≥ 0 — the air between the logo column and the name`);
-      if (r.aspect != null && !(isNum(r.aspect) && r.aspect > 0)) E(`${where}: aspect must be a positive number — width over height, the manifest's aspect`);
-      if (r.plate != null && !PLATES.includes(r.plate)) E(`${where}: plate "${r.plate}" not one of ${PLATES.join('|')}`);
-      if (r.name != null && typeof r.name !== 'string') E(`${where}: name must be a string`);
-      if (r.monogram != null && !(typeof r.monogram === 'string' && r.monogram.trim())) E(`${where}: monogram must be the initials to draw`);
-      if (!r.logo && !r.monogram && !(typeof r.name === 'string' && r.name.trim())) E(`${where}: no logo, no monogram and no name — a monogram chip needs initials or a name to take them from`);
-      if (r.img != null) E(`${where}: a logo row carries its image in logo, not img`);
+      if (r.logo && !IMGSRC.test(r.logo)) E('assets/logo-source', `${where}: logo must be a data: URI (single file, zero network), '#id' naming a deck.assets entry, or '' for a monogram chip`);
+      if (!(isNum(r.h) && r.h > 0)) E('logo/h', `${where}: h must be a positive number — the logo row's height`);
+      if (r.col != null && !(isNum(r.col) && r.col > 0)) E('logo/col', `${where}: col must be a positive number — the logo column's width; give every row in a list the same col`);
+      if (r.gap != null && !(isNum(r.gap) && r.gap >= 0)) E('logo/gap', `${where}: gap must be a number of px ≥ 0 — the air between the logo column and the name`);
+      if (r.aspect != null && !(isNum(r.aspect) && r.aspect > 0)) E('logo/aspect', `${where}: aspect must be a positive number — width over height, the manifest's aspect`);
+      if (r.plate != null && !PLATES.includes(r.plate)) E('logo/plate', `${where}: plate "${r.plate}" not one of ${PLATES.join('|')}`);
+      if (r.name != null && typeof r.name !== 'string') E('logo/name', `${where}: name must be a string`);
+      if (r.monogram != null && !(typeof r.monogram === 'string' && r.monogram.trim())) E('logo/monogram', `${where}: monogram must be the initials to draw`);
+      if (!r.logo && !r.monogram && !(typeof r.name === 'string' && r.name.trim())) E('logo/empty', `${where}: no logo, no monogram and no name — a monogram chip needs initials or a name to take them from`);
+      if (r.img != null) E('logo/img-not-logo', `${where}: a logo row carries its image in logo, not img`);
     }
-    if (r.alt != null && typeof r.alt !== 'string') E(`${where}: alt must be a string — what the row shows, for a reader who cannot see it`);
-    if (r.svg && /<script|href\s*=\s*["']https?:/i.test(r.svg)) E(`${where}: svg contains script or external href`);
+    if (r.alt != null && typeof r.alt !== 'string') E('contract/alt', `${where}: alt must be a string — what the row shows, for a reader who cannot see it`);
+    if (r.svg && /<script|href\s*=\s*["']https?:/i.test(r.svg)) E('contract/svg-script', `${where}: svg contains script or external href`);
     // a stand-in mark is a drawing aid, never a shipped brand: a real deck must replace it, a sample sheet says deck.draft
-    if (r.placeholder != null) { if (deck.draft) stands.add(String(r.placeholder)); else E(`${where}: placeholder mark "${r.placeholder}" may not ship — swap in the real logo, or set deck.draft on a sample sheet`); }
-    if (textual && /^\s*\d+\s*\/\s*\d+\s*$/.test(plain(r))) Wn(`${where}: "${plain(r).trim()}" looks like a hardcoded page counter — the footer master renders it`);
+    if (r.placeholder != null) { if (deck.draft) stands.add(String(r.placeholder)); else E('assets/placeholder', `${where}: placeholder mark "${r.placeholder}" may not ship — swap in the real logo, or set deck.draft on a sample sheet`); }
+    if (textual && /^\s*\d+\s*\/\s*\d+\s*$/.test(plain(r))) Wn('contract/hardcoded-counter', `${where}: "${plain(r).trim()}" looks like a hardcoded page counter — the footer master renders it`);
     // geometry: inside the canvas (slot geometry resolved)
     const right = r.after != null ? null : r.right ?? (r.x == null && slot ? slot.right : null), y = r.y ?? (slot && slot.y) ?? 0, w = r.w ?? (slot && slot.w);
     const x = r.after != null ? ((placed(r, s) || {}).row || {}).x ?? 0 : right != null ? (isNum(w) ? W - right - w : 0) : r.x ?? (slot && slot.x) ?? 0;
-    if (isNum(W) && isNum(w) && x + w > W + 0.5) Wn(`${where}: extends past the right edge (${x}+${w} > ${W})`);
-    if (isNum(H) && y > H) Wn(`${where}: y ${y} is below the canvas (${H})`);
+    if (isNum(W) && isNum(w) && x + w > W + 0.5) Wn('fit/past-right-edge', `${where}: extends past the right edge (${x}+${w} > ${W})`);
+    if (isNum(H) && y > H) Wn('fit/below-canvas', `${where}: y ${y} is below the canvas (${H})`);
     // text-fit heuristic: a nowrap row whose text is wider than its box (role.cw em per char, 0.55 unmeasured) will overflow
-    if (textual && r.nowrap && isNum(w) && roleOf(role) && plain(r).length * roleOf(role).size * cwOf(role) > w) Wn(`${where}: nowrap text "${plain(r).slice(0, 30)}" likely wider than w=${w} — widen or use w:"auto"`);
-    if (textual && !r.nowrap && r.w !== 'auto' && isNum(w) && roleOf(role) && plain(r).length * roleOf(role).size * cwOf(role) > w * 3.5 && !/\n/.test(plain(r))) Wn(`${where}: "${plain(r).slice(0, 30)}" wraps past 3 lines at w=${w} — split it or widen`);
+    if (textual && r.nowrap && isNum(w) && roleOf(role) && plain(r).length * roleOf(role).size * cwOf(role) > w) Wn('fit/nowrap-width', `${where}: nowrap text "${plain(r).slice(0, 30)}" likely wider than w=${w} — widen or use w:"auto"`, {need: Math.ceil(plain(r).length * roleOf(role).size * cwOf(role)), have: w});
+    if (textual && !r.nowrap && r.w !== 'auto' && isNum(w) && roleOf(role) && plain(r).length * roleOf(role).size * cwOf(role) > w * 3.5 && !/\n/.test(plain(r))) Wn('fit/wraps-past-three', `${where}: "${plain(r).slice(0, 30)}" wraps past 3 lines at w=${w} — split it or widen`);
   };
   // ── the GAP gate: the box a row declares, plus the air every neighbour owes it. verify measures glyphs in a browser after
   // the deck exists; this runs on the model, at create, with no browser, and refuses the layout that WOULD collide.
@@ -476,7 +502,7 @@ export function validate(deck) {
           const dx = Math.max(Q.x - px, px - (Q.x + Q.w), 0), dy = Math.max(Q.y - py, py - (Q.y + Q.h), 0), d = dx || dy ? Math.hypot(dx, dy) : 0;
           if (d > gap - 0.5) continue;
           const est = Q.estW || Q.estH;
-          (est ? Wn : E)(`${where}: ${label(P.r, P.i)} ends ${est ? '~' : ''}${Math.round(d)}px from ${label(Q.r, Q.i)} — an arrow or connector end touches the box; styles.gap is ${gap} (a connector row {from, to, style} routes it clear; butt:1 marks a stroke that deliberately butts a frame)`);
+          (est ? Wn : E)('air/arrow-end', `${where}: ${label(P.r, P.i)} ends ${est ? '~' : ''}${Math.round(d)}px from ${label(Q.r, Q.i)} — an arrow or connector end touches the box; styles.gap is ${gap} (a connector row {from, to, style} routes it clear; butt:1 marks a stroke that deliberately butts a frame)`);
         }
       }
       const g = st(A) || st(B) ? 0 : A.boxy || B.boxy ? gap : 0;   // two bare text rows carry their own air in their line boxes
@@ -487,19 +513,19 @@ export function validate(deck) {
       // interior, and an estimate is no evidence against it. A pair that overlaps on an axis both rows DECLARE still fails.
       if (est && sa && sa === sb) continue;
       const how = sep >= 0 ? `is ${est ? '~' : ''}${Math.round(sep)}px from` : `overlaps by ${est ? '~' : ''}${Math.round(-sep)}px`;
-      (est ? Wn : E)(`${where}: ${label(A.r, A.i)} ${how} ${label(B.r, B.i)} — ${g ? `styles.gap is ${gap}` : 'text rows may not overlap'}${est ? ' (~ = estimated from the text; set h, or role.cw, to make it exact)' : ''}; over:1 declares an overlay`);
+      (est ? Wn : E)('air/gap', `${where}: ${label(A.r, A.i)} ${how} ${label(B.r, B.i)} — ${g ? `styles.gap is ${gap}` : 'text rows may not overlap'}${est ? ' (~ = estimated from the text; set h, or role.cw, to make it exact)' : ''}; over:1 declares an overlay`);
     }
   };
   master.forEach((m, k) => row(m, `master[${k}]`, null));
-  if (!Array.isArray(deck.slides) || !deck.slides.length) E('slides must be a non-empty array');
+  if (!Array.isArray(deck.slides) || !deck.slides.length) E('contract/slides', 'slides must be a non-empty array');
   else deck.slides.forEach((s, si) => {
-    if (!s || typeof s !== 'object') return E(`slides[${si}]: not an object`);
-    if (s.layout && !layouts[s.layout]) E(`slides[${si}]: layout "${s.layout}" not in deck.layouts or the library (${Object.keys(LIBRARY).join(', ')})`);
+    if (!s || typeof s !== 'object') return E('contract/slide-shape', `slides[${si}]: not an object`);
+    if (s.layout && !layouts[s.layout]) E('slot/unknown-layout', `slides[${si}]: layout "${s.layout}" not in deck.layouts or the library (${Object.keys(LIBRARY).join(', ')})`);
     const tpl = TEMPLATE[kinds[si]] || TEMPLATE[s.name];   // a Numbers-shelf template is a number slide (K19), read before or after create expands it
     // a template may name its slide kind (exec-summary is a summary slide, K19); a Numbers-shelf template is a number slide
-    const dm = densityReport(s, layouts, s.density || deck.density, tpl && (tpl.kind || (tpl.cat === 'Numbers' ? 'numbers' : null))); if (dm) Wn(`slides[${si}]: ${dm}`);
-    if (!Array.isArray(s.els)) return E(`slides[${si}]: els must be an array`);
-    for (const id of s.hide || []) if (!mids.has(id)) E(`slides[${si}]: hide "${id}" is not a master id`);
+    const dm = densityReport(s, layouts, s.density || deck.density, tpl && (tpl.kind || (tpl.cat === 'Numbers' ? 'numbers' : null))); if (dm) Wn('density/budget', `slides[${si}]: ${dm}`);
+    if (!Array.isArray(s.els)) return E('contract/els', `slides[${si}]: els must be an array`);
+    for (const id of s.hide || []) if (!mids.has(id)) E('contract/hide-unknown', `slides[${si}]: hide "${id}" is not a master id`);
     // an after chain that comes back to itself has no left edge to start from: one error per cycle
     const cycled = new Set();
     for (const [ei, r] of s.els.entries()) {
@@ -507,10 +533,10 @@ export function validate(deck) {
       const seen = [r], name = x => x.id ?? s.els.indexOf(x);
       for (let cur = findRow(s, r.after); cur && cur.after != null && !seen.includes(cur); cur = findRow(s, cur.after)) seen.push(cur);
       const last = findRow(s, seen[seen.length - 1].after);
-      if (last === r) { seen.forEach(x => cycled.add(x)); E(`slides[${si}].els[${ei}]: after cycle: ${[...seen, r].map(name).join(' → ')} — one row in the chain needs an x`); }
+      if (last === r) { seen.forEach(x => cycled.add(x)); E('contract/after-cycle', `slides[${si}].els[${ei}]: after cycle: ${[...seen, r].map(name).join(' → ')} — one row in the chain needs an x`); }
     }
     const used = new Set();
-    s.els.forEach((r, ei) => { row(r, `slides[${si}].els[${ei}]`, s); if (r && r.slot) { if (used.has(r.slot)) Wn(`slides[${si}]: slot "${r.slot}" bound twice`); used.add(r.slot); } });
+    s.els.forEach((r, ei) => { row(r, `slides[${si}].els[${ei}]`, s); if (r && r.slot) { if (used.has(r.slot)) Wn('slot/bound-twice', `slides[${si}]: slot "${r.slot}" bound twice`); used.add(r.slot); } });
     // the master rows this slide shows sit in the same set — a footer chip and a slide's last row owe each other the same air
     // K17: the foot line as the engine draws it — a left-anchored footer hands the left to a seated source (its text moves next to
     // the counter), a left foot row keeps its x on the footer's y, a right one hangs 16px left of the footer's text
@@ -528,18 +554,18 @@ export function validate(deck) {
       const sl = slotOf(r, s), x = r.x ?? sl.x, y = r.y ?? sl.y, ln = r.line ?? sl.line, D = rectOf({...dr, over: 0}, s);
       if (!D || !isNum(x) || !isNum(y) || !Array.isArray(ln)) continue;
       const d = Math.min(...[[x, y], ln].map(([px, py]) => Math.hypot(Math.max(D.x - px, px - (D.x + D.w), 0), Math.max(D.y - py, py - (D.y + D.h), 0))));
-      if (d > 1) E(`slides[${si}]: leader "${k}" ends ${Math.round(d)}px from its marker "${m[1]}-dot"; run it to the marker's edge`); }
+      if (d > 1) E('connector/leader-marker', `slides[${si}]: leader "${k}" ends ${Math.round(d)}px from its marker "${m[1]}-dot"; run it to the marker's edge`); }
     // K26: the source (left foot) and the legend (right foot) share ONE line — estimate both widths as seated and warn with the
     // overlap in px, or the air short of styles.gap (verify measures the glyphs; this catches it before a browser runs)
     const feet = s.els.map(r => footOf(r, s) && rectOf(seat(r), s)).filter(Boolean), fl = feet.find(b => b.r._foot === 'left'), fg = feet.find(b => b.r._foot === 'right');
     if (fl && fg && fl.x < fg.x) { const d = fg.x - (fl.x + fl.w);
-      if (d < gap - 0.5) Wn(`slides[${si}]: the source (~${Math.round(fl.w)}px wide) and the legend (~${Math.round(fg.w)}px) collide on the foot line — ${d < 0 ? `they overlap by ~${Math.round(-d)}px` : `~${Math.round(d)}px apart, under styles.gap ${gap}`}; shorten the source, or move the key off the foot (a label on the chart, a card body)`); }
+      if (d < gap - 0.5) Wn('air/foot-line', `slides[${si}]: the source (~${Math.round(fl.w)}px wide) and the legend (~${Math.round(fg.w)}px) collide on the foot line — ${d < 0 ? `they overlap by ~${Math.round(-d)}px` : `~${Math.round(d)}px apart, under styles.gap ${gap}`}; shorten the source, or move the key off the foot (a label on the chart, a card body)`); }
     // K17: the foot band — below the content area's bottom edge (FOOT.y, scaled) and above the footer — holds the foot line only
     if (F && isNum(F.y) && isNum(H)) {
       // a row that shares the footer's own line (within half its leading) IS the foot line — a foot mark, a rail's label
       const top = FOOT.y * H / 540, fl = roleOf(F.role), line = F.y - (fl ? fl.lh ?? fl.size * 1.25 : 14) / 2;
       s.els.forEach((r, ei) => { if (!r || !isText(r) || r.override || footOf(r, s)) return; const b = rectOf(r, s);
-        if (b && b.y >= top - 0.5 && b.y < line) Wn(`slides[${si}].els[${ei}] "${plain(r).replace(/\s+/g, ' ').slice(0, 30)}" starts at y ${Math.round(b.y)}, in the foot band (${Math.round(top)}–${F.y}, under the content area and above the footer) — the foot is one line: bind the source slot (it joins the footer's line), set a note beside its visual, or move the row up`); });
+        if (b && b.y >= top - 0.5 && b.y < line) Wn('density/foot-band', `slides[${si}].els[${ei}] "${plain(r).replace(/\s+/g, ' ').slice(0, 30)}" starts at y ${Math.round(b.y)}, in the foot band (${Math.round(top)}–${F.y}, under the content area and above the footer) — the foot is one line: bind the source slot (it joins the footer's line), set a note beside its visual, or move the row up`); });
     }
     // ── connector AIR, across the slide: a connector leaves the same visible gap at both ends and never touches a
     // container. `to:`/`from:` hand that to the engine, so ends it terminates are not second-guessed here.
@@ -570,12 +596,12 @@ export function validate(deck) {
       const z0 = r.line ? [r.line[0], r.line[1]] : [r.curve[4], r.curve[5]];
       // a to:/from: end is clipped by the engine and backs off its gap — flush only when it asks for gap:0
       const ends = [[a0, r.from, z0], [z0, r.to, a0]].map(([pt, term, other]) => term != null ? (r.gap === 0 ? 0 : null) : clear(pt, other));
-      for (const g of ends) if (g !== null && g <= 1) E(`${w}: touches the box — an arrow or connector end stops clear of a painted box (a connector row {from, to, style} or to:/from: leaves the gap for you; butt:1 marks a stroke that deliberately butts a frame)`);
+      for (const g of ends) if (g !== null && g <= 1) E('air/touches-box', `${w}: touches the box — an arrow or connector end stops clear of a painted box (a connector row {from, to, style} or to:/from: leaves the gap for you; butt:1 marks a stroke that deliberately butts a frame)`);
       const [g1, g2] = ends;
       if (g1 !== null && g2 !== null && g1 > 2 && g2 > 2 && g1 < 60 && g2 < 60 && Math.abs(g1 - g2) > 4)
-        Wn(`${w}: uneven air — ${Math.round(g1)}px at one end, ${Math.round(g2)}px at the other; use the same gap at both`);
+        Wn('air/uneven', `${w}: uneven air — ${Math.round(g1)}px at one end, ${Math.round(g2)}px at the other; use the same gap at both`);
       if (fedBy.some(e => Math.hypot(e[0] - a0[0], e[1] - a0[1]) < 4))
-        for (const q of seen) if (Math.hypot(q[0] - a0[0], q[1] - a0[1]) < 4) Wn(`${w}: shared stub — a segment feeds a point that two connectors leave from; fan out from the edge instead`);
+        for (const q of seen) if (Math.hypot(q[0] - a0[0], q[1] - a0[1]) < 4) Wn('connector/shared-stub', `${w}: shared stub — a segment feeds a point that two connectors leave from; fan out from the edge instead`);
       seen.push(a0);
     }
   });
@@ -672,14 +698,14 @@ export function validate(deck) {
     const rt = texts.map(r => rectOf({...r, over: 0}, s)).filter(Boolean);
     const roleName = r => r.role || ((r.slot && ((deck.slots || {})[r.slot] || (layouts[s.layout] || {})[r.slot])) || {}).role || '';
     if (!s.textOnly && ![kinds[si], s.layout, TEMPLATE[s.name] && s.name].some(k => TEXT_KINDS.has(k)) && texts.length >= 3) {   // name: create() keeps the template id there
-      if (coverage(s, els, rt) < COVER) Wn(`slides[${si}]: text only — words and no graphic over ${COVER * 100}% of the content box (icons, chips and a lone bar are decoration); add an img or logo group, a chart, a diagram or a proportional figure (or set textOnly: true if the slide is words by design)`);
+      if (coverage(s, els, rt) < COVER) Wn('coverage/text-only', `slides[${si}]: text only — words and no graphic over ${COVER * 100}% of the content box (icons, chips and a lone bar are decoration); add an img or logo group, a chart, a diagram or a proportional figure (or set textOnly: true if the slide is words by design)`);
     }
     if (!entRe.length) continue;
     const logos = els.filter(isLogo).map(r => rectOf({...r, over: 0}, s) || (isNum(r.x) && isNum(r.y) ? {x: r.x, y: r.y, w: isNum(r.w) ? r.w : (r.h ?? 24) * 2, h: r.h ?? 24} : null)).filter(Boolean);
     const named = new Set(), prose = new Set();
     const owned = new Set(els.filter(r => (isLogoRow(r) && r.logo) || (!isLogoRow(r) && r.img != null && !isText(r))).flatMap(logoOf));
-    for (const [ei, r] of s.els.entries()) if (isLogo(r) && typeof r.entity === 'string' && r.entity.trim() && !entOf(r.entity).length) Wn(`slides[${si}].els[${ei}]: entity "${r.entity}" names no company in deck.entities — use a listed name or alias, or add the company to deck.entities`);
-    for (const r of els) if (isLogoRow(r) && !r.logo) for (const n of namesIn(r.name)) Wn(`slides[${si}]: monogram for ${n} — a listed company wants its real logo; fetch it with decklet-assets (deck.entities asks for this)`);
+    for (const [ei, r] of s.els.entries()) if (isLogo(r) && typeof r.entity === 'string' && r.entity.trim() && !entOf(r.entity).length) Wn('entity/unknown', `slides[${si}].els[${ei}]: entity "${r.entity}" names no company in deck.entities — use a listed name or alias, or add the company to deck.entities`);
+    for (const r of els) if (isLogoRow(r) && !r.logo) for (const n of namesIn(r.name)) Wn('assets/monogram-known', `slides[${si}]: monogram for ${n} — a listed company wants its real logo; fetch it with decklet-assets (deck.entities asks for this)`);
     // a source line names where the numbers came from, not who is on the slide: the source slot, or a Caption in the foot band
     const footTop = FOOT.y * (isNum(H) ? H : 540) / 540;
     const sourced = r => r.slot === 'source' || (roleName(r) === 'Caption' && (rectOf({...r, over: 0}, s) || {}).y >= footTop - 0.5);
@@ -690,16 +716,16 @@ export function validate(deck) {
         if (!(b && logos.some(l => far(b, l) <= NEAR))) hits.forEach(n => named.add(n));
       } else hits.filter(n => !owned.has(n)).forEach(n => prose.add(n));   // a heading or a sentence: the company's own logo, anywhere on the slide
     }
-    if (prose.size) Wn(`slides[${si}]: names ${[...prose].join(', ')} in prose with no logo for it on the slide — add a logo row (or an img with alt) for each company named`);
-    if (named.size) Wn(`slides[${si}]: names ${[...named].join(', ')} with no logo within ${NEAR}px — add an img (or logo) row beside each name (deck.entities asks for this)`);
+    if (prose.size) Wn('entity/prose-without-logo', `slides[${si}]: names ${[...prose].join(', ')} in prose with no logo for it on the slide — add a logo row (or an img with alt) for each company named`);
+    if (named.size) Wn('entity/named-without-logo', `slides[${si}]: names ${[...named].join(', ')} with no logo within ${NEAR}px — add an img (or logo) row beside each name (deck.entities asks for this)`);
   }
   // the asset table (FRICTION F4): deck.assets = {id: data URI}, embedded once; any img or logo key anywhere in the model
   // (a row, a master row, a layout slot, a chart datum) may name one as '#id'. The runtime resolves it when it draws.
   const assets = deck.assets ?? {}, used = new Set();
-  if (typeof assets !== 'object' || Array.isArray(assets)) E('deck.assets must be an object of {id: data URI}');
+  if (typeof assets !== 'object' || Array.isArray(assets)) E('assets/shape', 'deck.assets must be an object of {id: data URI}');
   else for (const [id, v] of Object.entries(assets)) {
-    if (!/^[\w-]+$/.test(id)) E(`deck.assets.${id}: id must be letters, digits, _ or - (rows reference it as '#${id}')`);
-    if (!(typeof v === 'string' && /^data:/.test(v))) E(`deck.assets.${id} must be a data: URI (single file, zero network)`);
+    if (!/^[\w-]+$/.test(id)) E('assets/id', `deck.assets.${id}: id must be letters, digits, _ or - (rows reference it as '#${id}')`);
+    if (!(typeof v === 'string' && /^data:/.test(v))) E('assets/data-uri', `deck.assets.${id} must be a data: URI (single file, zero network)`);
   }
   const walk = (v, where) => {
     if (Array.isArray(v)) return v.forEach((x, k) => walk(x, `${where}[${k}]`));
@@ -707,14 +733,14 @@ export function validate(deck) {
     for (const [k, x] of Object.entries(v)) {
       if ((k === 'img' || k === 'logo') && typeof x === 'string' && x[0] === '#') {
         const id = x.slice(1); used.add(id);
-        if (!Object.hasOwn(assets, id)) E(`${where}.${k}: "${x}" is not in deck.assets (${Object.keys(assets).join(', ') || 'none defined'})`);
+        if (!Object.hasOwn(assets, id)) E('assets/unknown-ref', `${where}.${k}: "${x}" is not in deck.assets (${Object.keys(assets).join(', ') || 'none defined'})`);
       } else walk(x, `${where}.${k}`);
     }
   };
   for (const k of ['slides', 'master', 'layouts', 'slots']) walk(deck[k], k);
-  for (const id of Object.keys(typeof assets === 'object' && assets || {})) if (!used.has(id)) Wn(`deck.assets.${id} is unused — nobody references '#${id}'; delete it or point a row at it`);
-  if (stands.size) Wn(`draft sheet: ${stands.size} stand-in mark(s) — ${[...stands].sort().join(', ')} — shown under deck.draft; validate errors on them in any deck without it`);
-  return {ok: !errors.length, errors, warnings};
+  for (const id of Object.keys(typeof assets === 'object' && assets || {})) if (!used.has(id)) Wn('assets/unused', `deck.assets.${id} is unused — nobody references '#${id}'; delete it or point a row at it`);
+  if (stands.size) Wn('assets/draft-stand-ins', `draft sheet: ${stands.size} stand-in mark(s) — ${[...stands].sort().join(', ')} — shown under deck.draft; validate errors on them in any deck without it`);
+  return {ok: !errors.length, errors, warnings, diagnostics};
 }
 
 // a model as create() will build it, judged: the style merged the same way (or text fit is measured against the wrong roles —
@@ -745,9 +771,10 @@ if (isMain(import.meta.url)) {
     process.exit(0);
   }
   const file = (si < 0 ? a : a.filter((_, k) => k !== si && k !== si + 1)).find(x => !x.startsWith('--'));
-  if (!file) { console.error('usage: node bin/validate.mjs model.json [--style style.json] [--strict]'); process.exit(2); }
+  if (!file) { console.error('usage: node bin/validate.mjs model.json [--style style.json] [--strict] [--json]'); process.exit(2); }
   const r = validateModel(JSON.parse(fs.readFileSync(file, 'utf8')), si >= 0 ? JSON.parse(fs.readFileSync(a[si + 1], 'utf8')) : null);
   for (const m of r.notes) console.error('note    ' + m);
+  if (a.includes('--json')) { console.log(JSON.stringify({file, ok: r.ok, diagnostics: r.diagnostics}, null, 1)); process.exit(r.ok && !(strict && r.warnings.length) ? 0 : 1); }
   for (const m of r.errors) console.error('ERROR   ' + m);
   for (const m of r.warnings) console.error('warning ' + m);
   console.log(`${file}: ${r.errors.length} errors, ${r.warnings.length} warnings`);
