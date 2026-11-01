@@ -632,15 +632,16 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden){commitEdit
 addEventListener('beforeunload',e=>{commitEdit();if(route()==='tab'&&unsynced){e.preventDefault();e.returnValue=''}});
 // ── sync: the other windows and tabs of this browser showing this deck. Every save is told to them — a `storage` event on the
 // localStorage tier, a BroadcastChannel on any tier that has one (Safari 15.4+) — and a window that hears one takes the model as
-// its own: last write wins, the slide you were on is kept by id, an edit in flight lands on top of theirs, and NOTHING is written
-// in response (no echo: a second window is a reader of what it hears). Logs merge by entry, so no window's edits go missing from
+// its own: last write wins, the slide you were on is kept by id, an edit in flight lands on top of theirs. Logs merge by entry, so no window's edits go missing from
 // the replay; a file another agent version wrote (a different rev) is left to the reload path, which reconciles by log.
 const bc=(()=>{try{return new BroadcastChannel(NS)}catch{return null}})();
 const tell=m=>{if(bc)bc.postMessage(m)};
 if(bc)bc.onmessage=e=>receive(e.data);
-addEventListener('storage',e=>{if(e.key===KEY)receive({model:e.newValue});else if(e.key===LKEY)receive({log:e.newValue})});
+addEventListener('storage',e=>{if(e.key===KEY){receive({model:e.newValue});restoreModel(e.newValue)}else if(e.key===LKEY){receive({log:e.newValue});restoreLog()}});
 let heard=null;const ekey=e=>JSON.stringify({...e,rev:undefined}); // an entry's identity: what changed and when — never the rev a later write stamped on it
 function mergeLog(rl){const mine=new Map(log.map(e=>[ekey(e),e]));let ch=false;for(const e of rl){const k=ekey(e),m=mine.get(k);if(!m){log.push(e);mine.set(k,e);ch=true}else if(e.rev&&!m.rev){m.rev=e.rev;ch=true}}if(ch){log.sort((a,b)=>(a.t||'').localeCompare(b.t||''));unsynced=log.filter(e=>!e.rev).length}return ch}
+const restoreModel=v=>{if(LS&&v!=null&&v===heard&&base!==heard&&LS.getItem(KEY)===v)store.set(KEY,base)};
+const restoreLog=()=>{if(!LS)return;let held;try{held=new Set(JSON.parse(LS.getItem(LKEY)).map(ekey))}catch{return}if(log.some(e=>!held.has(ekey(e))))store.set(LKEY,JSON.stringify(log))};
 function receive(m){
   if(!m)return;if(m.log)try{mergeLog(JSON.parse(m.log))}catch{}
   if(m.model==null||m.model===base||m.model===heard)return;heard=m.model;let d;try{d=JSON.parse(m.model)}catch{return}if(!d||d.rev!==DECK.rev)return; // one save reaches a window twice on the localStorage tier (the storage event and the channel): the second copy is ignored

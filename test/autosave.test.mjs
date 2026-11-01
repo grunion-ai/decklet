@@ -57,7 +57,7 @@ test('storage is a tier chain — localStorage → IndexedDB → memory — and 
   assert.match(tpl, /let TIER=LS\?'local':'mem';/); assert.match(tpl, /indexedDB\.open\('decklet',2\)/, 'one db, bumped to v2 for the kv store');
   assert.match(tpl, /for\(const s of \['h','kv'\]\)if\(!r\.result\.objectStoreNames\.contains\(s\)\)r\.result\.createObjectStore\(s\)/, 'the handle store and the kv store');
   assert.match(tpl, /async function idbLoad\(\)/); assert.match(tpl, /if\(LS\)settle\(\);else\{autosave\('busy','Loading…'\);idbLoad\(\)\.then\(settle\)\}/, 'the deck draws from DECK first, the IndexedDB copy lands after');
-  assert.match(tpl, /new BroadcastChannel\(NS\)/); assert.match(tpl, /addEventListener\('storage',e=>\{if\(e\.key===KEY\)receive/);
+  assert.match(tpl, /new BroadcastChannel\(NS\)/); assert.match(tpl, /addEventListener\('storage',e=>\{if\(e\.key===KEY\)\{receive/);
   const recv = tpl.slice(tpl.indexOf('function receive(m){'), tpl.indexOf('const slide=()=>'));
   assert.ok(!/store\.set\(|LS\.setItem|localStorage\.setItem|tell\(/.test(recv), 'receive() writes nothing and tells no one: ' + recv);
   assert.match(recv, /commitEdit\(\)/, 'an edit in flight is committed on top of what was heard');
@@ -161,5 +161,25 @@ for (const bn of projects()) live(`two windows (${bn}): an edit in one shows in 
   assert.deepEqual(await B.evaluate(() => [log.length, canvas.querySelector('.el[contenteditable="true"]')]), [3, null], 'B: same log, the edit committed');
   await until(A, () => JSON.parse(localStorage.getItem(KEY)).slides[0].els[0].text === 'typed in B');
   assert.deepEqual(JSON.parse(await A.evaluate(() => localStorage.getItem(KEY))).slides[0].els.map(e => [e.text, e.x, e.y]).slice(0, 2), [['typed in B', 60, 80], ['body one', 123, 250]], 'the store has both windows\' edits');
+  assert.deepEqual([...A.errs, ...B.errs], []);
+}));
+for (const bn of projects()) live(`two windows (${bn}): an older save landing after an edit on top of it never replaces that edit in the store`, async () => withProject(pw, bn, async ({context}) => {
+  const url = `http://127.0.0.1:${server.address().port}/late-${bn}.html`; const ctx = await context();
+  const A = watch(await ctx.newPage()); await A.goto(url); await A.evaluate(() => localStorage.clear()); await A.reload(); await settled(A);
+  const B = watch(await ctx.newPage()); await B.goto(url); await settled(B);
+  await B.evaluate(() => { sel.clear(); sel.add(0); render(); edit(0); }); await B.keyboard.type('typed in B');
+  await A.evaluate(() => { snap(); slide().els[1].y = 250; save(); window.__older = [localStorage.getItem(KEY), localStorage.getItem(LKEY)]; });
+  await until(B, () => deck.slides[0].els[1].y === 250);
+  await until(A, () => deck.slides[0].els[0].text === 'typed in B');
+  await until(A, () => JSON.parse(localStorage.getItem(KEY)).slides[0].els[0].text === 'typed in B');
+  const count = p => p.evaluate(() => { window.__sets = 0; const o = Storage.prototype.setItem; Storage.prototype.setItem = function (...a) { if (this === localStorage) window.__sets++; return o.apply(this, a); }; });
+  await count(B);
+  await A.evaluate(() => { localStorage.setItem(KEY, window.__older[0]); localStorage.setItem(LKEY, window.__older[1]); });
+  await until(A, () => JSON.parse(localStorage.getItem(KEY)).slides[0].els[0].text === 'typed in B');
+  await until(A, () => JSON.parse(localStorage.getItem(LKEY)).length === 2);
+  assert.deepEqual(JSON.parse(await A.evaluate(() => localStorage.getItem(KEY))).slides[0].els.map(e => [e.text, e.y]).slice(0, 2), [['typed in B', 80], ['body one', 250]], 'the store has both windows\' edits again');
+  assert.equal(await B.evaluate(() => window.__sets), 2, 'B wrote the model and the log once each');
+  await A.reload(); await settled(A);
+  assert.equal(await A.evaluate(() => slide().els[0].text), 'typed in B', 'a reload keeps the words');
   assert.deepEqual([...A.errs, ...B.errs], []);
 }));
