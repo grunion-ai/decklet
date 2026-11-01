@@ -17,6 +17,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 import {validate, linksOf, slideNo} from './validate.mjs';
 import {isMain} from '../lib/is-main.mjs';
@@ -39,6 +40,7 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
   // self-containment — the guarantee the whole engine rests on
   if (/(src|href)\s*=\s*["']https?:/i.test(html) || /@import|<link[^>]+stylesheet|fetch\s*\((?!'\/(?!\/))|new\s+EventSource\s*\((?!'\/(?!\/))|XMLHttpRequest|new\s+WebSocket/i.test(html)) res.errors.push('deck references the network'); // fetch('/…') and EventSource('/…'): the bin/serve.mjs host route, same origin only
   const deck = modelOf(html);
+  res.deck = {sha256: createHash('sha256').update(fs.readFileSync(file)).digest('hex'), id: deck.id || null, rev: deck.rev || null};
   const scope = slides ? scopeOf(deck, slides) : null;
   if (scope) res.scope = scope;
   const v = validate(deck); res.contract = v; res.links = linksOf(deck); // every link, for a reviewer to check; an unresolved '#' is a contract error
