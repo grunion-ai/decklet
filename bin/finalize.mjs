@@ -50,8 +50,6 @@ export async function finalize(modelFile, {style = null, out, format, space, tit
       const {html, deck} = create(model, {style: styleObj, format, space, title, from, spell});
       const v = validate(deck);
       if (!v.ok) return {status: 'fail', errors: v.errors, warnings: v.warnings, diagnostics: v.diagnostics};
-      fs.writeFileSync(out, html);
-      if (!v.ok) return {status: 'fail', errors: v.errors, warnings: v.warnings};
       writeDeck(out, html);
       receipt.deck = ident(out);
       return {status: 'pass', warnings: v.warnings, diagnostics: v.diagnostics};
