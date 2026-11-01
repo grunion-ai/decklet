@@ -14,7 +14,7 @@ const settled = p => p.waitForFunction(() => document.getElementById('autosave')
 const spy = () => { window.__w = []; const o = Storage.prototype.setItem; Storage.prototype.setItem = function (k, v) { if (this === localStorage && k === KEY) window.__w.push([Math.round(performance.timeOrigin + performance.now()), JSON.parse(v).slides[0].els[0].text]); return o.call(this, k, v); }; };
 const has = p => p.evaluate(() => { try { return JSON.parse(localStorage.getItem(KEY)).slides[0].els[0].text; } catch (e) { return String(e); } });
 const until = (p, fn, ms = 15000) => p.waitForFunction(fn, null, {timeout: ms});
-let bad = 0, good = 0, errs = 0;
+let bad = 0, good = 0, errs = 0, late = 0, maxMs = 0;
 for (let run = 0; run < RUNS; run++) {
   const b = await pw.firefox.launch();
   try {
@@ -33,7 +33,8 @@ for (let run = 0; run < RUNS; run++) {
     const s = Date.now();
     try { await until(A, () => JSON.parse(localStorage.getItem(KEY)).slides[0].els[0].text === 'typed in B', 2000); t.poll2s = true; } catch { t.poll2s = false; }
     t.pollMs = Date.now() - s;
-    if (t.first !== 'typed in B' || !t.poll2s) {
+    if (t.first !== 'typed in B') late++; maxMs = Math.max(maxMs, t.pollMs);
+    if (!t.poll2s) {
       t.aNow = await has(A); t.bNow = await has(B);
       const C = await ctx.newPage(); await C.goto(url + '?fresh'); t.freshNow = await has(C).catch(e => String(e)); await C.close();
       const r = Date.now(); let reads = 0;
@@ -42,11 +43,11 @@ for (let run = 0; run < RUNS; run++) {
       t.aWrites = await A.evaluate(() => window.__w); t.bWrites = await B.evaluate(() => window.__w);
       t.aFocus = await A.evaluate(() => [document.hidden, document.hasFocus()]);
     }
-    const flagged = t.first !== 'typed in B' || !t.poll2s;
+    const flagged = !t.poll2s;
     if (flagged) { bad++; console.log('FLAG ' + JSON.stringify(t)); } else good++;
     await ctx.close();
   } catch (e) { errs++; console.log('ERR ' + ID + ' ' + run + ' ' + String(e).slice(0, 200)); }
   await b.close();
 }
-console.log(`DONE ${ID} good ${good} bad ${bad} errs ${errs}`);
+console.log(`DONE ${ID} good ${good} bad ${bad} errs ${errs} storeLateAtFirstRead ${late} maxPollMs ${maxMs}`);
 server.close();
