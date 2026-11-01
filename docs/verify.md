@@ -28,6 +28,31 @@
 
 A verify that cannot render (Playwright absent) is `skipped`, and `ok` stays false: a gate that did not run is not a pass. The deck stays on disk when only `verify` fails, so its PNGs can be read.
 
+## Diagnostic codes
+
+Every `validate` finding also lands in `diagnostics`, one per line of `errors` and `warnings`, in the same order: `{code, severity, message, subject, evidence?, fixes}`. `subject` is `{slide, el, id}` for a row (slide 1-based, `el` the row's index in `els`, `id` when the row has one), `{slide}` for a slide, `{master, id}` for a master row, and `{}` for the deck. `node bin/validate.mjs model.json --json` prints them; the `finalize` receipt carries them per stage. The `errors` and `warnings` strings are unchanged.
+
+| family | what it names | example |
+|---|---|---|
+| `deck/` | canvas size, format, page | `deck/format` |
+| `style/` | the roles and `styles.gap` | `style/role-incomplete` |
+| `slot/` | slots, layouts, paint slots | `slot/unknown` |
+| `contract/` | row and slide props the model contract fixes | `contract/row-type-override` |
+| `connector/` | lines, curves, arrows, heads, dashes, routed connectors | `connector/target-unknown` |
+| `links/` | `href` targets and link runs | `links/href` |
+| `motion/` | `anim` | `motion/anim` |
+| `chart/` | chart rows `create` cannot expand | `chart/expand` |
+| `template/` | template names and fill keys | `template/fill` |
+| `format/` | 16:9 cuts on another canvas | `format/stretched-layout` |
+| `density/` | density, word budgets, the foot band | `density/budget` |
+| `coverage/` | a slide with words and no graphic | `coverage/text-only` |
+| `fit/` | text wider than its box, rows off the canvas | `fit/nowrap-width` (evidence `{need, have}`) |
+| `air/` | the gap gate: rows, arrow ends and the foot line | `air/gap` |
+| `logo/` | logo row props | `logo/plate` |
+| `assets/` | `deck.assets`, image sources, monograms, placeholders | `assets/monogram-known` |
+| `entity/` | `deck.entities` and the logo each named company needs | `entity/named-without-logo` |
+
+`fixes` lists the usual repairs for the common codes (`fit/nowrap-width` gives `w: <need>`, `w: 'auto'` and a shorter text) and is empty elsewhere. A code never changes once shipped; a new check takes a new code.
 `node bin/finalize.mjs --check deck.html` exits 0 only when the deck's receipt passed and its `deck.sha256` still matches the file; otherwise it prints `receipt is for <a>…, file is <b>…: rerun finalize` and exits 1. `verify` writes the same identity into `results.json` as `deck: {sha256, id, rev}`, so a rebuilt deck never inherits an older pass. `create` and `finalize` write the deck through a temp file and a rename, so a crash never leaves half a deck.
 ## One slide at a time
 
