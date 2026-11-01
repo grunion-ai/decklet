@@ -53,6 +53,10 @@ Every `validate` finding also lands in `diagnostics`, one per line of `errors` a
 | `entity/` | `deck.entities` and the logo each named company needs | `entity/named-without-logo` |
 
 `fixes` lists the usual repairs for the common codes (`fit/nowrap-width` gives `w: <need>`, `w: 'auto'` and a shorter text) and is empty elsewhere. A code never changes once shipped; a new check takes a new code.
+`node bin/finalize.mjs --check deck.html` exits 0 only when the deck's receipt passed and its `deck.sha256` still matches the file; otherwise it prints `receipt is for <a>…, file is <b>…: rerun finalize` and exits 1. `verify` writes the same identity into `results.json` as `deck: {sha256, id, rev}`, so a rebuilt deck never inherits an older pass. `create` and `finalize` write the deck through a temp file and a rename, so a crash never leaves half a deck.
+## One slide at a time
+
+`node bin/verify.mjs deck.html --slides s4,7` measures only the named slides, by slide id or 1-based number, in every engine, and `results.json` records them as `scope`. The contract and self-containment checks still cover the whole deck. Use it between repairs; the hand-off takes a full run. An unknown slide exits 2 and lists the ids that exist.
 
 ## Thresholds
 

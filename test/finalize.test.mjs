@@ -6,7 +6,9 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {finalize, receiptPath} from '../bin/finalize.mjs';
+import {finalize, receiptPath, checkReceipt} from '../bin/finalize.mjs';
+import {writeDeck} from '../bin/create.mjs';
+import {verify} from '../bin/verify.mjs';
 import {validateModel} from '../bin/validate.mjs';
 import {raceOrExit} from './helpers/browser.mjs';
 
@@ -93,4 +95,47 @@ test('live: finalize takes the explainer model to FINALIZE PASS in a real browse
   const r = await raceOrExit(finalize(path.join(root, 'examples/explainer/model.json'), {out, title: 'decklet', webkit: false, verifyOut: path.join(tmp, 'v-explainer'), log: quiet}), 120000, 'finalize explainer');
   assert.equal(r.ok, true, JSON.stringify(r.stages, null, 1));
   assert.equal(r.deck.sha256, sha(out));
+});
+
+test('finalize --check: a receipt vouches only for the bytes it hashed (#200)', async () => {
+  const m = write('check.model.json', model('Short line')), out = path.join(tmp, 'check.html');
+  await finalize(m, {out, verifyFn: passVerify, log: quiet});
+  assert.deepEqual(checkReceipt(out).ok, true);
+  const bin = path.join(root, 'bin/finalize.mjs');
+  assert.equal(spawnSync(process.execPath, [bin, '--check', out], {encoding: 'utf8'}).status, 0);
+  const before = sha(out);
+  fs.appendFileSync(out, ' ');
+  const c = checkReceipt(out);
+  assert.equal(c.ok, false);
+  assert.match(c.message, new RegExp(`receipt is for ${before.slice(0, 12)}.*file is ${sha(out).slice(0, 12)}`));
+  const r = spawnSync(process.execPath, [bin, '--check', out], {encoding: 'utf8'});
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /rerun finalize/);
+  assert.match(checkReceipt(path.join(tmp, 'never-built.html')).message, /no receipt/);
+});
+
+test('finalize --check: a receipt whose run failed never vouches, even for unchanged bytes (#200)', async () => {
+  const m = write('checkfail.model.json', model('Short line')), out = path.join(tmp, 'checkfail.html');
+  await finalize(m, {out, verifyFn: async () => ({ok: false, errors: ['x'], warnings: [], skipped: [], parity: []}), log: quiet});
+  const c = checkReceipt(out);
+  assert.equal(c.ok, false);
+  assert.match(c.message, /did not pass/);
+});
+
+test('writeDeck: the deck lands whole through a temp file and a rename, leaving no temp file behind (#200)', () => {
+  const dir = fs.mkdtempSync(path.join(tmp, 'atomic-')), f = path.join(dir, 'deck.html');
+  writeDeck(f, '<!doctype html>one');
+  writeDeck(f, '<!doctype html>two');
+  assert.equal(fs.readFileSync(f, 'utf8'), '<!doctype html>two');
+  assert.deepEqual(fs.readdirSync(dir), ['deck.html']);
+});
+
+test('live: verify results carry the sha256, id and rev of the deck they measured (#200)', {skip: !pw && 'Playwright not installed'}, async () => {
+  const m = write('vbytes.model.json', model('Short line')), out = path.join(tmp, 'vbytes.html'), vout = path.join(tmp, 'v-bytes');
+  await finalize(m, {out, verifyFn: passVerify, log: quiet});
+  const r = await raceOrExit(verify(out, {out: vout, webkit: false, log: quiet}), 60000, 'verify bytes');
+  assert.equal(r.deck.sha256, sha(out));
+  assert.match(r.deck.id, /^[0-9a-f]{10}$/);
+  assert.match(r.deck.rev, /^[0-9a-f]{10}$/);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(vout, 'results.json'), 'utf8')).deck, r.deck);
 });
