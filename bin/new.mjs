@@ -5,7 +5,8 @@
 // the study's best decks climbed. What comes out passes `validate --strict` and `verify --strict` untouched, so the
 // author's first loop is replacing placeholder copy rather than debugging geometry.
 //
-// usage: node bin/new.mjs --out model.json [--slides 8] [--density reading|speaker] [--style <kit>] [--space WxH]
+// usage: node bin/new.mjs --out model.json [--slides 8] [--density reading|speaker] [--canvas low|medium|high] [--style <kit>] [--space WxH]
+import {CANVAS, mapRow} from '../lib/layouts.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -136,16 +137,18 @@ export function run(n, density) {
   return [COVER(), ...take.map(r => r.build(density)), CLOSE()];
 }
 
-export function newModel({slides = 8, density = 'reading', space = null} = {}) {
-  const [w, h] = space ? space.split('x').map(Number) : [960, 540];
+export function newModel({slides = 8, density = 'reading', space = null, canvas = null} = {}) {
+  const tier = canvas && canvas !== 'medium' ? CANVAS[canvas] : null;
+  const [w, h] = tier ? [tier.w, tier.h] : space ? space.split('x').map(Number) : [960, 540];
+  const free = r => (tier && r.slot == null ? mapRow(r, tier) : r);
   return {
     title: `${CO} — ${MARK} deck`,
-    format: 'slides', w, h, density,
-    styles: {margin: 60},
+    format: 'slides', w, h, density, ...(canvas ? {canvas} : {}),
+    styles: {margin: tier ? tier.margin : 60},
     // Master discipline (SKILL.md): one master row carries footer:1 and the engine draws the page counter with it.
     // Right-anchored with w:'auto' is the anchoring that passes --strict; never type "3 / 9" into a row.
-    master: [{id: 'foot', footer: 1, right: 60, y: h - 34, w: 'auto', role: 'Label', nowrap: 1, text: `${CO} · ${MARK}`}],
-    slides: run(slides, density),
+    master: [{id: 'foot', footer: 1, right: tier ? tier.margin : 60, y: tier ? tier.footer : h - 34, w: 'auto', role: 'Label', nowrap: 1, text: `${CO} · ${MARK}`}],
+    slides: run(slides, density).map(s => ({...s, els: (s.els || []).map(free)})),
   };
 }
 
@@ -174,7 +177,7 @@ if (isMain(import.meta.url)) {
   const a = process.argv.slice(2), o = {};
   for (let k = 0; k < a.length; k++) if (a[k].startsWith('--')) o[a[k].slice(2)] = a[k + 1] && !a[k + 1].startsWith('--') ? a[++k] : true;
   const die = m => { console.error(m); process.exit(2); };
-  if (!o.out) die('usage: node bin/new.mjs --out model.json [--slides 8] [--density reading|speaker] [--style <kit>] [--space WxH]');
+  if (!o.out) die('usage: node bin/new.mjs --out model.json [--slides 8] [--density reading|speaker] [--canvas low|medium|high] [--style <kit>] [--space WxH]');
   const slides = o.slides == null ? 8 : Number(o.slides);
   if (!Number.isInteger(slides) || slides < MIN || slides > MAX) die(`--slides must be ${MIN}..${MAX} — the shape ladder has ${MAX} rungs, and a deck that repeats a layout is worse than a shorter one`);
   const density = o.density == null ? 'reading' : String(o.density);
@@ -183,7 +186,8 @@ if (isMain(import.meta.url)) {
   if (o.space && !/^\d+x\d+$/.test(o.space)) die('--space must be WxH, e.g. 960x540');
 
   const dir = path.dirname(path.resolve(o.out));
-  const model = newModel({slides, density, space: o.space || null});
+  if (o.canvas && !CANVAS[o.canvas]) die(`--canvas must be ${Object.keys(CANVAS).join('|')}`);
+  const model = newModel({slides, density, space: o.space || null, canvas: o.canvas || null});
   const $schema = path.relative(dir, fileURLToPath(new URL('../schemas/model.schema.json', import.meta.url))).split(path.sep).join('/');
   fs.writeFileSync(o.out, JSON.stringify({$schema, ...model}, null, 2) + '\n');
   const man = path.join(dir, 'MANIFEST.md');
