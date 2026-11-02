@@ -41,6 +41,7 @@ git clone https://github.com/grunion-ai/decklet && cd decklet
 node bin/validate.mjs examples/explainer/model.json
 node bin/create.mjs --model examples/explainer/model.json --out deck.html --title decklet
 open deck.html
+node bin/finalize.mjs examples/explainer/model.json --out deck.html
 node bin/bug.mjs deck.html --category looks --desc "chips wrap" --log verify.log   # a prefilled bug mail: [ISSUE] subject, engine, format, size, node + OS; never the deck's words
 ```
 
@@ -161,9 +162,11 @@ A row is text by default; `box`, `tile`, `bar`, `line`, `donut`, `svg`, `img` ar
 deck.html            the engine + the explainer deck (built from examples/explainer)
 template.html        the engine with an empty model — create.mjs fills it
 bin/new.mjs          a starter model + MANIFEST.md — validate/verify clean before you edit it
-bin/validate.mjs     model contract, pure Node
+bin/validate.mjs     model contract, pure Node; --suggest names the layouts that fit a slide's content
 bin/create.mjs       model (+style) → deck.html; format presets
-bin/verify.mjs       parity + AE + contract proof (Playwright optional)
+bin/verify.mjs       parity + AE + contract proof (Playwright optional); --slides measures named slides only
+bin/finalize.mjs     validate, create and verify with one style; writes a receipt, --check tests it against the deck's bytes
+schemas/             JSON Schema for model.json and style.json, built from the engine's constants
 bin/import-html.mjs  finished HTML pages → model.json (Playwright)
 bin/bug.mjs          a prefilled bug report (mailto) — the deck's bug button and dialog use the same builder
 bin/assets.mjs       decklet-assets: a company name to a logo file, a URL to a screenshot, a monogram; writes manifest.json
