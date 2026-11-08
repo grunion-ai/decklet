@@ -1,0 +1,419 @@
+{
+  "$schema": "../../../../home/user/wt-bench/schemas/model.schema.json",
+  "title": "Meridian Freight — PLACEHOLDER deck",
+  "format": "slides",
+  "w": 960,
+  "h": 540,
+  "density": "reading",
+  "styles": {
+    "margin": 60
+  },
+  "master": [
+    {
+      "id": "foot",
+      "footer": 1,
+      "right": 60,
+      "y": 506,
+      "w": "auto",
+      "role": "Label",
+      "nowrap": 1,
+      "text": "Meridian Freight · PLACEHOLDER"
+    }
+  ],
+  "slides": [
+    {
+      "name": "cover",
+      "layout": "cover",
+      "els": [
+        {
+          "slot": "supertitle",
+          "text": "MERIDIAN FREIGHT · PLACEHOLDER DECK"
+        },
+        {
+          "slot": "title",
+          "text": "Replace with the deck's one-line promise."
+        },
+        {
+          "slot": "body",
+          "text": "Replace with who this is for and what they get."
+        },
+        {
+          "slot": "caption",
+          "text": "Replace · presenter, audience, date"
+        }
+      ]
+    },
+    {
+      "name": "agenda",
+      "layout": "agenda",
+      "els": [
+        {
+          "slot": "supertitle",
+          "text": "AGENDA"
+        },
+        {
+          "slot": "title",
+          "text": "Replace with what the deck covers."
+        },
+        {
+          "slot": "n1",
+          "text": "01"
+        },
+        {
+          "slot": "item1",
+          "text": "Replace · section 1 in five words"
+        },
+        {
+          "slot": "n2",
+          "text": "02"
+        },
+        {
+          "slot": "item2",
+          "text": "Replace · section 2 in five words"
+        },
+        {
+          "slot": "n3",
+          "text": "03"
+        },
+        {
+          "slot": "item3",
+          "text": "Replace · section 3 in five words"
+        },
+        {
+          "slot": "n4",
+          "text": "04"
+        },
+        {
+          "slot": "item4",
+          "text": "Replace · section 4 in five words"
+        },
+        {
+          "slot": "n5",
+          "text": "05"
+        },
+        {
+          "slot": "item5",
+          "text": "Replace · section 5 in five words"
+        },
+        {
+          "slot": "note",
+          "text": "Replace with the one sentence that frames the list."
+        }
+      ]
+    },
+    {
+      "name": "numbers",
+      "template": "area-bubbles",
+      "fill": {
+        "t1": "NUMBERS",
+        "t2": "Replace with what the numbers say.",
+        "t3": "Replace with the one line the three values add up to.",
+        "t4": "Circle area is the value. Replace with the reading of the circles, not a repeat of the labels.",
+        "t5": "PLACEHOLDER · name the source",
+        "t6": "30",
+        "t7": "Replace · metric 1",
+        "t8": "20",
+        "t9": "Replace · metric 2",
+        "t10": "10",
+        "t11": "Replace · metric 3",
+        "data": [
+          {
+            "label": "Replace · metric 1",
+            "value": 30
+          },
+          {
+            "label": "Replace · metric 2",
+            "value": 20
+          },
+          {
+            "label": "Replace · metric 3",
+            "value": 10
+          }
+        ]
+      }
+    },
+    {
+      "name": "trend",
+      "layout": "chart",
+      "els": [
+        {
+          "slot": "supertitle",
+          "text": "TREND"
+        },
+        {
+          "slot": "title",
+          "text": "Replace with what the series shows."
+        },
+        {
+          "slot": "chart",
+          "chart": {
+            "mark": "bar",
+            "data": [
+              {
+                "label": "One",
+                "value": 10
+              },
+              {
+                "label": "Two",
+                "value": 20
+              },
+              {
+                "label": "Three",
+                "value": 30
+              },
+              {
+                "label": "Four",
+                "value": 40
+              }
+            ]
+          }
+        },
+        {
+          "slot": "takeaway",
+          "text": "Replace with the takeaway. The bars above are a placeholder ramp, not data."
+        },
+        {
+          "slot": "source",
+          "text": "PLACEHOLDER · name the source"
+        }
+      ]
+    },
+    {
+      "name": "process",
+      "layout": "process-steps",
+      "textOnly": true,
+      "els": [
+        {
+          "slot": "supertitle",
+          "text": "PROCESS"
+        },
+        {
+          "slot": "title",
+          "text": "Replace with the name of the process."
+        },
+        {
+          "slot": "n1",
+          "text": "01"
+        },
+        {
+          "slot": "step1",
+          "text": "Replace · step 1, what happens and who does it"
+        },
+        {
+          "slot": "n2",
+          "text": "02"
+        },
+        {
+          "slot": "step2",
+          "text": "Replace · step 2, what happens and who does it"
+        },
+        {
+          "slot": "n3",
+          "text": "03"
+        },
+        {
+          "slot": "step3",
+          "text": "Replace · step 3, what happens and who does it"
+        },
+        {
+          "slot": "n4",
+          "text": "04"
+        },
+        {
+          "slot": "step4",
+          "text": "Replace · step 4, what happens and who does it"
+        },
+        {
+          "slot": "note",
+          "text": "Replace with where the process breaks today."
+        }
+      ]
+    },
+    {
+      "name": "figure",
+      "layout": "diagram",
+      "els": [
+        {
+          "slot": "supertitle",
+          "text": "FIGURE"
+        },
+        {
+          "slot": "title",
+          "text": "Replace with the name of the figure."
+        },
+        {
+          "id": "a",
+          "x": 68,
+          "y": 250,
+          "w": 200,
+          "h": 60,
+          "bg": "var(--card)",
+          "bd": "1px solid var(--fg)",
+          "radius": 8
+        },
+        {
+          "x": 84,
+          "y": 258,
+          "w": 168,
+          "role": "Body",
+          "weight": 600,
+          "color": "var(--fg)",
+          "nowrap": 1,
+          "text": "Replace A"
+        },
+        {
+          "x": 84,
+          "y": 286,
+          "w": 168,
+          "role": "Label",
+          "nowrap": 1,
+          "color": "var(--muted)",
+          "text": "placeholder node"
+        },
+        {
+          "id": "b",
+          "x": 380,
+          "y": 250,
+          "w": 200,
+          "h": 60,
+          "bg": "var(--card)",
+          "bd": "1px solid var(--fg)",
+          "radius": 8
+        },
+        {
+          "x": 396,
+          "y": 258,
+          "w": 168,
+          "role": "Body",
+          "weight": 600,
+          "color": "var(--fg)",
+          "nowrap": 1,
+          "text": "Replace B"
+        },
+        {
+          "x": 396,
+          "y": 286,
+          "w": 168,
+          "role": "Label",
+          "nowrap": 1,
+          "color": "var(--muted)",
+          "text": "placeholder node"
+        },
+        {
+          "id": "c",
+          "x": 692,
+          "y": 250,
+          "w": 200,
+          "h": 60,
+          "bg": "var(--box)",
+          "bd": "2px solid var(--accent)",
+          "radius": 8
+        },
+        {
+          "x": 708,
+          "y": 258,
+          "w": 168,
+          "role": "Body",
+          "weight": 600,
+          "color": "var(--fg)",
+          "nowrap": 1,
+          "text": "Replace C"
+        },
+        {
+          "x": 708,
+          "y": 286,
+          "w": 168,
+          "role": "Label",
+          "nowrap": 1,
+          "color": "var(--muted)",
+          "text": "placeholder node"
+        },
+        {
+          "x": 268,
+          "y": 280,
+          "line": [
+            380,
+            280
+          ],
+          "h": 2.5,
+          "bg": "var(--fg)",
+          "from": "a",
+          "to": "b",
+          "arrow": "end",
+          "head": "triangle"
+        },
+        {
+          "x": 580,
+          "y": 280,
+          "line": [
+            692,
+            280
+          ],
+          "h": 3,
+          "bg": "var(--accent)",
+          "from": "b",
+          "to": "c",
+          "arrow": "end",
+          "head": "triangle"
+        },
+        {
+          "slot": "caption",
+          "text": "Replace with the sentence this figure proves."
+        }
+      ]
+    },
+    {
+      "name": "options",
+      "layout": "comparison",
+      "textOnly": true,
+      "els": [
+        {
+          "slot": "supertitle",
+          "text": "OPTIONS"
+        },
+        {
+          "slot": "title",
+          "text": "Replace with the choice being made."
+        },
+        {
+          "slot": "left-head",
+          "text": "Replace · option A"
+        },
+        {
+          "slot": "right-head",
+          "text": "Replace · option B"
+        },
+        {
+          "slot": "left",
+          "text": "Replace with what option A costs and buys. Two lines at most."
+        },
+        {
+          "slot": "right",
+          "text": "Replace with what option B costs and buys. Two lines at most."
+        },
+        {
+          "slot": "source",
+          "text": "PLACEHOLDER · name the source"
+        }
+      ]
+    },
+    {
+      "name": "close",
+      "layout": "end",
+      "els": [
+        {
+          "slot": "title",
+          "text": "Replace with the ask."
+        },
+        {
+          "slot": "body",
+          "text": "Replace with the one next step, and who takes it."
+        },
+        {
+          "slot": "caption",
+          "text": "PLACEHOLDER · how to reach you"
+        }
+      ]
+    }
+  ]
+}

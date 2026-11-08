@@ -24,3 +24,8 @@ templates/library-*.style.json
 templates/landed.index.json
 .decklet-host.json
 .decklet-history/
+
+# authoring benchmark: what score writes beside each candidate
+benchmarks/authoring/**/deck.html
+benchmarks/authoring/**/deck.finalize.json
+benchmarks/authoring/**/verify-out/

@@ -1,0 +1,66 @@
+{
+  "format": "document-letter",
+  "density": "reading",
+  "title": "Pilot results",
+  "counter": 0,
+  "slides": [
+    {
+      "els": [
+        {
+          "x": 48,
+          "y": 48,
+          "w": 720,
+          "role": "Supertitle",
+          "text": "Pilot results · Q3"
+        },
+        {
+          "x": 48,
+          "y": 72,
+          "w": 720,
+          "role": "Title",
+          "text": "Onboarding fell from nine days to four"
+        },
+        {
+          "x": 48,
+          "y": 260,
+          "w": 720,
+          "role": "Body",
+          "text": "Forty new hires used the guided checklist in August and September. Median time to first shipped change fell from nine working days to four."
+        },
+        {
+          "x": 48,
+          "y": 370,
+          "w": 720,
+          "h": 280,
+          "chart": {
+            "mark": "bar",
+            "data": [
+              {
+                "label": "Before",
+                "value": 9
+              },
+              {
+                "label": "Pilot",
+                "value": 4
+              }
+            ]
+          }
+        },
+        {
+          "x": 48,
+          "y": 700,
+          "w": 720,
+          "role": "Body",
+          "text": "Next: extend the checklist to the support team in November and measure the same interval."
+        },
+        {
+          "x": 48,
+          "y": 960,
+          "w": 720,
+          "role": "Caption",
+          "text": "Source: onboarding tracker, 40 hires, Aug–Sep."
+        }
+      ]
+    }
+  ]
+}
