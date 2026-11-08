@@ -7,7 +7,7 @@
 //        later-painted opaque row (occlusion — sampled with elementFromPoint; fails like every other parity shape), and the page
 //        counter's box is the same on every slide that shows the footer (the corner is the counter's; a `hide` of the footer is exempt)
 //   3. AE pixel diff vs reference PNGs (ImageMagick `magick`/`compare`)  only when --refs is given
-// usage: node bin/verify.mjs deck.html [--refs dir] [--out dir] [--threshold 0.5] [--fuzz 2%] [--report model.report.json] [--fonts <css url>] [--strict] [--webkit | --no-webkit] [--slides id,n,…]
+// usage: node bin/verify.mjs deck.html [--refs dir] [--out dir] [--threshold 0.5] [--fuzz 2%] [--report model.report.json] [--fonts <css url>] [--strict] [--webkit | --no-webkit] [--slides id,n,…] [--json]
 //   parity runs in Chromium and, when installed, WebKit on every OS (per-engine results; --no-webkit skips it, --webkit is the
 //   same as the default). WebKit shots go to <out>/webkit/
 //   --report: the importer's drift report (default: model.report.json beside the deck) — masks where the mockup drew its chrome
@@ -33,6 +33,43 @@ export const fontWarnings = deck => Object.entries(deck?.styles?.roles || {}).fl
 });
 
 export const scopeOf = (deck, slides) => slides.map(u => { const n = slideNo(deck, '#' + String(u).trim()); if (!n) throw new Error(`no slide "${u}" — slides are 1-${deck.slides.length} or ${deck.slides.map((s, k) => s.id || `s${k + 1}`).join(', ')}`); return n; }).sort((a, b) => a - b).filter((n, k, a) => n !== a[k - 1]);
+
+const num = (m, k) => +m[k];
+export const PARITY_CODES = [
+  {re: /^overflows its box \((\d+)>(\d+)\)/, code: 'parity/overflow', evidence: m => ({need: num(m, 1), have: num(m, 2)}), fixes: ev => [`w: ${ev.need}`, "w: 'auto'", 'shorten the text']},
+  {re: /^nowrap row renders (\d+) lines/, code: 'parity/nowrap-lines', evidence: m => ({lines: num(m, 1)}), fixes: () => ["w: 'auto'", 'widen w', 'shorten the text']},
+  {re: /^source had (\d+) line\(s\), renders (\d+)/, code: 'parity/line-count', evidence: m => ({source: num(m, 1), rendered: num(m, 2)}), fixes: () => ['widen w', 'shorten the text']},
+  {re: /^overlapped by (.+)/, code: 'parity/ink-through-text', evidence: m => ({by: m[1].split(',')}), fixes: () => ['move the stroke off the text', 'over: 1 for a deliberate overlay']},
+  {re: /^straddles (.+)/, code: 'parity/straddles-container', evidence: m => ({by: m[1].split(',')}), fixes: () => ['move the text inside the box or clear of it']},
+  {re: /^overlaps text (.+)/, code: 'parity/text-over-text', evidence: m => ({by: m[1].split(',')}), fixes: () => ['move one row styles.gap clear of the other']},
+  {re: /^arrow lands inside ([^ ]+)/, code: 'parity/arrow-in-fill', evidence: m => ({on: m[1].split(',')}), fixes: () => ["to: '<row id>' so the engine stops the stroke on the box edge"]},
+  {re: /^outside the canvas/, code: 'parity/outside-canvas', fixes: () => ['move the row inside the canvas', 'narrow w']},
+  {re: /^under row (\S+) \((\w+)\)/, code: 'parity/occlusion', evidence: m => ({under: m[1], kind: m[2]}), fixes: () => ['reorder els so paint comes first', 'move the box']},
+  {re: /^counter right edge/, code: 'parity/counter-margin', fixes: () => ['anchor the footer with right:, or drop its own y']},
+  {re: /^counter box/, code: 'parity/counter-drift', fixes: () => ['drop the slide-local footer override']},
+];
+const subjectOfRow = (deck, slide, n) => {
+  const s = {slide}, m = /^m:(\d+)$/.exec(String(n));
+  if (m) { const id = deck.master?.[+m[1]]?.id; return {...s, master: +m[1], ...(id ? {id} : {})}; }
+  if (!/^\d+$/.test(String(n))) return s;
+  const id = deck.slides?.[slide - 1]?.els?.[+n]?.id; return {...s, el: +n, ...(id ? {id} : {})};
+};
+export function diagnosticsOf(res, deck) {
+  const out = [...(res.contract?.diagnostics || [])];
+  for (const e of res.errors) {
+    if (e === 'deck references the network') out.push({code: 'deck/network', severity: 'error', message: e, subject: {}, fixes: ['embed every image as a data: URI; use installed or system fonts']});
+    else if (e.startsWith('page errors: ')) out.push({code: 'parity/page-error', severity: 'error', message: e, subject: {}, fixes: []});
+  }
+  for (const [engine, list] of Object.entries(res.engines || {})) for (const q of list) {
+    for (const [rows, severity] of [[q.rows || [], 'error'], [q.crowding || [], 'warning']]) for (const o of rows) for (const p of o.problems) {
+      const c = severity === 'warning' ? {code: 'parity/crowding', fixes: () => []} : PARITY_CODES.find(x => x.re.test(p)) || {code: 'parity/unclassified', fixes: () => []};
+      const evidence = c.evidence ? c.evidence(c.re.exec(p)) : undefined;
+      out.push({code: c.code, severity, engine, message: `slide ${q.slide} row ${o.n}: ${p}`, subject: subjectOfRow(deck, q.slide, o.n), ...(evidence ? {evidence} : {}), fixes: c.fixes(evidence || {})});
+    }
+  }
+  for (const a of res.ae || []) if (a.pass === false) out.push({code: 'ae/over-threshold', severity: 'error', message: `slide ${a.slide} differs from its reference by ${a.pctNoChromeNoConflict ?? a.pct}%`, subject: {slide: a.slide}, evidence: {pct: a.pctNoChromeNoConflict ?? a.pct}, fixes: ['fix the layout, or replace the reference if the change is intended']});
+  return out;
+}
 
 export async function verify(file, {refs = null, out = null, threshold = 0.5, fuzz = '2%', strict = false, report = null, fonts = null, webkit = 'auto', slides = null, log = console.log} = {}) {
   const html = fs.readFileSync(file, 'utf8');
@@ -243,20 +280,22 @@ export async function verify(file, {refs = null, out = null, threshold = 0.5, fu
         q.rows.push({n: 'counter', text: `${q.slide} / ${N}`, problems: [`counter box (right ${q.counter.right}, top ${q.counter.top}, h ${q.counter.h}) differs from slide ${ref.slide} (right ${ref.counter.right}, top ${ref.counter.top}, h ${ref.counter.h}) — the corner is the counter's on every slide`]}); q.pass = false; }
     }
     if (pageErrors.length) res.errors.push('page errors: ' + pageErrors.join(' | '));
-    fs.writeFileSync(path.join(out, 'results.json'), JSON.stringify(res, null, 1));
   }
   if (res.parity.some(r => !r.pass)) res.errors.push('layout parity failed on ' + res.parity.filter(r => !r.pass).map(r => r.slide).join(','));
   for (const [eng, q] of Object.entries(res.engines)) if (eng !== 'chromium' && q.some(r => !r.pass)) res.errors.push(`layout parity failed in ${eng} on ` + q.filter(r => !r.pass).map(r => r.slide).join(','));
   if (res.ae.some(r => r.pass === false)) res.errors.push('AE over threshold on ' + res.ae.filter(r => r.pass === false).map(r => `${r.slide} (${r.pctNoChromeNoConflict ?? r.pct}% after masks)`).join(','));
   res.ok = !res.errors.length;
+  res.diagnostics = diagnosticsOf(res, deck);
+  if (pw) fs.writeFileSync(path.join(out, 'results.json'), JSON.stringify(res, null, 1));
   return res;
 }
 
 if (isMain(import.meta.url)) {
   const a = process.argv.slice(2), o = {}; let file = null;
   for (let k = 0; k < a.length; k++) if (a[k].startsWith('--')) o[a[k].slice(2)] = a[k + 1] && !a[k + 1].startsWith('--') ? a[++k] : true; else file = a[k];
-  if (!file) { console.error('usage: node bin/verify.mjs deck.html [--refs dir] [--out dir] [--threshold 0.5] [--fuzz 2%] [--report model.report.json] [--fonts <css url, test-time only>] [--strict] [--webkit | --no-webkit] [--slides id,n,…]'); process.exit(2); }
-  const r = await verify(file, {slides: typeof o.slides === 'string' ? o.slides.split(',') : null, refs: o.refs, out: o.out, threshold: o.threshold ? +o.threshold : 0.5, fuzz: o.fuzz || '2%', strict: !!o.strict, report: o.report || null, fonts: o.fonts || null, webkit: o['no-webkit'] ? false : o.webkit ? true : 'auto'}).catch(e => { if (/^no slide /.test(e.message)) { console.error(e.message); process.exit(2); } throw e; });
+  if (!file) { console.error('usage: node bin/verify.mjs deck.html [--refs dir] [--out dir] [--threshold 0.5] [--fuzz 2%] [--report model.report.json] [--fonts <css url, test-time only>] [--strict] [--webkit | --no-webkit] [--slides id,n,…] [--json]'); process.exit(2); }
+  const r = await verify(file, {slides: typeof o.slides === 'string' ? o.slides.split(',') : null, refs: o.refs, out: o.out, threshold: o.threshold ? +o.threshold : 0.5, fuzz: o.fuzz || '2%', strict: !!o.strict, report: o.report || null, fonts: o.fonts || null, webkit: o['no-webkit'] ? false : o.webkit ? true : 'auto', ...(o.json ? {log: () => {}} : {})}).catch(e => { if (/^no slide /.test(e.message)) { console.error(e.message); process.exit(2); } throw e; });
+  if (o.json) { console.log(JSON.stringify({file, ok: r.ok, diagnostics: r.diagnostics}, null, 1)); process.exit(r.ok ? 0 : 1); }
   if (r.scope) console.log(`scope   slides ${r.scope.join(',')} of ${r.contract ? modelOf(fs.readFileSync(file, 'utf8')).slides.length : '?'} — a repair pass; hand off on a full run`);
   for (const m of r.contract.errors) console.error('ERROR   contract: ' + m);
   for (const m of r.contract.warnings) console.error('warning contract: ' + m);

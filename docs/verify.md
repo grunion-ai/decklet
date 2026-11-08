@@ -52,8 +52,11 @@ Every `validate` finding also lands in `diagnostics`, one per line of `errors` a
 | `logo/` | logo row props | `logo/plate` |
 | `assets/` | `deck.assets`, image sources, monograms, placeholders | `assets/monogram-known` |
 | `entity/` | `deck.entities` and the logo each named company needs | `entity/named-without-logo` |
+| `deck/` (verify) | the deck reaches the network | `deck/network` |
+| `parity/` (verify) | what rendered: overflow, nowrap lines, line count, ink through text, a straddled container, text over text, an arrow in a fill, the canvas edge, occlusion, the counter, page errors, crowding (a warning) | `parity/overflow` (evidence `{need, have}`) |
+| `ae/` (verify) | the pixel diff against a reference | `ae/over-threshold` (evidence `{pct}`) |
 
-`fixes` lists the usual repairs for the common codes (`fit/nowrap-width` gives `w: <need>`, `w: 'auto'` and a shorter text) and is empty elsewhere. A code never changes once shipped; a new check takes a new code.
+`fixes` lists the usual repairs for the common codes (`fit/nowrap-width` gives `w: <need>`, `w: 'auto'` and a shorter text) and is empty elsewhere. `verify` returns the same shape as `diagnostics` and writes it into `results.json`: the contract's codes first, then one per rendered problem, each with its `engine` (`chromium` or `webkit`) and `subject` `{slide, el, id}` or `{slide, master, id}`. `node bin/verify.mjs deck.html --json` prints them, and the `finalize` receipt carries them on the verify stage. A code never changes once shipped; a new check takes a new code.
 `node bin/finalize.mjs --check deck.html` exits 0 only when the deck's receipt passed and its `deck.sha256` still matches the file; otherwise it prints `receipt is for <a>…, file is <b>…: rerun finalize` and exits 1. `verify` writes the same identity into `results.json` as `deck: {sha256, id, rev}`, so a rebuilt deck never inherits an older pass. `create` and `finalize` write the deck through a temp file and a rename, so a crash never leaves half a deck.
 ## One slide at a time
 
