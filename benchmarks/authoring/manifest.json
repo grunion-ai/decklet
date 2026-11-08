@@ -1,0 +1,13 @@
+{
+  "benchmark": "decklet-authoring",
+  "version": 1,
+  "cases": [
+    {"id": "pitch", "prompt": "prompts/pitch.md", "format": "slides", "density": "speaker", "slides": [8, 12], "entities": [], "counts": {"chart": 1}},
+    {"id": "qbr", "prompt": "prompts/qbr.md", "format": "slides", "density": "reading", "slides": [6, 10], "entities": [], "counts": {"chart": 1}},
+    {"id": "one-pager", "prompt": "prompts/one-pager.md", "format": "document-letter", "density": "reading", "slides": [1, 1], "entities": [], "counts": {"chart": 1}},
+    {"id": "carousel", "prompt": "prompts/carousel.md", "format": "carousel-4x5", "density": "speaker", "slides": [5, 8], "entities": [], "counts": {}},
+    {"id": "landscape", "prompt": "prompts/landscape.md", "format": "slides", "density": "speaker", "slides": [2, 4],
+      "entities": ["Northwind", "Bluefin", "Corvid", "Delta Loom", "Emberly", "Fathom", "Gridline", "Halcyon", "Ironleaf", "Juniper", "Kestrel", "Lumen"],
+      "counts": {"logo": 12}, "inputs": "inputs/landscape"}
+  ]
+}

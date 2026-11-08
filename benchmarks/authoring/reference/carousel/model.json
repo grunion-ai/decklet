@@ -1,0 +1,132 @@
+{
+  "format": "carousel-4x5",
+  "density": "speaker",
+  "title": "Three habits",
+  "slides": [
+    {
+      "els": [
+        {
+          "x": 90,
+          "y": 120,
+          "w": 900,
+          "role": "Title",
+          "text": "Three habits of fast teams"
+        },
+        {
+          "x": 90,
+          "y": 420,
+          "w": 900,
+          "role": "Body",
+          "text": "Swipe for the numbers behind each one."
+        },
+        {
+          "x": 340,
+          "y": 700,
+          "w": 400,
+          "donut": 100,
+          "color": "var(--accent)"
+        }
+      ]
+    },
+    {
+      "els": [
+        {
+          "x": 90,
+          "y": 120,
+          "w": 900,
+          "role": "Title",
+          "text": "Small changes"
+        },
+        {
+          "x": 90,
+          "y": 420,
+          "w": 900,
+          "role": "Body",
+          "text": "Teams that merge under 200 lines ship twice as often."
+        },
+        {
+          "x": 340,
+          "y": 700,
+          "w": 400,
+          "donut": 72,
+          "color": "var(--accent)"
+        }
+      ]
+    },
+    {
+      "els": [
+        {
+          "x": 90,
+          "y": 120,
+          "w": 900,
+          "role": "Title",
+          "text": "Fast review"
+        },
+        {
+          "x": 90,
+          "y": 420,
+          "w": 900,
+          "role": "Body",
+          "text": "A first review inside four hours halves cycle time."
+        },
+        {
+          "x": 340,
+          "y": 700,
+          "w": 400,
+          "donut": 58,
+          "color": "var(--accent)"
+        }
+      ]
+    },
+    {
+      "els": [
+        {
+          "x": 90,
+          "y": 120,
+          "w": 900,
+          "role": "Title",
+          "text": "Green main"
+        },
+        {
+          "x": 90,
+          "y": 420,
+          "w": 900,
+          "role": "Body",
+          "text": "A main branch that stays green saves a day a week."
+        },
+        {
+          "x": 340,
+          "y": 700,
+          "w": 400,
+          "donut": 81,
+          "color": "var(--accent)"
+        }
+      ]
+    },
+    {
+      "els": [
+        {
+          "x": 90,
+          "y": 120,
+          "w": 900,
+          "role": "Title",
+          "text": "Start with one"
+        },
+        {
+          "x": 90,
+          "y": 420,
+          "w": 900,
+          "role": "Body",
+          "text": "Pick the habit your team misses most and measure it for a month."
+        },
+        {
+          "x": 340,
+          "y": 700,
+          "w": 400,
+          "donut": 100,
+          "color": "var(--accent)"
+        }
+      ]
+    }
+  ]
+}

@@ -38,6 +38,7 @@ Node 22 or newer. Nothing else to install for the engine or the CLI.
 | HTML pages to model | `bin/import-html.mjs` |
 | Worked examples | `examples/<name>/brief.md` + `model.json` |
 | Layout library | `templates/` (then `npm run build:library`) |
+| A SKILL.md change, and its measured effect | `SKILL.md`, then a run of `benchmarks/authoring/` (its README has the protocol) |
 
 ## License
 

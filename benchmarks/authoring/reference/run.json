@@ -1,0 +1,13 @@
+{
+  "agent": "reference",
+  "model": "hand-built",
+  "evidence": false,
+  "note": "Wiring proof for benchmark.mjs: candidates built by hand and by bin/new.mjs. Never benchmark evidence.",
+  "cases": {
+    "pitch": {"minutes": 0, "repairs": 0},
+    "qbr": {"minutes": 0, "repairs": 0},
+    "one-pager": {"minutes": 0, "repairs": 1},
+    "carousel": {"minutes": 0, "repairs": 0},
+    "landscape": {"minutes": 0, "repairs": 0}
+  }
+}

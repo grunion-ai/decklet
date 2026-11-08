@@ -1,0 +1,178 @@
+{
+  "format": "slides",
+  "density": "speaker",
+  "title": "Workflow tools",
+  "entities": [
+    "Northwind",
+    "Bluefin",
+    "Corvid",
+    "Delta Loom",
+    "Emberly",
+    "Fathom",
+    "Gridline",
+    "Halcyon",
+    "Ironleaf",
+    "Juniper",
+    "Kestrel",
+    "Lumen"
+  ],
+  "assets": {
+    "l0": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiMyNTYzZWIiLz48Y2lyY2xlIGN4PSIzMiIgY3k9IjMyIiByPSIxMiIgZmlsbD0iI2ZmZiIvPjwvc3ZnPg==",
+    "l1": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiMxNmEzNGEiLz48Y2lyY2xlIGN4PSIzMiIgY3k9IjMyIiByPSIxNSIgZmlsbD0iI2ZmZiIvPjwvc3ZnPg==",
+    "l2": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiNkYjI3NzciLz48Y2lyY2xlIGN4PSIzMiIgY3k9IjMyIiByPSIxOCIgZmlsbD0iI2ZmZiIvPjwvc3ZnPg==",
+    "l3": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiNlYTU4MGMiLz48Y2lyY2xlIGN4PSIzMiIgY3k9IjMyIiByPSIyMSIgZmlsbD0iI2ZmZiIvPjwvc3ZnPg==",
+    "l4": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiM3YzNhZWQiLz48Y2lyY2xlIGN4PSIzMiIgY3k9IjMyIiByPSIxMiIgZmlsbD0iI2ZmZiIvPjwvc3ZnPg==",
+    "l5": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiMwODkxYjIiLz48Y2lyY2xlIGN4PSIzMiIgY3k9IjMyIiByPSIxNSIgZmlsbD0iI2ZmZiIvPjwvc3ZnPg==",
+    "l6": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiMyNTYzZWIiLz48Y2lyY2xlIGN4PSIzMiIgY3k9IjMyIiByPSIxOCIgZmlsbD0iI2ZmZiIvPjwvc3ZnPg==",
+    "l7": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiMxNmEzNGEiLz48Y2lyY2xlIGN4PSIzMiIgY3k9IjMyIiByPSIyMSIgZmlsbD0iI2ZmZiIvPjwvc3ZnPg==",
+    "l8": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiNkYjI3NzciLz48Y2lyY2xlIGN4PSIzMiIgY3k9IjMyIiByPSIxMiIgZmlsbD0iI2ZmZiIvPjwvc3ZnPg==",
+    "l9": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiNlYTU4MGMiLz48Y2lyY2xlIGN4PSIzMiIgY3k9IjMyIiByPSIxNSIgZmlsbD0iI2ZmZiIvPjwvc3ZnPg==",
+    "l10": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiM3YzNhZWQiLz48Y2lyY2xlIGN4PSIzMiIgY3k9IjMyIiByPSIxOCIgZmlsbD0iI2ZmZiIvPjwvc3ZnPg==",
+    "l11": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTIiIGZpbGw9IiMwODkxYjIiLz48Y2lyY2xlIGN4PSIzMiIgY3k9IjMyIiByPSIyMSIgZmlsbD0iI2ZmZiIvPjwvc3ZnPg=="
+  },
+  "slides": [
+    {
+      "textOnly": true,
+      "els": [
+        {
+          "x": 60,
+          "y": 200,
+          "w": 840,
+          "role": "Title",
+          "text": "Who builds workflow tools"
+        }
+      ]
+    },
+    {
+      "els": [
+        {
+          "x": 60,
+          "y": 60,
+          "w": 840,
+          "role": "H1",
+          "text": "Twelve vendors, three camps"
+        },
+        {
+          "logo": "#l0",
+          "name": "Northwind",
+          "x": 60,
+          "y": 150,
+          "h": 40,
+          "col": 40,
+          "plate": "none",
+          "aspect": 1
+        },
+        {
+          "logo": "#l1",
+          "name": "Bluefin",
+          "x": 350,
+          "y": 150,
+          "h": 40,
+          "col": 40,
+          "plate": "none",
+          "aspect": 1
+        },
+        {
+          "logo": "#l2",
+          "name": "Corvid",
+          "x": 640,
+          "y": 150,
+          "h": 40,
+          "col": 40,
+          "plate": "none",
+          "aspect": 1
+        },
+        {
+          "logo": "#l3",
+          "name": "Delta Loom",
+          "x": 60,
+          "y": 230,
+          "h": 40,
+          "col": 40,
+          "plate": "none",
+          "aspect": 1
+        },
+        {
+          "logo": "#l4",
+          "name": "Emberly",
+          "x": 350,
+          "y": 230,
+          "h": 40,
+          "col": 40,
+          "plate": "none",
+          "aspect": 1
+        },
+        {
+          "logo": "#l5",
+          "name": "Fathom",
+          "x": 640,
+          "y": 230,
+          "h": 40,
+          "col": 40,
+          "plate": "none",
+          "aspect": 1
+        },
+        {
+          "logo": "#l6",
+          "name": "Gridline",
+          "x": 60,
+          "y": 310,
+          "h": 40,
+          "col": 40,
+          "plate": "none",
+          "aspect": 1
+        },
+        {
+          "logo": "#l7",
+          "name": "Halcyon",
+          "x": 350,
+          "y": 310,
+          "h": 40,
+          "col": 40,
+          "plate": "none",
+          "aspect": 1
+        },
+        {
+          "logo": "#l8",
+          "name": "Ironleaf",
+          "x": 640,
+          "y": 310,
+          "h": 40,
+          "col": 40,
+          "plate": "none",
+          "aspect": 1
+        },
+        {
+          "logo": "#l9",
+          "name": "Juniper",
+          "x": 60,
+          "y": 390,
+          "h": 40,
+          "col": 40,
+          "plate": "none",
+          "aspect": 1
+        },
+        {
+          "logo": "#l10",
+          "name": "Kestrel",
+          "x": 350,
+          "y": 390,
+          "h": 40,
+          "col": 40,
+          "plate": "none",
+          "aspect": 1
+        },
+        {
+          "logo": "#l11",
+          "name": "Lumen",
+          "x": 640,
+          "y": 390,
+          "h": 40,
+          "col": 40,
+          "plate": "none",
+          "aspect": 1
+        }
+      ]
+    }
+  ]
+}
