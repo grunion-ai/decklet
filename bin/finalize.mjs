@@ -57,7 +57,7 @@ export async function finalize(modelFile, {style = null, out, format, space, tit
     stage('verify', async () => {
       const r = await verifyFn(out, {out: verifyOut, strict: true, webkit, log: () => {}});
       const noRender = (r.skipped || []).some(s => s.startsWith('layout parity'));
-      return {status: !r.ok ? 'fail' : noRender ? 'skipped' : 'pass', errors: r.errors, warnings: r.warnings, skipped: r.skipped};
+      return {status: !r.ok ? 'fail' : noRender ? 'skipped' : 'pass', errors: r.errors, warnings: r.warnings, diagnostics: r.diagnostics, skipped: r.skipped};
     }),
   ];
   for (const run of stages) if (!await run()) break;
