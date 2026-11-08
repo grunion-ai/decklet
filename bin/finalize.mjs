@@ -13,6 +13,7 @@ import {validateModel, validate} from './validate.mjs';
 import {create, writeDeck} from './create.mjs';
 import {verify} from './verify.mjs';
 import {loadChecker} from '../lib/spell.mjs';
+import {updateCheck} from '../lib/release.mjs';
 import {isMain} from '../lib/is-main.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -31,9 +32,10 @@ export function checkReceipt(deckFile) {
   return {ok: true, receipt, actual, message: `receipt matches ${actual.slice(0, 12)}…`};
 }
 
-export async function finalize(modelFile, {style = null, out, format, space, title, from = null, verifyOut = null, webkit = 'auto', verifyFn = verify, log = console.log} = {}) {
+export async function finalize(modelFile, {style = null, out, format, space, title, from = null, verifyOut = null, webkit = 'auto', verifyFn = verify, update = null, log = console.log} = {}) {
   const model = JSON.parse(fs.readFileSync(modelFile, 'utf8'));
   const styleObj = style ? JSON.parse(fs.readFileSync(style, 'utf8')) : null;
+  const checking = update ? updateCheck({installed: engine(), ...update}) : null;
   const receipt = {engine: engine(), model: ident(modelFile), style: style ? ident(style) : null, deck: null, stages: [], ok: false};
   const stage = (name, run) => async () => {
     const t = Date.now(), r = await run();
@@ -63,6 +65,7 @@ export async function finalize(modelFile, {style = null, out, format, space, tit
   for (const run of stages) if (!await run()) break;
   for (const name of ['validate', 'create', 'verify'].slice(receipt.stages.length)) receipt.stages.push({stage: name, status: 'not-run', errors: [], warnings: [], ms: 0});
   receipt.ok = receipt.stages.every(s => s.status === 'pass');
+  if (checking) { const u = await checking; if (u) receipt.update = u; }
   fs.writeFileSync(receiptPath(out), JSON.stringify(receipt, null, 1));
   return receipt;
 }
@@ -77,7 +80,7 @@ if (isMain(import.meta.url)) {
   }
   for (let k = 0; k < a.length; k++) if (a[k].startsWith('--')) o[a[k].slice(2)] = a[k + 1] && !a[k + 1].startsWith('--') ? a[++k] : true; else file = a[k];
   if (!file || !o.out) { console.error('usage: node bin/finalize.mjs model.json [--style style.json] --out deck.html [--format …] [--space WxH] [--title …] [--from prev.html] [--verify-out dir] [--webkit | --no-webkit]'); process.exit(2); }
-  const r = await finalize(file, {style: o.style || null, out: o.out, format: o.format, space: o.space, title: o.title, from: o.from || null, verifyOut: o['verify-out'] || null, webkit: o['no-webkit'] ? false : o.webkit ? true : 'auto'});
+  const r = await finalize(file, {style: o.style || null, out: o.out, format: o.format, space: o.space, title: o.title, from: o.from || null, verifyOut: o['verify-out'] || null, webkit: o['no-webkit'] ? false : o.webkit ? true : 'auto', update: {}});
   const mark = {pass: '✓', fail: '✗', skipped: '–', 'not-run': ' '};
   for (const s of r.stages) {
     console.log(`${mark[s.status]} ${s.stage.padEnd(9)} ${s.status}${s.status === 'not-run' ? '' : ` · ${s.errors.length} errors · ${s.warnings.length} warnings · ${s.ms} ms`}`);
@@ -85,6 +88,7 @@ if (isMain(import.meta.url)) {
     for (const m of s.warnings) console.log('  warning ' + m);
     for (const m of s.skipped || []) console.log('  skipped ' + m);
   }
+  if (r.update?.noticeRequired) console.log(`update  decklet ${r.update.available} is out (installed ${r.update.installed}): mention it once, never install`);
   console.log(`receipt ${receiptPath(o.out)}`);
   console.log(r.ok ? 'FINALIZE PASS' : 'FINALIZE FAIL');
   process.exit(r.ok ? 0 : 1);

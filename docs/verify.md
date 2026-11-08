@@ -25,6 +25,7 @@
 | `deck` | path and sha256 of the written deck, `null` when `create` did not run |
 | `stages` | `validate`, `create`, `verify`, each `{status, errors, warnings, ms}`; status is `pass`, `fail`, `skipped` or `not-run` |
 | `ok` | true only when all three passed |
+| `update` | the CLI only: `{installed, available, noticeRequired, source}`, `available` read from `package.json` on main once a day (`source` is `network`, `cache` or `unavailable`); `DECKLET_NO_UPDATE_CHECK=1` turns it off, and it never changes `ok` |
 
 A verify that cannot render (Playwright absent) is `skipped`, and `ok` stays false: a gate that did not run is not a pass. The deck stays on disk when only `verify` fails, so its PNGs can be read.
 
