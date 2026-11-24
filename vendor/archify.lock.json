@@ -1,7 +1,7 @@
 {
   "repo": "tt-a1i/archify",
-  "tag": "v3.2.0",
-  "commit": "208acba8d412335185b2056fedf54b3405df43fb",
-  "zipSha256": "70e210265c59f24dcbdf2a502ff671104b5454e7ee7d3554aecd86bad32384f5",
-  "treeSha256": "1841d23861077b47a4243c889d16b39636e52b61de75166dcaf1ff1e52973d26"
+  "tag": "v3.3.0",
+  "commit": "af3aaf3c36762f2afb62a4a09533f6c7273b07e5",
+  "zipSha256": "00e4ff53267aee7dabf22ed333360cd3e380db20271a50264ae146ee25cf2538",
+  "treeSha256": "cc8ff24014281652de150084abeafebad8e174b31dd7cbf8b15345d6f9421f78"
 }
