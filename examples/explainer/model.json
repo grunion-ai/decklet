@@ -140,7 +140,7 @@
       {"x":520,"y":240,"w":380,"role":"Caption","box":1,"text":"slides[5].els[1]\n{slot:'title', text:'Layout slots…'}","id":"slotuse"},
       {"from":"slotuse","to":"slotdef","style":"arrow","gap":10,"h":2.5,"bg":"var(--accent)"},
       {"x":60,"y":330,"w":840,"role":"Body","text":"Move a slotted row and the slide keeps a local override. The toolbar's “Apply to layout” promotes that geometry to the slot, and every sibling slide follows. Deck-scope slots (deck.slots) sit under every layout and give per-slide text, such as the supertitle, one position across the deck."},
-      {"x":60,"y":420,"w":840,"role":"Caption","text":"Thirty-five named layouts ship in the library, in nine groups from openers to closers. node bin/validate.mjs --layouts prints every slot box."}
+      {"x":60,"y":420,"w":840,"role":"Caption","text":"Fifty-four named layouts ship in the library, in nine groups from openers to closers. node bin/validate.mjs --layouts prints every slot box."}
     ]},
     {"name":"master","textOnly":true,"layout":"content", "els": [
       {"slot":"supertitle","text":"MASTER LAYER","anim":"fade"},
