@@ -17,10 +17,58 @@ let pw = null; try { pw = await import('playwright'); } catch {}
 const live = pw ? test : test.skip;
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'decklet-lib-'));
 
-export const NAMES = ['cover', 'agenda', 'section', 'cover-agenda-rail', 'cover-contents-column', 'cover-agenda-strip', 'content', 'title', 'statement', 'fact', 'quote', 'two-cols', 'two-cols-header', 'bullets', 'image-left', 'image-right',
+export const NAMES = ['cover', 'agenda', 'section', 'cover-agenda-rail', 'cover-contents-column', 'cover-agenda-strip',
+  'cover-front-page', 'cover-contents-page', 'cover-decision', 'cover-title-block', 'cover-presenter-panel', 'cover-margin-notes', 'cover-purpose-ask-footer', 'cover-description-column',
+  'cover-description-headline', 'cover-fact-ledger', 'cover-description-card', 'cover-ask-sticker', 'cover-three-bands', 'cover-section-rows', 'cover-two-anchors', 'cover-framed',
+  'content', 'title', 'statement', 'fact', 'quote', 'two-cols', 'two-cols-header', 'bullets', 'memo', 'letter', 'brief-sheet', 'image-left', 'image-right',
   'bento-grid', 'image-hero-overlay', 'image-split', 'annotated-shot', 'three-up-cards', 'dashboard-composite', 'table-insight', 'proof-strip', 'team-grid',
   'kpi-grid', 'kpi-grid-4', 'stat', 'chart', 'comparison', 'process-steps', 'diagram', 'timeline', 'cta', 'end'];
 const COVERS = ['cover-agenda-rail', 'cover-contents-column', 'cover-agenda-strip'];
+const run = (n, mk) => Array.from({length: n}, (_, i) => mk(i + 1)).flat();
+const FULL = {x: 0, y: 0, w: 960, h: 540};
+export const BATCH2 = {
+  'cover-front-page': {group: 'openers', density: 'reading', links: true, panels: {rule: {x: 60, y: 72, w: 840, h: 3, bg: 'var(--fg)'}},
+    slots: ['rule', ...run(5, k => `rule${k}`), 'masthead', 'meta', 'title', 'description', ...run(5, k => [`section${k}`, `page${k}`])]},
+  'cover-contents-page': {group: 'openers', density: 'reading', links: true, panels: {panel: {x: 0, y: 0, w: 403, h: 540, bg: 'var(--box)'}},
+    slots: ['panel', ...run(5, k => `rule${k}`), 'supertitle', 'title', 'tagline', 'caption', 'contents-label', ...run(5, k => [`section${k}`, `page${k}`])]},
+  'cover-decision': {group: 'openers', density: 'speaker', panels: {ground: {...FULL, bg: 'var(--fg)'}},
+    slots: ['ground', 'title', 'meta', 'decision-label', 'decision', 'item1', 'item2', 'item3', 'item4']},
+  'cover-title-block': {group: 'openers', density: 'speaker', panels: {frame: {x: 48, y: 36, w: 864, h: 468, bd: '1px solid var(--fg)'}, block: {x: 504, y: 372, w: 408, h: 132, bg: 'var(--card)', bd: '1px solid var(--fg)'}},
+    slots: ['frame', 'block', ...run(5, k => `block-rule${k}`), 'supertitle', 'title', ...run(6, k => [`fact${k}-label`, `fact${k}`])]},
+  'cover-presenter-panel': {group: 'openers', density: 'reading', panels: {panel: {x: 614, y: 0, w: 346, h: 540, bg: 'var(--fg)'}},
+    slots: ['panel', 'avatar', 'supertitle', 'title', 'purpose', 'avatar-label', 'presenter', 'presenter-label', 'fact1-label', 'fact1', 'fact2-label', 'fact2', 'ask-label', 'ask']},
+  'cover-margin-notes': {group: 'openers', density: 'reading', panels: {},
+    slots: [...run(4, k => `note${k}-rule`), 'supertitle', 'title', ...run(4, k => [`note${k}-label`, `note${k}`])]},
+  'cover-purpose-ask-footer': {group: 'openers', density: 'reading', panels: {'purpose-panel': {x: 0, y: 410, w: 480, h: 130, bg: 'var(--box)'}, 'ask-panel': {x: 480, y: 410, w: 480, h: 130, bg: 'var(--fg)'}},
+    slots: ['purpose-panel', 'ask-panel', 'supertitle', 'title', 'description', 'purpose-label', 'purpose', 'ask-label', 'ask']},
+  'cover-description-column': {group: 'openers', density: 'reading', panels: {column: {x: 499, y: 0, w: 461, h: 540, bg: 'var(--box)'}},
+    slots: ['column', 'column-rule', 'supertitle', 'title', 'tagline', 'caption', 'about-label', 'description', 'purpose-label', 'purpose', 'ask-label', 'ask']},
+  'cover-description-headline': {group: 'openers', density: 'reading', panels: {rule: {x: 60, y: 404, w: 840, h: 2, bg: 'var(--fg)'}},
+    slots: ['rule', 'title', 'meta', 'description', ...run(4, k => [`fact${k}-label`, `fact${k}`])]},
+  'cover-fact-ledger': {group: 'openers', density: 'reading', panels: {rule: {x: 60, y: 404, w: 840, h: 1, bg: 'var(--fg)'}},
+    slots: ['rule', 'supertitle', 'description', 'title', 'tagline', ...run(4, k => [`fact${k}-label`, `fact${k}`])]},
+  'cover-description-card': {group: 'openers', density: 'reading', panels: {ground: {...FULL, bg: 'var(--box)'}, card: {x: 573, y: 110, w: 346, h: 320, bg: 'var(--card)', radius: 8}},
+    slots: ['ground', 'card', 'card-rule', 'supertitle', 'title', 'tagline', 'purpose', 'about-label', 'description', 'ask-label', 'ask']},
+  'cover-ask-sticker': {group: 'openers', density: 'reading', panels: {ground: {...FULL, bg: 'var(--accent)'}, sticker: {x: 716, y: 38, w: 180, h: 180, radius: 90, bg: 'var(--card)'}},
+    slots: ['ground', 'sticker', 'supertitle', 'title', 'tagline', 'description', 'ask-label', 'ask']},
+  'cover-three-bands': {group: 'openers', density: 'reading', links: true, panels: {band: {x: 0, y: 0, w: 960, h: 266, bg: 'var(--fg)'}, strip: {x: 0, y: 443, w: 960, h: 97, bg: 'var(--box)'}},
+    slots: ['band', 'strip', 'supertitle', 'title', 'description', ...run(5, k => `section${k}`), 'meta']},
+  'cover-section-rows': {group: 'openers', density: 'reading', links: true, panels: Object.fromEntries(run(5, k => [[`row${k}`, {x: 403, y: (k - 1) * 108, w: 557, h: 108, bg: k % 2 ? 'var(--box)' : 'var(--card)'}]])),
+    slots: [...run(5, k => `row${k}`), 'supertitle', 'title', 'tagline', 'caption', ...run(5, k => [`section${k}`, `page${k}`])]},
+  'cover-two-anchors': {group: 'openers', density: 'reading', panels: {},
+    slots: ['supertitle', 'meta', 'title', 'description', 'ask-label', 'ask']},
+  'cover-framed': {group: 'openers', density: 'speaker', panels: {ground: {...FULL, bg: 'var(--box)'}, frame: {x: 22, y: 22, w: 916, h: 484, radius: 14, bg: 'var(--card)'}},
+    slots: ['ground', 'frame', 'supertitle', 'meta', 'title', 'tagline', 'caption', 'ask']},
+  memo: {group: 'text', density: 'reading', links: true, panels: {rule: {x: 60, y: 222, w: 840, h: 2, bg: 'var(--fg)'}},
+    slots: ['rule', ...run(4, k => `field${k}-rule`), 'title', 'meta', ...run(4, k => [`field${k}-label`, `field${k}`]), 'body', 'ask', 'contents-label', ...run(5, k => [`section${k}`, `page${k}`])]},
+  letter: {group: 'text', density: 'reading', links: true, panels: {column: {x: 672, y: 0, w: 288, h: 540, bg: 'var(--box)'}},
+    slots: ['column', 'supertitle', 'greeting', 'body', 'name', 'caption', 'contents-label', ...run(5, k => [`n${k}`, `section${k}`])]},
+  'brief-sheet': {group: 'text', density: 'reading', links: true, panels: {grid: {x: 40, y: 30, w: 880, h: 480, bd: '1px solid var(--fg)'}},
+    slots: ['grid', ...run(4, k => `grid-rule${k}`), 'title-label', 'title', 'tagline', 'about-label', 'description', 'purpose-label', 'purpose', 'fact1-label', 'fact1', 'ask-label', 'ask', 'fact2-label', 'fact2', 'contents-label', ...run(5, k => [`page${k}`, `section${k}`])]},
+};
+const WORDY = [...COVERS, ...Object.keys(BATCH2)];
+const SHORT = [[/^(description|body)$/, 'Two sentences that say what the deck is about. Enough to wrap once.'], [/^time\d$/, '5 min'], [/^(item|section|note|field)\d$/, 'Pilot scope'], [/^fact\d$/, 'Pilot'], [/^(n|page)\d$/, '4'],
+  [/^(ask|decision)$/, 'Approve a pilot'], [/^(purpose|caption|tagline|masthead|presenter|name|greeting)$/, 'One short line'], [/^meta$/, '5-minute read'], [/^avatar-label$/, 'AB'], [/label$/, 'Label'], [/^(title)$/, 'Deck title']];
 const IMG = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 3"><rect width="4" height="3" fill="#5B9CF6"/></svg>');
 // one slide per library layout, every slot bound with plausible content
 export const fill = (name, k = 0) => {
@@ -33,10 +81,10 @@ export const fill = (name, k = 0) => {
     if (!sl.role) return {slot};                              // paint slots (rule, dots, button): the slot carries the paint
     const text = {Title: 'Two lines of display headline', Supertitle: 'Kicker', H1: 'A content-slide title', H2: 'A second-level heading',
       Body: 'Body copy, two short sentences at most. Enough to wrap once.', Caption: 'Source · caption text', Label: 'Label', Stat: '63%', Stat2: '$1.2M'}[sl.role];
-    const short = COVERS.includes(name) && (/^(item|section)\d$/.test(slot) ? 'Pilot scope' : /^time\d$/.test(slot) ? '5 min' : /^page\d$/.test(slot) ? 'Slide 4' : null);
+    const short = WORDY.includes(name) && (SHORT.find(([re]) => re.test(slot)) || [])[1];
     return {slot, text: short || (/^(n\d|t\d)$/.test(slot) ? '0' + (slot.slice(1)) : /delta/.test(slot) ? '↑ 8 pts' : /label/.test(slot) ? 'Renewals' : /value/.test(slot) ? '$86K' : text)};
   });
-  return {name: `${name}-${k}`, layout: name, els, ...(name === 'image-hero-overlay' || COVERS.includes(name) ? {hide: ['foot']} : {})};
+  return {name: `${name}-${k}`, layout: name, els, ...(name === 'image-hero-overlay' || WORDY.includes(name) ? {hide: ['foot']} : {})};
 };
 export const everyLayout = (w = 960, h = 540) => ({w, h, title: 'library', styles: {margin: 60}, master: [{id: 'foot', footer: 1, x: 60, y: 500, w: 300, role: 'Label', text: 'library'}],
   slides: NAMES.map((n, k) => ({...fill(n, k), textOnly: true}))});   // the catalogue shows each layout's words; coverage is judged in coverage.test
@@ -88,7 +136,7 @@ test('library: the three agenda covers are openers at reading density, a Title-r
     assert.ok(keys.slice(firstText).every(k => lay.slots[k].role), name + ': paint slots come first, so a fill in slot order never paints over text');
     assert.ok(!keys.some(k => k in DENSE), name + ': no dense chrome on a cover');
   }
-  assert.deepEqual(Object.keys(LIBRARY).filter(n => LIBRARY[n].group === 'openers'), ['cover', 'agenda', 'section', ...COVERS]);
+  assert.deepEqual(Object.keys(LIBRARY).filter(n => LIBRARY[n].group === 'openers'), ['cover', 'agenda', 'section', ...COVERS, ...Object.keys(BATCH2).filter(n => BATCH2[n].group === 'openers')]);
 });
 
 test('library: cover-agenda-rail — a rail over the left 34% with five numbered, timed items; the title block in the right 66%', () => {
@@ -178,6 +226,65 @@ test('library: cover-contents-column sections link into the deck — a bound sec
   assert.match(LIBRARY['cover-contents-column'].use, /link/, 'the use line says the sections link');
   const bad = validate(create(agendaCover('cover-contents-column', rows(false))).deck);
   assert.equal(bad.errors.filter(m => /names no slide/.test(m)).length, 3, bad.errors.join(' | '));
+});
+
+test('library: the nineteen reviewed layouts — group, density, slot names in order, panel boxes, every slot inside the canvas', () => {
+  assert.equal(Object.keys(BATCH2).length, 19);
+  for (const [name, want] of Object.entries(BATCH2)) {
+    const lay = LIBRARY[name];
+    assert.ok(lay, name + ' is in the library');
+    assert.equal(lay.group, want.group, name + ' group'); assert.equal(lay.density, want.density, name + ' density');
+    assert.deepEqual(Object.keys(lay.slots), want.slots, name + ' slots');
+    for (const [slot, box] of Object.entries(want.panels)) assert.deepEqual(lay.slots[slot], box, `${name}.${slot}`);
+    assert.match(lay.use, /hide the footer/, name + ': the layout fills the slide, so the use line says to hide the footer');
+    if (want.links) assert.match(lay.use, /link/, name + ': the use line says the sections link');
+    const keys = Object.keys(lay.slots), firstText = keys.findIndex(k => lay.slots[k].role);
+    assert.ok(keys.slice(firstText).every(k => lay.slots[k].role), name + ': paint slots come first');
+    for (const [slot, sl] of Object.entries(lay.slots)) {
+      assert.ok(inside(boxOf(sl), FULL), `${name}.${slot} inside the 960×540 cut`);
+      if (sl.role && (sl.align === 'right' || sl.x + sl.w > 820)) assert.ok(sl.y + (sl.h ?? NEUTRAL_LH[sl.role]) <= 514 || sl.x + sl.w <= 820, `${name}.${slot} ends above the counter pin a hidden footer leaves in the corner`);
+    }
+    assert.ok(!keys.some(k => k in DENSE), name + ': no dense chrome');
+  }
+});
+
+test('library: the nineteen reviewed layouts stay inside their density — a fully bound slide carries no more points than the budget', () => {
+  for (const name of Object.keys(BATCH2)) {
+    const s = fill(name), d = LIBRARY[name].density;
+    assert.equal(densityReport({...s, els: s.els.map(r => r.text ? {...r, text: 'word'} : r)}, LIBRARY, d), null, `${name} at ${d}`);
+  }
+});
+
+test('library: each reviewed layout is a words slide by kind and validates with no error and no warning, fully bound', () => {
+  for (const name of Object.keys(BATCH2)) {
+    const {textOnly, hide, ...slide} = fill(name);
+    const v = validate(create({w: 960, h: 540, title: 'batch', slides: [slide]}).deck);
+    assert.deepEqual(v.errors, [], name + ': ' + v.errors.join(' | ')); assert.deepEqual(v.warnings, [], name + ': ' + v.warnings.join(' | '));
+  }
+});
+
+test('library: a panel that holds text is an error when the text is bound without it', () => {
+  for (const [name, want] of Object.entries(BATCH2)) {
+    const holders = Object.keys(want.panels).filter(k => !/rule/.test(k));
+    if (!holders.length) continue;
+    const {hide, ...s} = fill(name);
+    const v = validate(create({w: 960, h: 540, title: 'loose', slides: [{...s, els: s.els.filter(r => !holders.includes(r.slot))}]}).deck);
+    for (const h of holders) assert.ok(v.errors.some(m => m.includes(`not the paint slot "${h}"`)), `${name}.${h}: ${v.errors.join(' | ')}`);
+  }
+});
+
+test('library: section entries link into the deck on every reviewed layout that lists sections', () => {
+  const linked = Object.keys(BATCH2).filter(n => BATCH2[n].links);
+  assert.deepEqual(linked, ['cover-front-page', 'cover-contents-page', 'cover-three-bands', 'cover-section-rows', 'memo', 'letter', 'brief-sheet']);
+  for (const name of linked) {
+    const deck = to => ({w: 960, h: 540, title: 'links', slides: [{...fill(name), hide: undefined, els: fill(name).els.map(r => /^(section|page)\d$/.test(r.slot) ? {...r, href: to(+r.slot.slice(-1))} : r)},
+      ...[2, 3, 4, 5, 6].map(n => ({id: `s${n}`, layout: 'statement', els: [{slot: 'title', text: `Part ${n}`}]}))]});
+    const good = create(deck(k => `#s${k + 1}`)).deck, v = validate(good);
+    assert.deepEqual(v.errors, [], name + ': ' + v.errors.join(' | ')); assert.deepEqual(v.warnings, [], name + ': ' + v.warnings.join(' | '));
+    assert.deepEqual(good.slides[0].els.filter(r => /^section\d$/.test(r.slot || '')).map(r => r.href), ['#s2', '#s3', '#s4', '#s5', '#s6'], name + ': the href stays on the row');
+    const bad = validate(create(deck(k => `#s${k + 20}`)).deck);
+    assert.ok(bad.errors.filter(m => /names no slide/.test(m)).length >= 5, name + ': ' + bad.errors.join(' | '));
+  }
 });
 
 // ── U5.1 / U5.2: the missing starting rungs — a plain bullet page, and points beside an image

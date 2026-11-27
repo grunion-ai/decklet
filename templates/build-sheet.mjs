@@ -28,11 +28,11 @@ const stem = density ? `library-${density}` : 'candidates';
 // ── the kinds, in deck order, and which template / layout ids belong to each
 export const KINDS = [
   { id: 'title', name: 'Title & section', note: 'Covers, dividers and the bare title chrome.',
-    templates: ['cover-hero', 'cover-split', 'section-numeral'], layouts: ['cover', 'cover-agenda-rail', 'cover-contents-column', 'cover-agenda-strip', 'title', 'section', 'content'] },
+    templates: ['cover-hero', 'cover-split', 'section-numeral'], layouts: ['cover', 'cover-agenda-rail', 'cover-contents-column', 'cover-agenda-strip', 'cover-front-page', 'cover-contents-page', 'cover-decision', 'cover-title-block', 'cover-presenter-panel', 'cover-margin-notes', 'cover-purpose-ask-footer', 'cover-description-column', 'cover-description-headline', 'cover-fact-ledger', 'cover-description-card', 'cover-ask-sticker', 'cover-three-bands', 'cover-section-rows', 'cover-two-anchors', 'cover-framed', 'title', 'section', 'content'] },
   { id: 'agenda', name: 'Agenda', note: 'What the deck covers.', templates: ['agenda-ruled'], layouts: ['agenda'] },
   { id: 'concept', name: 'Concept', note: 'Claims, comparisons, frameworks, cards: the slide that carries an argument.',
     templates: ['bullet-page', 'exec-summary', 'statement', 'three-up-cards', 'bento-grid', 'two-col-compare', 'pros-cons', 'benchmark-table', 'harvey-balls', 'scorecard-grid', 'two-by-two', 'swot', 'temple', 'venn-3', 'pyramid-layers', 'value-chain', 'table-panel', 'table-insight', 'proof-strip', 'team-grid', 'quad-growth-share', 'quad-effort-impact', 'quad-risk-heat', 'quad-stakeholder', 'quad-movement', 'quad-where-we-play', 'quad-conceptual', 'quad-nine-box', 'quad-with-panel'],
-    layouts: ['bullets', 'statement', 'two-cols', 'two-cols-header', 'comparison'] },
+    layouts: ['bullets', 'statement', 'two-cols', 'two-cols-header', 'comparison', 'memo', 'letter', 'brief-sheet'] },
   { id: 'chrome', name: 'Chrome', note: 'Where the header, the footer and the page counter sit.',
     templates: ['chrome-foot-band', 'chrome-hairline-foot', 'chrome-header-kicker', 'chrome-side-rail', 'chrome-tabs', 'chrome-dots', 'chrome-brand-bar', 'chrome-none'], layouts: [] },
   { id: 'mark', name: 'Logo & icons', note: 'Where a mark goes, and where an icon earns its place. Every mark here is a stand-in.',
@@ -128,6 +128,15 @@ const TEXT = {
 const ITEMS = ['Where we are', 'What shipped', 'What it cost', 'What is next', 'Questions'];
 const STEPS = ['Kickoff', 'Discover', 'Design', 'Hand over'];
 const MINUTES = [5, 8, 7, 5, 5];
+const PANEL_FOOT = ['cover-agenda-rail', 'cover-contents-column', 'cover-agenda-strip', 'cover-front-page', 'cover-contents-page', 'cover-decision', 'cover-title-block', 'cover-presenter-panel', 'cover-margin-notes', 'cover-purpose-ask-footer', 'cover-description-column', 'cover-description-headline', 'cover-fact-ledger', 'cover-description-card', 'cover-ask-sticker', 'cover-three-bands', 'cover-section-rows', 'cover-two-anchors', 'cover-framed', 'memo', 'letter', 'brief-sheet'];
+const REVIEWED = { supertitle: 'Close review', title: 'Tallyline close review', tagline: 'The month-end close in four days', description: 'Tallyline matches every payment on the day it arrives, so the month-end close starts with a clean ledger.',
+  purpose: 'Decide whether to roll out to both subsidiaries.', ask: 'Approve the rollout', decision: 'Approve the rollout to both subsidiaries', 'decision-label': 'Decision asked today', meta: '30 minutes', masthead: 'Tallyline',
+  greeting: 'Before we meet,', name: 'The finance systems team', presenter: 'R. Vance', 'presenter-label': 'Presenter', 'avatar-label': 'RV', caption: 'For the finance leads',
+  'contents-label': 'Contents', 'about-label': 'About', 'purpose-label': 'Purpose', 'ask-label': 'Asking for', 'title-label': 'Subject' };
+const FACTS = [['Purpose', 'Decide on the rollout'], ['Decision asked', 'Approve the rollout'], ['Length', '30 min'], ['Presenter', 'R. Vance'], ['Audience', 'Finance leads'], ['Sheet', '1 of 11']];
+const NOTES = [['Purpose', 'Decide on the rollout.'], ['Decision asked', 'Approve both subsidiaries.'], ['Length', '30 minutes, five sections'], ['Presenter', 'R. Vance']];
+const FIELDS = [['To', 'Finance leads'], ['From', 'The finance systems team'], ['Re', 'Tallyline close review'], ['Purpose', 'Decide on the rollout']];
+const PAIRED = { fact: FACTS, note: NOTES, field: FIELDS };
 const PAGES = [2, 4, 7, 9, 11];
 const EVENTS = ['Code freeze', 'Beta out', 'Review passed', 'In the store'];
 const DATES = ['Mar', 'May', 'Jun', 'Jul'];
@@ -154,7 +163,9 @@ const fill = (name) => {
     if ((m = /^item(\d)$/.exec(slot))) return { slot, text: ITEMS[m[1] - 1] };
     if ((m = /^section(\d)$/.exec(slot))) return { slot, text: ITEMS[m[1] - 1] };
     if ((m = /^time(\d)$/.exec(slot))) return { slot, text: `${MINUTES[m[1] - 1]} min` };
-    if ((m = /^page(\d)$/.exec(slot))) return { slot, text: `Slide ${PAGES[m[1] - 1]}` };
+    if ((m = /^page(\d)$/.exec(slot))) return { slot, text: sl.w < 60 ? String(PAGES[m[1] - 1]) : `Slide ${PAGES[m[1] - 1]}` };
+    if ((m = /^(fact|note|field)(\d)(-label)?$/.exec(slot))) return { slot, text: PAIRED[m[1]][m[2] - 1][m[3] ? 0 : 1] };
+    if (REVIEWED[slot] && TEXT[`${name}.${slot}`] == null && PANEL_FOOT.includes(name)) return { slot, text: REVIEWED[slot] };
     if ((m = /^step(\d)$/.exec(slot))) return { slot, text: STEPS[m[1] - 1] };
     if ((m = /^t(\d)$/.exec(slot))) return { slot, text: DATES[m[1] - 1] };
     if ((m = /^e(\d)$/.exec(slot))) return { slot, text: EVENTS[m[1] - 1] };
@@ -235,7 +246,6 @@ const marked = t => Object.fromEntries(t.media.map((_, i) => ['m' + (i + 1), MAR
 const tslide = (t) => ({ name: t.id, layout: t.layout || undefined, hide: FULL_BLEED.includes(t.id) ? ['foot'] : undefined, textOnly: t.textOnly,
   ...(MARKS[t.id] ? { template: t.id, layout: undefined, fill: marked(t) } : {}),
   els: [...(MARKS[t.id] ? [] : scale(bind(t), 1)), ...(FULL_BLEED.includes(t.id) ? [] : [foot('template', t.id, t)])] });
-const PANEL_FOOT = ['cover-agenda-rail', 'cover-contents-column', 'cover-agenda-strip'];
 const footless = (n) => FULL_BLEED.includes(n) || PANEL_FOOT.includes(n);
 const lslide = (n) => ({ name: `layout-${n}`, layout: n, textOnly: WORDS.includes(n) || undefined, hide: footless(n) ? ['foot'] : undefined, els: [...fill(n), ...(footless(n) ? [] : [foot('layout', n)])] });
 const index = [];

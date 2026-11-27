@@ -12,7 +12,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = f => fs.readFileSync(path.join(root, f), 'utf8');
 const words = f => read(f).split(/\s+/).filter(Boolean).length;
 
-const BUDGET = 7140;
+const BUDGET = 7380;
 
 test('skill: SKILL.md stays inside the authoring budget', () => {
   const n = words('SKILL.md');

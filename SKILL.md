@@ -253,12 +253,12 @@ Resolution order for any row: slot geometry ← master row (for `override` rows)
 
 ## LAYOUT LIBRARY
 
-Thirty-five named layouts ship with the engine (`lib/layouts.mjs`), in the same shape as a `layouts` entry. Name one on a slide the deck does not define and `create` merges it into `deck.layouts`, scaled from its 960×540 cut to the canvas (1600×900 = ×1.67). `node bin/validate.mjs --layouts` prints it: name, group, density, use and every slot's box (`x y w h`).
+Fifty-four named layouts ship with the engine (`lib/layouts.mjs`), in the same shape as a `layouts` entry. Name one on a slide the deck does not define and `create` merges it into `deck.layouts`, scaled from its 960×540 cut to the canvas (1600×900 = ×1.67). `node bin/validate.mjs --layouts` prints it: name, group, density, use and every slot's box (`x y w h`).
 Read that instead of inventing geometry: each layout prints a `free:` band where a free row goes. A slide may mix library slots with free rows, a deck-defined layout of the same name wins, and a slotted row still takes its own x/y/w/h.
 
-- **openers** — `cover` · `agenda` · `section` · `cover-agenda-rail` · `cover-contents-column` · `cover-agenda-strip`
+- **openers** — `cover` · `agenda` · `section` · `cover-agenda-rail` · `cover-contents-column` · `cover-agenda-strip` · `cover-front-page` · `cover-contents-page` · `cover-decision` · `cover-title-block` · `cover-presenter-panel` · `cover-margin-notes` · `cover-purpose-ask-footer` · `cover-description-column` · `cover-description-headline` · `cover-fact-ledger` · `cover-description-card` · `cover-ask-sticker` · `cover-three-bands` · `cover-section-rows` · `cover-two-anchors` · `cover-framed`
 - **chrome** — `content` · `title`
-- **text** — `statement` · `fact` · `quote` · `two-cols` · `two-cols-header` · `bullets`
+- **text** — `statement` · `fact` · `quote` · `two-cols` · `two-cols-header` · `bullets` · `memo` · `letter` · `brief-sheet`
 - **visuals** — `image-left` · `image-right`
 - **modern** — `bento-grid` · `image-hero-overlay` · `image-split` · `annotated-shot` · `three-up-cards` · `dashboard-composite` · `table-insight` · `proof-strip` · `team-grid`
 - **numbers** — `kpi-grid` · `kpi-grid-4` · `stat` · `chart` · `comparison`
@@ -278,6 +278,25 @@ Picking a layout by what the content is:
 | the cover with a timed agenda rail | `cover-agenda-rail` |
 | the cover with a column of linked sections | `cover-contents-column` |
 | the cover over a strip of agenda columns | `cover-agenda-strip` |
+| the cover as a newspaper front page | `cover-front-page` |
+| the cover as a linked contents page | `cover-contents-page` |
+| the cover led by the decision asked | `cover-decision` |
+| the cover with a drawing title block of facts | `cover-title-block` |
+| the cover with a presenter panel | `cover-presenter-panel` |
+| the cover with margin notes | `cover-margin-notes` |
+| the cover with purpose and ask in the footer | `cover-purpose-ask-footer` |
+| the cover with a description column | `cover-description-column` |
+| the cover with the description as headline | `cover-description-headline` |
+| the cover with a ledger row of facts | `cover-fact-ledger` |
+| the cover with a description card | `cover-description-card` |
+| the cover with the ask on a sticker | `cover-ask-sticker` |
+| the cover in three bands | `cover-three-bands` |
+| the cover with two-tone section rows | `cover-section-rows` |
+| the cover with two corner anchors | `cover-two-anchors` |
+| the cover in a rounded frame | `cover-framed` |
+| a memo with header fields | `memo` |
+| a cover letter with a greeting | `letter` |
+| a brief sheet of ruled cells | `brief-sheet` |
 | one claim | `statement`; with a number in it → `fact`; the number alone → `stat` |
 | someone's words | `quote` |
 | two bodies of text, a lede over two columns | `two-cols`, `two-cols-header` |
