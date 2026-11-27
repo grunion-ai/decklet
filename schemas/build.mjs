@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {ROLES, OPTIONAL, ANIMS, FORMATS, ARROWS, HEADS, PAGES} from '../bin/validate.mjs';
-import {DENSITY} from '../lib/layouts.mjs';
+import {DENSITY, CANVAS} from '../lib/layouts.mjs';
 import {TEMPLATE} from '../lib/templates.mjs';
 import {PLATES} from '../lib/logo.mjs';
 import {STYLES} from '../lib/connector.mjs';
@@ -74,7 +74,7 @@ export function schemas() {
     type: 'object',
     required: ['slides'],
     properties: {
-      $schema: str, w: num, h: num, format: {enum: FORMATS}, page: {enum: PAGES}, title: str, lang: str, id: str, rev: str,
+      $schema: str, w: num, h: num, canvas: {enum: Object.keys(CANVAS)}, format: {enum: FORMATS}, page: {enum: PAGES}, title: str, lang: str, id: str, rev: str,
       spell: {type: 'object', properties: {ignore: {type: 'array', items: str}}}, counter: {const: 0},
       density: {enum: Object.keys(DENSITY)}, draft: {type: 'boolean'},
       styles: {type: 'object', properties: {roles, margin: num, pad: {type: 'object', additionalProperties: str}, gap: num}},

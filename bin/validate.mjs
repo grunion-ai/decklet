@@ -8,7 +8,7 @@
 //   --style: the same style.json create() will build with — text fit is only meaningful against the scale the deck will wear
 // library: import {validate, mergeStyle, ROLES} from './validate.mjs'  →  {ok, errors:[…], warnings:[…]}
 import fs from 'node:fs';
-import {LIBRARY, libraryFor, catalogue, DENSITY, densityReport, FOOT} from '../lib/layouts.mjs';
+import {LIBRARY, libraryFor, catalogue, DENSITY, densityReport, CANVAS, canvasOf, applyCanvas, footTop} from '../lib/layouts.mjs';
 import {TEMPLATE, templateKeys, fillErrors, expandTemplates, templateCatalogue} from '../lib/templates.mjs';
 import {ICONS, iconNames, expandIcons} from '../lib/icons.mjs';
 import {checkChart, expandCharts} from '../lib/chart.mjs';
@@ -59,6 +59,8 @@ export function resolveCanvas(deck, {format, space, fallback} = {}) {
   const fmt = format || deck.format || fallback || null;
   const preset = fmt ? FORMAT[fmt] || null : null;
   let w = deck.w, h = deck.h;
+  const tier = canvasOf(deck);
+  if (tier) ({w, h} = tier);
   if (space) [w, h] = space.split('x').map(Number);
   if ((w == null || h == null) && preset) ({w, h} = preset);
   return {format: fmt, page: preset ? preset.page : deck.page, w, h};
@@ -134,7 +136,9 @@ export function validate(deck) {
   if (!deck || typeof deck !== 'object') return {ok: false, errors: ['model is not an object'], warnings, diagnostics: [{code: 'contract/model-shape', severity: 'error', message: 'model is not an object', subject: {}, fixes: []}]};
   // the canvas create() will build: an explicit w/h wins, else the named format's preset (U1.1 — the contract's "from format")
   const {w: W, h: H} = resolveCanvas(deck);
-  if (deck.format == null && deck.w == null && deck.h == null) E('deck/size', `deck size missing — name a format (${FORMATS.join('|')}), or give deck.w and deck.h as positive numbers`);
+  if (deck.canvas != null && !CANVAS[deck.canvas]) E('deck/canvas', `unknown canvas "${deck.canvas}": ${Object.keys(CANVAS).join('|')}, default medium`);
+  if (deck.canvas != null && deck.format != null && deck.format !== 'slides') E('deck/canvas', `canvas "${deck.canvas}" applies to slides only, this deck is ${deck.format}`);
+  if (deck.format == null && deck.w == null && deck.h == null && !deck.canvas) E('deck/size', `deck size missing — name a format (${FORMATS.join('|')}), or give deck.w and deck.h as positive numbers`);
   else {
     if (!isNum(W) || W <= 0) E('deck/size', 'deck.w must be a positive number');
     if (!isNum(H) || H <= 0) E('deck/size', 'deck.h must be a positive number');
@@ -172,7 +176,7 @@ export function validate(deck) {
   // template / icon rows that create() could not expand are reported here, then the valid ones expand so the same rows are judged
   // the library's own cut of every layout the slides name, scaled to this canvas — a deck layout that equals it IS the library
   // (merged by create or by the CLI, or copied verbatim), and stretches the same way off 16:9
-  const libCut = Array.isArray(deck.slides) ? libraryFor({w: W, h: H, slides: deck.slides.filter(s => s && typeof s === 'object'), layouts: {}}) : {};
+  const libCut = Array.isArray(deck.slides) ? libraryFor({w: W, h: H, canvas: deck.canvas, slides: deck.slides.filter(s => s && typeof s === 'object'), layouts: {}}) : {};
   const isLibrary = name => !!libCut[name] && JSON.stringify((deck.layouts || {})[name] ?? libCut[name]) === JSON.stringify(libCut[name]);
   const kinds = [];   // the layout or template each slide named, read before templates expand — TEXT_KINDS are words by kind
   const nameOk = n => typeof n === 'string' && !!n.trim();
@@ -522,7 +526,7 @@ export function validate(deck) {
     if (s.layout && !layouts[s.layout]) E('slot/unknown-layout', `slides[${si}]: layout "${s.layout}" not in deck.layouts or the library (${Object.keys(LIBRARY).join(', ')})`);
     const tpl = TEMPLATE[kinds[si]] || TEMPLATE[s.name];   // a Numbers-shelf template is a number slide (K19), read before or after create expands it
     // a template may name its slide kind (exec-summary is a summary slide, K19); a Numbers-shelf template is a number slide
-    const dm = densityReport(s, layouts, s.density || deck.density, tpl && (tpl.kind || (tpl.cat === 'Numbers' ? 'numbers' : null))); if (dm) Wn('density/budget', `slides[${si}]: ${dm}`);
+    const dm = densityReport(s, layouts, s.density || deck.density, tpl && (tpl.kind || (tpl.cat === 'Numbers' ? 'numbers' : null)), deck.canvas); if (dm) Wn('density/budget', `slides[${si}]: ${dm}`);
     if (!Array.isArray(s.els)) return E('contract/els', `slides[${si}]: els must be an array`);
     for (const id of s.hide || []) if (!mids.has(id)) E('contract/hide-unknown', `slides[${si}]: hide "${id}" is not a master id`);
     // an after chain that comes back to itself has no left edge to start from: one error per cycle
@@ -562,7 +566,7 @@ export function validate(deck) {
     // K17: the foot band — below the content area's bottom edge (FOOT.y, scaled) and above the footer — holds the foot line only
     if (F && isNum(F.y) && isNum(H)) {
       // a row that shares the footer's own line (within half its leading) IS the foot line — a foot mark, a rail's label
-      const top = FOOT.y * H / 540, fl = roleOf(F.role), line = F.y - (fl ? fl.lh ?? fl.size * 1.25 : 14) / 2;
+      const top = footTop(deck, H), fl = roleOf(F.role), line = F.y - (fl ? fl.lh ?? fl.size * 1.25 : 14) / 2;
       s.els.forEach((r, ei) => { if (!r || !isText(r) || r.override || footOf(r, s)) return; const b = rectOf(r, s);
         if (b && b.y >= top - 0.5 && b.y < line) Wn('density/foot-band', `slides[${si}].els[${ei}] "${plain(r).replace(/\s+/g, ' ').slice(0, 30)}" starts at y ${Math.round(b.y)}, in the foot band (${Math.round(top)}–${F.y}, under the content area and above the footer) — the foot is one line: bind the source slot (it joins the footer's line), set a note beside its visual, or move the row up`); });
     }
@@ -706,8 +710,8 @@ export function validate(deck) {
     for (const [ei, r] of s.els.entries()) if (isLogo(r) && typeof r.entity === 'string' && r.entity.trim() && !entOf(r.entity).length) Wn('entity/unknown', `slides[${si}].els[${ei}]: entity "${r.entity}" names no company in deck.entities — use a listed name or alias, or add the company to deck.entities`);
     for (const r of els) if (isLogoRow(r) && !r.logo) for (const n of namesIn(r.name)) Wn('assets/monogram-known', `slides[${si}]: monogram for ${n} — a listed company wants its real logo; fetch it with decklet-assets (deck.entities asks for this)`);
     // a source line names where the numbers came from, not who is on the slide: the source slot, or a Caption in the foot band
-    const footTop = FOOT.y * (isNum(H) ? H : 540) / 540;
-    const sourced = r => r.slot === 'source' || (roleName(r) === 'Caption' && (rectOf({...r, over: 0}, s) || {}).y >= footTop - 0.5);
+    const footBand = footTop(deck, isNum(H) ? H : 540);
+    const sourced = r => r.slot === 'source' || (roleName(r) === 'Caption' && (rectOf({...r, over: 0}, s) || {}).y >= footBand - 0.5);
     for (const r of [...texts.filter(r => !sourced(r)), ...els.filter(r => isLogoRow(r) && r.logo)]) {
       const t = isText(r) ? plain(r) : r.name, hits = namesIn(t); if (!hits.length) continue;
       if (isText(r) && !/^(Title|Supertitle|H1)$/.test(roleName(r)) && t.trim().length <= 40) {   // a listing is a short label: its logo sits beside it
@@ -752,6 +756,7 @@ export function validateModel(model, style = null) {
     const tpl = new URL('../template.html', import.meta.url);
     if (fs.existsSync(tpl)) { const t = JSON.parse(fs.readFileSync(tpl, 'utf8').match(/\/\*DECK\*\/([\s\S]*?)\/\*\/DECK\*\//)[1]); deck.styles = {...t.styles, ...(deck.styles || {}), roles: t.styles.roles}; notes.push('no styles.roles in the model — validated against the template\'s neutral roles (create.mjs does the same)'); }
   }
+  applyCanvas(deck);
   const canvas = resolveCanvas(deck);
   if (canvas.w != null && canvas.h != null) { deck.w = canvas.w; deck.h = canvas.h; if (canvas.page) deck.page = deck.page || canvas.page; }
   deck.layouts = {...libraryFor(deck), ...(deck.layouts || {})}; fillKpi(deck); expandCharts(deck);

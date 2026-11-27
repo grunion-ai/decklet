@@ -14,7 +14,7 @@ body{background:var(--bg);color:var(--fg);font:16px/1.45 -apple-system,BlinkMacS
    the slide (QuickLook's thumbnailer misplaces an svg foreignObject). With script on the still is inert text, and render()
    empties #canvas before the first paint. */
 #canvas:has(>noscript){width:100%;height:100%;border:0;background:none;transform:none!important;container-type:size;display:flex;align-items:center;justify-content:center}
-#canvas>noscript{display:contents}
+#canvas>noscript{display:none}#canvas>noscript:has(>.still){display:contents}#canvas:has(>noscript)::before{content:"This viewer blocks scripts. Open the deck in a browser, or host it with bin/serve.mjs.";font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--muted);padding:24px;text-align:center}#canvas:has(>noscript>.still)::before{content:none}
 .still .el.box{padding:calc(var(--u)*6) calc(var(--u)*8);border-width:calc(var(--u)*1.5);border-radius:calc(var(--u)*8)}.still .el.tile{border-width:var(--u);border-radius:calc(var(--u)*12)}.still .pin{bottom:calc(var(--u)*10);font-size:calc(var(--u)*12)}
 #canvas{position:relative;width:var(--W);height:var(--H);background:var(--card);border:1px solid var(--line);border-radius:12px;transform-origin:center;flex:none;overflow:hidden}
 /* href is one model prop with two surfaces: an inset anchor over a whole row (a CTA box), and anchor runs inside .html.

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // decklet create — headless: model.json (+ style.json) → one self-contained deck.html
 // usage: node bin/create.mjs --model model.json [--style style.json] --out deck.html
-//          [--format slides|slides-4x3|story|carousel|carousel-4x5|document-letter|document-a4|document-letter-landscape|document-a4-landscape|poster-a3] [--space 960x540|1600x900] [--title "…"] [--force]
+//          [--format slides|slides-4x3|story|carousel|carousel-4x5|document-letter|document-a4|document-letter-landscape|document-a4-landscape|poster-a3] [--canvas low|medium|high] [--space 960x540|1600x900] [--title "…"] [--force]
 //          [--from prev.html]   revise an existing deck: keep its id + slide/row ids, replay the human edits it carries
 //                               (human wins, conflicts reported), push its state into the version history
 // library: import {create, FORMAT} from './create.mjs'
@@ -10,7 +10,7 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {validate, mergeStyle, fillKpi, FORMAT, resolveCanvas} from './validate.mjs';
-import {libraryFor} from '../lib/layouts.mjs';
+import {libraryFor, applyCanvas} from '../lib/layouts.mjs';
 import {expandCharts} from '../lib/chart.mjs';
 import {expandTemplates} from '../lib/templates.mjs';
 import {expandIcons} from '../lib/icons.mjs';
@@ -49,8 +49,9 @@ function inheritIds(deck, prev) {
   for (const [s, ps] of pairs) (s.els || []).forEach((r, k) => { const pr = (ps.els || [])[k]; if (!r.id && pr && pr.id && (pr.role || null) === (r.role || null) && !!(pr.line || pr.curve) === !!(r.line || r.curve) && !(s.els || []).some(x => x.id === pr.id)) r.id = pr.id; });
 }
 
-export function create(model, {style = null, format, space, title, template, from = null, spell = null} = {}) {
+export function create(model, {style = null, format, space, title, template, from = null, spell = null, canvas: tierName} = {}) {
   const {$schema, ...rest} = model, deck = structuredClone(rest);
+  if (tierName) deck.canvas = tierName;
   const prevHtml = from ? fs.readFileSync(from, 'utf8') : null, prev = prevHtml ? blockOf(prevHtml, 'DECK') : null;
   if (prev) inheritIds(deck, prev);
   const fmt = format || deck.format || 'slides';
@@ -60,6 +61,7 @@ export function create(model, {style = null, format, space, title, template, fro
   deck.format = canvas.format; deck.page = canvas.page; deck.w = canvas.w; deck.h = canvas.h;
   // style.json: {tokens:{bg,fg,muted,accent,card,line,sel,box}, roles:{…}, pad:{…}} — shared with validate --style so the two never drift
   mergeStyle(deck, style);
+  applyCanvas(deck);
   // `group` left the contract in 0.12.0 — a model written against an older skill still builds, minus the dead prop, so no
   // deck carries a link the editor no longer honours. validate says so out loud; this only keeps the file clean.
   for (const s of deck.slides || []) for (const r of (s && s.els) || []) if (r && r.group != null) delete r.group;
@@ -74,6 +76,7 @@ export function create(model, {style = null, format, space, title, template, fro
   if (!deck.styles || !deck.styles.roles || !Object.keys(deck.styles.roles).length) { // no roles anywhere → inherit the template's neutral scale
     const tpl = JSON.parse(html.match(/\/\*DECK\*\/([\s\S]*?)\/\*\/DECK\*\//)[1]);
     deck.styles = {...tpl.styles, ...(deck.styles || {}), roles: tpl.styles.roles};
+    applyCanvas(deck);
   }
   fillKpi(deck);        // the optional Stat2 role, derived from Stat when a kpi tile asks for it and the style has none
   expandCharts(deck);   // chart rows → the ordinary rows they stand for; the runtime draws no charts
@@ -106,11 +109,11 @@ export function create(model, {style = null, format, space, title, template, fro
 if (isMain(import.meta.url)) {
   const a = process.argv.slice(2), o = {};
   for (let k = 0; k < a.length; k++) if (a[k].startsWith('--')) o[a[k].slice(2)] = a[k + 1] && !a[k + 1].startsWith('--') ? a[++k] : true;
-  if (!o.model || !o.out) { console.error('usage: node bin/create.mjs --model model.json [--style style.json] --out deck.html [--format …] [--space WxH] [--title …] [--from prev.html] [--force]'); process.exit(2); }
+  if (!o.model || !o.out) { console.error('usage: node bin/create.mjs --model model.json [--style style.json] --out deck.html [--format …] [--canvas low|medium|high] [--space WxH] [--title …] [--from prev.html] [--force]'); process.exit(2); }
   const model = JSON.parse(fs.readFileSync(o.model, 'utf8'));
   const style = o.style ? JSON.parse(fs.readFileSync(o.style, 'utf8')) : null;
   const spell = await loadChecker(model.lang || 'en'); // optional: nspell + dictionary-en; absent → no flags, the browser's own checker only
-  const {html, deck, hash, migrate} = create(model, {style, format: o.format, space: o.space, title: o.title, from: o.from || null, spell});
+  const {html, deck, hash, migrate} = create(model, {style, canvas: o.canvas, format: o.format, space: o.space, title: o.title, from: o.from || null, spell});
   const flagged = spell ? spellFlags(deck, spell) : null;
   if (flagged === null) console.error('spell: nspell + dictionary-en not installed — no words flagged (npm i -D nspell dictionary-en)');
   else if (flagged.length) {
