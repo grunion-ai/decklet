@@ -84,7 +84,7 @@ const isNum = v => typeof v === 'number' && Number.isFinite(v);
 const plain = r => (r.text ?? r.html ?? '').replace(/<[^>]+>/g, '');
 const isText = r => r.text != null || r.html != null;
 // the kinds that are words by design: the coverage gate never asks them for a graphic (any other slide says textOnly: true)
-const TEXT_KINDS = new Set(['cover', 'agenda', 'section', 'statement', 'quote', 'cta', 'end',
+const TEXT_KINDS = new Set(['cover', 'agenda', 'section', 'cover-agenda-rail', 'cover-contents-column', 'cover-agenda-strip', 'statement', 'quote', 'cta', 'end',
   'cover-hero', 'cover-split', 'section-numeral', 'agenda-ruled', 'quote-pull', 'closing-cta', 'logo-cover-lockup']);
 export const AGAP = 10;   // `after` air when a row states no gap — the connector's own default air (template AGAP)
 // end-to-end span of a connector row; below ~40px a line is an icon stroke (a tick, a cross), not a run between boxes

@@ -253,10 +253,10 @@ Resolution order for any row: slot geometry ← master row (for `override` rows)
 
 ## LAYOUT LIBRARY
 
-Thirty-two named layouts ship with the engine (`lib/layouts.mjs`), in the same shape as a `layouts` entry. Name one on a slide the deck does not define and `create` merges it into `deck.layouts`, scaled from its 960×540 cut to the canvas (1600×900 = ×1.67). `node bin/validate.mjs --layouts` prints it: name, group, density, use and every slot's box (`x y w h`).
+Thirty-five named layouts ship with the engine (`lib/layouts.mjs`), in the same shape as a `layouts` entry. Name one on a slide the deck does not define and `create` merges it into `deck.layouts`, scaled from its 960×540 cut to the canvas (1600×900 = ×1.67). `node bin/validate.mjs --layouts` prints it: name, group, density, use and every slot's box (`x y w h`).
 Read that instead of inventing geometry: each layout prints a `free:` band where a free row goes. A slide may mix library slots with free rows, a deck-defined layout of the same name wins, and a slotted row still takes its own x/y/w/h.
 
-- **openers** — `cover` · `agenda` · `section`
+- **openers** — `cover` · `agenda` · `section` · `cover-agenda-rail` · `cover-contents-column` · `cover-agenda-strip`
 - **chrome** — `content` · `title`
 - **text** — `statement` · `fact` · `quote` · `two-cols` · `two-cols-header` · `bullets`
 - **visuals** — `image-left` · `image-right`
@@ -275,6 +275,9 @@ Picking a layout by what the content is:
 | four to six points under a title | `bullets` |
 | the deck's name and promise | `cover`; `end` closes |
 | what the deck will cover | `agenda`; `section` between parts |
+| the cover with a timed agenda rail | `cover-agenda-rail` |
+| the cover with a column of linked sections | `cover-contents-column` |
+| the cover over a strip of agenda columns | `cover-agenda-strip` |
 | one claim | `statement`; with a number in it → `fact`; the number alone → `stat` |
 | someone's words | `quote` |
 | two bodies of text, a lede over two columns | `two-cols`, `two-cols-header` |

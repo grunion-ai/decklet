@@ -22,7 +22,7 @@ test('library.html == create(build-sheet): every template and layout, by kind, c
   assert.equal(r.status, 0, r.stderr);
   const model = JSON.parse(fs.readFileSync(path.join(root, 'templates/candidates.model.json'), 'utf8'));
   const styled = 6 * KITS.length;   // the Styles section: the same six templates under every kit on the shelf
-  assert.equal(model.slides.filter(s => !/^kind-/.test(s.name)).length, 139 + styled, `116 templates + 23 layouts + ${styled} styled`);
+  assert.equal(model.slides.filter(s => !/^kind-/.test(s.name)).length, 142 + styled, `116 templates + 26 layouts + ${styled} styled`);
   const style = JSON.parse(fs.readFileSync(path.join(root, 'templates/candidates.style.json'), 'utf8'));
   assert.ok(model.slides.some(s => s.name === 'kind-figures'), 'a Figures kind divider');
   const names = model.slides.map(s => s.name);
@@ -47,7 +47,7 @@ test('sheet: every slide\'s foot band (y â‰¥ 496) carries the same set of rows â
     .filter(e => !(inset.has(s.name) && !e.override))
     .map(e => e.override ? `override:${e.override}` : `row@${e.y}`);
   const shown = model.slides.filter(s => !(s.hide || []).includes(foot.id)), hidden = model.slides.filter(s => (s.hide || []).includes(foot.id));
-  assert.deepEqual(hidden.map(s => s.name).sort(), ['image-hero-overlay', 'image-split'], 'the modern nine review as their templates, so these are the only two');
+  assert.deepEqual(hidden.map(s => s.name).sort(), ['image-hero-overlay', 'image-split', 'layout-cover-agenda-rail', 'layout-cover-agenda-strip', 'layout-cover-contents-column'], 'the two full-bleed image templates, and the three agenda covers whose panels own the foot');
   for (const s of hidden) assert.deepEqual(band(s), [], `${s.name}: a hidden foot leaves the band empty`);
   assert.deepEqual([...new Set(shown.map(s => JSON.stringify(band(s))))], ['["override:foot"]'], 'one set of rows in the band on every shown slide');
   for (const s of shown) {

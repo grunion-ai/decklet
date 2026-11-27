@@ -17,9 +17,10 @@ let pw = null; try { pw = await import('playwright'); } catch {}
 const live = pw ? test : test.skip;
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'decklet-lib-'));
 
-export const NAMES = ['cover', 'agenda', 'section', 'content', 'title', 'statement', 'fact', 'quote', 'two-cols', 'two-cols-header', 'bullets', 'image-left', 'image-right',
+export const NAMES = ['cover', 'agenda', 'section', 'cover-agenda-rail', 'cover-contents-column', 'cover-agenda-strip', 'content', 'title', 'statement', 'fact', 'quote', 'two-cols', 'two-cols-header', 'bullets', 'image-left', 'image-right',
   'bento-grid', 'image-hero-overlay', 'image-split', 'annotated-shot', 'three-up-cards', 'dashboard-composite', 'table-insight', 'proof-strip', 'team-grid',
   'kpi-grid', 'kpi-grid-4', 'stat', 'chart', 'comparison', 'process-steps', 'diagram', 'timeline', 'cta', 'end'];
+const COVERS = ['cover-agenda-rail', 'cover-contents-column', 'cover-agenda-strip'];
 const IMG = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 3"><rect width="4" height="3" fill="#5B9CF6"/></svg>');
 // one slide per library layout, every slot bound with plausible content
 export const fill = (name, k = 0) => {
@@ -32,9 +33,10 @@ export const fill = (name, k = 0) => {
     if (!sl.role) return {slot};                              // paint slots (rule, dots, button): the slot carries the paint
     const text = {Title: 'Two lines of display headline', Supertitle: 'Kicker', H1: 'A content-slide title', H2: 'A second-level heading',
       Body: 'Body copy, two short sentences at most. Enough to wrap once.', Caption: 'Source · caption text', Label: 'Label', Stat: '63%', Stat2: '$1.2M'}[sl.role];
-    return {slot, text: /^(n\d|t\d)$/.test(slot) ? '0' + (slot.slice(1)) : /delta/.test(slot) ? '↑ 8 pts' : /label/.test(slot) ? 'Renewals' : /value/.test(slot) ? '$86K' : text};
+    const short = COVERS.includes(name) && (/^(item|section)\d$/.test(slot) ? 'Pilot scope' : /^time\d$/.test(slot) ? '5 min' : /^page\d$/.test(slot) ? 'Slide 4' : null);
+    return {slot, text: short || (/^(n\d|t\d)$/.test(slot) ? '0' + (slot.slice(1)) : /delta/.test(slot) ? '↑ 8 pts' : /label/.test(slot) ? 'Renewals' : /value/.test(slot) ? '$86K' : text)};
   });
-  return {name: `${name}-${k}`, layout: name, els, ...(name === 'image-hero-overlay' ? {hide: ['foot']} : {})};   // a full-bleed hero hides the footer
+  return {name: `${name}-${k}`, layout: name, els, ...(name === 'image-hero-overlay' || COVERS.includes(name) ? {hide: ['foot']} : {})};
 };
 export const everyLayout = (w = 960, h = 540) => ({w, h, title: 'library', styles: {margin: 60}, master: [{id: 'foot', footer: 1, x: 60, y: 500, w: 300, role: 'Label', text: 'library'}],
   slides: NAMES.map((n, k) => ({...fill(n, k), textOnly: true}))});   // the catalogue shows each layout's words; coverage is judged in coverage.test
@@ -68,6 +70,114 @@ test('library: every layout is complete, its slots wear a role from the scale (o
   for (const n of ['kpi-grid', 'kpi-grid-4']) for (const k of [1, 2, 3]) for (const s of [`kpi${k}`, `kpi${k}-label`, `kpi${k}-delta`]) assert.ok(LIBRARY[n].slots[s], `${n}.${s}: value + label + delta`);
   for (const s of ['supertitle', 'title', 'chart', 'takeaway', 'source']) assert.ok(LIBRARY.chart.slots[s], 'chart: ' + s);
   assert.equal(LIBRARY.stat.slots.stat.role, 'Stat', 'stat is the hero number');
+});
+
+const boxOf = sl => ({x: sl.x, y: sl.y, w: sl.w, h: sl.h ?? NEUTRAL_LH[sl.role]});
+const inside = (t, p) => t.x >= p.x && t.x + t.w <= p.x + p.w && t.y >= p.y && t.y + t.h <= p.y + p.h;
+const five = (slots, stem) => [1, 2, 3, 4, 5].map(k => slots[`${stem}${k}`]);
+
+test('library: the three agenda covers are openers at reading density, a Title-role title on each, every slot inside the canvas', () => {
+  for (const name of COVERS) {
+    const lay = LIBRARY[name];
+    assert.ok(lay, name + ' is in the library');
+    assert.equal(lay.group, 'openers', name); assert.equal(lay.density, 'reading', name + ': five items are over the speaker budget');
+    assert.equal(lay.slots.title.role, 'Title', name); assert.equal(lay.slots.supertitle.role, 'Supertitle', name); assert.equal(lay.slots.body.role, 'Body', name);
+    assert.match(lay.use, /hide the footer/, name + ': a panel owns the foot, so the use line says to hide the footer');
+    for (const [slot, sl] of Object.entries(lay.slots)) assert.ok(inside(boxOf(sl), {x: 0, y: 0, w: 960, h: 540}), `${name}.${slot} inside the 960×540 cut`);
+    const keys = Object.keys(lay.slots), firstText = keys.findIndex(k => lay.slots[k].role);
+    assert.ok(keys.slice(firstText).every(k => lay.slots[k].role), name + ': paint slots come first, so a fill in slot order never paints over text');
+    assert.ok(!keys.some(k => k in DENSE), name + ': no dense chrome on a cover');
+  }
+  assert.deepEqual(Object.keys(LIBRARY).filter(n => LIBRARY[n].group === 'openers'), ['cover', 'agenda', 'section', ...COVERS]);
+});
+
+test('library: cover-agenda-rail — a rail over the left 34% with five numbered, timed items; the title block in the right 66%', () => {
+  const s = LIBRARY['cover-agenda-rail'].slots, rail = boxOf(s.rail);
+  assert.deepEqual(s.rail, {x: 0, y: 0, w: 326, h: 540, bg: 'var(--fg)'}, '34% of 960, full height, the inverse of the ground');
+  assert.deepEqual(Object.keys(s), ['rail', 'rail-label', ...[1, 2, 3, 4, 5].flatMap(k => [`n${k}`, `item${k}`, `time${k}`]), 'total', 'supertitle', 'title', 'body', 'caption']);
+  for (const k of ['rail-label', 'total', ...[1, 2, 3, 4, 5].flatMap(k => [`n${k}`, `item${k}`, `time${k}`])]) assert.ok(inside(boxOf(s[k]), rail), k + ' sits on the rail');
+  for (const k of ['supertitle', 'title', 'body', 'caption']) assert.ok(s[k].x >= rail.w + 24, k + ' sits right of the rail');
+  assert.equal(s['rail-label'].role, 'Label'); assert.equal(s.total.role, 'Label'); assert.equal(s.caption.role, 'Caption');
+  for (const [i, sl] of five(s, 'item').entries()) {
+    const n = s[`n${i + 1}`], t = s[`time${i + 1}`];
+    assert.equal(sl.role, 'Body'); assert.equal(n.role, 'Label'); assert.equal(t.role, 'Caption');
+    assert.equal(sl.color, 'var(--card)', 'the item reads on the inverse rail');
+    assert.equal(centreY(n), centreY(sl), `n${i + 1} on its item's line`); assert.equal(centreY(t), centreY(sl), `time${i + 1} on its item's line`);
+    assert.equal(t.align, 'right'); assert.equal(t.nowrap, 1); assert.ok(n.x + n.w <= sl.x && sl.x + sl.w <= t.x, 'number, item, duration left to right');
+    if (i) assert.equal(sl.y - s[`item${i}`].y, 44, 'a 44px pitch: one line of Body and 20px of air');
+  }
+  assert.ok(s.item5.y + NEUTRAL_LH.Body < s.total.y && s['rail-label'].y + NEUTRAL_LH.Label < s.item1.y, 'label above the list, total under it');
+  assert.equal(s.title.h, 4 * NEUTRAL_LH.Title, 'room for four lines of Title in the 526px column'); assert.equal(s.title.valign, 'bottom', 'a shorter title sits on the purpose line, in the lower middle');
+  assert.ok(s.supertitle.y + NEUTRAL_LH.Supertitle < s.title.y && s.title.y + s.title.h <= s.body.y && s.body.y + 2 * NEUTRAL_LH.Body <= s.caption.y, 'supertitle, the title, a two-line purpose, the presenter line');
+});
+
+test('library: cover-contents-column — an accent panel over the left 73%, a ground-colour column of five slide-numbered sections on the right', () => {
+  const s = LIBRARY['cover-contents-column'].slots, panel = boxOf(s.panel), column = boxOf(s.column);
+  assert.deepEqual(s.panel, {x: 0, y: 0, w: 701, h: 540, bg: 'var(--accent)'}, '73% of 960, full height, the brand colour');
+  assert.deepEqual(s.column, {x: 701, y: 0, w: 259, h: 540, bg: 'var(--card)'}, 'the remaining 27%, the ground colour');
+  assert.deepEqual(Object.keys(s), ['panel', 'column', 'supertitle', 'title', 'body', 'column-label', ...[1, 2, 3, 4, 5].flatMap(k => [`page${k}`, `section${k}`])]);
+  for (const k of ['supertitle', 'title', 'body']) { assert.ok(inside(boxOf(s[k]), panel), k + ' sits on the panel'); assert.equal(s[k].color, 'var(--card)', k + ' reads on the accent'); }
+  for (const k of ['column-label', ...[1, 2, 3, 4, 5].flatMap(k => [`page${k}`, `section${k}`])]) assert.ok(inside(boxOf(s[k]), column), k + ' sits in the column');
+  assert.equal(s['column-label'].role, 'Label');
+  for (const [i, sl] of five(s, 'section').entries()) {
+    const p = s[`page${i + 1}`];
+    assert.equal(sl.role, 'Body'); assert.equal(p.role, 'Label');
+    assert.ok(p.y + NEUTRAL_LH.Label <= sl.y && sl.y - p.y <= 24, `page${i + 1} is the caption above section${i + 1}`);
+    if (i) assert.ok(sl.y - s[`section${i}`].y >= 2 * NEUTRAL_LH.Body + NEUTRAL_LH.Label, 'a two-line section name clears the next page caption');
+  }
+  assert.equal(s.title.h, 4 * NEUTRAL_LH.Title, 'room for four lines of Title'); assert.equal(s.title.valign, 'middle'); assert.equal(centreY(s.title), 270, 'the title is centred on the canvas');
+  assert.ok(s.supertitle.y + NEUTRAL_LH.Supertitle < s.title.y && s.title.y + s.title.h <= s.body.y && s.body.y + 2 * NEUTRAL_LH.Body <= 540, 'supertitle at the top, the title in the middle, the purpose at the bottom');
+});
+
+test('library: cover-agenda-strip — the title block in the top 76%, an inverse strip over the bottom 24% cut into five equal columns', () => {
+  const s = LIBRARY['cover-agenda-strip'].slots, strip = boxOf(s.strip);
+  assert.deepEqual(s.strip, {x: 0, y: 410, w: 960, h: 130, bg: 'var(--fg)'}, '24% of 540, full width, the inverse of the ground');
+  assert.deepEqual(Object.keys(s), ['strip', 'rule2', 'rule3', 'rule4', 'rule5', 'supertitle', 'title', 'body', ...[1, 2, 3, 4, 5].flatMap(k => [`n${k}`, `item${k}`, `time${k}`])]);
+  assert.equal(s.title.h, 3 * NEUTRAL_LH.Title, 'room for three lines of Title at the content width'); assert.equal(s.title.valign, 'bottom', 'a shorter title sits on the purpose line');
+  assert.ok(s.supertitle.y + NEUTRAL_LH.Supertitle < s.title.y && s.title.y + s.title.h <= s.body.y && s.body.y + 2 * NEUTRAL_LH.Body <= strip.y, 'supertitle, the title and a two-line purpose end above the strip');
+  const xs = five(s, 'item').map(sl => sl.x);
+  assert.deepEqual(xs.slice(1).map((x, i) => x - xs[i]), [172, 172, 172, 172], 'five equal columns across the content width');
+  assert.equal(xs[0], 60); assert.equal(xs[4] + s.item5.w, 900);
+  for (const k of [1, 2, 3, 4, 5]) {
+    const n = s[`n${k}`], item = s[`item${k}`], time = s[`time${k}`];
+    assert.equal(n.role, 'Label'); assert.equal(item.role, 'Body'); assert.equal(time.role, 'Caption');
+    for (const sl of [n, item, time]) { assert.ok(inside(boxOf(sl), strip), `column ${k} sits on the strip`); assert.equal(sl.x, xs[k - 1]); assert.equal(sl.w, 152); }
+    assert.ok(n.y + NEUTRAL_LH.Label < item.y && item.y + NEUTRAL_LH.Body <= time.y, 'the number at the top, the name over its duration at the bottom');
+    assert.equal(item.color, 'var(--card)', 'the name reads on the inverse strip');
+    if (k > 1) { const r = s[`rule${k}`]; assert.ok(!r.role && r.w === 1 && r.y === strip.y && r.h === strip.h, `rule${k} is a full-height hairline`); assert.ok(r.x > xs[k - 2] + 152 && r.x < xs[k - 1], `rule${k} sits in the gutter before column ${k}`); }
+  }
+  assert.ok(s.time5.y + NEUTRAL_LH.Caption <= 514, 'the fifth column ends above the counter pin a hidden footer leaves in the corner');
+});
+
+const agendaCover = (name, rows, n = 3) => ({w: 960, h: 540, title: 'covers', slides: [{id: 'open', layout: name, hide: [], els: [
+  ...Object.keys(LIBRARY[name].slots).filter(k => !LIBRARY[name].slots[k].role && !/^rule[45]$/.test(k)).map(slot => ({slot})),
+  {slot: 'supertitle', text: 'Plumbline'}, {slot: 'title', text: 'Supplier funding verification'}, {slot: 'body', text: 'Decide whether to pilot on one funding desk.'}, ...rows],
+}, ...Array.from({length: n}, (_, i) => ({id: `s${i + 2}`, layout: 'statement', els: [{slot: 'title', text: `Part ${i + 1}`}]}))]});
+
+test('library: each agenda cover is a words slide by kind and binds only the items it has — three of five validate with no error and no warning', () => {
+  const three = {
+    'cover-agenda-rail': [1, 2, 3].flatMap(k => [{slot: `n${k}`, text: String(k)}, {slot: `item${k}`, text: 'Pilot scope'}, {slot: `time${k}`, text: '7 min'}]),
+    'cover-contents-column': [1, 2, 3].flatMap(k => [{slot: `page${k}`, text: `Slide ${k + 1}`}, {slot: `section${k}`, text: 'Pilot scope'}]),
+    'cover-agenda-strip': [1, 2, 3].flatMap(k => [{slot: `n${k}`, text: String(k)}, {slot: `item${k}`, text: 'Pilot scope'}, {slot: `time${k}`, text: '7 min'}]),
+  };
+  for (const name of COVERS) {
+    const d = create(agendaCover(name, three[name])).deck, v = validate(d);
+    assert.deepEqual(v.errors, [], name + ': ' + v.errors.join(' | ')); assert.deepEqual(v.warnings, [], name + ': ' + v.warnings.join(' | '));
+    assert.ok(!d.slides[0].els.some(r => /4$|5$/.test(r.slot || '')), name + ': no fourth or fifth row exists');
+    const loose = create(agendaCover(name, three[name])).deck; loose.slides[0].els = loose.slides[0].els.filter(r => LIBRARY[name].slots[r.slot].role);
+    assert.ok(validate(loose).errors.some(m => /not the paint slot/.test(m)), name + ': text bound without its panel is an error');
+  }
+});
+
+test('library: cover-contents-column sections link into the deck — a bound section and its page take the engine\'s own #slide href', () => {
+  const rows = good => [1, 2, 3].flatMap(k => [{slot: `page${k}`, text: `Slide ${k + 1}`, href: `#${k + 1}`}, {slot: `section${k}`, text: 'Pilot scope', href: good ? `#s${k + 1}` : `#s${k + 7}`}]);
+  const made = create(agendaCover('cover-contents-column', rows(true)));
+  const v = validate(made.deck);
+  assert.deepEqual(v.errors, [], v.errors.join(' | ')); assert.deepEqual(v.warnings, [], v.warnings.join(' | '));
+  assert.deepEqual(made.deck.slides[0].els.filter(r => /^section\d$/.test(r.slot || '')).map(r => r.href), ['#s2', '#s3', '#s4'], 'the href stays on the row');
+  assert.match(LIBRARY['cover-contents-column'].use, /link/, 'the use line says the sections link');
+  const bad = validate(create(agendaCover('cover-contents-column', rows(false))).deck);
+  assert.equal(bad.errors.filter(m => /names no slide/.test(m)).length, 3, bad.errors.join(' | '));
 });
 
 // ── U5.1 / U5.2: the missing starting rungs — a plain bullet page, and points beside an image
