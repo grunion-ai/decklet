@@ -44,6 +44,27 @@ live('the mini toolbar opens on a text edit inside a multi-row selection: the ed
   assert.deepEqual(p.errs, []); await b.close();
 });
 
+live('the toolbar offers at most eight colours: roles first, then the text colours used most, never a chart fill', async () => {
+  const hex = i => `#${(0x102030 + i * 0x010305).toString(16).padStart(6, '0')}`;
+  const once = Array.from({length: 30}, (_, i) => ({x: 60, y: 300, w: 200, role: 'Body', color: hex(i), text: `once ${i}`}));
+  const twice = [0, 1, 2].map(() => ({x: 60, y: 340, w: 200, role: 'Body', color: '#ff00aa', text: 'pink'}));
+  const m = model({slides: [{els: [
+    {x: 60, y: 80, w: 800, role: 'H1', text: 'Palette'},
+    {x: 60, y: 200, w: 100, h: 20, bar: 1, color: '#00ff01'},
+    {x: 60, y: 240, w: 400, role: 'Body', html: '<span style="background-color:#00ff02">marked</span>'},
+    ...once, ...twice]}]});
+  const b = await pw.chromium.launch(); try {
+  const p = await fresh(b, write('swatches.html', create(m).html));
+  await p.evaluate(() => { sel.clear(); sel.add(0); render(); });
+  const shown = await p.evaluate(() => [...document.querySelectorAll('#tb-colors .sw')].map(s => s.dataset.color));
+  const roleColours = await p.evaluate(() => [...new Set(Object.values(deck.styles.roles).map(r => r.color))]);
+  assert.ok(shown.length <= 8, `at most eight swatches, got ${shown.length}`);
+  assert.deepEqual(shown.slice(0, roleColours.length), roleColours, 'the role colours come first');
+  assert.ok(shown.includes('#ff00aa'), 'the most used row colour stays');
+  assert.ok(!shown.includes('#00ff01'), 'a bar fill is not a text colour');
+  assert.ok(!shown.includes('#00ff02'), 'a run background is not a text colour');
+  assert.deepEqual(p.errs, []); } finally { await b.close(); }
+});
 live('an inline mark on a multi-line row keeps its line breaks: italic, a colour run, a reload, a deck already carrying html with a newline', async () => {
   // any mark moves a row from text to html, and the newline travels into html as a literal \n. text rows pre-wrap on a \n
   // and html rows did not, so the committed row collapsed onto one line. The fault sits on the shared text → html path.

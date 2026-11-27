@@ -1138,9 +1138,18 @@ function edit(k){
 }
 // ── floating mini toolbar (roles + inline marks + Apply to all slides) ──
 const tb=$('tb');
-// color swatches = the text colors ALREADY in the deck (roles first, then first appearance in rows/runs). No picker, no hex input.
-// dedupe on the RESOLVED value (#23262C and rgb(35, 38, 44) are one swatch); the first literal spelling is kept
-const deckColors=()=>{const seen=new Map();for(const c of [...Object.values(deck.styles&&deck.styles.roles||{}).map(r=>r.color),...[...(deck.master||[]),...deck.slides.flatMap(s=>s.els||[])].flatMap(e=>[e.color,...[...(e.html||'').matchAll(/color:\s*([^;"']+)/g)].map(m=>m[1].trim())])].filter(Boolean)){canvas.style.color=c;const k=getComputedStyle(canvas).color;if(!seen.has(k))seen.set(k,c)}canvas.style.color='';return [...seen.values()]};
+const SWATCH_MAX=8;
+const deckColors=()=>{
+  const key=c=>{canvas.style.color=c;return getComputedStyle(canvas).color};
+  const roles=Object.values(deck.styles&&deck.styles.roles||{}).map(r=>r.color).filter(Boolean);
+  const rows=[...(deck.master||[]),...deck.slides.flatMap(s=>s.els||[])].filter(e=>e.text||e.html);
+  const used=rows.flatMap(e=>[e.color,...[...(e.html||'').matchAll(/(?<![-\w])color:\s*([^;"']+)/g)].map(m=>m[1].trim())]).filter(Boolean);
+  const spelled=new Map(),uses=new Map();
+  for(const c of used){const k=key(c);if(!spelled.has(k))spelled.set(k,c);uses.set(k,(uses.get(k)||0)+1)}
+  const out=new Map(roles.map(c=>[key(c),c]));
+  for(const k of [...uses.keys()].sort((a,b)=>uses.get(b)-uses.get(a)))if(!out.has(k))out.set(k,spelled.get(k));
+  canvas.style.color='';return [...out.values()].slice(0,SWATCH_MAX);
+};
 const runSpan=(sr,node)=>{const a=sr.rangeCount&&sr.anchorNode,el=a&&(a.nodeType===1?a:a.parentElement).closest('[style*="color"]');return el&&node.contains(el)&&el!==node?el:null};
 // a row whose resolved weight is already bold (any role the style sets to 600+): B would only write font-weight:normal, so it stays off
 const heavy=r=>!!r&&(/^bold/.test(r.weight)||+r.weight>=600);
