@@ -12,7 +12,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = f => fs.readFileSync(path.join(root, f), 'utf8');
 const words = f => read(f).split(/\s+/).filter(Boolean).length;
 
-const BUDGET = 7380;
+const BUDGET = 7550;
 
 test('skill: SKILL.md stays inside the authoring budget', () => {
   const n = words('SKILL.md');
@@ -141,5 +141,5 @@ test('skill: v0.13.0 routes summaries and numbers to graphics and hands off HTML
   assert.match(doc, /style: 'arrow'\|'dashed'\|'blocked'/, 'connector rows are documented');
   assert.match(doc, /foot is one line/, 'the one-line foot is documented');
   assert.match(doc, /HTML file only[^\n]*PDF only when (asked|the human asks)/, 'hand-off is the HTML file; a PDF only when asked');
-  assert.match(doc, /115 finished slides/, 'the template count is current');
+  assert.match(doc, /129 finished slides/, 'the template count is current');
 });

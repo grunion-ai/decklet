@@ -48,6 +48,8 @@ export const KINDS = [
     templates: ['process-flow-3', 'process-flow-4', 'process-flow-5', 'vertical-steps', 'cycle-loop', 'funnel-stages'], layouts: ['process-steps'] },
   { id: 'figures', name: 'Figures', note: 'The figure kinds as rows — decision, flow, before / after, data model, states, release, boundaries (five nodes, then seven across three zones), tree, layers — and the bare frame.',
     templates: ['figure-decision', 'figure-flow', 'figure-before-after', 'figure-data-model', 'figure-states', 'figure-release', 'figure-boundaries', 'figure-boundaries-6', 'figure-tree', 'figure-layers'], layouts: ['diagram'] },
+  { id: 'status', name: 'Status', note: 'Where a project, a program or a system stands: lamps, stoplights, stage bars and the one decision.',
+    templates: ['status-rail', 'status-hero', 'status-title-block', 'status-title-strip', 'status-margin-notes', 'status-columns', 'status-filled', 'status-split', 'status-corner-lamp', 'status-stage-rail', 'status-trajectory', 'status-decision', 'status-owner-note', 'status-roster-rail'], layouts: [] },
   { id: 'timeline', name: 'Timeline', note: 'Dated events on a spine, lanes on a month grid.', templates: ['timeline-horizontal', 'gantt-lanes'], layouts: ['timeline'] },
   { id: 'image', name: 'Image', note: 'A photo or a screenshot carries the slide.', templates: ['image-hero-overlay', 'image-split', 'image-bullets', 'annotated-shot'], layouts: ['image-left', 'image-right'] },
   { id: 'end', name: 'End', note: 'The ask, then thanks.', templates: ['closing-cta'], layouts: ['cta', 'end'] },

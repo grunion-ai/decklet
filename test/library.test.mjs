@@ -24,7 +24,7 @@ test('library.html == create(build-sheet): every template and layout, by kind, c
   assert.equal(r.status, 0, r.stderr);
   const model = JSON.parse(fs.readFileSync(path.join(root, 'templates/candidates.model.json'), 'utf8'));
   const styled = 6 * KITS.length;   // the Styles section: the same six templates under every kit on the shelf
-  assert.equal(model.slides.filter(s => !/^kind-/.test(s.name)).length, 161 + styled, `116 templates + 45 layouts + ${styled} styled`);
+  assert.equal(model.slides.filter(s => !/^kind-/.test(s.name)).length, 175 + styled, `130 templates + 45 layouts + ${styled} styled`);
   const style = JSON.parse(fs.readFileSync(path.join(root, 'templates/candidates.style.json'), 'utf8'));
   assert.ok(model.slides.some(s => s.name === 'kind-figures'), 'a Figures kind divider');
   const names = model.slides.map(s => s.name);

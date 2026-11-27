@@ -19,10 +19,9 @@ const read = f => fs.readFileSync(path.join(root, f), 'utf8');
 const v = m => validate(create(m).deck);   // validate what create() judges: the neutral roles filled in
 const deck = (slides, extra = {}) => ({w: 960, h: 540, title: 'tpl', ...extra, slides});
 
-test('templates: 116 ship, every id unique, every one names a tier, a category and a density', () => {
-  // K26: 116 = 115 + the deprecated 'table-insight' alias for 'table-panel'
-  assert.equal(TEMPLATES.length, 116);
-  assert.equal(new Set(TEMPLATES.map(t => t.id)).size, 116);
+test('templates: 130 ship, every id unique, every one names a tier, a category and a density', () => {
+  assert.equal(TEMPLATES.length, 130);
+  assert.equal(new Set(TEMPLATES.map(t => t.id)).size, 130);
   for (const t of TEMPLATES) {
     assert.ok(['core', 'standard', 'fringe'].includes(t.tier), t.id + ' tier');
     assert.ok(t.cat && t.note, t.id + ' cat + note');
