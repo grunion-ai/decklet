@@ -28,7 +28,7 @@ const stem = density ? `library-${density}` : 'candidates';
 // ── the kinds, in deck order, and which template / layout ids belong to each
 export const KINDS = [
   { id: 'title', name: 'Title & section', note: 'Covers, dividers and the bare title chrome.',
-    templates: ['cover-hero', 'cover-split', 'section-numeral'], layouts: ['cover', 'title', 'section', 'content'] },
+    templates: ['cover-hero', 'cover-split', 'section-numeral'], layouts: ['cover', 'cover-agenda-rail', 'cover-contents-column', 'cover-agenda-strip', 'title', 'section', 'content'] },
   { id: 'agenda', name: 'Agenda', note: 'What the deck covers.', templates: ['agenda-ruled'], layouts: ['agenda'] },
   { id: 'concept', name: 'Concept', note: 'Claims, comparisons, frameworks, cards: the slide that carries an argument.',
     templates: ['bullet-page', 'exec-summary', 'statement', 'three-up-cards', 'bento-grid', 'two-col-compare', 'pros-cons', 'benchmark-table', 'harvey-balls', 'scorecard-grid', 'two-by-two', 'swot', 'temple', 'venn-3', 'pyramid-layers', 'value-chain', 'table-panel', 'table-insight', 'proof-strip', 'team-grid', 'quad-growth-share', 'quad-effort-impact', 'quad-risk-heat', 'quad-stakeholder', 'quad-movement', 'quad-where-we-play', 'quad-conceptual', 'quad-nine-box', 'quad-with-panel'],
@@ -90,6 +90,9 @@ const TEXT = {
   subtitle: 'One line under the title that says what the slide shows.', note: 'A note for the reader who has no speaker in the room.', source: 'Source · where the numbers came from', legend: '● this year  ● last year',
   // openers
   'cover.supertitle': 'Board update', 'cover.title': 'Tallyline, third quarter', 'cover.body': 'Forty new accounts, a second data center, and the first profitable month in September.', 'cover.caption': 'Board pack · October 2026',
+  'cover-agenda-rail.rail-label': 'Agenda', 'cover-agenda-rail.total': '30 minutes', 'cover-agenda-rail.supertitle': 'Product review', 'cover-agenda-rail.title': 'Relay, week twelve', 'cover-agenda-rail.body': 'Decide which of the two retry designs ships in the next release.', 'cover-agenda-rail.caption': 'Presented by the platform team · for engineering leads',
+  'cover-contents-column.column-label': 'In this deck', 'cover-contents-column.supertitle': 'Field trial', 'cover-contents-column.title': 'Fieldsense on twenty farms', 'cover-contents-column.body': 'What the trial measured, what it cost and what comes next.',
+  'cover-agenda-strip.supertitle': 'Quarterly review', 'cover-agenda-strip.title': 'Stride, third quarter', 'cover-agenda-strip.body': 'Agree the three bets for the winter season.',
   'title.supertitle': 'Part three', 'title.title': 'The close, rebuilt',
   'section.number': '04', 'section.title': 'Go-to-market', 'section.body': 'Channels, pricing and the three accounts worth a visit.',
   'content.supertitle': 'Field notes', 'content.title': 'A title over an empty canvas', 'content.subtitle': 'The rows of the slide go here; this chrome is all the layout gives.', 'content.note': 'Bind only the chrome you need.', 'content.source': 'Source · your own', 'content.legend': '',
@@ -124,6 +127,8 @@ const TEXT = {
 };
 const ITEMS = ['Where we are', 'What shipped', 'What it cost', 'What is next', 'Questions'];
 const STEPS = ['Kickoff', 'Discover', 'Design', 'Hand over'];
+const MINUTES = [5, 8, 7, 5, 5];
+const PAGES = [2, 4, 7, 9, 11];
 const EVENTS = ['Code freeze', 'Beta out', 'Review passed', 'In the store'];
 const DATES = ['Mar', 'May', 'Jun', 'Jul'];
 const KPIS = {   // per layout, so the two grids speak for two companies
@@ -147,6 +152,9 @@ const fill = (name) => {
     let m;
     if ((m = /^n(\d)$/.exec(slot))) return { slot, text: '0' + m[1] };
     if ((m = /^item(\d)$/.exec(slot))) return { slot, text: ITEMS[m[1] - 1] };
+    if ((m = /^section(\d)$/.exec(slot))) return { slot, text: ITEMS[m[1] - 1] };
+    if ((m = /^time(\d)$/.exec(slot))) return { slot, text: `${MINUTES[m[1] - 1]} min` };
+    if ((m = /^page(\d)$/.exec(slot))) return { slot, text: `Slide ${PAGES[m[1] - 1]}` };
     if ((m = /^step(\d)$/.exec(slot))) return { slot, text: STEPS[m[1] - 1] };
     if ((m = /^t(\d)$/.exec(slot))) return { slot, text: DATES[m[1] - 1] };
     if ((m = /^e(\d)$/.exec(slot))) return { slot, text: EVENTS[m[1] - 1] };
@@ -227,7 +235,9 @@ const marked = t => Object.fromEntries(t.media.map((_, i) => ['m' + (i + 1), MAR
 const tslide = (t) => ({ name: t.id, layout: t.layout || undefined, hide: FULL_BLEED.includes(t.id) ? ['foot'] : undefined, textOnly: t.textOnly,
   ...(MARKS[t.id] ? { template: t.id, layout: undefined, fill: marked(t) } : {}),
   els: [...(MARKS[t.id] ? [] : scale(bind(t), 1)), ...(FULL_BLEED.includes(t.id) ? [] : [foot('template', t.id, t)])] });
-const lslide = (n) => ({ name: `layout-${n}`, layout: n, textOnly: WORDS.includes(n) || undefined, hide: FULL_BLEED.includes(n) ? ['foot'] : undefined, els: [...fill(n), ...(FULL_BLEED.includes(n) ? [] : [foot('layout', n)])] });
+const PANEL_FOOT = ['cover-agenda-rail', 'cover-contents-column', 'cover-agenda-strip'];
+const footless = (n) => FULL_BLEED.includes(n) || PANEL_FOOT.includes(n);
+const lslide = (n) => ({ name: `layout-${n}`, layout: n, textOnly: WORDS.includes(n) || undefined, hide: footless(n) ? ['foot'] : undefined, els: [...fill(n), ...(footless(n) ? [] : [foot('layout', n)])] });
 const index = [];
 const slides = [];
 for (const [i, k] of KINDS.entries()) {
