@@ -709,7 +709,21 @@
             "logo-proof-wall",
             "logo-top-right-mark",
             "logo-top-right-lockup",
-            "logo-top-right-badge"
+            "logo-top-right-badge",
+            "status-rail",
+            "status-hero",
+            "status-title-block",
+            "status-title-strip",
+            "status-margin-notes",
+            "status-columns",
+            "status-filled",
+            "status-split",
+            "status-corner-lamp",
+            "status-stage-rail",
+            "status-trajectory",
+            "status-decision",
+            "status-owner-note",
+            "status-roster-rail"
           ],
           "description": "a library template (validate --templates)"
         },
